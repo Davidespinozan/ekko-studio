@@ -63,14 +63,16 @@ export default function MiQR() {
     if (!qrPayload || !qrContainerRef.current) return;
 
     qrInstance.current = new QRCodeStyling({
-      width: 280,
-      height: 280,
+      width: 320,
+      height: 320,
       type: 'svg',
       data: qrPayload,
+      margin: 16,
       dotsOptions: { color: '#0A0A0A', type: 'rounded' },
-      backgroundOptions: { color: 'transparent' },
+      backgroundOptions: { color: '#FFFFFF' },
       cornersSquareOptions: { color: '#0A0A0A', type: 'extra-rounded' },
-      cornersDotOptions: { color: '#D4A93C' }
+      cornersDotOptions: { color: '#D4A93C' },
+      qrOptions: { errorCorrectionLevel: 'H' }
     });
 
     qrContainerRef.current.innerHTML = '';
@@ -107,10 +109,10 @@ export default function MiQR() {
 
         <div
           style={{
-            background: 'var(--ek-cream-warm)',
+            background: '#FFFFFF',
             border: '1px solid var(--ek-line)',
             borderRadius: 'var(--ek-radius-lg)',
-            padding: '2rem',
+            padding: '1.5rem',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -118,7 +120,7 @@ export default function MiQR() {
           }}
         >
           <div ref={qrContainerRef} />
-          <p style={{ fontFamily: 'var(--ek-font-mono)', fontSize: '0.875rem' }}>
+          <p style={{ fontFamily: 'var(--ek-font-mono)', fontSize: '0.875rem', color: '#0A0A0A' }}>
             {reserva?.folio}
           </p>
         </div>
