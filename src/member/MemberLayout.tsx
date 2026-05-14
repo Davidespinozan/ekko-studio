@@ -1,11 +1,53 @@
+import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { useTenant } from '@shared/hooks/useTenant';
+import { useAuth } from '@shared/hooks/useAuth';
+import { LoadingScreen } from '@shared/components/LoadingScreen';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+
 export default function MemberLayout() {
+  const tenant = useTenant();
+  const { authUser, isLoading, signOut } = useAuth();
+  const location = useLocation();
+
+  // Mientras hidrata, mostrar loading
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  // No autenticado → redirigir a login con redirect param
+  if (!authUser) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
   return (
-    <div style={{ minHeight: '100dvh', padding: '2rem', background: 'var(--ek-cream)' }}>
-      <p style={{ fontSize: '0.75rem', letterSpacing: '0.16em', color: 'var(--ek-mustard-deep)', marginBottom: '0.5rem' }}>
-        EKKO STUDIO
-      </p>
-      <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Member layout (placeholder)</h1>
-      <p style={{ color: 'var(--ek-ink-muted)', marginTop: '0.5rem' }}>Se construye en Fase 1.</p>
+    <div className="ek-page">
+      <header
+        style={{
+          padding: '1rem 1.25rem',
+          borderBottom: '1px solid var(--ek-line)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}
+      >
+        <Link to="/app" style={{ fontWeight: 700, fontSize: '1.125rem' }}>
+          {tenant.nombre}
+        </Link>
+        <button
+          onClick={signOut}
+          style={{ fontSize: '0.875rem', color: 'var(--ek-ink-muted)' }}
+        >
+          Salir
+        </button>
+      </header>
+
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+        </Routes>
+      </Suspense>
     </div>
   );
 }

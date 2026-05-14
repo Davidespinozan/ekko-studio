@@ -1,11 +1,68 @@
+import { Routes, Route, Link } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { useTenant } from '@shared/hooks/useTenant';
+import { useAuth } from '@shared/hooks/useAuth';
+import { LoadingScreen } from '@shared/components/LoadingScreen';
+
+const Home = lazy(() => import('./pages/Home'));
+const Login = lazy(() => import('./pages/Login'));
+const Signup = lazy(() => import('./pages/Signup'));
+
 export default function PublicLayout() {
+  const tenant = useTenant();
+  const { authUser, signOut } = useAuth();
+
   return (
-    <div style={{ minHeight: '100dvh', padding: '2rem', background: 'var(--ek-cream)' }}>
-      <p style={{ fontSize: '0.75rem', letterSpacing: '0.16em', color: 'var(--ek-mustard-deep)', marginBottom: '0.5rem' }}>
-        EKKO STUDIO
-      </p>
-      <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Public layout (placeholder)</h1>
-      <p style={{ color: 'var(--ek-ink-muted)', marginTop: '0.5rem' }}>Se construye en Fase 1.</p>
+    <div className="ek-page">
+      <header
+        style={{
+          padding: '1rem 1.25rem',
+          borderBottom: '1px solid var(--ek-line)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}
+      >
+        <Link to="/" style={{ fontWeight: 700, fontSize: '1.125rem' }}>
+          {tenant.nombre}
+        </Link>
+        <nav style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          {authUser ? (
+            <>
+              <Link to="/app" className="ek-cta" style={{ padding: '0.625rem 1.25rem', minHeight: '40px' }}>
+                Mi cuenta
+              </Link>
+              <button
+                onClick={signOut}
+                style={{ fontSize: '0.875rem', color: 'var(--ek-ink-muted)' }}
+              >
+                Salir
+              </button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" style={{ fontSize: '0.9375rem', fontWeight: 500 }}>
+                Iniciar sesión
+              </Link>
+              <Link
+                to="/signup"
+                className="ek-cta"
+                style={{ padding: '0.625rem 1.25rem', minHeight: '40px' }}
+              >
+                Crear cuenta
+              </Link>
+            </>
+          )}
+        </nav>
+      </header>
+
+      <Suspense fallback={<LoadingScreen />}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+        </Routes>
+      </Suspense>
     </div>
   );
 }

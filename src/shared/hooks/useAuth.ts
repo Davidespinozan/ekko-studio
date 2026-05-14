@@ -1,2 +1,1 @@
-// TODO: hook de autenticación (sesión Supabase, onAuthStateChange). Fase 2.
-export {};
+export { useAuth } from '@shared/providers/AuthProvider';
