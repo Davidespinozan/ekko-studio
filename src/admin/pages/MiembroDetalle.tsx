@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { useMiembroDetalle, updateMiembro } from '../hooks/useAdminData';
+import { useMiembroDetalle, updateMiembro, adminUpdateRole } from '../hooks/useAdminData';
 import { formatHora } from '@member/logic/reservaLogic';
 
 export default function MiembroDetalle() {
@@ -94,9 +94,21 @@ export default function MiembroDetalle() {
           </label>
         </div>
         {error && <p className="ek-error-text">{error}</p>}
-        <button onClick={handleSave} disabled={saving} className="ek-cta" style={{ marginTop: '1rem' }}>
+        <button onClick={handleSave} disabled={saving} className="ek-cta" style={{ marginTop: '1rem', alignSelf: 'flex-start' }}>
           {saving ? 'Guardando…' : 'Guardar cambios'}
         </button>
+      </section>
+
+      <section className="adm-section">
+        <h2 className="ek-h3">Rol</h2>
+        <p className="adm-body">
+          Rol actual: <RolBadge rol={miembro.rol} />
+        </p>
+        <CambiarRolControl
+          usuarioId={miembro.id}
+          rolActual={miembro.rol}
+          onChanged={refetch}
+        />
       </section>
 
       <section className="adm-section">
@@ -138,6 +150,72 @@ function Info({ label, value, mono }: { label: string; value: React.ReactNode; m
       <p className="adm-info-value" style={mono ? { fontFamily: 'var(--ek-font-mono)' } : undefined}>
         {value}
       </p>
+    </div>
+  );
+}
+
+function RolBadge({ rol }: { rol: string }) {
+  return <code style={{ fontFamily: 'var(--ek-font-mono)', background: 'var(--ek-cream-deep)', padding: '2px 8px', borderRadius: '4px' }}>{rol}</code>;
+}
+
+function CambiarRolControl({ usuarioId, rolActual, onChanged }: {
+  usuarioId: string;
+  rolActual: string;
+  onChanged: () => Promise<void>;
+}) {
+  const [nuevoRol, setNuevoRol] = useState<'miembro' | 'recepcionista' | 'staff' | 'admin'>(rolActual as any);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [needsConfirm, setNeedsConfirm] = useState(false);
+
+  async function handleSave() {
+    if (nuevoRol === rolActual) return;
+    if (nuevoRol === 'admin' && !needsConfirm) {
+      setNeedsConfirm(true);
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      await adminUpdateRole({ usuario_id: usuarioId, rol: nuevoRol });
+      await onChanged();
+      setNeedsConfirm(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error cambiando rol');
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div className="adm-form-row" style={{ marginTop: '0.5rem' }}>
+      <label className="ek-label" style={{ flex: 1 }}>
+        Nuevo rol
+        <select
+          value={nuevoRol}
+          onChange={(e) => setNuevoRol(e.target.value as any)}
+          className="ek-input"
+        >
+          <option value="miembro">Miembro</option>
+          <option value="recepcionista">Recepción</option>
+          <option value="staff">Staff</option>
+          <option value="admin">Admin</option>
+        </select>
+      </label>
+      <button
+        onClick={handleSave}
+        disabled={saving || nuevoRol === rolActual}
+        className="ek-cta"
+        style={{ alignSelf: 'flex-end' }}
+      >
+        {saving ? '…' : needsConfirm && nuevoRol === 'admin' ? 'Confirmar admin' : 'Cambiar rol'}
+      </button>
+      {error && <p className="ek-error-text">{error}</p>}
+      {needsConfirm && nuevoRol === 'admin' && (
+        <p style={{ fontSize: '0.8125rem', color: 'var(--ek-danger)', flexBasis: '100%', marginTop: '0.5rem' }}>
+          ⚠️ Promover a admin da acceso TOTAL al negocio. Click "Confirmar admin" para proceder.
+        </p>
+      )}
     </div>
   );
 }

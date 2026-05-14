@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
+import { backendPost } from '@shared/lib/backend';
 import type { Database } from '@shared/types/database';
 
 type Usuario = Database['public']['Tables']['usuarios']['Row'];
@@ -20,7 +21,7 @@ export interface ReservaConJoin extends Reserva {
 /**
  * Lista de miembros del tenant (sin paginación por simplicidad inicial).
  */
-export function useMiembros(filtros?: { search?: string; status?: string; rol?: string }) {
+export function useMiembros(filtros?: { search?: string; status?: string; rol?: string | 'staff' }) {
   const tenant = useTenant();
   const [miembros, setMiembros] = useState<Usuario[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +35,14 @@ export function useMiembros(filtros?: { search?: string; status?: string; rol?: 
       .order('created_at', { ascending: false });
 
     if (filtros?.status) query = query.eq('status', filtros.status);
-    if (filtros?.rol) query = query.eq('rol', filtros.rol);
+
+    // Filtro especial "staff" = todos los no-miembros (recepcionista, staff, admin)
+    if (filtros?.rol === 'staff') {
+      query = query.in('rol', ['recepcionista', 'staff', 'admin']);
+    } else if (filtros?.rol) {
+      query = query.eq('rol', filtros.rol);
+    }
+
     if (filtros?.search) {
       const term = `%${filtros.search}%`;
       query = query.or(`nombre.ilike.${term},email.ilike.${term}`);
@@ -279,4 +287,38 @@ export function useReservasRango(fechaInicio: Date, fechaFin: Date) {
 
   useEffect(() => { refetch(); }, [refetch]);
   return { reservas, isLoading, refetch };
+}
+
+// ============================================================================
+// Mutations de gestión de usuarios (vía Netlify Functions con service_role)
+// ============================================================================
+
+export interface CreateUserParams {
+  email: string;
+  password: string;
+  nombre: string;
+  telefono?: string;
+  rol: 'miembro' | 'recepcionista' | 'staff' | 'admin';
+  membresia_tier?: 'basica' | 'pro' | null;
+}
+
+export interface CreateUserResponse {
+  success: boolean;
+  user: {
+    email: string;
+    nombre: string;
+    rol: string;
+    password: string;
+  };
+}
+
+export async function adminCreateUser(params: CreateUserParams) {
+  return backendPost<CreateUserResponse>('admin-create-user', params);
+}
+
+export async function adminUpdateRole(params: {
+  usuario_id: string;
+  rol: 'miembro' | 'recepcionista' | 'staff' | 'admin';
+}) {
+  return backendPost<{ success: boolean }>('admin-update-role', params);
 }

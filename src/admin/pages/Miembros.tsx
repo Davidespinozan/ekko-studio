@@ -1,17 +1,25 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useMiembros } from '../hooks/useAdminData';
+import { NuevaPersonaModal } from '../components/NuevaPersonaModal';
 
 export default function Miembros() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('');
-  const { miembros, isLoading } = useMiembros({ search, status });
+  const [rolFilter, setRolFilter] = useState<string>('');
+  const [showNuevo, setShowNuevo] = useState(false);
+  const { miembros, isLoading, refetch } = useMiembros({ search, status, rol: rolFilter });
 
   return (
     <div className="adm-page">
-      <div className="adm-page-header">
-        <p className="ek-eyebrow">MIEMBROS</p>
-        <h1 className="ek-h2">Comunidad EKKO</h1>
+      <div className="adm-page-header" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        <div>
+          <p className="ek-eyebrow">MIEMBROS</p>
+          <h1 className="ek-h2">Personas en EKKO</h1>
+        </div>
+        <button onClick={() => setShowNuevo(true)} className="ek-cta">
+          + Nueva persona
+        </button>
       </div>
 
       <div className="adm-filters">
@@ -21,13 +29,25 @@ export default function Miembros() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="ek-input"
-          style={{ maxWidth: '320px' }}
+          style={{ maxWidth: '280px' }}
         />
+        <select
+          value={rolFilter}
+          onChange={(e) => setRolFilter(e.target.value)}
+          className="ek-input"
+          style={{ maxWidth: '180px' }}
+        >
+          <option value="">Todos los roles</option>
+          <option value="miembro">Miembros</option>
+          <option value="recepcionista">Recepción</option>
+          <option value="staff">Staff (todos)</option>
+          <option value="admin">Admin</option>
+        </select>
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
           className="ek-input"
-          style={{ maxWidth: '200px' }}
+          style={{ maxWidth: '180px' }}
         >
           <option value="">Todos los status</option>
           <option value="activo">Activo</option>
@@ -61,7 +81,7 @@ export default function Miembros() {
                 <tr key={m.id}>
                   <td>{m.nombre ?? '—'}</td>
                   <td style={{ color: 'var(--ek-ink-muted)' }}>{m.email}</td>
-                  <td><code style={{ fontFamily: 'var(--ek-font-mono)' }}>{m.rol}</code></td>
+                  <td><RolBadge rol={m.rol} /></td>
                   <td>{m.membresia_tier ?? '—'}</td>
                   <td><StatusBadge status={m.status} /></td>
                   <td style={{ fontSize: '0.8125rem', color: 'var(--ek-ink-muted)' }}>
@@ -76,7 +96,37 @@ export default function Miembros() {
           </table>
         </div>
       )}
+
+      {showNuevo && (
+        <NuevaPersonaModal
+          onClose={() => setShowNuevo(false)}
+          onCreated={async () => { await refetch(); setShowNuevo(false); }}
+        />
+      )}
     </div>
+  );
+}
+
+function RolBadge({ rol }: { rol: string }) {
+  const styles: Record<string, { bg: string; color: string }> = {
+    admin: { bg: 'var(--ek-black)', color: 'var(--ek-mustard)' },
+    staff: { bg: 'var(--ek-ink-muted)', color: 'var(--ek-cream)' },
+    recepcionista: { bg: 'var(--ek-info)', color: 'var(--ek-cream)' },
+    miembro: { bg: 'var(--ek-cream-deep)', color: 'var(--ek-black)' }
+  };
+  const s = styles[rol] ?? styles.miembro;
+  return (
+    <span style={{
+      display: 'inline-block',
+      padding: '2px 8px',
+      borderRadius: '4px',
+      fontSize: '0.75rem',
+      fontWeight: 600,
+      background: s.bg,
+      color: s.color
+    }}>
+      {rol}
+    </span>
   );
 }
 
@@ -89,12 +139,7 @@ function StatusBadge({ status }: { status: string }) {
     cancelado: 'var(--ek-ink-muted)'
   };
   return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: '6px',
-      fontSize: '0.8125rem'
-    }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem' }}>
       <span style={{
         width: '8px', height: '8px', borderRadius: '50%',
         background: colorMap[status] ?? 'var(--ek-ink-muted)'
