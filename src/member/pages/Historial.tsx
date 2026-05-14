@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useReservasDelUsuario, cancelarReserva } from '../hooks/useReservas';
 import { formatHora } from '../logic/reservaLogic';
 
@@ -68,19 +69,28 @@ export default function Historial() {
                           {r.folio}
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleCancelar(r.id)}
-                        disabled={cancelando === r.id}
-                        style={{
-                          fontSize: '0.875rem',
-                          color: 'var(--ek-danger)',
-                          padding: '0.5rem',
-                          minHeight: '44px',
-                          fontWeight: 500
-                        }}
-                      >
-                        {cancelando === r.id ? '…' : 'Cancelar'}
-                      </button>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                        <Link
+                          to={`/app/qr/${r.id}`}
+                          className="ek-cta"
+                          style={{ padding: '0.5rem 1rem', minHeight: '36px', fontSize: '0.8125rem' }}
+                        >
+                          Ver QR →
+                        </Link>
+                        <button
+                          onClick={() => handleCancelar(r.id)}
+                          disabled={cancelando === r.id}
+                          style={{
+                            fontSize: '0.8125rem',
+                            color: 'var(--ek-danger)',
+                            padding: '0.25rem 0.5rem',
+                            minHeight: '32px',
+                            fontWeight: 500
+                          }}
+                        >
+                          {cancelando === r.id ? '…' : 'Cancelar'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

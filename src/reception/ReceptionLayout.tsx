@@ -1,11 +1,27 @@
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { useAuth } from '@shared/hooks/useAuth';
+import { LoadingScreen } from '@shared/components/LoadingScreen';
+
+const Scanner = lazy(() => import('./pages/Scanner'));
+
 export default function ReceptionLayout() {
+  const { authUser, usuario, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) return <LoadingScreen />;
+  if (!authUser) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (!usuario) return <LoadingScreen />;
+
+  if (usuario.rol !== 'recepcionista' && usuario.rol !== 'admin') {
+    return <Navigate to="/app" replace />;
+  }
+
   return (
-    <div style={{ minHeight: '100dvh', padding: '2rem', background: 'var(--ek-cream)' }}>
-      <p style={{ fontSize: '0.75rem', letterSpacing: '0.16em', color: 'var(--ek-mustard-deep)', marginBottom: '0.5rem' }}>
-        EKKO STUDIO
-      </p>
-      <h1 style={{ fontSize: '2rem', fontWeight: 700 }}>Reception layout (placeholder)</h1>
-      <p style={{ color: 'var(--ek-ink-muted)', marginTop: '0.5rem' }}>Se construye en Fase 1.</p>
-    </div>
+    <Suspense fallback={<LoadingScreen />}>
+      <Routes>
+        <Route path="/" element={<Scanner />} />
+      </Routes>
+    </Suspense>
   );
 }
