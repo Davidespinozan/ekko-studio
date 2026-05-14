@@ -68,11 +68,11 @@ export default function MiQR() {
       type: 'svg',
       data: qrPayload,
       margin: 16,
-      dotsOptions: { color: '#0A0A0A', type: 'rounded' },
+      dotsOptions: { color: '#0A0A0A', type: 'square' },
       backgroundOptions: { color: '#FFFFFF' },
-      cornersSquareOptions: { color: '#0A0A0A', type: 'extra-rounded' },
-      cornersDotOptions: { color: '#D4A93C' },
-      qrOptions: { errorCorrectionLevel: 'H' }
+      cornersSquareOptions: { color: '#0A0A0A', type: 'square' },
+      cornersDotOptions: { color: '#0A0A0A', type: 'square' },
+      qrOptions: { errorCorrectionLevel: 'M' }
     });
 
     qrContainerRef.current.innerHTML = '';
