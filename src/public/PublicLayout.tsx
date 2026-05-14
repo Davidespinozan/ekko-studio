@@ -2,6 +2,7 @@ import { Routes, Route, Link } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
+import { useRoleRedirect } from '@shared/hooks/useRoleRedirect';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 
 const Home = lazy(() => import('./pages/Home'));
@@ -11,6 +12,7 @@ const Signup = lazy(() => import('./pages/Signup'));
 export default function PublicLayout() {
   const tenant = useTenant();
   const { authUser, signOut } = useAuth();
+  useRoleRedirect(['/', '/login', '/signup']);
 
   return (
     <div className="ek-page">

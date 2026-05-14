@@ -46,8 +46,9 @@ export default function Signup() {
         return;
       }
 
-      // Si hay sesión inmediata, ir directo al dashboard
-      navigate('/app');
+      // Si hay sesión inmediata, el useRoleRedirect del PublicLayout
+      // hace el redirect por rol.
+      navigate('/', { replace: true });
     } catch (err) {
       setError('Error inesperado. Intenta de nuevo.');
       setIsSubmitting(false);

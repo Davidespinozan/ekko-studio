@@ -26,7 +26,11 @@ export default function Login() {
         return;
       }
 
-      navigate('/app');
+      // El useRoleRedirect del PublicLayout maneja el redirect por rol.
+      // Forzamos un navigate genérico que el hook va a interceptar.
+      // (En la práctica, AuthProvider va a hidratar usuario y luego
+      // useRoleRedirect lo mueve a /admin, /recepcion o /app según rol.)
+      navigate('/', { replace: true });
     } catch (err) {
       setError('Error inesperado. Intenta de nuevo.');
       setIsSubmitting(false);
