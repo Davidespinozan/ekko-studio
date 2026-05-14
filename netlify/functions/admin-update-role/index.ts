@@ -1,3 +1,11 @@
+import ws from 'ws';
+
+// supabase-js inicializa Realtime aunque no lo usemos; en Node <22
+// no hay WebSocket global. Le damos el de 'ws'.
+if (!globalThis.WebSocket) {
+  (globalThis as any).WebSocket = ws;
+}
+
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
@@ -37,8 +45,7 @@ export const handler: Handler = async (event) => {
     const anonKey = requireEnv('VITE_SUPABASE_ANON_KEY');
     const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
-    const supabaseAsUser = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: `Bearer ${userToken}` } }
+    const supabaseAsUser = createClient(supabaseUrl, anonKey, {      global: { headers: { Authorization: `Bearer ${userToken}` } }
     });
 
     const { data: { user: authUser }, error: userErr } = await supabaseAsUser.auth.getUser();
@@ -54,8 +61,7 @@ export const handler: Handler = async (event) => {
       return forbidden('Solo admin puede cambiar roles');
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false }
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {      auth: { persistSession: false }
     });
 
     // Obtener usuario target

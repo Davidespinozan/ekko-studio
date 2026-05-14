@@ -1,3 +1,11 @@
+import ws from 'ws';
+
+// supabase-js inicializa Realtime aunque no lo usemos; en Node <22
+// no hay WebSocket global. Le damos el de 'ws'.
+if (!globalThis.WebSocket) {
+  (globalThis as any).WebSocket = ws;
+}
+
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, serverError } from '../_lib/http';
@@ -41,8 +49,7 @@ export const handler: Handler = async (event) => {
     const jwtSecret = requireEnv('QR_JWT_SECRET');
 
     // Cliente con token del usuario (respeta RLS)
-    const supabase = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: `Bearer ${userToken}` } }
+    const supabase = createClient(supabaseUrl, anonKey, {      global: { headers: { Authorization: `Bearer ${userToken}` } }
     });
 
     // Buscar reserva (RLS valida que sea suya)

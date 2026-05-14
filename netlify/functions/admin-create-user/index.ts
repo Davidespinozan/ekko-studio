@@ -1,3 +1,11 @@
+import ws from 'ws';
+
+// supabase-js inicializa Realtime aunque no lo usemos; en Node <22
+// no hay WebSocket global. Le damos el de 'ws'.
+if (!globalThis.WebSocket) {
+  (globalThis as any).WebSocket = ws;
+}
+
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
@@ -45,8 +53,7 @@ export const handler: Handler = async (event) => {
     const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
     // Cliente con token del admin (para validar quién es)
-    const supabaseAsUser = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: `Bearer ${userToken}` } }
+    const supabaseAsUser = createClient(supabaseUrl, anonKey, {      global: { headers: { Authorization: `Bearer ${userToken}` } }
     });
 
     const { data: { user: authUser }, error: userErr } = await supabaseAsUser.auth.getUser();
@@ -66,8 +73,7 @@ export const handler: Handler = async (event) => {
     const tenantId = adminProfile.tenant_id;
 
     // Cliente con service_role (bypasea RLS para crear cuentas)
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false }
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {      auth: { persistSession: false }
     });
 
     // 1. Crear cuenta en Auth con email confirmado (no manda email)

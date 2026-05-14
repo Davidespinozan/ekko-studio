@@ -1,3 +1,11 @@
+import ws from 'ws';
+
+// supabase-js inicializa Realtime aunque no lo usemos; en Node <22
+// no hay WebSocket global. Le damos el de 'ws'.
+if (!globalThis.WebSocket) {
+  (globalThis as any).WebSocket = ws;
+}
+
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, serverError } from '../_lib/http';
@@ -61,8 +69,7 @@ export const handler: Handler = async (event) => {
     // Llamar al RPC check_in_atomic con el token del recepcionista
     const supabaseUrl = requireEnv('VITE_SUPABASE_URL');
     const anonKey = requireEnv('VITE_SUPABASE_ANON_KEY');
-    const supabase = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: `Bearer ${userToken}` } }
+    const supabase = createClient(supabaseUrl, anonKey, {      global: { headers: { Authorization: `Bearer ${userToken}` } }
     });
 
     const { data, error } = await supabase.rpc('check_in_atomic', {
