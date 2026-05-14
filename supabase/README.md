@@ -5,19 +5,22 @@ en orden estricto.
 
 ## Migraciones actuales (Fase 0)
 
-| # | Archivo | Descripción |
-|---|---|---|
-| 000 | extensions.sql | Extensiones Postgres (pgcrypto, pg_trgm, btree_gist) |
-| 001 | tenants.sql | Tabla `tenants` + config jsonb + branding + seed EKKO |
-| 002 | usuarios.sql | Perfiles extendidos de auth.users con rol y tenant |
-| 003 | recursos.sql | Estudios/salas + seed 3 estudios de EKKO |
-| 004 | membresias.sql | Tabla `tiers` + tabla `membresias` + seed Básica/Pro |
-| 005 | reservas.sql | Reservas + folios + UNIQUE para evitar double-booking |
-| 006 | pagos.sql | Journal `payment_events` para webhooks Stripe |
-| 007 | helper_functions.sql | `get_my_user_id`, `get_my_tenant_id`, `is_admin`, etc. |
-| 008 | rls_policies.sql | RLS estricto por tabla y rol |
-| 009 | rpc_reservar.sql | `reservar_recurso_atomic`, `cancelar_reserva_atomic` |
-| 010 | trigger_signup.sql | `on_auth_user_created` → crea fila en `usuarios` |
+Convención de nombres: timestamp `YYYYMMDDHHMMSS_nombre.sql` (formato que
+espera el Supabase CLI). Se aplican en orden cronológico estricto.
+
+| Archivo | Descripción |
+|---|---|
+| 20260514100000_extensions.sql | Extensiones Postgres (pgcrypto, pg_trgm, btree_gist) |
+| 20260514100100_tenants.sql | Tabla `tenants` + config jsonb + branding + seed EKKO |
+| 20260514100200_usuarios.sql | Perfiles extendidos de auth.users con rol y tenant |
+| 20260514100300_recursos.sql | Estudios/salas + seed 3 estudios de EKKO |
+| 20260514100400_membresias.sql | Tabla `tiers` + tabla `membresias` + seed Básica/Pro |
+| 20260514100500_reservas.sql | Reservas + folios + UNIQUE para evitar double-booking |
+| 20260514100600_pagos.sql | Journal `payment_events` para webhooks Stripe |
+| 20260514100700_helper_functions.sql | `get_my_user_id`, `get_my_tenant_id`, `is_admin`, etc. |
+| 20260514100800_rls_policies.sql | RLS estricto por tabla y rol |
+| 20260514100900_rpc_reservar.sql | `reservar_recurso_atomic`, `cancelar_reserva_atomic` |
+| 20260514101000_trigger_signup.sql | `on_auth_user_created` → crea fila en `usuarios` |
 
 ## Aplicar migraciones
 
