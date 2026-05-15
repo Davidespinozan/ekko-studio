@@ -50,9 +50,8 @@ export default function Estudios() {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 320px))',
-        gap: '16px',
-        justifyContent: 'center'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+        gap: '16px'
       }}>
         {recursos.map((r) => {
           const esPro = r.tiers_permitidos.length === 1 && r.tiers_permitidos[0] === 'pro';
