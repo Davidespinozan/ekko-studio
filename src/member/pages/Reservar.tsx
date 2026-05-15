@@ -50,8 +50,17 @@ export default function Reservar() {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slotPendiente, setSlotPendiente] = useState<Slot | null>(null);
+  const [invitados, setInvitados] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const maxInvitados = usuario?.membresia_tier === 'pro' ? 4 :
+                       usuario?.membresia_tier === 'basica' ? 2 : 0;
+
+  // Resetear invitados cuando se abre/cierra el modal
+  useEffect(() => {
+    if (!slotPendiente) setInvitados(0);
+  }, [slotPendiente]);
 
   // Auto-seleccionar primer recurso disponible
   useEffect(() => {
@@ -93,18 +102,21 @@ export default function Reservar() {
     if (!slotPendiente || !recursoSel) return;
     setSubmitting(true);
     setError(null);
-    const { error: rpcError } = await crearReserva({
-      recurso_id: recursoSel.id,
-      slot_inicio: slotPendiente.inicio
-    });
-    if (rpcError) {
-      setError(rpcError);
+    try {
+      await crearReserva({
+        recursoId: recursoSel.id,
+        slotInicio: slotPendiente.inicio,
+        duracionMin: config.duracion_default_min,
+        invitados,
+        notas: undefined
+      });
+      setSlotPendiente(null);
       setSubmitting(false);
-      return;
+      navigate('/app/historial');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error reservando');
+      setSubmitting(false);
     }
-    setSlotPendiente(null);
-    setSubmitting(false);
-    navigate('/app/historial');
   }
 
   if (loadingRecursos) {
@@ -270,6 +282,45 @@ export default function Reservar() {
                 <br />
                 {formatHora(slotPendiente.inicio)} – {formatHora(slotPendiente.fin)}
               </p>
+
+              {maxInvitados > 0 && (
+                <div className="ek-form-field" style={{ marginBottom: '1rem' }}>
+                  <label className="ek-label">
+                    Invitados ({invitados} de {maxInvitados} disponibles)
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => setInvitados(Math.max(0, invitados - 1))}
+                      disabled={invitados === 0}
+                      className="ek-cta ek-cta--secondary"
+                      style={{ minHeight: '40px', minWidth: '40px', padding: '0 0.75rem' }}
+                    >
+                      −
+                    </button>
+                    <span style={{
+                      fontSize: '1.5rem',
+                      fontWeight: 700,
+                      minWidth: '40px',
+                      textAlign: 'center'
+                    }}>
+                      {invitados}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setInvitados(Math.min(maxInvitados, invitados + 1))}
+                      disabled={invitados === maxInvitados}
+                      className="ek-cta ek-cta--secondary"
+                      style={{ minHeight: '40px', minWidth: '40px', padding: '0 0.75rem' }}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <p className="ek-helper-text">
+                    Total de personas en la grabación: {1 + invitados}
+                  </p>
+                </div>
+              )}
 
               {error && (
                 <p className="ek-error-text" style={{ marginBottom: '1rem' }}>{error}</p>

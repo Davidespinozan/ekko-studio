@@ -56,24 +56,30 @@ export function useReservasDelUsuario() {
 
 /**
  * Crea una reserva llamando al RPC atómico.
+ *
+ * NOTA: la firma del RPC cambió en la migración 160000 (agregó p_duracion_min
+ * y renombró p_invitados_count → p_invitados, returns jsonb en vez de reservas).
+ * Cast a `any` hasta que se aplique la migración y se regeneren tipos.
  */
 export async function crearReserva(params: {
-  recurso_id: string;
-  slot_inicio: Date;
-  invitados_count?: number;
+  recursoId: string;
+  slotInicio: Date;
+  duracionMin: number;
+  invitados?: number;
   notas?: string;
-}): Promise<{ data: Reserva | null; error: string | null }> {
-  const { data, error } = await supabase.rpc('reservar_recurso_atomic', {
-    p_recurso_id: params.recurso_id,
-    p_slot_inicio: params.slot_inicio.toISOString(),
-    p_invitados_count: params.invitados_count ?? 0,
+}) {
+  const { data, error } = await (supabase.rpc as any)('reservar_recurso_atomic', {
+    p_recurso_id: params.recursoId,
+    p_slot_inicio: params.slotInicio.toISOString(),
+    p_duracion_min: params.duracionMin,
+    p_invitados: params.invitados ?? 0,
     p_notas: params.notas
   });
 
   if (error) {
-    return { data: null, error: traducirErrorRPC(error.message) };
+    throw new Error(traducirErrorRPC(error.message));
   }
-  return { data: data as Reserva, error: null };
+  return data;
 }
 
 /**
