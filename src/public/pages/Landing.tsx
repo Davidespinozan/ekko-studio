@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 export default function Landing() {
   return (
     <div style={{
@@ -284,13 +286,13 @@ export default function Landing() {
                 </li>
               ))}
             </ul>
-            <a
-              href="#contacto"
+            <Link
+              to="/signup?tier=basica"
               className="ek-cta ek-cta--secondary ek-cta--full"
               style={{ marginTop: '28px' }}
             >
               Empezar con Básica
-            </a>
+            </Link>
           </div>
 
           {/* Pro */}
@@ -328,13 +330,13 @@ export default function Landing() {
                 </li>
               ))}
             </ul>
-            <a
-              href="#contacto"
+            <Link
+              to="/signup?tier=pro"
               className="ek-cta ek-cta--full"
               style={{ marginTop: '28px' }}
             >
               Quiero la Pro
-            </a>
+            </Link>
           </div>
         </div>
       </section>
