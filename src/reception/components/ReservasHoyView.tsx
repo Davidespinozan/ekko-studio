@@ -94,7 +94,7 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
   }
 
   return (
-    <div className="rec-hoy">
+    <div className="rec-hoy" style={{ paddingBottom: '110px' }}>
       <div
         style={{
           display: 'flex',
