@@ -775,3 +775,218 @@
   background: var(--ek-danger);
   color: var(--ek-cream);
 }
+
+/* ============================================================================
+   RECEPCION extensions — tabs + Hoy view
+   ============================================================================ */
+
+.rec-tabs {
+  display: flex;
+  background: var(--ek-black-soft);
+  border-top: 1px solid rgba(245, 241, 232, 0.1);
+  flex-shrink: 0;
+}
+
+.rec-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: rgba(245, 241, 232, 0.5);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  padding: 0.875rem 1rem;
+  cursor: pointer;
+  font-family: inherit;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.rec-tab--active {
+  color: var(--ek-cream);
+  border-bottom-color: var(--ek-mustard);
+}
+
+.rec-fallback-btn {
+  margin-top: 1rem;
+  background: none;
+  border: 1px solid rgba(245, 241, 232, 0.2);
+  color: var(--ek-cream);
+  padding: 0.625rem 1.25rem;
+  border-radius: var(--ek-radius);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+.rec-fallback-btn:hover {
+  background: rgba(245, 241, 232, 0.08);
+}
+
+/* Hoy view */
+.rec-hoy {
+  width: 100%;
+  max-width: 720px;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  overflow-y: auto;
+  max-height: 100%;
+}
+
+.rec-search {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: var(--ek-black-soft);
+  border: 1px solid rgba(245, 241, 232, 0.15);
+  border-radius: var(--ek-radius);
+  color: var(--ek-cream);
+  font-size: 1rem;
+  font-family: inherit;
+  min-height: 48px;
+}
+
+.rec-search::placeholder {
+  color: rgba(245, 241, 232, 0.4);
+}
+
+.rec-search:focus {
+  outline: none;
+  border-color: var(--ek-mustard);
+}
+
+.rec-section-title {
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--ek-mustard);
+  margin-bottom: 0.5rem;
+}
+
+.rec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.rec-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--ek-black-soft);
+  border: 1px solid rgba(245, 241, 232, 0.1);
+  border-radius: var(--ek-radius-lg);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  color: var(--ek-cream);
+  min-height: 64px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.rec-card:hover:not(:disabled) {
+  border-color: var(--ek-mustard);
+}
+
+.rec-card:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rec-card--highlight {
+  border-color: var(--ek-mustard);
+  background: rgba(212, 169, 60, 0.08);
+}
+
+.rec-card-hora {
+  font-family: var(--ek-font-mono);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--ek-mustard);
+  min-width: 60px;
+}
+
+.rec-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rec-card-nombre {
+  font-size: 1rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rec-card-meta {
+  font-size: 0.8125rem;
+  color: rgba(245, 241, 232, 0.6);
+  margin-top: 2px;
+}
+
+.rec-card-status {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 4px;
+  color: var(--ek-black);
+  flex-shrink: 0;
+}
+
+/* Modal de check-in manual */
+.rec-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.rec-modal {
+  background: var(--ek-black-soft);
+  border: 1px solid rgba(245, 241, 232, 0.15);
+  border-radius: var(--ek-radius-lg);
+  padding: 1.5rem;
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.rec-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--ek-black);
+  border: 1px solid rgba(245, 241, 232, 0.2);
+  border-radius: var(--ek-radius);
+  color: var(--ek-cream);
+  font-size: 1rem;
+  font-family: inherit;
+  min-height: 44px;
+}
+
+.rec-input:focus {
+  outline: none;
+  border-color: var(--ek-mustard);
+}
+
+/* Ajuste de rec-main para que tabs y contenido coexistan */
+.rec-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 1.5rem 1rem;
+  position: relative;
+  overflow: hidden;
+}
