@@ -990,3 +990,174 @@
   position: relative;
   overflow: hidden;
 }
+
+/* ============================================================================
+   RECEPCION extensions — check-in detail + camera modal
+   ============================================================================ */
+
+.rec-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  z-index: 200;
+}
+
+.rec-detail {
+  background: var(--ek-black-soft);
+  border: 1px solid rgba(245, 241, 232, 0.1);
+  border-radius: var(--ek-radius-xl);
+  padding: 2rem;
+  max-width: 560px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  color: var(--ek-cream);
+}
+
+.rec-detail--success {
+  border-top: 4px solid var(--ek-success);
+}
+
+.rec-detail--error {
+  border-top: 4px solid var(--ek-danger);
+  text-align: center;
+}
+
+.rec-detail-eyebrow {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  margin-bottom: 1.25rem;
+}
+
+.rec-detail--success .rec-detail-eyebrow { color: var(--ek-success); }
+.rec-detail--error .rec-detail-eyebrow { color: var(--ek-danger); }
+
+.rec-detail-error-message {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--ek-cream);
+  margin-top: 0.5rem;
+}
+
+.rec-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.rec-detail-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.rec-detail-avatar--initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ek-mustard);
+  color: var(--ek-black);
+  font-weight: 700;
+  font-size: 1.5rem;
+}
+
+.rec-detail-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.rec-detail-contact {
+  font-size: 0.875rem;
+  color: rgba(245, 241, 232, 0.7);
+  margin-top: 2px;
+}
+
+.rec-detail-divider {
+  height: 1px;
+  background: rgba(245, 241, 232, 0.1);
+  margin: 1.25rem 0;
+}
+
+.rec-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+}
+
+.rec-detail-section-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(245, 241, 232, 0.5);
+  margin-bottom: 4px;
+}
+
+.rec-detail-value {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.rec-detail-notas {
+  background: rgba(212, 169, 60, 0.08);
+  border: 1px solid rgba(212, 169, 60, 0.2);
+  border-radius: var(--ek-radius);
+  padding: 0.875rem 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.rec-detail-footer {
+  margin-top: 1.5rem;
+  text-align: center;
+}
+
+/* Camera modal */
+.rec-camera-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 150;
+  padding: 1rem;
+}
+
+.rec-camera-modal-inner {
+  position: relative;
+  max-width: 560px;
+  width: 100%;
+}
+
+.rec-camera-close {
+  position: absolute;
+  top: -3rem;
+  right: 0;
+  background: rgba(245, 241, 232, 0.1);
+  border: 1px solid rgba(245, 241, 232, 0.2);
+  color: var(--ek-cream);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 1.125rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rec-camera-close:hover {
+  background: rgba(245, 241, 232, 0.2);
+}

@@ -55,16 +55,10 @@ export function useReservasHoy() {
 
 /**
  * Marca un check-in manual sin pasar por QR.
- *
- * NOTA: `check_in_manual_atomic` está en la migración 20260514140000 (nueva).
- * Hasta que David la aplique y regenere los tipos, no aparece en `Database`,
- * por eso el cast a `any` en el rpc. Quitar el cast después de regenerar.
+ * Devuelve { reserva, miembro, recurso, stats } del RPC.
  */
 export async function checkInManual(reservaId: string, motivo?: string) {
-  // Cast a any porque check_in_manual_atomic vive en la migración 140000 (no
-  // aplicada todavía), por eso aún no aparece en `Database`. Quitar el cast
-  // después de aplicar la migración y regenerar tipos.
-  const { data, error } = await (supabase.rpc as any)('check_in_manual_atomic', {
+  const { data, error } = await supabase.rpc('check_in_manual_atomic', {
     p_reserva_id: reservaId,
     p_motivo: motivo ?? undefined
   });

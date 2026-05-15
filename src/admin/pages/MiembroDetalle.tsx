@@ -1,6 +1,7 @@
 import { useParams, Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { useMiembroDetalle, updateMiembro, adminUpdateRole } from '../hooks/useAdminData';
+import { supabase } from '@shared/lib/supabase';
 import { formatHora } from '@member/logic/reservaLogic';
 
 export default function MiembroDetalle() {
@@ -112,6 +113,28 @@ export default function MiembroDetalle() {
       </section>
 
       <section className="adm-section">
+        <h2 className="ek-h3">Foto del miembro</h2>
+        <AvatarUploadControl
+          usuarioId={miembro.id}
+          avatarUrl={miembro.avatar_url}
+          onChanged={refetch}
+        />
+      </section>
+
+      <section className="adm-section">
+        <h2 className="ek-h3">Notas operativas</h2>
+        <p className="adm-body" style={{ marginBottom: '0.5rem' }}>
+          Las verá la recepción al hacer check-in. Útil para condiciones físicas,
+          preferencias, recordatorios.
+        </p>
+        <NotasControl
+          usuarioId={miembro.id}
+          notasIniciales={(miembro as { notas_admin?: string | null }).notas_admin ?? null}
+          onSaved={refetch}
+        />
+      </section>
+
+      <section className="adm-section">
         <h2 className="ek-h3">Reservas ({reservas.length})</h2>
         {reservas.length === 0 ? (
           <p className="adm-body">Sin reservas.</p>
@@ -216,6 +239,129 @@ function CambiarRolControl({ usuarioId, rolActual, onChanged }: {
           ⚠️ Promover a admin da acceso TOTAL al negocio. Click "Confirmar admin" para proceder.
         </p>
       )}
+    </div>
+  );
+}
+
+function AvatarUploadControl({ usuarioId, avatarUrl, onChanged }: {
+  usuarioId: string;
+  avatarUrl: string | null;
+  onChanged: () => Promise<void>;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    setError(null);
+    try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const path = `${usuarioId}/${Date.now()}.${ext}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { cacheControl: '3600', upsert: false });
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+
+      const { error: updateErr } = await supabase
+        .from('usuarios')
+        .update({ avatar_url: publicUrl })
+        .eq('id', usuarioId);
+
+      if (updateErr) throw updateErr;
+
+      await onChanged();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error subiendo foto');
+    }
+    setUploading(false);
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt="Avatar" style={{
+          width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover',
+          border: '1px solid var(--ek-line)'
+        }} />
+      ) : (
+        <div style={{
+          width: '80px', height: '80px', borderRadius: '50%',
+          background: 'var(--ek-cream-deep)', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', color: 'var(--ek-ink-muted)', fontSize: '0.875rem'
+        }}>
+          Sin foto
+        </div>
+      )}
+      <label className="ek-cta ek-cta--secondary" style={{ cursor: 'pointer' }}>
+        {uploading ? 'Subiendo…' : avatarUrl ? 'Cambiar foto' : 'Subir foto'}
+        <input
+          type="file"
+          accept="image/*"
+          disabled={uploading}
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+          style={{ display: 'none' }}
+        />
+      </label>
+      {error && <p className="ek-error-text">{error}</p>}
+    </div>
+  );
+}
+
+function NotasControl({ usuarioId, notasIniciales, onSaved }: {
+  usuarioId: string;
+  notasIniciales: string | null;
+  onSaved: () => Promise<void>;
+}) {
+  const [notas, setNotas] = useState(notasIniciales ?? '');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({ notas_admin: notas.trim() || null } as never)
+        .eq('id', usuarioId);
+      if (error) throw error;
+      await onSaved();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error guardando');
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div className="ek-stack-md">
+      <textarea
+        value={notas}
+        onChange={(e) => setNotas(e.target.value)}
+        maxLength={500}
+        rows={4}
+        placeholder="Ej. Tendinitis en hombro derecho. Prefiere Estudio 2 los lunes."
+        className="ek-input"
+      />
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <p style={{ fontSize: '0.75rem', color: 'var(--ek-ink-muted)' }}>
+          {notas.length}/500 caracteres
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          {saved && <span style={{ color: 'var(--ek-success)', fontSize: '0.875rem' }}>✓ Guardado</span>}
+          {error && <span style={{ color: 'var(--ek-danger)', fontSize: '0.875rem' }}>{error}</span>}
+          <button onClick={handleSave} disabled={saving} className="ek-cta">
+            {saving ? 'Guardando…' : 'Guardar notas'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

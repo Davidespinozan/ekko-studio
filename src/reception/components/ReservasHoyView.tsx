@@ -1,7 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useReservasHoy, checkInManual, type ReservaConJoin } from '../hooks/useReservasHoy';
 
-export function ReservasHoyView() {
+interface Props {
+  onManualCheckInSuccess?: (data: any) => void;
+}
+
+export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
   const { reservas, isLoading, refetch } = useReservasHoy();
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ReservaConJoin | null>(null);
@@ -77,9 +81,10 @@ export function ReservasHoyView() {
         <ManualCheckInModal
           reserva={selected}
           onClose={() => setSelected(null)}
-          onDone={async () => {
+          onDone={async (data) => {
             await refetch();
             setSelected(null);
+            onManualCheckInSuccess?.(data);
           }}
         />
       )}
@@ -132,7 +137,7 @@ function ReservaCard({ reserva, onSelect, highlight }: {
 function ManualCheckInModal({ reserva, onClose, onDone }: {
   reserva: ReservaConJoin;
   onClose: () => void;
-  onDone: () => Promise<void>;
+  onDone: (data: any) => Promise<void>;
 }) {
   const [motivo, setMotivo] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -144,8 +149,8 @@ function ManualCheckInModal({ reserva, onClose, onDone }: {
     setSubmitting(true);
     setError(null);
     try {
-      await checkInManual(reserva.id, motivo.trim() || undefined);
-      await onDone();
+      const result = await checkInManual(reserva.id, motivo.trim() || undefined);
+      await onDone(result);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error en check-in');
       setSubmitting(false);
