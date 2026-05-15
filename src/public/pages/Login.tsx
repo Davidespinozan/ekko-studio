@@ -56,8 +56,6 @@ export default function Login() {
         </div>
 
         <div className="ek-card">
-          <p className="ek-eyebrow" style={{ marginBottom: '16px' }}>INICIAR SESIÓN</p>
-
           <form onSubmit={handleSubmit} className="ek-stack-md">
             <div className="ek-form-field">
               <label htmlFor="email" className="ek-label">Email</label>
