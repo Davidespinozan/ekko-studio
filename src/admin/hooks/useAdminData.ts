@@ -15,7 +15,7 @@ export interface MiembroRow extends Usuario {
 
 export interface ReservaConJoin extends Reserva {
   recurso: Pick<Recurso, 'id' | 'slug' | 'nombre'> | null;
-  usuario: Pick<Usuario, 'id' | 'nombre' | 'email'> | null;
+  usuario: Pick<Usuario, 'id' | 'nombre' | 'email' | 'membresia_tier'> | null;
 }
 
 /**
@@ -187,6 +187,8 @@ export function useAdminMetrics() {
     miembrosTotal: number;
     reservasHoy: number;
     reservasEsteMes: number;
+    noShowsMes: number;
+    ocupacion7d: number;
     proximasReservas: ReservaConJoin[];
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -199,12 +201,14 @@ export function useAdminMetrics() {
       const inicioHoy = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const finHoy = new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
       const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+      const hace7d = new Date(inicioHoy.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-      const [activos, total, hoy, mes, proximas] = await Promise.all([
+      const [activos, total, hoy, mes, noShows, reservas7d, proximas] = await Promise.all([
         supabase
           .from('usuarios')
           .select('id', { count: 'exact', head: true })
           .eq('tenant_id', tenant.id)
+          .eq('rol', 'miembro')
           .eq('status', 'activo'),
         supabase
           .from('usuarios')
@@ -222,25 +226,44 @@ export function useAdminMetrics() {
           .from('reservas')
           .select('id', { count: 'exact', head: true })
           .eq('tenant_id', tenant.id)
-          .in('status', ['confirmada', 'completada'])
+          .neq('status', 'cancelada')
           .gte('slot_inicio', inicioMes.toISOString()),
         supabase
           .from('reservas')
-          .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios(id, nombre, email)')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenant.id)
+          .eq('status', 'no_show')
+          .gte('slot_inicio', inicioMes.toISOString()),
+        supabase
+          .from('reservas')
+          .select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenant.id)
+          .neq('status', 'cancelada')
+          .gte('slot_inicio', hace7d.toISOString())
+          .lt('slot_inicio', inicioHoy.toISOString()),
+        supabase
+          .from('reservas')
+          .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios(id, nombre, email, membresia_tier)')
           .eq('tenant_id', tenant.id)
           .eq('status', 'confirmada')
           .gte('slot_inicio', now.toISOString())
           .order('slot_inicio', { ascending: true })
-          .limit(10)
+          .limit(5)
       ]);
 
       if (!mounted) return;
+
+      // 13 slots operativos × 3 estudios × 7 días = 273 slots disponibles/semana
+      const SLOTS_DISPONIBLES_7D = 13 * 3 * 7;
+      const ocupacion7d = Math.round(((reservas7d.count ?? 0) / SLOTS_DISPONIBLES_7D) * 100);
 
       setMetrics({
         miembrosActivos: activos.count ?? 0,
         miembrosTotal: total.count ?? 0,
         reservasHoy: hoy.count ?? 0,
         reservasEsteMes: mes.count ?? 0,
+        noShowsMes: noShows.count ?? 0,
+        ocupacion7d,
         proximasReservas: (proximas.data ?? []) as unknown as ReservaConJoin[]
       });
       setIsLoading(false);

@@ -730,41 +730,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .adm-error-text { color: var(--ek-danger); font-size: 13px; }
 
-  .adm-sidebar {
-    background: var(--ek-bg-soft);
-    border-right: 0.5px solid var(--ek-line);
-    padding: 24px 16px;
-  }
-
-  @media (max-width: 1023px) {
-    .adm-sidebar {
-      display: none;
-    }
-  }
-
-  .adm-nav-link {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    border-radius: var(--ek-r-sm);
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--ek-ink-muted);
-    text-decoration: none;
-    margin-bottom: 4px;
-  }
-
-  .adm-nav-link:hover {
-    background: rgba(245, 241, 232, 0.04);
-    color: var(--ek-ink);
-  }
-
-  .adm-nav-link--active {
-    background: var(--ek-mustard-soft);
-    color: var(--ek-mustard);
-    font-weight: 600;
-  }
+  /* Sidebar layout: ver bloque ADMIN LAYOUT más abajo */
 
   /* ============================================================================
      RECEPCIÓN
@@ -1314,109 +1280,195 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   /* CTA secondary alias (algunas pantallas usan ek-cta--secondary) ya cubierto */
 
   /* Admin shell + topbar */
+  /* ============================================================================
+     ADMIN LAYOUT — SIDEBAR + DRAWER
+     ============================================================================ */
+
   .adm-shell {
     min-height: 100vh;
     display: flex;
-    flex-direction: column;
     background: var(--ek-bg);
   }
 
-  .adm-topbar {
+  .adm-sidebar-desktop {
+    display: none;
+  }
+
+  @media (min-width: 1024px) {
+    .adm-sidebar-desktop {
+      display: block;
+      width: 240px;
+      flex-shrink: 0;
+      border-right: 0.5px solid var(--ek-line);
+      background: var(--ek-bg-soft);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }
+  }
+
+  .adm-sidebar {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 24px 0;
+  }
+
+  .adm-sidebar-brand {
+    padding: 0 20px 24px;
+    border-bottom: 0.5px solid var(--ek-line);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 24px;
+  }
+
+  .adm-sidebar-nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    padding: 0 12px;
+    overflow-y: auto;
+  }
+
+  .adm-sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .adm-sidebar-section-label {
+    padding: 0 8px 6px;
+    font-size: 10px !important;
+  }
+
+  .adm-sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    color: var(--ek-ink-muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.18s ease;
+    position: relative;
+  }
+
+  .adm-sidebar-item:hover {
+    background: var(--ek-bg-elevated);
+    color: var(--ek-ink);
+  }
+
+  .adm-sidebar-item--active {
+    background: var(--ek-mustard-soft);
+    color: var(--ek-mustard) !important;
+  }
+
+  .adm-sidebar-item--active::before {
+    content: '';
+    position: absolute;
+    left: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 20px;
+    background: var(--ek-mustard);
+    border-radius: 0 2px 2px 0;
+  }
+
+  .adm-sidebar-item-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .adm-sidebar-footer {
+    padding: 16px 20px 0;
+    border-top: 0.5px solid var(--ek-line);
+  }
+
+  /* Drawer mobile */
+  .adm-drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 90;
+    animation: ek-fade-in 0.2s ease;
+  }
+
+  .adm-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 80%;
+    background: var(--ek-bg-soft);
+    border-right: 0.5px solid var(--ek-line);
+    animation: ek-slide-in-left 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow-y: auto;
+    z-index: 91;
+  }
+
+  @keyframes ek-slide-in-left {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+  }
+
+  /* Content column (mobile topbar + main) */
+  .adm-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Topbar mobile */
+  .adm-topbar-mobile {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 14px 24px;
+    padding: 12px 16px;
+    border-bottom: 0.5px solid var(--ek-line);
     background: rgba(10, 10, 10, 0.7);
     backdrop-filter: blur(20px);
-    border-bottom: 0.5px solid var(--ek-line);
+    -webkit-backdrop-filter: blur(20px);
     position: sticky;
     top: 0;
     z-index: 10;
+    height: 56px;
   }
 
-  .adm-brand {
-    font-family: var(--ek-font-display);
-    font-weight: 700;
-    font-size: 17px;
-    letter-spacing: -0.03em;
-    color: var(--ek-ink);
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
+  @media (min-width: 1024px) {
+    .adm-topbar-mobile {
+      display: none;
+    }
   }
 
-  .adm-brand-tag {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    background: var(--ek-mustard);
-    color: var(--ek-bg);
-    padding: 3px 9px;
-    border-radius: var(--ek-r-pill);
-  }
-
-  .adm-topbar-right {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-  }
-
-  .adm-user-label {
-    font-size: 13px;
-    color: var(--ek-ink-muted);
-  }
-
-  .adm-link-btn {
-    background: transparent;
-    border: 0.5px solid var(--ek-line);
-    color: var(--ek-ink-muted);
-    font-size: 13px;
-    padding: 8px 14px;
-    border-radius: var(--ek-r-sm);
-    cursor: pointer;
-    font-family: inherit;
-  }
-
-  .adm-link-btn:hover { color: var(--ek-ink); border-color: var(--ek-line-strong); }
-
-  .adm-body-wrap,
-  .adm-body {
-    flex: 1;
-    min-height: 0;
-  }
-  /* .adm-body se usa también como párrafo, lo cubre la regla específica arriba */
-
-  .adm-sidebar-nav { display: flex; flex-direction: column; gap: 4px; }
-
-  .adm-sidebar-link {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    border-radius: var(--ek-r-sm);
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--ek-ink-muted);
-    text-decoration: none;
-  }
-
-  .adm-sidebar-link:hover {
-    background: rgba(245, 241, 232, 0.04);
-    color: var(--ek-ink);
-  }
-
-  .adm-sidebar-link--active {
-    background: var(--ek-mustard-soft);
-    color: var(--ek-mustard);
-    font-weight: 600;
-  }
-
+  /* Main */
   .adm-main {
     flex: 1;
-    padding: 28px;
-    overflow-y: auto;
+    min-height: 100vh;
+    padding: 24px 16px 80px;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  @media (min-width: 768px) {
+    .adm-main {
+      padding: 32px 32px 100px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .adm-main {
+      padding: 40px 48px;
+    }
   }
 
   .adm-page {
