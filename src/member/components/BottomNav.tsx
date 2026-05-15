@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Calendar, ListChecks, User } from 'lucide-react';
+import { Home, Calendar, User } from 'lucide-react';
 
 export function BottomNav() {
   return (
@@ -7,7 +7,6 @@ export function BottomNav() {
       <div className="ek-bottom-nav-inner">
         <NavItem to="/app" end icon={<Home size={22} className="ek-bottom-nav-icon" />} label="Inicio" />
         <NavItem to="/app/reservar" icon={<Calendar size={22} className="ek-bottom-nav-icon" />} label="Reservar" />
-        <NavItem to="/app/historial" icon={<ListChecks size={22} className="ek-bottom-nav-icon" />} label="Historial" />
         <NavItem to="/app/perfil" icon={<User size={22} className="ek-bottom-nav-icon" />} label="Perfil" />
       </div>
     </nav>
