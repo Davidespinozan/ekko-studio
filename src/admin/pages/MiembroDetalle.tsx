@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { useMiembroDetalle, updateMiembro, adminUpdateRole } from '../hooks/useAdminData';
 import { supabase } from '@shared/lib/supabase';
 import { formatHora } from '@member/logic/reservaLogic';
+import type { Database } from '@shared/types/database';
 
 export default function MiembroDetalle() {
   const { id } = useParams<{ id: string }>();
@@ -48,10 +49,17 @@ export default function MiembroDetalle() {
       </div>
 
       <section className="adm-section">
-        <h2 className="ek-h3">Información</h2>
+        <h2 className="ek-h3">Datos del miembro</h2>
+        <EditarDatosForm
+          miembro={miembro}
+          onSaved={refetch}
+        />
+      </section>
+
+      <section className="adm-section">
+        <h2 className="ek-h3">Información del sistema</h2>
         <div className="adm-info-grid">
           <Info label="Email" value={miembro.email} />
-          <Info label="Teléfono" value={miembro.telefono ?? '—'} />
           <Info label="Rol" value={miembro.rol} mono />
           <Info label="Alta" value={new Date(miembro.created_at).toLocaleString('es-MX')} />
           {miembro.commitment_ends_at && (
@@ -62,6 +70,7 @@ export default function MiembroDetalle() {
           )}
           <Info label="No-shows" value={miembro.no_shows_count} />
         </div>
+        <ResetPasswordControl email={miembro.email} />
       </section>
 
       <section className="adm-section">
@@ -307,6 +316,116 @@ function AvatarUploadControl({ usuarioId, avatarUrl, onChanged }: {
         />
       </label>
       {error && <p className="ek-error-text">{error}</p>}
+    </div>
+  );
+}
+
+function EditarDatosForm({ miembro, onSaved }: {
+  miembro: Database['public']['Tables']['usuarios']['Row'];
+  onSaved: () => Promise<void>;
+}) {
+  const [nombre, setNombre] = useState(miembro.nombre ?? '');
+  const [telefono, setTelefono] = useState(miembro.telefono ?? '');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isDirty = (nombre !== (miembro.nombre ?? '')) || (telefono !== (miembro.telefono ?? ''));
+
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+    try {
+      const { error } = await supabase
+        .from('usuarios')
+        .update({
+          nombre: nombre.trim() || null,
+          telefono: telefono.trim() || null
+        })
+        .eq('id', miembro.id);
+      if (error) throw error;
+      await onSaved();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error guardando');
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div className="adm-info-grid" style={{ background: 'transparent', padding: 0, border: 'none' }}>
+      <label className="ek-label">
+        Nombre
+        <input
+          type="text"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          className="ek-input"
+          placeholder="Nombre completo"
+        />
+      </label>
+      <label className="ek-label">
+        Teléfono
+        <input
+          type="tel"
+          value={telefono}
+          onChange={(e) => setTelefono(e.target.value)}
+          className="ek-input"
+          placeholder="+52 667 123 4567"
+        />
+      </label>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.75rem', gridColumn: '1 / -1' }}>
+        <button
+          onClick={handleSave}
+          disabled={saving || !isDirty}
+          className="ek-cta"
+        >
+          {saving ? 'Guardando…' : 'Guardar cambios'}
+        </button>
+        {saved && <span style={{ color: 'var(--ek-success)', fontSize: '0.875rem' }}>✓ Guardado</span>}
+        {error && <span style={{ color: 'var(--ek-danger)', fontSize: '0.875rem' }}>{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+function ResetPasswordControl({ email }: { email: string }) {
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleReset() {
+    if (!confirm(`¿Enviar email de recuperación de contraseña a ${email}?`)) return;
+    setSending(true);
+    setError(null);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/login`
+      });
+      if (error) throw error;
+      setSent(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error enviando');
+    }
+    setSending(false);
+  }
+
+  if (sent) {
+    return (
+      <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--ek-success)' }}>
+        ✓ Email de recuperación enviado a {email}
+      </p>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <button onClick={handleReset} disabled={sending} className="ek-cta ek-cta--secondary">
+        {sending ? 'Enviando…' : 'Enviar email de recuperación de contraseña'}
+      </button>
+      {error && <span style={{ color: 'var(--ek-danger)', fontSize: '0.875rem' }}>{error}</span>}
     </div>
   );
 }
