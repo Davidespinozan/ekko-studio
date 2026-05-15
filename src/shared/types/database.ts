@@ -268,6 +268,7 @@ export type Database = {
           cancelada_motivo: string | null
           check_in_at: string | null
           check_in_by: string | null
+          check_in_method: string | null
           created_at: string
           duracion_min: number
           folio: string
@@ -288,6 +289,7 @@ export type Database = {
           cancelada_motivo?: string | null
           check_in_at?: string | null
           check_in_by?: string | null
+          check_in_method?: string | null
           created_at?: string
           duracion_min: number
           folio: string
@@ -308,6 +310,7 @@ export type Database = {
           cancelada_motivo?: string | null
           check_in_at?: string | null
           check_in_by?: string | null
+          check_in_method?: string | null
           created_at?: string
           duracion_min?: number
           folio?: string
@@ -557,6 +560,7 @@ export type Database = {
           cancelada_motivo: string | null
           check_in_at: string | null
           check_in_by: string | null
+          check_in_method: string | null
           created_at: string
           duracion_min: number
           folio: string
@@ -579,6 +583,42 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      check_in_atomic: { Args: { p_reserva_id: string }; Returns: Json }
+      check_in_manual_atomic: {
+        Args: { p_motivo?: string; p_reserva_id: string }
+        Returns: Json
+      }
+      count_active_admins: { Args: { p_tenant_id: string }; Returns: number }
+      dev_activar_miembro: {
+        Args: { p_email: string; p_tier?: string }
+        Returns: {
+          auth_id: string | null
+          avatar_url: string | null
+          bloqueado_hasta: string | null
+          commitment_ends_at: string | null
+          created_at: string
+          email: string
+          id: string
+          membresia_activa_id: string | null
+          membresia_tier: string | null
+          no_shows_count: number
+          nombre: string | null
+          ob_data: Json | null
+          rol: string
+          status: string
+          stripe_customer_id: string | null
+          telefono: string | null
+          tenant_id: string
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "usuarios"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_my_rol: { Args: never; Returns: string }
       get_my_tenant_id: { Args: never; Returns: string }
       get_my_user_id: { Args: never; Returns: string }
@@ -596,6 +636,7 @@ export type Database = {
           cancelada_motivo: string | null
           check_in_at: string | null
           check_in_by: string | null
+          check_in_method: string | null
           created_at: string
           duracion_min: number
           folio: string
