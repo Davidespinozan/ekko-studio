@@ -41,7 +41,6 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
     return d;
   });
   const { reservas, isLoading, refetch } = useReservasHoy(fechaSeleccionada);
-  const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ReservaConJoin | null>(null);
 
   const hoy = new Date();
@@ -54,21 +53,11 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
     setFechaSeleccionada(nueva);
   };
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return reservas;
-    const term = search.toLowerCase();
-    return reservas.filter((r) => {
-      const nombre = r.usuario?.nombre?.toLowerCase() ?? '';
-      const email = r.usuario?.email?.toLowerCase() ?? '';
-      return nombre.includes(term) || email.includes(term);
-    });
-  }, [reservas, search]);
-
   const { llegando, resto } = useMemo(() => {
     const now = Date.now();
     const llegando: ReservaConJoin[] = [];
     const resto: ReservaConJoin[] = [];
-    filtered.forEach((r) => {
+    reservas.forEach((r) => {
       const inicio = new Date(r.slot_inicio).getTime();
       const fin = new Date(r.slot_fin).getTime();
       // "Llegando ahora" solo aplica si la fecha vista es hoy
@@ -83,7 +72,7 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
       }
     });
     return { llegando, resto };
-  }, [filtered, esHoy]);
+  }, [reservas, esHoy]);
 
   if (isLoading) {
     return (
@@ -166,16 +155,7 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
         </button>
       </div>
 
-      <input
-        type="search"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Buscar por nombre o email…"
-        className="ek-input"
-        style={{ marginBottom: '24px' }}
-      />
-
-      <section style={{ marginBottom: '32px' }}>
+      <section style={{ marginBottom: '32px', marginTop: '24px' }}>
         <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '12px' }}>
           LLEGANDO AHORA
         </p>
