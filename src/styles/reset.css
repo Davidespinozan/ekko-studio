@@ -13,10 +13,8 @@ html, body {
   height: 100%;
 }
 
+/* body color/background/font fijados en ekko.css (design system Mostaza Ink) */
 body {
-  font-family: var(--ek-font-sans);
-  color: var(--ek-black);
-  background: var(--ek-cream);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
