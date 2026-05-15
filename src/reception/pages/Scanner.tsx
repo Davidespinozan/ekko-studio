@@ -1,11 +1,20 @@
 import { useCallback, useState } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
-import { useTenant } from '@shared/hooks/useTenant';
 import { backendPost } from '@shared/lib/backend';
 import { ReservasHoyView } from '../components/ReservasHoyView';
 import { CheckInDetail } from '../components/CheckInDetail';
 import { CameraModal } from '../components/CameraModal';
 import { useScannerHID } from '../hooks/useScannerHID';
+
+function capitalizarNombre(s: string | undefined | null): string {
+  if (!s) return '';
+  return s
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
 
 interface VerifyResponse {
   success: boolean;
@@ -26,7 +35,6 @@ type DetailState =
 
 export default function Scanner() {
   const { usuario, signOut } = useAuth();
-  const tenant = useTenant();
   const [detail, setDetail] = useState<DetailState>({ kind: 'none' });
   const [cameraOpen, setCameraOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -54,23 +62,48 @@ export default function Scanner() {
     setRefreshTick((t) => t + 1);
   };
 
+  const nombreUsuarioFormat = capitalizarNombre(usuario?.nombre) || usuario?.email || '';
+
   return (
     <div className="rec-shell">
-      <header className="rec-topbar">
-        <div>
-          <p className="ek-eyebrow" style={{ color: 'var(--ek-cream)' }}>RECEPCIÓN</p>
-          <h1 style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--ek-cream)', marginTop: '2px' }}>
-            {tenant.nombre}
-          </h1>
-        </div>
-        <div className="rec-topbar-right">
-          <button onClick={() => setCameraOpen(true)} className="rec-link-btn">
-            📷 Cámara
-          </button>
-          <span style={{ fontSize: '0.8125rem', color: 'rgba(245,241,232,0.6)' }}>
-            {usuario?.nombre ?? usuario?.email}
-          </span>
-          <button onClick={signOut} className="rec-link-btn">Salir</button>
+      <header className="ek-header-glass">
+        <div
+          className="ek-header-inner"
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        >
+          <div>
+            <p
+              className="ek-eyebrow ek-eyebrow--mustard"
+              style={{ marginBottom: '4px', fontSize: '10px' }}
+            >
+              RECEPCIÓN
+            </p>
+            <p
+              style={{
+                fontFamily: 'var(--ek-font-display)',
+                fontSize: '18px',
+                fontWeight: 700,
+                letterSpacing: '-0.03em',
+                margin: 0,
+                color: 'var(--ek-mustard)'
+              }}
+            >
+              EKKO Studio
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--ek-ink-muted)' }}>
+              {nombreUsuarioFormat}
+            </span>
+            <button
+              onClick={signOut}
+              className="ek-icon-btn"
+              style={{ width: 'auto', padding: '8px 14px', fontSize: '13px' }}
+            >
+              Salir
+            </button>
+          </div>
         </div>
       </header>
 
@@ -80,6 +113,55 @@ export default function Scanner() {
           onManualCheckInSuccess={handleManualCheckIn}
         />
       </div>
+
+      <button
+        onClick={() => setCameraOpen(true)}
+        aria-label="Abrir cámara para escanear QR"
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          width: '64px',
+          height: '64px',
+          borderRadius: '50%',
+          background: 'var(--ek-mustard)',
+          color: 'var(--ek-bg)',
+          border: 'none',
+          boxShadow:
+            '0 8px 32px rgba(229, 184, 41, 0.35), 0 4px 12px rgba(0, 0, 0, 0.4)',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 50,
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.05)';
+          e.currentTarget.style.boxShadow =
+            '0 12px 40px rgba(229, 184, 41, 0.45), 0 6px 16px rgba(0, 0, 0, 0.5)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          e.currentTarget.style.boxShadow =
+            '0 8px 32px rgba(229, 184, 41, 0.35), 0 4px 12px rgba(0, 0, 0, 0.4)';
+        }}
+      >
+        <svg
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+          <circle cx="12" cy="13" r="4" />
+        </svg>
+      </button>
 
       {cameraOpen && (
         <CameraModal

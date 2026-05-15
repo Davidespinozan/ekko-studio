@@ -5,6 +5,35 @@ interface Props {
   onManualCheckInSuccess?: (data: any) => void;
 }
 
+function capitalizarNombre(s: string | undefined | null): string {
+  if (!s) return '';
+  return s
+    .toLowerCase()
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+function formatearDia(fecha: Date): string {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const target = new Date(fecha);
+  target.setHours(0, 0, 0, 0);
+
+  const diffDias = Math.round((target.getTime() - hoy.getTime()) / 86400000);
+
+  if (diffDias === 0) return 'Hoy';
+  if (diffDias === 1) return 'Mañana';
+  if (diffDias === -1) return 'Ayer';
+
+  return target.toLocaleDateString('es-MX', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short'
+  });
+}
+
 export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => {
     const d = new Date();
@@ -19,24 +48,9 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
   hoy.setHours(0, 0, 0, 0);
   const esHoy = fechaSeleccionada.getTime() === hoy.getTime();
 
-  const formatFecha = (d: Date) => {
-    if (d.getTime() === hoy.getTime()) return 'Hoy';
-    return d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
-  };
-
   const cambiarDia = (delta: number) => {
     const nueva = new Date(fechaSeleccionada);
     nueva.setDate(nueva.getDate() + delta);
-    setFechaSeleccionada(nueva);
-  };
-
-  const irAHoy = () => setFechaSeleccionada(new Date(hoy));
-
-  const handleDateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.value) return;
-    const [y, m, d] = e.target.value.split('-').map(Number);
-    const nueva = new Date(y, m - 1, d);
-    nueva.setHours(0, 0, 0, 0);
     setFechaSeleccionada(nueva);
   };
 
@@ -58,7 +72,11 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
       const inicio = new Date(r.slot_inicio).getTime();
       const fin = new Date(r.slot_fin).getTime();
       // "Llegando ahora" solo aplica si la fecha vista es hoy
-      if (esHoy && ((now >= inicio - 15 * 60_000 && now <= fin) || (now >= inicio - 15 * 60_000 && now <= inicio + 15 * 60_000))) {
+      if (
+        esHoy &&
+        ((now >= inicio - 15 * 60_000 && now <= fin) ||
+          (now >= inicio - 15 * 60_000 && now <= inicio + 15 * 60_000))
+      ) {
         llegando.push(r);
       } else {
         resto.push(r);
@@ -68,65 +86,122 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
   }, [filtered, esHoy]);
 
   if (isLoading) {
-    return <p style={{ color: 'var(--ek-cream)', textAlign: 'center', marginTop: '2rem' }}>Cargando agenda…</p>;
+    return (
+      <p style={{ color: 'var(--ek-ink-muted)', textAlign: 'center', marginTop: '2rem' }}>
+        Cargando agenda…
+      </p>
+    );
   }
 
   return (
     <div className="rec-hoy">
-      <div className="rec-day-selector">
-        <button onClick={() => cambiarDia(-1)} className="rec-day-arrow" aria-label="Día anterior">
-          ←
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '20px',
+          padding: '6px',
+          background: 'var(--ek-bg-soft)',
+          border: '0.5px solid var(--ek-line)',
+          borderRadius: 'var(--ek-r-md)'
+        }}
+      >
+        <button
+          onClick={() => cambiarDia(-1)}
+          className="ek-icon-btn"
+          aria-label="Día anterior"
+          style={{ width: '40px', height: '40px', padding: 0 }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
         </button>
-        <div className="rec-day-center">
-          <label className="rec-day-label">
-            <span className="rec-day-text">{formatFecha(fechaSeleccionada)}</span>
-            <input
-              type="date"
-              value={fechaSeleccionada.toISOString().slice(0, 10)}
-              onChange={handleDateInput}
-              className="rec-day-input"
-            />
-          </label>
-          {!esHoy && (
-            <button onClick={irAHoy} className="rec-day-today-btn">
-              Ir a hoy
-            </button>
-          )}
+
+        <div style={{ textAlign: 'center', flex: 1 }}>
+          <p className="ek-eyebrow" style={{ marginBottom: '2px', fontSize: '9px' }}>
+            VISTA DEL DÍA
+          </p>
+          <p
+            style={{
+              fontFamily: 'var(--ek-font-display)',
+              fontSize: '16px',
+              fontWeight: 700,
+              letterSpacing: '-0.02em',
+              margin: 0,
+              textTransform: 'capitalize'
+            }}
+          >
+            {formatearDia(fechaSeleccionada)}
+          </p>
         </div>
-        <button onClick={() => cambiarDia(1)} className="rec-day-arrow" aria-label="Día siguiente">
-          →
+
+        <button
+          onClick={() => cambiarDia(1)}
+          className="ek-icon-btn"
+          aria-label="Día siguiente"
+          style={{ width: '40px', height: '40px', padding: 0 }}
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
         </button>
       </div>
 
       <input
-        type="text"
+        type="search"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Buscar por nombre o email…"
-        className="rec-search"
+        className="ek-input"
+        style={{ marginBottom: '24px' }}
       />
 
-      {llegando.length > 0 && (
-        <section>
-          <h2 className="rec-section-title">Llegando ahora</h2>
-          <div className="rec-list">
+      <section style={{ marginBottom: '32px' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '12px' }}>
+          LLEGANDO AHORA
+        </p>
+        {llegando.length === 0 ? (
+          <p className="ek-body-faint" style={{ padding: '12px 0' }}>
+            No hay reservas próximas a llegar.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {llegando.map((r) => (
               <ReservaCard key={r.id} reserva={r} onSelect={setSelected} highlight />
             ))}
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       <section>
-        <h2 className="rec-section-title">
-          {esHoy ? 'Resto del día' : 'Reservas del día'}
-        </h2>
+        <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>
+          {esHoy ? 'RESTO DEL DÍA' : 'RESERVAS DEL DÍA'}
+        </p>
         {resto.length === 0 ? (
-          <p style={{ color: 'rgba(245,241,232,0.5)', fontSize: '0.875rem', padding: '1rem' }}>
-            Sin más reservas hoy.
+          <p className="ek-body-faint" style={{ padding: '12px 0' }}>
+            {esHoy ? 'No hay más reservas para este día.' : 'No hay reservas para este día.'}
           </p>
         ) : (
-          <div className="rec-list">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {resto.map((r) => (
               <ReservaCard key={r.id} reserva={r} onSelect={setSelected} />
             ))}
@@ -149,49 +224,136 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
   );
 }
 
-function ReservaCard({ reserva, onSelect, highlight }: {
+function ReservaCard({
+  reserva,
+  onSelect,
+  highlight
+}: {
   reserva: ReservaConJoin;
   onSelect: (r: ReservaConJoin) => void;
   highlight?: boolean;
 }) {
   const hora = new Date(reserva.slot_inicio).toLocaleTimeString('es-MX', {
-    hour: '2-digit', minute: '2-digit', hour12: false
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
   });
 
-  const statusColor: Record<string, string> = {
-    confirmada: 'var(--ek-warning)',
-    completada: 'var(--ek-success)',
-    cancelada: 'var(--ek-danger)',
-    no_show: 'rgba(245,241,232,0.4)'
+  const nombreFormat =
+    capitalizarNombre(reserva.usuario?.nombre) || reserva.usuario?.email || '—';
+
+  const tier = reserva.usuario?.membresia_tier;
+  const disabled = reserva.status === 'cancelada' || reserva.status === 'no_show';
+
+  const statusConfig: Record<
+    string,
+    { label: string; bg: string; color: string }
+  > = {
+    confirmada: {
+      label: 'PENDIENTE',
+      bg: 'var(--ek-mustard)',
+      color: 'var(--ek-bg)'
+    },
+    completada: {
+      label: '✓ OK',
+      bg: 'var(--ek-success-soft)',
+      color: 'var(--ek-success)'
+    },
+    cancelada: {
+      label: 'CANCELADA',
+      bg: 'var(--ek-danger-soft)',
+      color: 'var(--ek-danger)'
+    },
+    no_show: {
+      label: 'NO SHOW',
+      bg: 'var(--ek-danger-soft)',
+      color: 'var(--ek-danger)'
+    }
   };
+
+  const status = statusConfig[reserva.status] ?? statusConfig.confirmada;
 
   return (
     <button
       onClick={() => onSelect(reserva)}
-      disabled={reserva.status === 'cancelada' || reserva.status === 'no_show'}
-      className={`rec-card ${highlight ? 'rec-card--highlight' : ''}`}
+      disabled={disabled}
+      className="ek-card ek-card-interactive"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        padding: '16px 18px',
+        textAlign: 'left',
+        background: 'var(--ek-bg-soft)',
+        border: highlight
+          ? '0.5px solid var(--ek-mustard-dim)'
+          : '0.5px solid var(--ek-line)',
+        borderRadius: 'var(--ek-r-md)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        font: 'inherit',
+        color: 'inherit',
+        width: '100%',
+        opacity: disabled ? 0.55 : 1,
+        boxShadow: highlight ? '0 0 0 1px var(--ek-mustard-dim)' : 'none'
+      }}
     >
-      <div className="rec-card-hora">{hora}</div>
-      <div className="rec-card-info">
-        <p className="rec-card-nombre">
-          {reserva.usuario?.nombre ?? reserva.usuario?.email ?? '—'}
+      <div
+        style={{
+          fontFamily: 'var(--ek-font-display)',
+          fontSize: '22px',
+          fontWeight: 700,
+          letterSpacing: '-0.02em',
+          color: 'var(--ek-ink)',
+          minWidth: '70px'
+        }}
+      >
+        {hora}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p
+          style={{
+            fontFamily: 'var(--ek-font-display)',
+            fontSize: '16px',
+            fontWeight: 600,
+            letterSpacing: '-0.02em',
+            margin: 0,
+            marginBottom: '4px',
+            color: 'var(--ek-ink)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {nombreFormat}
         </p>
-        <p className="rec-card-meta">
+        <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: 0 }}>
           {reserva.recurso?.nombre ?? '—'}
-          {reserva.usuario?.membresia_tier && ` · ${reserva.usuario.membresia_tier}`}
+          {tier && ` · ${tier}`}
         </p>
       </div>
+
       <span
-        className="rec-card-status"
-        style={{ background: statusColor[reserva.status] ?? 'rgba(245,241,232,0.2)' }}
+        className="ek-badge"
+        style={{
+          backgroundColor: status.bg,
+          color: status.color,
+          fontSize: '10px',
+          fontWeight: 700,
+          flexShrink: 0
+        }}
       >
-        {reserva.status === 'completada' ? '✓' : reserva.status === 'confirmada' ? 'Pendiente' : reserva.status}
+        {status.label}
       </span>
     </button>
   );
 }
 
-function ManualCheckInModal({ reserva, onClose, onDone }: {
+function ManualCheckInModal({
+  reserva,
+  onClose,
+  onDone
+}: {
   reserva: ReservaConJoin;
   onClose: () => void;
   onDone: (data: any) => Promise<void>;
@@ -215,19 +377,33 @@ function ManualCheckInModal({ reserva, onClose, onDone }: {
   }
 
   const hora = new Date(reserva.slot_inicio).toLocaleTimeString('es-MX', {
-    hour: '2-digit', minute: '2-digit', hour12: false
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
   });
+
+  const nombreFormat =
+    capitalizarNombre(reserva.usuario?.nombre) || reserva.usuario?.email || '—';
 
   return (
     <div className="rec-modal-backdrop" onClick={() => !submitting && onClose()}>
       <div className="rec-modal" onClick={(e) => e.stopPropagation()}>
-        <p className="ek-eyebrow" style={{ color: 'var(--ek-cream)' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard">
           {yaCheckIn ? 'CHECK-IN COMPLETADO' : 'CHECK-IN MANUAL'}
         </p>
-        <h3 style={{ color: 'var(--ek-cream)', fontSize: '1.5rem', fontWeight: 700, marginTop: '0.25rem' }}>
-          {reserva.usuario?.nombre ?? reserva.usuario?.email ?? '—'}
+        <h3
+          style={{
+            color: 'var(--ek-ink)',
+            fontFamily: 'var(--ek-font-display)',
+            fontSize: '1.5rem',
+            fontWeight: 700,
+            letterSpacing: '-0.02em',
+            marginTop: '0.25rem'
+          }}
+        >
+          {nombreFormat}
         </h3>
-        <p style={{ color: 'rgba(245,241,232,0.7)', marginTop: '0.25rem' }}>
+        <p style={{ color: 'var(--ek-ink-muted)', marginTop: '0.25rem' }}>
           {reserva.recurso?.nombre} · {hora}
         </p>
 
@@ -247,7 +423,7 @@ function ManualCheckInModal({ reserva, onClose, onDone }: {
         ) : (
           <>
             <label style={{ display: 'block', marginTop: '1.25rem' }}>
-              <span className="ek-eyebrow" style={{ color: 'rgba(245,241,232,0.7)' }}>
+              <span className="ek-eyebrow" style={{ color: 'var(--ek-ink-muted)' }}>
                 MOTIVO (OPCIONAL)
               </span>
               <input
@@ -255,13 +431,15 @@ function ManualCheckInModal({ reserva, onClose, onDone }: {
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value)}
                 placeholder="Ej. olvidó su celular"
-                className="rec-input"
+                className="ek-input"
                 style={{ marginTop: '0.5rem' }}
               />
             </label>
 
             {error && (
-              <p style={{ color: 'var(--ek-danger)', marginTop: '1rem', fontSize: '0.875rem' }}>{error}</p>
+              <p style={{ color: 'var(--ek-danger)', marginTop: '1rem', fontSize: '0.875rem' }}>
+                {error}
+              </p>
             )}
 
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem' }}>
@@ -277,7 +455,7 @@ function ManualCheckInModal({ reserva, onClose, onDone }: {
                 onClick={handleConfirm}
                 disabled={submitting}
                 className="ek-cta"
-                style={{ flex: 1, background: 'var(--ek-success)', color: 'var(--ek-cream)' }}
+                style={{ flex: 1 }}
               >
                 {submitting ? 'Marcando…' : 'Marcar check-in'}
               </button>
