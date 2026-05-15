@@ -1,6 +1,62 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
+
+const ESTUDIOS: EstudioInfo[] = [
+  {
+    slug: 'estudio-1',
+    nombre: 'Estudio 1',
+    tier: 'basica',
+    capacidad: 'Hasta 3 personas',
+    contenido: ['Podcast', 'Video', 'Entrevistas'],
+    descripcion: 'Espacio versátil con iluminación cálida y fondo neutro de madera. Atmósfera profesional pero accesible. Ideal para contenido conversacional y entrevistas.',
+    estiloVisual: 'Iluminación cálida, fondo neutro madera, atmósfera profesional pero accesible.',
+    equipoIncluido: [
+      'Cámara Sony A7 IV',
+      'Micrófono Shure SM7B',
+      'Iluminación LED profesional',
+      'Pantalla verde opcional',
+      'Audio Interface profesional'
+    ]
+  },
+  {
+    slug: 'estudio-2',
+    nombre: 'Estudio 2',
+    tier: 'basica',
+    capacidad: 'Hasta 3 personas',
+    contenido: ['Video', 'Cursos', 'Tutoriales'],
+    descripcion: 'Espacio versátil con fondo intercambiable, ideal para contenido educativo y reviews. Setup pensado para creadores que producen variedad de contenido.',
+    estiloVisual: 'Espacio versátil con fondo intercambiable, ideal para contenido educativo y reviews.',
+    equipoIncluido: [
+      'Cámara Sony A7 IV',
+      'Micrófono Rode NT-USB',
+      'Iluminación LED ajustable',
+      'Audio Interface',
+      'Trípode profesional'
+    ]
+  },
+  {
+    slug: 'black',
+    nombre: 'Black',
+    tier: 'pro',
+    capacidad: 'Hasta 5 personas',
+    contenido: ['Producciones', 'Cinema', 'Comerciales', 'Music Videos'],
+    descripcion: 'Estudio premium con estética cinematográfica. Iluminación dramática controlable. Diseñado para producciones de alto nivel donde cada detalle importa.',
+    estiloVisual: 'Estudio premium con estética cinematográfica. Iluminación dramática controlable. Diseñado para producciones de alto nivel.',
+    equipoIncluido: [
+      'Cámaras Cinema 4K',
+      'Set completo de iluminación cinematográfica',
+      'Micrófonos profesionales (Shure SM7B + Rode lavalier)',
+      'Pantalla LED grande',
+      'Mesa de mezclas',
+      'Asistencia técnica incluida'
+    ]
+  }
+];
 
 export default function Landing() {
+  const [estudioAbierto, setEstudioAbierto] = useState<EstudioInfo | null>(null);
+
   return (
     <div style={{
       maxWidth: '1200px',
@@ -59,22 +115,13 @@ export default function Landing() {
           horas ilimitadas según tu membresía.
         </p>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-          <a
-            href="#contacto"
-            className="ek-cta"
-            style={{ padding: '16px 28px', fontSize: '15px' }}
-          >
-            Agendar una visita →
-          </a>
-          <a
-            href="#membresias"
-            className="ek-cta ek-cta--secondary"
-            style={{ padding: '16px 28px', fontSize: '15px' }}
-          >
-            Ver membresías
-          </a>
-        </div>
+        <a
+          href="#membresias"
+          className="ek-cta"
+          style={{ padding: '16px 28px', fontSize: '15px', display: 'inline-block' }}
+        >
+          Ver membresías →
+        </a>
       </section>
 
       {/* ============================================================
@@ -169,27 +216,31 @@ export default function Landing() {
           gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
           gap: '20px'
         }}>
-          {[
-            {
-              nombre: 'Estudio 1',
-              tier: 'BÁSICA',
-              capacidad: 'Hasta 3 personas',
-              contenido: 'Podcast · Video · Entrevistas'
-            },
-            {
-              nombre: 'Estudio 2',
-              tier: 'BÁSICA',
-              capacidad: 'Hasta 3 personas',
-              contenido: 'Video · Cursos · Tutoriales'
-            },
-            {
-              nombre: 'Black',
-              tier: '★ PRO',
-              capacidad: 'Hasta 5 personas',
-              contenido: 'Producciones · Cinema · Comerciales'
-            }
-          ].map((s) => (
-            <div key={s.nombre} className="ek-card" style={{ padding: 0, overflow: 'hidden' }}>
+          {ESTUDIOS.map((s) => (
+            <button
+              key={s.slug}
+              onClick={() => setEstudioAbierto(s)}
+              className="ek-card"
+              style={{
+                padding: 0,
+                overflow: 'hidden',
+                cursor: 'pointer',
+                textAlign: 'left',
+                border: '0.5px solid var(--ek-line)',
+                background: 'var(--ek-bg-soft)',
+                color: 'var(--ek-ink)',
+                transition: 'transform 0.2s ease, border-color 0.2s ease',
+                font: 'inherit'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.borderColor = 'var(--ek-mustard-dim)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.borderColor = 'var(--ek-line)';
+              }}
+            >
               <div style={{
                 background: 'linear-gradient(135deg, var(--ek-bg-elevated) 0%, var(--ek-bg) 100%)',
                 aspectRatio: '16 / 10',
@@ -199,10 +250,10 @@ export default function Landing() {
                 position: 'relative'
               }}>
                 <span
-                  className={s.tier.includes('PRO') ? 'ek-badge ek-badge--outline' : 'ek-badge'}
+                  className={s.tier === 'pro' ? 'ek-badge ek-badge--outline' : 'ek-badge'}
                   style={{ position: 'absolute', top: '14px', left: '14px' }}
                 >
-                  {s.tier}
+                  {s.tier === 'pro' ? '★ PRO' : 'BÁSICA'}
                 </span>
                 <span style={{
                   fontSize: '10px',
@@ -223,16 +274,27 @@ export default function Landing() {
                   fontSize: '13px',
                   color: 'var(--ek-ink-muted)',
                   margin: 0,
-                  marginBottom: '4px'
+                  marginBottom: '6px'
                 }}>{s.capacidad}</p>
                 <p style={{
                   fontSize: '12px',
                   color: 'var(--ek-mustard)',
                   margin: 0,
+                  marginBottom: '12px',
                   fontWeight: 600
-                }}>{s.contenido}</p>
+                }}>{s.contenido.join(' · ')}</p>
+                <p style={{
+                  fontSize: '11px',
+                  color: 'var(--ek-ink-faint)',
+                  margin: 0,
+                  letterSpacing: '0.08em',
+                  textTransform: 'uppercase',
+                  fontWeight: 600
+                }}>
+                  Ver detalle →
+                </p>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </section>
@@ -504,6 +566,11 @@ export default function Landing() {
           © {new Date().getFullYear()} EKKO Studio. Todos los derechos reservados.
         </p>
       </footer>
+
+      <EstudioModal
+        estudio={estudioAbierto}
+        onClose={() => setEstudioAbierto(null)}
+      />
     </div>
   );
 }
