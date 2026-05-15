@@ -20,10 +20,7 @@ export default function Home() {
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <Link to="/signup" className="ek-cta">
-            Crear cuenta
-          </Link>
-          <Link to="/login" className="ek-cta ek-cta--secondary">
+          <Link to="/login" className="ek-cta">
             Iniciar sesión
           </Link>
         </div>

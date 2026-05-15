@@ -42,18 +42,13 @@ export default function PublicLayout() {
               </button>
             </>
           ) : (
-            <>
-              <Link to="/login" style={{ fontSize: '0.9375rem', fontWeight: 500 }}>
-                Iniciar sesión
-              </Link>
-              <Link
-                to="/signup"
-                className="ek-cta"
-                style={{ padding: '0.625rem 1.25rem', minHeight: '40px' }}
-              >
-                Crear cuenta
-              </Link>
-            </>
+            <Link
+              to="/login"
+              className="ek-cta"
+              style={{ padding: '0.625rem 1.25rem', minHeight: '40px' }}
+            >
+              Iniciar sesión
+            </Link>
           )}
         </nav>
       </header>

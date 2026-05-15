@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@shared/lib/supabase';
 
 export default function Login() {
@@ -99,18 +99,6 @@ export default function Login() {
             </button>
           </form>
         </div>
-
-        <p style={{
-          textAlign: 'center',
-          marginTop: '24px',
-          fontSize: '14px',
-          color: 'var(--ek-ink-muted)'
-        }}>
-          ¿No tienes cuenta?{' '}
-          <Link to="/signup" style={{ color: 'var(--ek-mustard)', fontWeight: 600 }}>
-            Regístrate
-          </Link>
-        </p>
       </div>
     </div>
   );
