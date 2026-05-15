@@ -95,7 +95,7 @@ export default function Login() {
               className="ek-cta ek-cta--full"
               disabled={isSubmitting || !email || !password}
             >
-              {isSubmitting ? 'Entrando…' : 'Entrar'}
+              {isSubmitting ? 'Iniciando sesión…' : 'Iniciar sesión'}
             </button>
           </form>
         </div>

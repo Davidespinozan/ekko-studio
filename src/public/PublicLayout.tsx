@@ -1,4 +1,4 @@
-import { Routes, Route, Link } from 'react-router-dom';
+import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
@@ -12,6 +12,8 @@ const Signup = lazy(() => import('./pages/Signup'));
 export default function PublicLayout() {
   const tenant = useTenant();
   const { authUser, signOut } = useAuth();
+  const location = useLocation();
+  const enLogin = location.pathname === '/login';
   useRoleRedirect(['/', '/login', '/signup']);
 
   return (
@@ -41,7 +43,7 @@ export default function PublicLayout() {
                 Salir
               </button>
             </>
-          ) : (
+          ) : !enLogin ? (
             <Link
               to="/login"
               className="ek-cta"
@@ -49,7 +51,7 @@ export default function PublicLayout() {
             >
               Iniciar sesión
             </Link>
-          )}
+          ) : null}
         </nav>
       </header>
 
