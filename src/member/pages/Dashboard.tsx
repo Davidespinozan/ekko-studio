@@ -106,13 +106,6 @@ function formatearFecha(iso: string): string {
   return `${fecha} · ${hora}`;
 }
 
-function formatearFechaCorta(iso: string): string {
-  const d = new Date(iso);
-  const fecha = d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
-  const hora = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
-  return `${fecha} · ${hora}`;
-}
-
 function capitalizarNombre(nombre: string | null | undefined): string {
   if (!nombre) return '';
   return nombre
@@ -136,7 +129,7 @@ export default function Dashboard() {
   const ahora = new Date();
   const bloqueado = usuario?.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > ahora;
   const nombreFormat = capitalizarNombre(usuario?.nombre) || 'creador';
-  const [proximaReserva, ...otrasReservas] = proximasReservas;
+  const proximaReserva = proximasReservas[0];
 
   return (
     <div className="ek-container">
@@ -205,47 +198,6 @@ export default function Dashboard() {
           <Link to="/app/reservar" className="ek-cta">
             Reservar ahora
           </Link>
-        </div>
-      )}
-
-      {/* Otras próximas reservas */}
-      {otrasReservas.length > 0 && (
-        <div style={{ marginBottom: '32px' }}>
-          <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>
-            TUS PRÓXIMAS RESERVAS
-          </p>
-          <div className="ek-stack-sm">
-            {otrasReservas.map((r) => (
-              <Link
-                key={r.id}
-                to={`/app/qr/${r.id}`}
-                className="ek-card ek-card--md ek-card-interactive"
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  textDecoration: 'none',
-                  color: 'inherit'
-                }}
-              >
-                <div>
-                  <p style={{
-                    fontFamily: 'var(--ek-font-display)',
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    letterSpacing: '-0.02em',
-                    margin: 0
-                  }}>
-                    {r.recurso?.nombre ?? 'Estudio'}
-                  </p>
-                  <p className="ek-body-faint" style={{ marginTop: '2px' }}>
-                    {formatearFechaCorta(r.slot_inicio)}
-                  </p>
-                </div>
-                <span style={{ color: 'var(--ek-mustard)', fontSize: '14px' }}>→</span>
-              </Link>
-            ))}
-          </div>
         </div>
       )}
 

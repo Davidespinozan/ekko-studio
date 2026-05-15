@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import {
@@ -11,7 +11,6 @@ import {
 import {
   generarSlotsDisponibles,
   generarFechasReservables,
-  filtrarRecursosPorTier,
   formatHora,
   type TenantReservaConfig,
   type Slot
@@ -20,10 +19,16 @@ import type { Database } from '@shared/types/database';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 
+function tierTieneAcceso(recurso: Recurso, tier: string | null | undefined): boolean {
+  return tier ? recurso.tiers_permitidos.includes(tier) : false;
+}
+
 export default function Reservar() {
   const tenant = useTenant();
   const { usuario } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const recursoSlugParam = searchParams.get('recurso');
   const { recursos, isLoading: loadingRecursos } = useRecursosDelTenant();
 
   const config = useMemo<TenantReservaConfig>(() => {
@@ -38,10 +43,8 @@ export default function Reservar() {
     };
   }, [tenant.config]);
 
-  const recursosVisibles = useMemo(
-    () => filtrarRecursosPorTier(recursos, usuario?.membresia_tier ?? null),
-    [recursos, usuario?.membresia_tier]
-  );
+  const tier = usuario?.membresia_tier ?? null;
+  const puedeUsar = (r: Recurso) => tierTieneAcceso(r, tier);
 
   const fechas = useMemo(() => generarFechasReservables(config), [config]);
 
@@ -62,12 +65,21 @@ export default function Reservar() {
     if (!slotPendiente) setInvitados(0);
   }, [slotPendiente]);
 
-  // Auto-seleccionar primer recurso disponible
+  // Auto-seleccionar primer recurso accesible (o el del query param ?recurso=slug)
   useEffect(() => {
-    if (!recursoSel && recursosVisibles.length > 0) {
-      setRecursoSel(recursosVisibles[0]);
+    if (recursoSel || recursos.length === 0) return;
+
+    if (recursoSlugParam) {
+      const found = recursos.find((r) => r.slug === recursoSlugParam);
+      if (found && tierTieneAcceso(found, tier)) {
+        setRecursoSel(found);
+        return;
+      }
     }
-  }, [recursosVisibles, recursoSel]);
+
+    const primerAccesible = recursos.find((r) => tierTieneAcceso(r, tier));
+    if (primerAccesible) setRecursoSel(primerAccesible);
+  }, [recursos, recursoSel, recursoSlugParam, tier]);
 
   // Recargar slots cuando cambia recurso o fecha
   useEffect(() => {
@@ -123,13 +135,13 @@ export default function Reservar() {
     return <div className="ek-container"><p className="ek-body">Cargando estudios…</p></div>;
   }
 
-  if (recursosVisibles.length === 0) {
+  if (recursos.length === 0) {
     return (
       <div className="ek-container">
         <div className="ek-stack-lg">
           <p className="ek-eyebrow">SIN ESTUDIOS DISPONIBLES</p>
           <p className="ek-body">
-            Tu plan actual no incluye acceso a ningún estudio. Contacta al administrador.
+            No hay estudios activos en este momento. Contacta al administrador.
           </p>
         </div>
       </div>
@@ -148,26 +160,48 @@ export default function Reservar() {
         <div className="ek-stack-sm">
           <label className="ek-label">Estudio</label>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {recursosVisibles.map((r) => {
+            {recursos.map((r) => {
               const activo = recursoSel?.id === r.id;
+              const accesible = puedeUsar(r);
+              const esPro = r.tiers_permitidos.length === 1 && r.tiers_permitidos[0] === 'pro';
               return (
                 <button
                   key={r.id}
-                  onClick={() => setRecursoSel(r)}
+                  onClick={() => {
+                    if (!accesible) {
+                      alert('Tu plan no incluye este estudio. Ve a Estudios para más info.');
+                      return;
+                    }
+                    setRecursoSel(r);
+                  }}
                   style={{
                     padding: '10px 18px',
                     minHeight: '44px',
-                    background: activo ? 'var(--ek-mustard-soft)' : 'transparent',
-                    color: activo ? 'var(--ek-mustard)' : 'var(--ek-ink-muted)',
-                    border: `0.5px solid ${activo ? 'var(--ek-mustard)' : 'var(--ek-line)'}`,
+                    background: activo && accesible ? 'var(--ek-mustard-soft)' : 'transparent',
+                    color: activo && accesible
+                      ? 'var(--ek-mustard)'
+                      : accesible ? 'var(--ek-ink-muted)' : 'var(--ek-ink-faint)',
+                    border: `0.5px solid ${activo && accesible ? 'var(--ek-mustard)' : 'var(--ek-line)'}`,
                     borderRadius: 'var(--ek-r-pill)',
                     fontWeight: 600,
                     fontSize: '14px',
-                    cursor: 'pointer',
-                    fontFamily: 'var(--ek-font-body)'
+                    cursor: accesible ? 'pointer' : 'not-allowed',
+                    opacity: accesible ? 1 : 0.5,
+                    fontFamily: 'var(--ek-font-body)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px'
                   }}
                 >
                   {r.nombre}
+                  {esPro && !accesible && (
+                    <span style={{
+                      fontSize: '9px',
+                      color: 'var(--ek-mustard)',
+                      fontWeight: 700,
+                      letterSpacing: '0.12em'
+                    }}>★ PRO</span>
+                  )}
                 </button>
               );
             })}

@@ -9,6 +9,8 @@ const Reservar = lazy(() => import('./pages/Reservar'));
 const Historial = lazy(() => import('./pages/Historial'));
 const Perfil = lazy(() => import('./pages/Perfil'));
 const MiQR = lazy(() => import('./pages/MiQR'));
+const Estudios = lazy(() => import('./pages/Estudios'));
+const EstudioDetalle = lazy(() => import('./pages/EstudioDetalle'));
 
 export default function MemberLayout() {
   const { authUser, isLoading, signOut } = useAuth();
@@ -54,6 +56,8 @@ export default function MemberLayout() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/reservar" element={<Reservar />} />
+          <Route path="/estudios" element={<Estudios />} />
+          <Route path="/estudios/:slug" element={<EstudioDetalle />} />
           <Route path="/historial" element={<Historial />} />
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/qr/:reservaId" element={<MiQR />} />
