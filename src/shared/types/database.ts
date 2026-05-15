@@ -203,9 +203,13 @@ export type Database = {
       recursos: {
         Row: {
           activo: boolean
+          capacidad_personas: number | null
           created_at: string
           cupos: number
           descripcion: string | null
+          equipo_incluido: string[] | null
+          estilo_visual: string | null
+          foto_url: string | null
           fotos_urls: string[]
           horarios: Json
           id: string
@@ -215,14 +219,19 @@ export type Database = {
           tenant_id: string
           tiers_permitidos: string[]
           tipo: string
+          tipo_contenido: string[] | null
           updated_at: string
           video_url: string | null
         }
         Insert: {
           activo?: boolean
+          capacidad_personas?: number | null
           created_at?: string
           cupos?: number
           descripcion?: string | null
+          equipo_incluido?: string[] | null
+          estilo_visual?: string | null
+          foto_url?: string | null
           fotos_urls?: string[]
           horarios?: Json
           id?: string
@@ -232,14 +241,19 @@ export type Database = {
           tenant_id: string
           tiers_permitidos?: string[]
           tipo?: string
+          tipo_contenido?: string[] | null
           updated_at?: string
           video_url?: string | null
         }
         Update: {
           activo?: boolean
+          capacidad_personas?: number | null
           created_at?: string
           cupos?: number
           descripcion?: string | null
+          equipo_incluido?: string[] | null
+          estilo_visual?: string | null
+          foto_url?: string | null
           fotos_urls?: string[]
           horarios?: Json
           id?: string
@@ -249,6 +263,7 @@ export type Database = {
           tenant_id?: string
           tiers_permitidos?: string[]
           tipo?: string
+          tipo_contenido?: string[] | null
           updated_at?: string
           video_url?: string | null
         }

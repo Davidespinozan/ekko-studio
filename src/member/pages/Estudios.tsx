@@ -2,18 +2,9 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
+import type { Database } from '@shared/types/database';
 
-interface Recurso {
-  id: string;
-  slug: string;
-  nombre: string;
-  descripcion: string | null;
-  tiers_permitidos: string[];
-  activo: boolean;
-  tipo_contenido: string[];
-  capacidad_personas: number;
-  foto_url: string | null;
-}
+type Recurso = Database['public']['Tables']['recursos']['Row'];
 
 export default function Estudios() {
   const tenant = useTenant();
@@ -23,9 +14,6 @@ export default function Estudios() {
   useEffect(() => {
     let mounted = true;
     async function load() {
-      // select '*' + cast: las columnas nuevas (tipo_contenido, capacidad_personas,
-      // foto_url) están en la migración 180000 y aún no aparecen en database.ts
-      // hasta que David regenere tipos. Por eso el cast.
       const { data, error } = await supabase
         .from('recursos')
         .select('*')
@@ -35,7 +23,7 @@ export default function Estudios() {
 
       if (!mounted) return;
       if (error) console.error('[Estudios]', error);
-      else setRecursos((data ?? []) as unknown as Recurso[]);
+      else setRecursos(data ?? []);
       setIsLoading(false);
     }
     load();
@@ -154,7 +142,7 @@ export default function Estudios() {
                   color: 'var(--ek-ink-muted)'
                 }}>
                   <span>
-                    {r.capacidad_personas > 0
+                    {(r.capacidad_personas ?? 0) > 0
                       ? `Hasta ${r.capacidad_personas} personas`
                       : 'Capacidad por confirmar'}
                   </span>

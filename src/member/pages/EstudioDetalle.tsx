@@ -3,19 +3,9 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
+import type { Database } from '@shared/types/database';
 
-interface RecursoDetalle {
-  id: string;
-  slug: string;
-  nombre: string;
-  descripcion: string | null;
-  tiers_permitidos: string[];
-  tipo_contenido: string[];
-  equipo_incluido: string[];
-  estilo_visual: string | null;
-  capacidad_personas: number;
-  foto_url: string | null;
-}
+type RecursoDetalle = Database['public']['Tables']['recursos']['Row'];
 
 export default function EstudioDetalle() {
   const { slug } = useParams<{ slug: string }>();
@@ -38,7 +28,7 @@ export default function EstudioDetalle() {
 
       if (!mounted) return;
       if (error) console.error('[EstudioDetalle]', error);
-      else setRecurso(data as unknown as RecursoDetalle | null);
+      else setRecurso(data);
       setIsLoading(false);
     }
     load();
@@ -150,7 +140,7 @@ export default function EstudioDetalle() {
         </div>
       )}
 
-      {recurso.capacidad_personas > 0 && (
+      {(recurso.capacidad_personas ?? 0) > 0 && (
         <div className="ek-stat-card" style={{ marginBottom: '24px' }}>
           <p className="ek-eyebrow" style={{ marginBottom: '6px' }}>CAPACIDAD</p>
           <p className="ek-kpi">
