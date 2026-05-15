@@ -21,7 +21,7 @@ interface ReservaData {
   slot_inicio: string;
   slot_fin: string;
   duracion_min: number;
-  cupos: number;
+  invitados_count: number;
 }
 
 interface StatsData {
@@ -104,7 +104,7 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMes
         <Cell label="HORA" value={`${hora(reserva.slot_inicio)} – ${hora(reserva.slot_fin)}`} />
         <Cell label="DURACIÓN" value={`${reserva.duracion_min} min`} />
         <Cell label="FOLIO" value={reserva.folio} mono />
-        <Cell label="PERSONAS" value={`${reserva.cupos}`} />
+        <Cell label="PERSONAS" value={`${1 + reserva.invitados_count}`} />
       </div>
 
       <div className="rec-detail-divider" />
