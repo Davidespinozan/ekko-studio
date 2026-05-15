@@ -38,7 +38,7 @@ export default function Historial() {
       <div className="ek-stack-xl">
         <div className="ek-stack-md">
           <p className="ek-eyebrow">HISTORIAL</p>
-          <h1 className="ek-h2">Tus reservas</h1>
+          <h1 className="ek-display-md">Tus reservas</h1>
         </div>
 
         {error && <p className="ek-error-text">{error}</p>}

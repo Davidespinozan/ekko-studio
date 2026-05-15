@@ -26,10 +26,7 @@ export default function Login() {
         return;
       }
 
-      // El useRoleRedirect del PublicLayout maneja el redirect por rol.
-      // Forzamos un navigate genérico que el hook va a interceptar.
-      // (En la práctica, AuthProvider va a hidratar usuario y luego
-      // useRoleRedirect lo mueve a /admin, /recepcion o /app según rol.)
+      // El useRoleRedirect del PublicLayout mueve al área correcta según rol.
       navigate('/', { replace: true });
     } catch (err) {
       setError('Error inesperado. Intenta de nuevo.');
@@ -38,61 +35,80 @@ export default function Login() {
   }
 
   return (
-    <div className="ek-container ek-container--narrow">
-      <div className="ek-stack-lg">
-        <div className="ek-stack-md">
-          <p className="ek-eyebrow">INICIAR SESIÓN</p>
-          <h1 className="ek-h2">Bienvenido de vuelta</h1>
-          <p className="ek-body">
-            Accede a tu espacio para reservar y crear contenido.
-          </p>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px 20px'
+    }}>
+      <div style={{ maxWidth: '400px', width: '100%' }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <h1 style={{
+            fontFamily: 'var(--ek-font-display)',
+            fontSize: '36px',
+            fontWeight: 700,
+            letterSpacing: '-0.04em',
+            color: 'var(--ek-mustard)',
+            margin: 0
+          }}>EKKO</h1>
+          <p className="ek-eyebrow" style={{ marginTop: '6px' }}>STUDIO</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="ek-stack-md">
-          <div className="ek-form-field">
-            <label htmlFor="email" className="ek-label">Email</label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="ek-input"
-              placeholder="tu@email.com"
-            />
-          </div>
+        <div className="ek-card">
+          <p className="ek-eyebrow" style={{ marginBottom: '16px' }}>INICIAR SESIÓN</p>
 
-          <div className="ek-form-field">
-            <label htmlFor="password" className="ek-label">Contraseña</label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="ek-input"
-              placeholder="••••••••"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="ek-stack-md">
+            <div className="ek-form-field">
+              <label htmlFor="email" className="ek-label">Email</label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="ek-input"
+                placeholder="tu@email.com"
+              />
+            </div>
 
-          {error && <p className="ek-error-text">{error}</p>}
+            <div className="ek-form-field">
+              <label htmlFor="password" className="ek-label">Contraseña</label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="ek-input"
+                placeholder="••••••••"
+              />
+            </div>
 
-          <button
-            type="submit"
-            className="ek-cta ek-cta--full"
-            disabled={isSubmitting || !email || !password}
-          >
-            {isSubmitting ? 'Entrando…' : 'Iniciar sesión'}
-          </button>
-        </form>
+            {error && <p className="ek-error-text">{error}</p>}
 
-        <p style={{ textAlign: 'center', fontSize: '0.9375rem', color: 'var(--ek-ink-muted)' }}>
+            <button
+              type="submit"
+              className="ek-cta ek-cta--full"
+              disabled={isSubmitting || !email || !password}
+            >
+              {isSubmitting ? 'Entrando…' : 'Entrar'}
+            </button>
+          </form>
+        </div>
+
+        <p style={{
+          textAlign: 'center',
+          marginTop: '24px',
+          fontSize: '14px',
+          color: 'var(--ek-ink-muted)'
+        }}>
           ¿No tienes cuenta?{' '}
-          <Link to="/signup" style={{ color: 'var(--ek-black)', fontWeight: 600 }}>
-            Crear cuenta
+          <Link to="/signup" style={{ color: 'var(--ek-mustard)', fontWeight: 600 }}>
+            Regístrate
           </Link>
         </p>
       </div>

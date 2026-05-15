@@ -39,15 +39,12 @@ export default function Signup() {
         return;
       }
 
-      // Si la confirmación de email está activa, no hay sesión aún
       if (!data.session) {
         setSuccess(true);
         setIsSubmitting(false);
         return;
       }
 
-      // Si hay sesión inmediata, el useRoleRedirect del PublicLayout
-      // hace el redirect por rol.
       navigate('/', { replace: true });
     } catch (err) {
       setError('Error inesperado. Intenta de nuevo.');
@@ -57,107 +54,149 @@ export default function Signup() {
 
   if (success) {
     return (
-      <div className="ek-container ek-container--narrow">
-        <div className="ek-stack-lg">
-          <p className="ek-eyebrow">REVISA TU EMAIL</p>
-          <h1 className="ek-h2">¡Casi listo!</h1>
-          <p className="ek-body">
-            Te enviamos un enlace de confirmación a <strong>{email}</strong>.
-            Haz click ahí para activar tu cuenta.
-          </p>
-          <Link to="/login" className="ek-cta ek-cta--secondary ek-cta--full">
-            Volver al inicio de sesión
-          </Link>
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px 20px'
+      }}>
+        <div style={{ maxWidth: '400px', width: '100%' }}>
+          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+            <h1 style={{
+              fontFamily: 'var(--ek-font-display)',
+              fontSize: '36px',
+              fontWeight: 700,
+              letterSpacing: '-0.04em',
+              color: 'var(--ek-mustard)',
+              margin: 0
+            }}>EKKO</h1>
+            <p className="ek-eyebrow" style={{ marginTop: '6px' }}>STUDIO</p>
+          </div>
+
+          <div className="ek-card">
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '12px' }}>REVISA TU EMAIL</p>
+            <h2 className="ek-display-md" style={{ marginBottom: '12px' }}>¡Casi listo!</h2>
+            <p className="ek-body" style={{ marginBottom: '24px' }}>
+              Te enviamos un enlace de confirmación a <strong>{email}</strong>.
+              Haz click ahí para activar tu cuenta.
+            </p>
+            <Link to="/login" className="ek-cta ek-cta--secondary ek-cta--full">
+              Volver al inicio de sesión
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="ek-container ek-container--narrow">
-      <div className="ek-stack-lg">
-        <div className="ek-stack-md">
-          <p className="ek-eyebrow">CREAR CUENTA</p>
-          <h1 className="ek-h2">Únete a {tenant.nombre}</h1>
-          <p className="ek-body">
-            Empieza a crear contenido profesional hoy.
-          </p>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '24px 20px'
+    }}>
+      <div style={{ maxWidth: '400px', width: '100%' }}>
+        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+          <h1 style={{
+            fontFamily: 'var(--ek-font-display)',
+            fontSize: '36px',
+            fontWeight: 700,
+            letterSpacing: '-0.04em',
+            color: 'var(--ek-mustard)',
+            margin: 0
+          }}>EKKO</h1>
+          <p className="ek-eyebrow" style={{ marginTop: '6px' }}>STUDIO</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="ek-stack-md">
-          <div className="ek-form-field">
-            <label htmlFor="nombre" className="ek-label">Nombre completo</label>
-            <input
-              id="nombre"
-              type="text"
-              autoComplete="name"
-              required
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              className="ek-input"
-              placeholder="María González"
-            />
-          </div>
+        <div className="ek-card">
+          <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>CREAR CUENTA</p>
+          <p className="ek-body-muted" style={{ marginBottom: '20px' }}>
+            Únete a {tenant.nombre}. Empieza a crear contenido profesional hoy.
+          </p>
 
-          <div className="ek-form-field">
-            <label htmlFor="email" className="ek-label">Email</label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="ek-input"
-              placeholder="tu@email.com"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="ek-stack-md">
+            <div className="ek-form-field">
+              <label htmlFor="nombre" className="ek-label">Nombre completo</label>
+              <input
+                id="nombre"
+                type="text"
+                autoComplete="name"
+                required
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                className="ek-input"
+                placeholder="María González"
+              />
+            </div>
 
-          <div className="ek-form-field">
-            <label htmlFor="telefono" className="ek-label">
-              Teléfono <span style={{ color: 'var(--ek-ink-muted)', fontWeight: 400 }}>(opcional)</span>
-            </label>
-            <input
-              id="telefono"
-              type="tel"
-              autoComplete="tel"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              className="ek-input"
-              placeholder="+52 667 123 4567"
-            />
-          </div>
+            <div className="ek-form-field">
+              <label htmlFor="email" className="ek-label">Email</label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="ek-input"
+                placeholder="tu@email.com"
+              />
+            </div>
 
-          <div className="ek-form-field">
-            <label htmlFor="password" className="ek-label">Contraseña</label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="ek-input"
-              placeholder="Mínimo 8 caracteres"
-            />
-            <p className="ek-helper-text">Al menos 8 caracteres.</p>
-          </div>
+            <div className="ek-form-field">
+              <label htmlFor="telefono" className="ek-label">
+                Teléfono <span style={{ color: 'var(--ek-ink-faint)', fontWeight: 400 }}>(opcional)</span>
+              </label>
+              <input
+                id="telefono"
+                type="tel"
+                autoComplete="tel"
+                value={telefono}
+                onChange={(e) => setTelefono(e.target.value)}
+                className="ek-input"
+                placeholder="+52 667 123 4567"
+              />
+            </div>
 
-          {error && <p className="ek-error-text">{error}</p>}
+            <div className="ek-form-field">
+              <label htmlFor="password" className="ek-label">Contraseña</label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="new-password"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="ek-input"
+                placeholder="Mínimo 8 caracteres"
+              />
+              <p className="ek-helper-text">Al menos 8 caracteres.</p>
+            </div>
 
-          <button
-            type="submit"
-            className="ek-cta ek-cta--full"
-            disabled={isSubmitting || !email || !password || !nombre}
-          >
-            {isSubmitting ? 'Creando cuenta…' : 'Crear cuenta'}
-          </button>
-        </form>
+            {error && <p className="ek-error-text">{error}</p>}
 
-        <p style={{ textAlign: 'center', fontSize: '0.9375rem', color: 'var(--ek-ink-muted)' }}>
+            <button
+              type="submit"
+              className="ek-cta ek-cta--full"
+              disabled={isSubmitting || !email || !password || !nombre}
+            >
+              {isSubmitting ? 'Creando cuenta…' : 'Crear cuenta'}
+            </button>
+          </form>
+        </div>
+
+        <p style={{
+          textAlign: 'center',
+          marginTop: '24px',
+          fontSize: '14px',
+          color: 'var(--ek-ink-muted)'
+        }}>
           ¿Ya tienes cuenta?{' '}
-          <Link to="/login" style={{ color: 'var(--ek-black)', fontWeight: 600 }}>
+          <Link to="/login" style={{ color: 'var(--ek-mustard)', fontWeight: 600 }}>
             Iniciar sesión
           </Link>
         </p>

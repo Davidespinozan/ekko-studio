@@ -148,25 +148,29 @@ export default function Reservar() {
         <div className="ek-stack-sm">
           <label className="ek-label">Estudio</label>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {recursosVisibles.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => setRecursoSel(r)}
-                style={{
-                  padding: '0.75rem 1rem',
-                  minHeight: '44px',
-                  background: recursoSel?.id === r.id ? 'var(--ek-black)' : 'transparent',
-                  color: recursoSel?.id === r.id ? 'var(--ek-cream)' : 'var(--ek-black)',
-                  border: '1.5px solid var(--ek-black)',
-                  borderRadius: 'var(--ek-radius-pill)',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  cursor: 'pointer'
-                }}
-              >
-                {r.nombre}
-              </button>
-            ))}
+            {recursosVisibles.map((r) => {
+              const activo = recursoSel?.id === r.id;
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => setRecursoSel(r)}
+                  style={{
+                    padding: '10px 18px',
+                    minHeight: '44px',
+                    background: activo ? 'var(--ek-mustard-soft)' : 'transparent',
+                    color: activo ? 'var(--ek-mustard)' : 'var(--ek-ink-muted)',
+                    border: `0.5px solid ${activo ? 'var(--ek-mustard)' : 'var(--ek-line)'}`,
+                    borderRadius: 'var(--ek-r-pill)',
+                    fontWeight: 600,
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--ek-font-body)'
+                  }}
+                >
+                  {r.nombre}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -182,27 +186,31 @@ export default function Reservar() {
               scrollbarWidth: 'thin'
             }}
           >
-            {fechas.slice(0, 14).map((f) => (
-              <button
-                key={f.fechaISO}
-                onClick={() => setFechaSel(f.fechaISO)}
-                style={{
-                  flexShrink: 0,
-                  padding: '0.625rem 0.875rem',
-                  minHeight: '44px',
-                  background: fechaSel === f.fechaISO ? 'var(--ek-black)' : 'var(--ek-cream-warm)',
-                  color: fechaSel === f.fechaISO ? 'var(--ek-cream)' : 'var(--ek-black)',
-                  border: '1px solid var(--ek-line)',
-                  borderRadius: 'var(--ek-radius)',
-                  fontWeight: 600,
-                  fontSize: '0.8125rem',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {f.label}
-              </button>
-            ))}
+            {fechas.slice(0, 14).map((f) => {
+              const activo = fechaSel === f.fechaISO;
+              return (
+                <button
+                  key={f.fechaISO}
+                  onClick={() => setFechaSel(f.fechaISO)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '10px 14px',
+                    minHeight: '44px',
+                    background: activo ? 'var(--ek-mustard-soft)' : 'var(--ek-bg-soft)',
+                    color: activo ? 'var(--ek-mustard)' : 'var(--ek-ink)',
+                    border: `0.5px solid ${activo ? 'var(--ek-mustard)' : 'var(--ek-line)'}`,
+                    borderRadius: 'var(--ek-r-sm)',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                    fontFamily: 'var(--ek-font-body)'
+                  }}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -210,9 +218,9 @@ export default function Reservar() {
         <div className="ek-stack-sm">
           <label className="ek-label">Horario</label>
           {loadingSlots ? (
-            <p style={{ color: 'var(--ek-ink-muted)', fontSize: '0.875rem' }}>Cargando horarios…</p>
+            <p className="ek-body-muted">Cargando horarios…</p>
           ) : slots.length === 0 ? (
-            <p style={{ color: 'var(--ek-ink-muted)', fontSize: '0.875rem' }}>
+            <p className="ek-body-muted">
               El estudio no opera este día.
             </p>
           ) : (
@@ -233,14 +241,14 @@ export default function Reservar() {
                     onClick={() => setSlotPendiente(slot)}
                     title={tooltip}
                     style={{
-                      padding: '0.875rem 0.5rem',
+                      padding: '14px 8px',
                       minHeight: '52px',
-                      background: slot.disponible ? 'var(--ek-cream-warm)' : 'transparent',
-                      color: slot.disponible ? 'var(--ek-black)' : 'var(--ek-ink-muted)',
-                      border: '1px solid var(--ek-line)',
-                      borderRadius: 'var(--ek-radius)',
+                      background: slot.disponible ? 'var(--ek-bg-soft)' : 'transparent',
+                      color: slot.disponible ? 'var(--ek-ink)' : 'var(--ek-ink-faint)',
+                      border: '0.5px solid var(--ek-line)',
+                      borderRadius: 'var(--ek-r-sm)',
                       fontFamily: 'var(--ek-font-mono)',
-                      fontSize: '0.9375rem',
+                      fontSize: '15px',
                       fontWeight: 600,
                       cursor: slot.disponible ? 'pointer' : 'not-allowed',
                       opacity: slot.disponible ? 1 : 0.4
@@ -257,25 +265,14 @@ export default function Reservar() {
         {/* Modal de confirmación */}
         {slotPendiente && recursoSel && (
           <div
+            className="ek-modal-backdrop"
             onClick={() => !submitting && setSlotPendiente(null)}
-            style={{
-              position: 'fixed', inset: 0, background: 'rgba(10,10,10,0.5)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '1rem', zIndex: 100
-            }}
           >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                background: 'var(--ek-cream)',
-                borderRadius: 'var(--ek-radius-lg)',
-                padding: '1.5rem',
-                maxWidth: '420px', width: '100%'
-              }}
-            >
-              <p className="ek-eyebrow" style={{ marginBottom: '0.5rem' }}>CONFIRMAR RESERVA</p>
-              <h3 className="ek-h3" style={{ marginBottom: '0.75rem' }}>{recursoSel.nombre}</h3>
-              <p style={{ color: 'var(--ek-ink-muted)', fontSize: '0.9375rem', marginBottom: '1.5rem' }}>
+            <div className="ek-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="ek-modal-handle" />
+              <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>CONFIRMAR RESERVA</p>
+              <h3 className="ek-display-md" style={{ marginBottom: '8px' }}>{recursoSel.nombre}</h3>
+              <p className="ek-body-muted" style={{ marginBottom: '20px' }}>
                 {slotPendiente.inicio.toLocaleDateString('es-MX', {
                   weekday: 'long', day: 'numeric', month: 'long'
                 })}

@@ -96,9 +96,9 @@ export default function MiQR() {
         <Link to="/app/historial" className="adm-link">← Volver al historial</Link>
 
         <div className="ek-stack-md">
-          <p className="ek-eyebrow">TU QR DE ACCESO</p>
-          <h1 className="ek-h2">{reserva?.recurso?.nombre ?? 'Estudio'}</h1>
-          <p className="ek-body">
+          <p className="ek-eyebrow ek-eyebrow--mustard">TU QR DE ACCESO</p>
+          <h1 className="ek-display-md">{reserva?.recurso?.nombre ?? 'Estudio'}</h1>
+          <p className="ek-body-muted">
             {new Date(reserva.slot_inicio).toLocaleDateString('es-MX', {
               weekday: 'long', day: 'numeric', month: 'long'
             })}
@@ -107,27 +107,29 @@ export default function MiQR() {
           </p>
         </div>
 
+        {/* Contenedor blanco DELIBERADO: el scanner necesita contraste
+            negro-sobre-blanco para decodificar de forma confiable.
+            No cambiar a fondo oscuro. */}
         <div
           style={{
             background: '#FFFFFF',
-            border: '1px solid var(--ek-line)',
-            borderRadius: 'var(--ek-radius-lg)',
-            padding: '1.5rem',
+            borderRadius: 'var(--ek-r-card)',
+            padding: '24px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: '1rem'
+            gap: '16px'
           }}
         >
           <div ref={qrContainerRef} />
-          <p style={{ fontFamily: 'var(--ek-font-mono)', fontSize: '0.875rem', color: '#0A0A0A' }}>
+          <p style={{ fontFamily: 'var(--ek-font-mono)', fontSize: '13px', color: '#0A0A0A' }}>
             {reserva?.folio}
           </p>
         </div>
 
         <div className="ek-card">
-          <p className="ek-eyebrow" style={{ marginBottom: '0.5rem' }}>INSTRUCCIONES</p>
-          <p style={{ fontSize: '0.9375rem', color: 'var(--ek-ink-muted)' }}>
+          <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>INSTRUCCIONES</p>
+          <p className="ek-body-muted">
             Muestra este código al llegar a EKKO. La recepción lo escanea
             para confirmar tu entrada.
             {expiresAt && (

@@ -25,14 +25,12 @@ export default function Dashboard() {
         </div>
 
         {bloqueado && (
-          <div style={{
-            background: 'rgba(212, 80, 80, 0.1)',
-            border: '1px solid var(--ek-danger)',
-            borderRadius: 'var(--ek-radius-lg)',
-            padding: '1rem 1.25rem'
+          <div className="ek-card ek-card--md" style={{
+            borderColor: 'rgba(226, 85, 85, 0.3)',
+            background: 'var(--ek-danger-soft)'
           }}>
             <p className="ek-eyebrow" style={{ color: 'var(--ek-danger)' }}>RESTRICCIÓN ACTIVA</p>
-            <p style={{ fontSize: '0.9375rem', marginTop: '0.25rem' }}>
+            <p className="ek-body" style={{ marginTop: '8px' }}>
               Podrás reservar nuevamente el{' '}
               <strong>
                 {new Date(usuario!.bloqueado_hasta!).toLocaleDateString('es-MX', {
@@ -41,19 +39,19 @@ export default function Dashboard() {
               </strong>
               .
             </p>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--ek-ink-muted)', marginTop: '0.5rem' }}>
+            <p className="ek-body-faint" style={{ marginTop: '8px' }}>
               Esto puede deberse a una inasistencia o suspensión. Contactá a EKKO si tienes dudas.
             </p>
           </div>
         )}
 
         {!isLoading && proximaReserva && (
-          <div className="ek-card ek-card--elevated">
-            <p className="ek-eyebrow" style={{ marginBottom: '0.5rem' }}>PRÓXIMA SESIÓN</p>
-            <h3 className="ek-h3" style={{ marginBottom: '0.25rem' }}>
+          <div className="ek-card--hero">
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>PRÓXIMA SESIÓN</p>
+            <h2 className="ek-display-lg" style={{ marginBottom: '6px' }}>
               {proximaReserva.recurso?.nombre ?? 'Recurso'}
-            </h3>
-            <p style={{ fontSize: '0.9375rem', color: 'var(--ek-ink-muted)' }}>
+            </h2>
+            <p className="ek-body-muted">
               {new Date(proximaReserva.slot_inicio).toLocaleDateString('es-MX', {
                 weekday: 'long',
                 day: 'numeric',
@@ -61,16 +59,21 @@ export default function Dashboard() {
               })}{' '}
               · {formatHora(new Date(proximaReserva.slot_inicio))}
             </p>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--ek-ink-muted)', marginTop: '0.75rem' }}>
+            <p className="ek-body-faint" style={{ marginTop: '14px' }}>
               Folio: <code style={{ fontFamily: 'var(--ek-font-mono)' }}>{proximaReserva.folio}</code>
             </p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              <Link to={`/app/qr/${proximaReserva.id}`} className="ek-cta">
+                Ver QR <span style={{ color: 'var(--ek-mustard)' }}>→</span>
+              </Link>
+            </div>
           </div>
         )}
 
         {!isLoading && !proximaReserva && (
           <div className="ek-card">
-            <p className="ek-eyebrow" style={{ marginBottom: '0.5rem' }}>SIN RESERVAS PRÓXIMAS</p>
-            <h3 className="ek-h3" style={{ marginBottom: '0.75rem' }}>
+            <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>SIN RESERVAS PRÓXIMAS</p>
+            <h3 className="ek-display-md" style={{ marginBottom: '16px' }}>
               ¿Listo para grabar?
             </h3>
             <Link to="/app/reservar" className="ek-cta">Reservar estudio</Link>
@@ -78,17 +81,15 @@ export default function Dashboard() {
         )}
 
         {usuario?.status === 'pendiente_onboarding' && (
-          <div
-            style={{
-              padding: '1rem',
-              background: '#FFF4D9',
-              border: '1px solid var(--ek-warning)',
-              borderRadius: 'var(--ek-radius)',
-              fontSize: '0.875rem'
-            }}
-          >
-            <strong>Onboarding pendiente:</strong> aún no completas tu perfil ni
-            activas tu membresía. (Esto se construye en el siguiente prompt.)
+          <div className="ek-card ek-card--md" style={{
+            borderColor: 'var(--ek-mustard-dim)',
+            background: 'var(--ek-mustard-soft)'
+          }}>
+            <p className="ek-eyebrow ek-eyebrow--mustard">ONBOARDING PENDIENTE</p>
+            <p className="ek-body" style={{ marginTop: '8px' }}>
+              Aún no completas tu perfil ni activas tu membresía.
+              (Esto se construye en el siguiente prompt.)
+            </p>
           </div>
         )}
       </div>
