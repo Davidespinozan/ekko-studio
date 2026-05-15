@@ -480,6 +480,7 @@ export type Database = {
           membresia_tier: string | null
           no_shows_count: number
           nombre: string | null
+          notas_admin: string | null
           ob_data: Json | null
           rol: string
           status: string
@@ -501,6 +502,7 @@ export type Database = {
           membresia_tier?: string | null
           no_shows_count?: number
           nombre?: string | null
+          notas_admin?: string | null
           ob_data?: Json | null
           rol?: string
           status?: string
@@ -522,6 +524,7 @@ export type Database = {
           membresia_tier?: string | null
           no_shows_count?: number
           nombre?: string | null
+          notas_admin?: string | null
           ob_data?: Json | null
           rol?: string
           status?: string
@@ -603,6 +606,7 @@ export type Database = {
           membresia_tier: string | null
           no_shows_count: number
           nombre: string | null
+          notas_admin: string | null
           ob_data: Json | null
           rol: string
           status: string
