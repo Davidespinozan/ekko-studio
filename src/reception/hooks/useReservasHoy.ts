@@ -29,7 +29,7 @@ export function useReservasHoy() {
 
     const { data, error } = await supabase
       .from('reservas')
-      .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios(id, nombre, email, membresia_tier)')
+      .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)')
       .eq('tenant_id', tenant.id)
       .gte('slot_inicio', inicio.toISOString())
       .lt('slot_inicio', fin.toISOString())
@@ -37,6 +37,7 @@ export function useReservasHoy() {
 
     if (error) {
       console.error('[useReservasHoy]', error);
+      setIsLoading(false); // CRÍTICO: sin esto la UI queda en "cargando" para siempre
       return;
     }
     setReservas((data ?? []) as unknown as ReservaConJoin[]);
