@@ -114,10 +114,8 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   border-radius: 8px;
 }
 
-@layer components {
-
-  /* ============================================================================
-     TYPOGRAPHY
+/* ============================================================================
+   TYPOGRAPHY
      ============================================================================ */
 
   .ek-display-xl {
@@ -1595,4 +1593,3 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     box-shadow: var(--ek-shadow-modal);
     color: var(--ek-ink);
   }
-}
