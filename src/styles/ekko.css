@@ -1161,3 +1161,92 @@
 .rec-camera-close:hover {
   background: rgba(245, 241, 232, 0.2);
 }
+
+/* ============================================================================
+   RECEPCION extensions — selector de día
+   ============================================================================ */
+
+.rec-day-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: var(--ek-black-soft);
+  border: 1px solid rgba(245, 241, 232, 0.1);
+  border-radius: var(--ek-radius);
+  padding: 0.5rem;
+}
+
+.rec-day-arrow {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--ek-radius);
+  background: rgba(245, 241, 232, 0.05);
+  border: 1px solid rgba(245, 241, 232, 0.1);
+  color: var(--ek-cream);
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+}
+
+.rec-day-arrow:hover {
+  background: rgba(245, 241, 232, 0.1);
+}
+
+.rec-day-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rec-day-label {
+  display: block;
+  position: relative;
+  cursor: pointer;
+  text-align: center;
+}
+
+.rec-day-text {
+  display: block;
+  color: var(--ek-cream);
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: capitalize;
+  padding: 4px 12px;
+  border-bottom: 1px dashed rgba(212, 169, 60, 0.4);
+}
+
+.rec-day-label:hover .rec-day-text {
+  color: var(--ek-mustard);
+  border-bottom-color: var(--ek-mustard);
+}
+
+.rec-day-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rec-day-today-btn {
+  background: none;
+  border: none;
+  color: var(--ek-mustard);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 2px 8px;
+  font-family: inherit;
+}
+
+.rec-day-today-btn:hover {
+  text-decoration: underline;
+}

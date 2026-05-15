@@ -13,18 +13,20 @@ export interface ReservaConJoin extends Reserva {
 }
 
 /**
- * Reservas del día actual del tenant, ordenadas por hora.
- * Polling cada 30s para mantener la vista actualizada.
+ * Reservas de un día específico (default hoy) del tenant, ordenadas por hora.
+ * Polling cada 30s.
  */
-export function useReservasHoy() {
+export function useReservasHoy(fecha?: Date) {
   const tenant = useTenant();
   const [reservas, setReservas] = useState<ReservaConJoin[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Normalizar fecha a inicio del día (memoizar para evitar re-render infinito)
+  const fechaMs = (fecha ?? new Date()).setHours(0, 0, 0, 0);
+
   const refetch = useCallback(async () => {
-    const inicio = new Date();
-    inicio.setHours(0, 0, 0, 0);
-    const fin = new Date(inicio);
+    const inicio = new Date(fechaMs);
+    const fin = new Date(fechaMs);
     fin.setDate(fin.getDate() + 1);
 
     const { data, error } = await supabase
@@ -37,26 +39,22 @@ export function useReservasHoy() {
 
     if (error) {
       console.error('[useReservasHoy]', error);
-      setIsLoading(false); // CRÍTICO: sin esto la UI queda en "cargando" para siempre
+      setIsLoading(false);
       return;
     }
     setReservas((data ?? []) as unknown as ReservaConJoin[]);
     setIsLoading(false);
-  }, [tenant.id]);
+  }, [tenant.id, fechaMs]);
 
   useEffect(() => {
     refetch();
-    const interval = setInterval(refetch, 30_000); // 30s polling
+    const interval = setInterval(refetch, 30_000);
     return () => clearInterval(interval);
   }, [refetch]);
 
   return { reservas, isLoading, refetch };
 }
 
-/**
- * Marca un check-in manual sin pasar por QR.
- * Devuelve { reserva, miembro, recurso, stats } del RPC.
- */
 export async function checkInManual(reservaId: string, motivo?: string) {
   const { data, error } = await supabase.rpc('check_in_manual_atomic', {
     p_reserva_id: reservaId,

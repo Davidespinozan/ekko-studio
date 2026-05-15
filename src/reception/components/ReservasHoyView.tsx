@@ -6,9 +6,39 @@ interface Props {
 }
 
 export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
-  const { reservas, isLoading, refetch } = useReservasHoy();
+  const [fechaSeleccionada, setFechaSeleccionada] = useState(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
+  const { reservas, isLoading, refetch } = useReservasHoy(fechaSeleccionada);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ReservaConJoin | null>(null);
+
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const esHoy = fechaSeleccionada.getTime() === hoy.getTime();
+
+  const formatFecha = (d: Date) => {
+    if (d.getTime() === hoy.getTime()) return 'Hoy';
+    return d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+  };
+
+  const cambiarDia = (delta: number) => {
+    const nueva = new Date(fechaSeleccionada);
+    nueva.setDate(nueva.getDate() + delta);
+    setFechaSeleccionada(nueva);
+  };
+
+  const irAHoy = () => setFechaSeleccionada(new Date(hoy));
+
+  const handleDateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.value) return;
+    const [y, m, d] = e.target.value.split('-').map(Number);
+    const nueva = new Date(y, m - 1, d);
+    nueva.setHours(0, 0, 0, 0);
+    setFechaSeleccionada(nueva);
+  };
 
   const filtered = useMemo(() => {
     if (!search.trim()) return reservas;
@@ -27,15 +57,15 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
     filtered.forEach((r) => {
       const inicio = new Date(r.slot_inicio).getTime();
       const fin = new Date(r.slot_fin).getTime();
-      // "Llegando ahora" = ventana ±15 min del slot_inicio O en curso
-      if ((now >= inicio - 15 * 60_000 && now <= fin) || (now >= inicio - 15 * 60_000 && now <= inicio + 15 * 60_000)) {
+      // "Llegando ahora" solo aplica si la fecha vista es hoy
+      if (esHoy && ((now >= inicio - 15 * 60_000 && now <= fin) || (now >= inicio - 15 * 60_000 && now <= inicio + 15 * 60_000))) {
         llegando.push(r);
       } else {
         resto.push(r);
       }
     });
     return { llegando, resto };
-  }, [filtered]);
+  }, [filtered, esHoy]);
 
   if (isLoading) {
     return <p style={{ color: 'var(--ek-cream)', textAlign: 'center', marginTop: '2rem' }}>Cargando agenda…</p>;
@@ -43,6 +73,31 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
 
   return (
     <div className="rec-hoy">
+      <div className="rec-day-selector">
+        <button onClick={() => cambiarDia(-1)} className="rec-day-arrow" aria-label="Día anterior">
+          ←
+        </button>
+        <div className="rec-day-center">
+          <label className="rec-day-label">
+            <span className="rec-day-text">{formatFecha(fechaSeleccionada)}</span>
+            <input
+              type="date"
+              value={fechaSeleccionada.toISOString().slice(0, 10)}
+              onChange={handleDateInput}
+              className="rec-day-input"
+            />
+          </label>
+          {!esHoy && (
+            <button onClick={irAHoy} className="rec-day-today-btn">
+              Ir a hoy
+            </button>
+          )}
+        </div>
+        <button onClick={() => cambiarDia(1)} className="rec-day-arrow" aria-label="Día siguiente">
+          →
+        </button>
+      </div>
+
       <input
         type="text"
         value={search}
@@ -63,7 +118,9 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
       )}
 
       <section>
-        <h2 className="rec-section-title">Resto del día</h2>
+        <h2 className="rec-section-title">
+          {esHoy ? 'Resto del día' : 'Reservas del día'}
+        </h2>
         {resto.length === 0 ? (
           <p style={{ color: 'rgba(245,241,232,0.5)', fontSize: '0.875rem', padding: '1rem' }}>
             Sin más reservas hoy.
