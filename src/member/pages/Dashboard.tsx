@@ -43,33 +43,6 @@ function useRecursosActivos() {
   return { recursos, isLoading };
 }
 
-function useStatsDelMes(usuarioId: string | undefined) {
-  const [sesionesEsteMes, setSesionesEsteMes] = useState(0);
-
-  useEffect(() => {
-    if (!usuarioId) return;
-    let mounted = true;
-    async function load() {
-      const inicio = new Date();
-      inicio.setDate(1);
-      inicio.setHours(0, 0, 0, 0);
-
-      const { count } = await supabase
-        .from('reservas')
-        .select('id', { count: 'exact', head: true })
-        .eq('usuario_id', usuarioId!)
-        .eq('status', 'completada')
-        .gte('check_in_at', inicio.toISOString());
-
-      if (mounted) setSesionesEsteMes(count ?? 0);
-    }
-    load();
-    return () => { mounted = false; };
-  }, [usuarioId]);
-
-  return { sesionesEsteMes };
-}
-
 function useProximasReservas(usuarioId: string | undefined) {
   const [reservas, setReservas] = useState<ReservaConRecurso[]>([]);
 
@@ -123,7 +96,6 @@ function capitalizarNombre(nombre: string | null | undefined): string {
 export default function Dashboard() {
   const { usuario } = useAuth();
   const { recursos } = useRecursosActivos();
-  const { sesionesEsteMes } = useStatsDelMes(usuario?.id);
   const { reservas: proximasReservas } = useProximasReservas(usuario?.id);
 
   const ahora = new Date();
@@ -200,29 +172,6 @@ export default function Dashboard() {
           </Link>
         </div>
       )}
-
-      {/* Stats del mes */}
-      <div className="ek-stat-card" style={{
-        marginBottom: '24px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div>
-          <p className="ek-eyebrow" style={{ marginBottom: '6px' }}>ESTE MES</p>
-          <p className="ek-kpi">
-            {sesionesEsteMes}{' '}
-            <span style={{
-              fontSize: '15px',
-              fontWeight: 500,
-              color: 'var(--ek-ink-muted)',
-              letterSpacing: 'normal'
-            }}>
-              {sesionesEsteMes === 1 ? 'sesión completada' : 'sesiones completadas'}
-            </span>
-          </p>
-        </div>
-      </div>
 
       {/* Onboarding pendiente */}
       {usuario?.status === 'pendiente_onboarding' && (

@@ -13,7 +13,7 @@ const Estudios = lazy(() => import('./pages/Estudios'));
 const EstudioDetalle = lazy(() => import('./pages/EstudioDetalle'));
 
 export default function MemberLayout() {
-  const { authUser, isLoading, signOut } = useAuth();
+  const { authUser, isLoading } = useAuth();
   const location = useLocation();
 
   if (isLoading) return <LoadingScreen />;
@@ -21,35 +21,27 @@ export default function MemberLayout() {
 
   return (
     <div className="ek-page" style={{ paddingBottom: '88px' /* espacio para bottom nav */ }}>
-      <header
-        className="ek-header-glass"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-      >
-        <Link
-          to="/app"
-          style={{
-            display: 'flex',
-            alignItems: 'baseline',
-            gap: '10px',
-            textDecoration: 'none'
-          }}
-        >
-          <span style={{
-            fontFamily: 'var(--ek-font-display)',
-            fontSize: '22px',
-            fontWeight: 700,
-            letterSpacing: '-0.04em',
-            color: 'var(--ek-mustard)'
-          }}>EKKO</span>
-          <span className="ek-eyebrow" style={{ paddingTop: '4px' }}>STUDIO</span>
-        </Link>
-        <button
-          onClick={signOut}
-          className="ek-icon-btn"
-          style={{ width: 'auto', padding: '8px 14px', fontSize: '13px' }}
-        >
-          Salir
-        </button>
+      <header className="ek-header-glass">
+        <div className="ek-header-inner">
+          <Link
+            to="/app"
+            style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: '10px',
+              textDecoration: 'none'
+            }}
+          >
+            <span style={{
+              fontFamily: 'var(--ek-font-display)',
+              fontSize: '22px',
+              fontWeight: 700,
+              letterSpacing: '-0.04em',
+              color: 'var(--ek-mustard)'
+            }}>EKKO</span>
+            <span className="ek-eyebrow" style={{ paddingTop: '4px' }}>STUDIO</span>
+          </Link>
+        </div>
       </header>
 
       <Suspense fallback={<LoadingScreen />}>

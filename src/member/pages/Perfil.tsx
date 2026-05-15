@@ -11,6 +11,33 @@ interface ReservaConRecurso extends Reserva {
   recurso: Pick<Recurso, 'nombre'> | null;
 }
 
+function useStatsDelMes(usuarioId: string | undefined) {
+  const [sesionesEsteMes, setSesionesEsteMes] = useState(0);
+
+  useEffect(() => {
+    if (!usuarioId) return;
+    let mounted = true;
+    async function load() {
+      const inicio = new Date();
+      inicio.setDate(1);
+      inicio.setHours(0, 0, 0, 0);
+
+      const { count } = await supabase
+        .from('reservas')
+        .select('id', { count: 'exact', head: true })
+        .eq('usuario_id', usuarioId!)
+        .eq('status', 'completada')
+        .gte('check_in_at', inicio.toISOString());
+
+      if (mounted) setSesionesEsteMes(count ?? 0);
+    }
+    load();
+    return () => { mounted = false; };
+  }, [usuarioId]);
+
+  return { sesionesEsteMes };
+}
+
 function useReservasPasadas(usuarioId: string | undefined) {
   const [reservas, setReservas] = useState<ReservaConRecurso[]>([]);
 
@@ -45,6 +72,7 @@ export default function Perfil() {
   const { authUser, usuario, signOut } = useAuth();
   const tenant = useTenant();
   const { reservas } = useReservasPasadas(usuario?.id);
+  const { sesionesEsteMes } = useStatsDelMes(usuario?.id);
 
   const nombreFormat = usuario?.nombre
     ?.toLowerCase()
@@ -136,8 +164,32 @@ export default function Perfil() {
           Cerrar sesión
         </button>
 
+        {/* Stat del mes */}
+        <section style={{ marginTop: '32px', marginBottom: '24px' }}>
+          <div className="ek-stat-card" style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div>
+              <p className="ek-eyebrow" style={{ marginBottom: '6px' }}>ESTE MES</p>
+              <p className="ek-kpi">
+                {sesionesEsteMes}{' '}
+                <span style={{
+                  fontSize: '15px',
+                  fontWeight: 500,
+                  color: 'var(--ek-ink-muted)',
+                  letterSpacing: 'normal'
+                }}>
+                  {sesionesEsteMes === 1 ? 'sesión completada' : 'sesiones completadas'}
+                </span>
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Reservas pasadas */}
-        <section style={{ marginTop: '12px' }}>
+        <section>
           <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>HISTORIAL</p>
           <h2 className="ek-display-md" style={{ marginBottom: '16px' }}>Reservas pasadas</h2>
 
