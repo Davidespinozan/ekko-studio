@@ -50,8 +50,9 @@ export default function Estudios() {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-        gap: '16px'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 320px))',
+        gap: '16px',
+        justifyContent: 'center'
       }}>
         {recursos.map((r) => {
           const esPro = r.tiers_permitidos.length === 1 && r.tiers_permitidos[0] === 'pro';
@@ -71,7 +72,7 @@ export default function Estudios() {
             >
               <div style={{
                 background: 'linear-gradient(135deg, var(--ek-bg-elevated) 0%, var(--ek-bg) 100%)',
-                aspectRatio: '4 / 3',
+                aspectRatio: '16 / 10',
                 position: 'relative',
                 display: 'flex',
                 alignItems: 'center',

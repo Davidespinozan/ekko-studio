@@ -217,6 +217,20 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     padding: 24px 20px 100px;
   }
 
+  @media (min-width: 768px) {
+    .ek-shell {
+      max-width: 720px;
+      padding: 32px 32px 100px;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .ek-shell {
+      max-width: 920px;
+      padding: 40px 40px 120px;
+    }
+  }
+
   .ek-shell--admin {
     max-width: 1200px;
     padding: 32px;
@@ -236,6 +250,18 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 0.5px solid var(--ek-line);
     padding: 14px 20px;
+  }
+
+  @media (min-width: 768px) {
+    .ek-header-glass {
+      padding: 18px 32px;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .ek-header-glass {
+      padding: 20px 40px;
+    }
   }
 
   /* ============================================================================
@@ -685,6 +711,12 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     background: var(--ek-bg-soft);
     border-right: 0.5px solid var(--ek-line);
     padding: 24px 16px;
+  }
+
+  @media (max-width: 1023px) {
+    .adm-sidebar {
+      display: none;
+    }
   }
 
   .adm-nav-link {
@@ -1592,4 +1624,10 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     gap: 12px;
     box-shadow: var(--ek-shadow-modal);
     color: var(--ek-ink);
+  }
+
+  @media (min-width: 768px) {
+    .ek-bottom-nav-inner {
+      max-width: 480px;
+    }
   }

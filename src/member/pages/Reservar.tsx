@@ -258,7 +258,7 @@ export default function Reservar() {
               El estudio no opera este día.
             </p>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(108px, 1fr))', gap: '0.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: '8px' }}>
               {slots.map((slot, i) => {
                 const tooltip = slot.disponible
                   ? undefined

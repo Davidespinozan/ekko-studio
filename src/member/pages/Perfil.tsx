@@ -46,6 +46,12 @@ export default function Perfil() {
   const tenant = useTenant();
   const { reservas } = useReservasPasadas(usuario?.id);
 
+  const nombreFormat = usuario?.nombre
+    ?.toLowerCase()
+    .split(' ')
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ') ?? '';
+
   const initials = (usuario?.nombre ?? usuario?.email ?? '?')
     .split(/[\s@]/)
     .filter(Boolean)
@@ -58,7 +64,7 @@ export default function Perfil() {
       <div className="ek-stack-xl">
         <div className="ek-stack-md">
           <p className="ek-eyebrow">PERFIL</p>
-          <h1 className="ek-display-md">{usuario?.nombre ?? 'Tu cuenta'}</h1>
+          <h1 className="ek-display-md">{nombreFormat || 'Tu cuenta'}</h1>
         </div>
 
         {/* Avatar */}
