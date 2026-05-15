@@ -124,8 +124,8 @@ export default function MiembroDetalle() {
       <section className="adm-section">
         <h2 className="ek-h3">Notas operativas</h2>
         <p className="adm-body" style={{ marginBottom: '0.5rem' }}>
-          Las verá la recepción al hacer check-in. Útil para condiciones físicas,
-          preferencias, recordatorios.
+          Visible para recepción al hacer check-in. Útil para preferencias,
+          equipo solicitado, observaciones del miembro.
         </p>
         <NotasControl
           usuarioId={miembro.id}
@@ -347,7 +347,7 @@ function NotasControl({ usuarioId, notasIniciales, onSaved }: {
         onChange={(e) => setNotas(e.target.value)}
         maxLength={500}
         rows={4}
-        placeholder="Ej. Tendinitis en hombro derecho. Prefiere Estudio 2 los lunes."
+        placeholder="Ej. Suele grabar podcasts largos. Prefiere micrófono Shure. Acompañado de 1 editor."
         className="ek-input"
       />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
