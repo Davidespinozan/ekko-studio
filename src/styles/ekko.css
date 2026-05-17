@@ -1737,3 +1737,56 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
       transform: translateX(0);
     }
   }
+
+  /* ============================================================================
+     PREMIUM POLISH (Sprint Final)
+     ============================================================================
+     5 efectos sutiles sobre la paleta Mostaza Ink. NO saturar — son glows
+     y tracking que dan sensación de calidad sin agregar ruido visual.
+     ============================================================================ */
+
+  /* 1. Glow mostaza en botones primarios (.ek-cta sin --secondary) */
+  .ek-cta:not(.ek-cta--secondary) {
+    transition: box-shadow 0.2s ease, transform 0.1s ease, background 0.18s ease, border-color 0.18s ease;
+  }
+  .ek-cta:not(.ek-cta--secondary):hover {
+    box-shadow: 0 0 24px rgba(229, 184, 41, 0.25);
+  }
+  .ek-cta:not(.ek-cta--secondary):active {
+    box-shadow: 0 0 32px rgba(229, 184, 41, 0.4);
+    transform: scale(0.98);
+  }
+
+  /* 2. Gradient sutil en sidebar admin */
+  .adm-sidebar {
+    background: linear-gradient(
+      180deg,
+      var(--ek-bg-soft) 0%,
+      rgba(13, 11, 8, 1) 50%,
+      rgba(15, 13, 8, 1) 100%
+    );
+  }
+
+  /* 3. Cards con border-glow mostaza al hover */
+  .ek-card {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .ek-card:hover {
+    border-color: rgba(229, 184, 41, 0.3);
+    box-shadow:
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      0 0 24px rgba(229, 184, 41, 0.08);
+  }
+
+  /* 4. Item activo del sidebar con glow lateral */
+  .adm-sidebar-item--active {
+    box-shadow: inset 0 0 24px rgba(229, 184, 41, 0.08);
+  }
+
+  /* 5. Tipografía con tracking ajustado */
+  h1, h2, h3, .ek-h1, .ek-h2, .ek-h3 {
+    letter-spacing: -0.02em;
+  }
+  .ek-eyebrow {
+    letter-spacing: 0.12em;
+  }

@@ -312,6 +312,161 @@ export function useAdminMetrics() {
 }
 
 /**
+ * Datos para Dashboard (Sprint Final).
+ *
+ * Devuelve métricas relevantes para 3 secciones del dashboard:
+ *   - HOY: reservas del día con join a recurso/usuario
+ *   - TU MES: 3 contadores (reservas, miembros nuevos, no-shows) con
+ *     valores del mes anterior para calcular tendencia
+ *   - GRAFICA: reservas por día en los últimos 30 días
+ *
+ * NO incluye datos de dinero — esos quedan deshabilitados hasta Stripe.
+ */
+export interface DashboardData {
+  reservasHoy: ReservaConJoin[];
+  reservasMesActual: number;
+  reservasMesAnterior: number;
+  miembrosNuevosMesActual: number;
+  miembrosNuevosMesAnterior: number;
+  noShowsMesActual: number;
+  noShowsMesAnterior: number;
+  totalReservasMesAnteriorParaNoShows: number;
+  reservasUltimos30Dias: Array<{ fecha: string; count: number }>;
+}
+
+export function useDashboardData() {
+  const tenant = useTenant();
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const refetch = useCallback(async () => {
+    setIsLoading(true);
+    const now = new Date();
+    const inicioHoy = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const finHoy = new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
+    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+    const inicioMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const finMesAnterior = inicioMes;
+    const hace30dias = new Date(inicioHoy.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [
+      reservasHoy,
+      reservasMesActual,
+      reservasMesAnterior,
+      miembrosMesActual,
+      miembrosMesAnterior,
+      noShowsActual,
+      noShowsAnterior,
+      reservasMesAnteriorTotales,
+      reservas30d
+    ] = await Promise.all([
+      supabase
+        .from('reservas')
+        .select(
+          '*, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)'
+        )
+        .eq('tenant_id', tenant.id)
+        .neq('status', 'cancelada')
+        .neq('status', 'cancelada_admin')
+        .gte('slot_inicio', inicioHoy.toISOString())
+        .lt('slot_inicio', finHoy.toISOString())
+        .order('slot_inicio', { ascending: true }),
+      supabase
+        .from('reservas')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenant.id)
+        .neq('status', 'cancelada')
+        .neq('status', 'cancelada_admin')
+        .gte('slot_inicio', inicioMes.toISOString()),
+      supabase
+        .from('reservas')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenant.id)
+        .neq('status', 'cancelada')
+        .neq('status', 'cancelada_admin')
+        .gte('slot_inicio', inicioMesAnterior.toISOString())
+        .lt('slot_inicio', finMesAnterior.toISOString()),
+      supabase
+        .from('usuarios')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenant.id)
+        .eq('rol', 'miembro')
+        .gte('created_at', inicioMes.toISOString()),
+      supabase
+        .from('usuarios')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenant.id)
+        .eq('rol', 'miembro')
+        .gte('created_at', inicioMesAnterior.toISOString())
+        .lt('created_at', finMesAnterior.toISOString()),
+      supabase
+        .from('reservas')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenant.id)
+        .eq('status', 'no_show')
+        .gte('slot_inicio', inicioMes.toISOString()),
+      supabase
+        .from('reservas')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenant.id)
+        .eq('status', 'no_show')
+        .gte('slot_inicio', inicioMesAnterior.toISOString())
+        .lt('slot_inicio', finMesAnterior.toISOString()),
+      supabase
+        .from('reservas')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenant.id)
+        .neq('status', 'cancelada')
+        .neq('status', 'cancelada_admin')
+        .gte('slot_inicio', inicioMesAnterior.toISOString())
+        .lt('slot_inicio', finMesAnterior.toISOString()),
+      supabase
+        .from('reservas')
+        .select('slot_inicio')
+        .eq('tenant_id', tenant.id)
+        .neq('status', 'cancelada')
+        .neq('status', 'cancelada_admin')
+        .gte('slot_inicio', hace30dias.toISOString())
+        .lt('slot_inicio', finHoy.toISOString())
+    ]);
+
+    // Agrupar reservas por día (YYYY-MM-DD)
+    const conteoPorDia: Record<string, number> = {};
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(hace30dias.getTime() + i * 24 * 60 * 60 * 1000);
+      conteoPorDia[d.toISOString().slice(0, 10)] = 0;
+    }
+    (reservas30d.data ?? []).forEach((r) => {
+      const k = String(r.slot_inicio).slice(0, 10);
+      if (k in conteoPorDia) conteoPorDia[k]++;
+    });
+    const reservasUltimos30Dias = Object.entries(conteoPorDia).map(([fecha, count]) => ({
+      fecha,
+      count
+    }));
+
+    setData({
+      reservasHoy: (reservasHoy.data ?? []) as unknown as ReservaConJoin[],
+      reservasMesActual: reservasMesActual.count ?? 0,
+      reservasMesAnterior: reservasMesAnterior.count ?? 0,
+      miembrosNuevosMesActual: miembrosMesActual.count ?? 0,
+      miembrosNuevosMesAnterior: miembrosMesAnterior.count ?? 0,
+      noShowsMesActual: noShowsActual.count ?? 0,
+      noShowsMesAnterior: noShowsAnterior.count ?? 0,
+      totalReservasMesAnteriorParaNoShows: reservasMesAnteriorTotales.count ?? 0,
+      reservasUltimos30Dias
+    });
+    setIsLoading(false);
+  }, [tenant.id]);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  return { data, isLoading, refetch };
+}
+
+/**
  * Reservas en un rango de fechas para vista calendario.
  */
 export function useReservasRango(fechaInicio: Date, fechaFin: Date) {

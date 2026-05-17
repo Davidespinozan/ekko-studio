@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@shared/hooks/useAuth';
+import { useTenant } from '@shared/hooks/useTenant';
 
 interface NavItem {
   to: string;
@@ -132,7 +133,6 @@ const SECTIONS: NavSection[] = [
       {
         to: '/admin/marca',
         label: 'Marca',
-        badge: 'PRÓXIMAMENTE',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
@@ -164,7 +164,17 @@ interface Props {
 
 export function Sidebar({ onNavigate }: Props = {}) {
   const { usuario, signOut } = useAuth();
+  const tenant = useTenant();
   const navigate = useNavigate();
+
+  const branding = (tenant.branding ?? {}) as Record<string, unknown>;
+  const logoUrl =
+    typeof branding.logo_url_dark === 'string'
+      ? branding.logo_url_dark
+      : typeof branding.logo_url === 'string'
+        ? (branding.logo_url as string)
+        : null;
+  const brandShort = (tenant.nombre || 'EKKO').split(/\s+/)[0];
 
   const nombreFormat =
     usuario?.nombre
@@ -177,20 +187,28 @@ export function Sidebar({ onNavigate }: Props = {}) {
   return (
     <aside className="adm-sidebar">
       <div className="adm-sidebar-brand">
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-          <span
-            style={{
-              fontFamily: 'var(--ek-font-display)',
-              fontSize: '20px',
-              fontWeight: 700,
-              letterSpacing: '-0.04em',
-              color: 'var(--ek-mustard)'
-            }}
-          >
-            EKKO
-          </span>
-          <span className="ek-eyebrow" style={{ fontSize: '10px' }}>STUDIO</span>
-        </div>
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={tenant.nombre}
+            style={{ maxHeight: '40px', maxWidth: '160px', objectFit: 'contain', display: 'block' }}
+          />
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <span
+              style={{
+                fontFamily: 'var(--ek-font-display)',
+                fontSize: '20px',
+                fontWeight: 700,
+                letterSpacing: '-0.04em',
+                color: 'var(--ek-mustard)'
+              }}
+            >
+              {brandShort}
+            </span>
+            <span className="ek-eyebrow" style={{ fontSize: '10px' }}>STUDIO</span>
+          </div>
+        )}
         <span
           className="ek-badge"
           style={{

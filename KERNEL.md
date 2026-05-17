@@ -408,6 +408,69 @@ Roles futuros (no implementados):
 - `canModifyTeamMember({...})` → { canModify, reason? } — front-end gate
 - `revokeTeamMember(userId)` → soft-revoke (status='revocado')
 
+## Dashboard relevante (Sprint Final)
+
+### Filosofía
+NUNCA agregar métricas que no respondan una pregunta accionable.
+Métricas deshabilitadas elegantemente cuando faltan integraciones
+(mostrar "—" + CTA "Conecta Stripe", no $0). Comparativos siempre
+que haya data; "Primer mes 🎉" como fallback.
+
+### 3 secciones máximo
+- **HOY**: operación inmediata (próximas reservas + cancelar)
+- **TU MES**: tendencia (3 métricas con flecha ↑/↓ + gráfica 30 días)
+- **DINERO**: cuando aplica (deshabilitado hasta Stripe)
+
+### NO agregar
+- Top estudios, top tiers, MRR, churn, ocupación absoluta sin contexto,
+  cobros pendientes (modelo de contado), alertas genéricas inventadas.
+
+## Cancelación de reservas (Sprint Final)
+
+### Vocabulario
+- UI: "Cancelar reserva" (no "Eliminar reserva").
+- BD: `status='cancelada_admin'` (distinguible de `cancelada` que es
+  acción del miembro).
+- Helper: `cancelarReserva({ reservaId, motivo, canceladoPorId, notificarMiembro })`.
+
+### Flow
+1. Admin abre modal con info de reserva (no editable).
+2. Motivo obligatorio (mínimo 5 chars, se comparte con el miembro).
+3. Checkbox "Notificar al miembro" (default: true).
+4. Sugerencia WhatsApp pre-formateada con el motivo escrito en
+   tiempo real + botón "Copiar mensaje".
+5. Typed confirmation "CANCELAR".
+6. UPDATE reservas + INSERT notificaciones (in-app inbox).
+7. Toast success + refetch.
+
+### Notificaciones in-app
+- Tabla `notificaciones` con `usuario_id`, `tipo`, `titulo`, `mensaje`,
+  `leida`, `metadata`.
+- Banner sticky-top mostaza en `MemberLayout` que renderiza las no
+  leídas (hasta 5). Botón ✕ marca como leída individualmente.
+- RLS: usuario solo lee/marca las suyas; admin del tenant inserta.
+- Email/SMS: pendiente Sprint Resend.
+
+## Branding (Sprint Final · slim)
+
+### Schema
+`tenants.branding` jsonb con keys:
+- `logo_url_dark` — logo principal (header oscuro, sidebar admin, footer)
+- `og_image_url` — imagen Open Graph para redes
+- `favicon_url` — favicon dinámico
+
+### Upload
+Bucket público `logos` con policies: SELECT anon, INSERT/UPDATE/DELETE
+solo admin. Path: `{tenant_slug}/{nombre-asset}-{timestamp}.{ext}`.
+Reusa el componente `ImageUploader` existente.
+
+### Consumo
+- `Sidebar.tsx` (admin) renderiza `<img logoUrl>` si existe, sino
+  fallback a texto `tenant.nombre.split()[0]`.
+- `Footer.tsx` (público) mismo patrón.
+- OG image y favicon dinámicos via meta tags: **pendiente** hooks
+  `useOGTags` y `useFavicon` (Sprint posterior con Marca completa).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

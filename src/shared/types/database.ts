@@ -118,6 +118,60 @@ export type Database = {
           },
         ]
       }
+      notificaciones: {
+        Row: {
+          creada_at: string
+          id: string
+          leida: boolean
+          leida_at: string | null
+          mensaje: string
+          metadata: Json | null
+          tenant_id: string
+          tipo: string
+          titulo: string
+          usuario_id: string
+        }
+        Insert: {
+          creada_at?: string
+          id?: string
+          leida?: boolean
+          leida_at?: string | null
+          mensaje: string
+          metadata?: Json | null
+          tenant_id: string
+          tipo: string
+          titulo: string
+          usuario_id: string
+        }
+        Update: {
+          creada_at?: string
+          id?: string
+          leida?: boolean
+          leida_at?: string | null
+          mensaje?: string
+          metadata?: Json | null
+          tenant_id?: string
+          tipo?: string
+          titulo?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificaciones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificaciones_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_events: {
         Row: {
           created_at: string
@@ -279,8 +333,10 @@ export type Database = {
       }
       reservas: {
         Row: {
+          cancelacion_notificada_at: string | null
           cancelada_at: string | null
           cancelada_motivo: string | null
+          cancelada_por: string | null
           check_in_at: string | null
           check_in_by: string | null
           check_in_method: string | null
@@ -300,8 +356,10 @@ export type Database = {
           usuario_id: string
         }
         Insert: {
+          cancelacion_notificada_at?: string | null
           cancelada_at?: string | null
           cancelada_motivo?: string | null
+          cancelada_por?: string | null
           check_in_at?: string | null
           check_in_by?: string | null
           check_in_method?: string | null
@@ -321,8 +379,10 @@ export type Database = {
           usuario_id: string
         }
         Update: {
+          cancelacion_notificada_at?: string | null
           cancelada_at?: string | null
           cancelada_motivo?: string | null
+          cancelada_por?: string | null
           check_in_at?: string | null
           check_in_by?: string | null
           check_in_method?: string | null
@@ -342,6 +402,13 @@ export type Database = {
           usuario_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "reservas_cancelada_por_fkey"
+            columns: ["cancelada_por"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "reservas_check_in_by_fkey"
             columns: ["check_in_by"]
@@ -577,8 +644,10 @@ export type Database = {
       cancelar_reserva_atomic: {
         Args: { p_motivo?: string; p_reserva_id: string }
         Returns: {
+          cancelacion_notificada_at: string | null
           cancelada_at: string | null
           cancelada_motivo: string | null
+          cancelada_por: string | null
           check_in_at: string | null
           check_in_by: string | null
           check_in_method: string | null

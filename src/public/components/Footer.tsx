@@ -53,6 +53,14 @@ export default function Footer() {
   // Si está vacío, fallback a "EKKO" para no romper visualmente.
   const brandShort = (tenant.nombre || 'EKKO').split(/\s+/)[0];
 
+  const branding = (tenant.branding ?? {}) as Record<string, unknown>;
+  const logoUrl =
+    typeof branding.logo_url_dark === 'string'
+      ? branding.logo_url_dark
+      : typeof branding.logo_url === 'string'
+        ? (branding.logo_url as string)
+        : null;
+
   const redesActivas = REDES_ORDEN.filter((r) => !!footer.redes[r.key]);
   const hayContacto = !!footer.email || !!footer.direccion;
 
@@ -74,20 +82,28 @@ export default function Footer() {
       >
         {/* Brand */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '12px' }}>
-            <span
-              style={{
-                fontFamily: 'var(--ek-font-display)',
-                fontSize: '20px',
-                fontWeight: 700,
-                letterSpacing: '-0.04em',
-                color: 'var(--ek-mustard)'
-              }}
-            >
-              {brandShort}
-            </span>
-            {footer.tagline && <span className="ek-eyebrow">{footer.tagline}</span>}
-          </div>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={tenant.nombre}
+              style={{ maxHeight: '36px', maxWidth: '180px', objectFit: 'contain', marginBottom: '12px' }}
+            />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '12px' }}>
+              <span
+                style={{
+                  fontFamily: 'var(--ek-font-display)',
+                  fontSize: '20px',
+                  fontWeight: 700,
+                  letterSpacing: '-0.04em',
+                  color: 'var(--ek-mustard)'
+                }}
+              >
+                {brandShort}
+              </span>
+              {footer.tagline && <span className="ek-eyebrow">{footer.tagline}</span>}
+            </div>
+          )}
           {redesActivas.length > 0 && (
             <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
               {redesActivas.map(({ key, label, Icon }) => (
