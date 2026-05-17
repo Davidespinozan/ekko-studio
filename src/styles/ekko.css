@@ -1327,9 +1327,15 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 4px;
     padding: 0 12px;
     overflow-y: auto;
+  }
+
+  /* Cuando una sección está expandida, sumamos un poco de aire abajo
+     para separarla de la siguiente. Si está colapsada, no añade nada. */
+  .adm-sidebar-section:has(.adm-sidebar-item) {
+    margin-bottom: 12px;
   }
 
   .adm-sidebar-section {

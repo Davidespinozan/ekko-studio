@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
@@ -205,8 +205,15 @@ export function Sidebar({ onNavigate }: Props = {}) {
     });
   };
 
-  // Auto-expandir la sección que contiene la ruta activa, para que el item
-  // current siempre sea visible aunque el admin haya colapsado todo.
+  // Auto-expandir la sección que contiene la ruta activa SOLO cuando cambia
+  // la URL (no cada vez que `collapsed` cambia). Si el admin colapsa una
+  // sección estando dentro de ella, se queda colapsada — su elección manda.
+  // Usamos un ref de `collapsed` para no re-disparar el effect al colapsar.
+  const collapsedRef = useRef(collapsed);
+  useEffect(() => {
+    collapsedRef.current = collapsed;
+  }, [collapsed]);
+
   useEffect(() => {
     const activeSection = SECTIONS.find((s) =>
       s.items.some(
@@ -216,7 +223,7 @@ export function Sidebar({ onNavigate }: Props = {}) {
             : location.pathname.startsWith(item.to)
       )
     );
-    if (activeSection && collapsed.has(activeSection.label)) {
+    if (activeSection && collapsedRef.current.has(activeSection.label)) {
       setCollapsed((prev) => {
         const next = new Set(prev);
         next.delete(activeSection.label);
@@ -224,7 +231,7 @@ export function Sidebar({ onNavigate }: Props = {}) {
         return next;
       });
     }
-  }, [location.pathname, collapsed]);
+  }, [location.pathname]);
 
   const branding = (tenant.branding ?? {}) as Record<string, unknown>;
   const logoUrl =
