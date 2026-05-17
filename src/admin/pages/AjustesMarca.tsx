@@ -162,14 +162,6 @@ export default function AjustesMarca() {
         >
           {isSaving ? 'Guardando…' : 'Guardar cambios'}
         </button>
-        <button
-          type="button"
-          onClick={() => window.open('/', '_blank', 'noopener,noreferrer')}
-          className="ek-cta ek-cta--secondary"
-          style={{ padding: '14px 28px', fontSize: '14px' }}
-        >
-          Ver landing ↗
-        </button>
       </div>
 
       <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '16px' }}>
