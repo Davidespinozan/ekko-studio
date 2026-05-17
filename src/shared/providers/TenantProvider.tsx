@@ -86,14 +86,18 @@ export function TenantProvider({ children }: TenantProviderProps) {
         setTenant(data);
         setIsLoading(false);
 
-        // Aplicar branding al :root si está definido
-        if (data.branding && typeof data.branding === 'object') {
-          const branding = data.branding as Record<string, string>;
-          const root = document.documentElement;
-          if (branding.color_primary) root.style.setProperty('--ek-black', branding.color_primary);
-          if (branding.color_accent) root.style.setProperty('--ek-mustard', branding.color_accent);
-          if (branding.color_bg) root.style.setProperty('--ek-cream', branding.color_bg);
-        }
+        // Branding tokens dinámicos están desactivados en Sprint C1.
+        // EKKO usa paleta fija "Mostaza Ink" definida en CSS global.
+        //
+        // Para activar multi-paleta dinámica en Sprint D:
+        // 1. Mapear branding.color_primary → --ek-mustard
+        // 2. Mapear branding.color_bg → --ek-bg
+        // 3. Mapear branding.color_accent → --ek-mustard-soft
+        // 4. Auditar todos los usos de hex codes hardcoded en componentes
+        // 5. Documentar el contrato en KERNEL.md sección "Branding"
+        //
+        // branding sigue disponible en el contexto para Sprint D:
+        // logo_url, og_image_url, favicon_url (cuando se implementen).
 
         // Setear título dinámico
         if (data.nombre) {

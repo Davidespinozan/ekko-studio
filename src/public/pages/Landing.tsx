@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@shared/lib/supabase';
+import { useLandingConfig } from '@shared/hooks/useLandingConfig';
 import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
+import Footer from '../components/Footer';
 
 interface EstudioPublico {
   id: string;
@@ -101,6 +103,8 @@ export default function Landing() {
   const [estudioAbierto, setEstudioAbierto] = useState<EstudioInfo | null>(null);
   const { estudios, isLoading: estudiosLoading } = useEstudiosPublicos();
   const { tiers, isLoading: tiersLoading } = useTiersPublicos();
+  const { hero, cta_final, whatsappUrl } = useLandingConfig();
+  const ctaWhatsappUrl = whatsappUrl();
 
   const precioPro = tiers.find((t) => t.slug === 'pro')?.precio_centavos;
   const precioBasica = tiers.find((t) => t.slug === 'basica')?.precio_centavos;
@@ -155,9 +159,11 @@ export default function Landing() {
           pointerEvents: 'none'
         }} />
 
-        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '20px' }}>
-          EKKO STUDIO · CULIACÁN
-        </p>
+        {hero.eyebrow && (
+          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '20px' }}>
+            {hero.eyebrow}
+          </p>
+        )}
 
         <h1 style={{
           fontFamily: 'var(--ek-font-display)',
@@ -168,29 +174,33 @@ export default function Landing() {
           margin: 0,
           marginBottom: '24px'
         }}>
-          Tu estudio.<br />
-          Tu contenido.<br />
-          <span style={{ color: 'var(--ek-mustard)' }}>Sin límites.</span>
+          {hero.titulo}
+          {hero.titulo_accent && (
+            <>
+              {hero.titulo && <br />}
+              <span style={{ color: 'var(--ek-mustard)' }}>{hero.titulo_accent}</span>
+            </>
+          )}
         </h1>
 
-        <p style={{
-          fontSize: 'clamp(16px, 2vw, 20px)',
-          color: 'var(--ek-ink-muted)',
-          maxWidth: '600px',
-          lineHeight: 1.5,
-          marginBottom: '40px'
-        }}>
-          La plataforma para creadores que quieren grabar, crear y crecer
-          al siguiente nivel. Equipo profesional, espacios diseñados y
-          horas ilimitadas según tu membresía.
-        </p>
+        {hero.subtitulo && (
+          <p style={{
+            fontSize: 'clamp(16px, 2vw, 20px)',
+            color: 'var(--ek-ink-muted)',
+            maxWidth: '600px',
+            lineHeight: 1.5,
+            marginBottom: '40px'
+          }}>
+            {hero.subtitulo}
+          </p>
+        )}
 
         <a
-          href="#membresias"
+          href={hero.cta_link || '#membresias'}
           className="ek-cta"
           style={{ padding: '16px 28px', fontSize: '15px', display: 'inline-block' }}
         >
-          Ver membresías →
+          {hero.cta_texto}
         </a>
       </section>
 
@@ -604,9 +614,11 @@ export default function Landing() {
             pointerEvents: 'none'
           }} />
 
-          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '16px' }}>
-            CULIACÁN · MÉXICO
-          </p>
+          {cta_final.eyebrow && (
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '16px' }}>
+              {cta_final.eyebrow}
+            </p>
+          )}
           <h2 style={{
             fontFamily: 'var(--ek-font-display)',
             fontSize: 'clamp(32px, 5vw, 48px)',
@@ -616,64 +628,42 @@ export default function Landing() {
             marginBottom: '16px',
             lineHeight: 1.1
           }}>
-            ¿Listo para llevar tu contenido<br />al siguiente nivel?
+            {cta_final.titulo}
           </h2>
-          <p className="ek-body-muted" style={{ marginBottom: '32px', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
-            Agenda una visita sin compromiso. Te mostramos los estudios y te ayudamos a elegir tu membresía.
-          </p>
-          <a
-            href="https://wa.me/5216670000000?text=Hola%2C%20me%20interesa%20conocer%20EKKO%20Studio"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ek-cta"
-            style={{ padding: '18px 32px', fontSize: '15px' }}
-          >
-            Contáctanos por WhatsApp →
-          </a>
+          {cta_final.subtitulo && (
+            <p className="ek-body-muted" style={{ marginBottom: '32px', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
+              {cta_final.subtitulo}
+            </p>
+          )}
+          {ctaWhatsappUrl ? (
+            <a
+              href={ctaWhatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ek-cta"
+              style={{ padding: '18px 32px', fontSize: '15px' }}
+            >
+              {cta_final.cta_texto}
+            </a>
+          ) : (
+            <span
+              style={{
+                fontSize: '12px',
+                color: 'var(--ek-ink-faint)',
+                fontStyle: 'italic'
+              }}
+              title="Configura el WhatsApp en /admin/configuracion"
+            >
+              (Contacto sin configurar)
+            </span>
+          )}
         </div>
       </section>
 
       {/* ============================================================
-          FOOTER
+          FOOTER (extraído a src/public/components/Footer.tsx)
           ============================================================ */}
-      <footer style={{
-        padding: '40px 0',
-        borderTop: '0.5px solid var(--ek-line)',
-        marginTop: '40px'
-      }}>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '20px'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-            <span style={{
-              fontFamily: 'var(--ek-font-display)',
-              fontSize: '20px',
-              fontWeight: 700,
-              letterSpacing: '-0.04em',
-              color: 'var(--ek-mustard)'
-            }}>EKKO</span>
-            <span className="ek-eyebrow">STUDIO · CULIACÁN</span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '20px', fontSize: '13px', color: 'var(--ek-ink-muted)' }}>
-            <a href="/login" style={{ color: 'inherit', textDecoration: 'none' }}>Iniciar sesión</a>
-            <a href="#contacto" style={{ color: 'inherit', textDecoration: 'none' }}>Contacto</a>
-          </div>
-        </div>
-
-        <p style={{
-          fontSize: '11px',
-          color: 'var(--ek-ink-faint)',
-          marginTop: '24px',
-          letterSpacing: '0.04em'
-        }}>
-          © {new Date().getFullYear()} EKKO Studio. Todos los derechos reservados.
-        </p>
-      </footer>
+      <Footer />
 
       <EstudioModal
         estudio={estudioAbierto}
