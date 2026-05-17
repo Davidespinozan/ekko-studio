@@ -1670,7 +1670,17 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   }
 
   .adm-cal-event[data-status="cancelada"] { border-left-color: var(--ek-danger); opacity: 0.6; }
+  .adm-cal-event[data-status="cancelada_admin"] { border-left-color: var(--ek-danger); opacity: 0.6; }
   .adm-cal-event[data-status="completada"] { border-left-color: var(--ek-mustard); }
+
+  button.adm-cal-event {
+    transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  }
+  button.adm-cal-event:hover {
+    border-color: var(--ek-mustard-dim);
+    background: var(--ek-mustard-soft);
+    transform: translateY(-1px);
+  }
 
   .adm-cal-event-time { font-family: var(--ek-font-mono); font-weight: 600; }
   .adm-cal-event-recurso { color: var(--ek-ink-muted); margin-top: 2px; }
