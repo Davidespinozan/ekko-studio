@@ -123,6 +123,65 @@ Todo viene de `useTenant()` (nombre, slug) o `useLandingConfig()`.
 6. **NO leer `tenants.config` directamente** desde componentes —
    pasá por el hook correspondiente con parseo defensivo.
 
+## Patrón Soft-Delete (Sprint C-CRUD)
+
+### Filosofía
+Todas las entidades de dominio (recursos, tiers, anuncios futuros)
+usan soft delete vía campo `activo: boolean`. **NUNCA** hard delete.
+
+### Razones
+1. **Integridad referencial**: reservas históricas mantienen
+   referencia al estudio donde ocurrieron, aunque el estudio
+   ya no esté activo.
+2. **Reversibilidad**: admin puede restaurar errores sin perder
+   datos.
+3. **Auditoría**: queda registro histórico de qué estuvo activo
+   y cuándo.
+4. **Stripe**: tier archivado con `stripe_price_id` no se borra;
+   queda referencia para reportes pasados.
+
+### Contrato de implementación
+Toda entidad soft-deletable debe:
+1. Tener columna `activo BOOLEAN NOT NULL DEFAULT true`.
+2. Tener índice `(tenant_id, activo)` para performance.
+3. Filtrar `WHERE activo = true` en TODAS las queries públicas
+   (landing, member, signup).
+4. Mostrar archivados solo en admin con toggle explícito.
+5. Validar antes de archivar si hay dependencias activas
+   (ej: tier con miembros activos via `countActiveMembersInTier`).
+6. **NUNCA** copiar referencias externas únicas (Stripe IDs, etc.)
+   al duplicar — son globalmente únicas en otro sistema.
+
+### Patrón "Duplicar"
+Helper `generateUniqueSlug(base, existingSlugs)` + omitir campos
+auto-generados (id, created_at, stripe_*). Prefijo "(copia)" en
+nombre para diferenciación visual inmediata.
+
+### Tablas que aplican el patrón
+- `recursos` (estudios)
+- `tiers` (membresías)
+- `anuncios` (futuro Sprint D)
+
+### Tablas que NO aplican (datos transaccionales)
+- `reservas` — cancelar es propio dominio (`status='cancelada'`),
+  no soft-delete genérico.
+- `payment_events` — eventos inmutables, nunca se archivan.
+- `usuarios` — el equivalente es `status='suspendido'` o
+  `'cancelado'`, no `activo` boolean.
+
+### Helpers reusables
+- `src/admin/lib/crudHelpers.ts`
+  - `archiveRecord(table, id)`
+  - `restoreRecord(table, id)`
+  - `generateUniqueSlug(base, existing)`
+  - `countActiveMembersInTier({tierId, tierSlug, tenantId})`
+
+### Componente reusable
+- `src/admin/components/ConfirmDialog.tsx`
+  - Variants: `'danger' | 'warning' | 'info'`
+  - `hideConfirm` para modo informativo bloqueante (ej: archivar
+    tier con miembros activos)
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

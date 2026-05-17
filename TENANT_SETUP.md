@@ -78,6 +78,11 @@ VALUES (
 );
 ```
 
+> **Nota** (post Sprint C-CRUD): Los SQLs de los Pasos 2 y 3 ya no son
+> obligatorios. El cliente puede crear sus tiers y estudios directamente
+> desde `/admin/tiers` y `/admin/recursos` con los botones "+ Nuevo". Los
+> SQLs siguen siendo útiles para bulk-load inicial (10+ items de una vez).
+
 ## Paso 2: Crear tiers (membresías)
 
 ```sql

@@ -1,12 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
-import { useRecursosAdmin, updateRecurso } from '../hooks/useAdminData';
+import { useRecursosAdmin, updateRecurso, insertRecurso } from '../hooks/useAdminData';
+import { archiveRecord, restoreRecord, generateUniqueSlug } from '../lib/crudHelpers';
 import Toggle from '../components/Toggle';
 import ImageUploader from '../components/ImageUploader';
+import ConfirmDialog from '../components/ConfirmDialog';
 import type { Database } from '@shared/types/database';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
+type RecursoInsert = Database['public']['Tables']['recursos']['Insert'];
+
+// Estado del modal: 'edit' lleva una fila existente; 'create' lleva los defaults.
+type ModalState =
+  | { mode: 'edit'; recurso: Recurso }
+  | { mode: 'create' }
+  | null;
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
 
 interface BloqueHorario {
   dia: string;
@@ -59,89 +77,291 @@ function useTiersDelTenant(): TierOption[] {
 }
 
 export default function Recursos() {
+  const tenant = useTenant();
   const { recursos, isLoading, refetch } = useRecursosAdmin();
-  const [editing, setEditing] = useState<Recurso | null>(null);
+  const [modal, setModal] = useState<ModalState>(null);
+  const [archivando, setArchivando] = useState<Recurso | null>(null);
+  const [mostrarArchivados, setMostrarArchivados] = useState(false);
+  const [duplicandoId, setDuplicandoId] = useState<string | null>(null);
+  const [restaurandoId, setRestaurandoId] = useState<string | null>(null);
+
+  const { activos, archivados } = useMemo(() => {
+    return {
+      activos: recursos.filter((r) => r.activo),
+      archivados: recursos.filter((r) => !r.activo)
+    };
+  }, [recursos]);
+
+  async function handleDuplicar(original: Recurso) {
+    setDuplicandoId(original.id);
+    const existingSlugs = recursos.map((r) => r.slug);
+    const nuevoSlug = generateUniqueSlug(original.slug, existingSlugs);
+
+    const payload: RecursoInsert = {
+      tenant_id: tenant.id,
+      slug: nuevoSlug,
+      nombre: `(copia) ${original.nombre}`,
+      descripcion: original.descripcion,
+      tipo: original.tipo,
+      cupos: original.cupos,
+      capacidad_personas: original.capacidad_personas,
+      horarios: original.horarios,
+      tiers_permitidos: original.tiers_permitidos,
+      equipo_incluido: original.equipo_incluido,
+      tipo_contenido: original.tipo_contenido,
+      estilo_visual: original.estilo_visual,
+      foto_url: null, // no copiar la foto (puede confundir; admin sube nueva si quiere)
+      activo: true,
+      orden: (original.orden ?? 0) + 1
+    };
+
+    const { error } = await insertRecurso(payload);
+    setDuplicandoId(null);
+    if (error) {
+      alert(`No se pudo duplicar: ${error}`);
+      return;
+    }
+    await refetch();
+  }
+
+  async function handleArchivar() {
+    if (!archivando) return;
+    const { error } = await archiveRecord('recursos', archivando.id);
+    if (error) {
+      alert(`No se pudo archivar: ${error}`);
+      return;
+    }
+    setArchivando(null);
+    await refetch();
+  }
+
+  async function handleRestaurar(r: Recurso) {
+    setRestaurandoId(r.id);
+    const { error } = await restoreRecord('recursos', r.id);
+    setRestaurandoId(null);
+    if (error) {
+      alert(`No se pudo restaurar: ${error}`);
+      return;
+    }
+    await refetch();
+  }
 
   return (
     <div className="adm-page">
-      <div className="adm-page-header">
-        <p className="ek-eyebrow">ESTUDIOS</p>
-        <h1 className="ek-h2">Recursos reservables</h1>
+      <div
+        className="adm-page-header"
+        style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}
+      >
+        <div>
+          <p className="ek-eyebrow">ESTUDIOS</p>
+          <h1 className="ek-h2">Recursos reservables</h1>
+        </div>
+        <button onClick={() => setModal({ mode: 'create' })} className="ek-cta">
+          + Nuevo estudio
+        </button>
       </div>
 
       {isLoading ? (
         <p className="adm-body">Cargando…</p>
       ) : (
-        <div className="adm-stack">
-          {recursos.map((r) => (
-            <div key={r.id} className="ek-card">
-              <div
+        <>
+          <div className="adm-stack">
+            {activos.length === 0 ? (
+              <p className="ek-body-faint" style={{ padding: '20px 0' }}>
+                No hay estudios activos. Click en &quot;+ Nuevo estudio&quot; para crear el primero.
+              </p>
+            ) : (
+              activos.map((r) => (
+                <RecursoRow
+                  key={r.id}
+                  recurso={r}
+                  onEdit={() => setModal({ mode: 'edit', recurso: r })}
+                  onDuplicate={() => handleDuplicar(r)}
+                  onArchive={() => setArchivando(r)}
+                  duplicating={duplicandoId === r.id}
+                />
+              ))
+            )}
+          </div>
+
+          {archivados.length > 0 && (
+            <section style={{ marginTop: '32px' }}>
+              <button
+                type="button"
+                onClick={() => setMostrarArchivados((v) => !v)}
+                className="ek-icon-btn"
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: '1rem'
+                  width: 'auto',
+                  padding: '8px 14px',
+                  fontSize: '12px',
+                  marginBottom: '12px'
                 }}
               >
-                <div>
-                  <h3 className="ek-h3">
-                    {r.nombre}{' '}
-                    {!r.activo && (
-                      <span
-                        style={{
-                          color: 'var(--ek-danger)',
-                          fontSize: '0.75rem',
-                          marginLeft: '0.5rem'
-                        }}
-                      >
-                        (inactivo)
-                      </span>
-                    )}
-                  </h3>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--ek-ink-muted)' }}>
-                    Cupos: {r.cupos}
-                  </p>
-                  <p
-                    style={{
-                      fontSize: '0.8125rem',
-                      color: 'var(--ek-ink-muted)',
-                      marginTop: '0.25rem'
-                    }}
-                  >
-                    Planes con acceso: {r.tiers_permitidos.join(', ') || '—'}
-                  </p>
-                  <p
-                    style={{
-                      fontSize: '0.8125rem',
-                      color: 'var(--ek-ink-muted)',
-                      marginTop: '0.25rem'
-                    }}
-                  >
-                    Horarios:{' '}
-                    {Array.isArray(r.horarios)
-                      ? `${(r.horarios as unknown[]).length} bloques`
-                      : '—'}
-                  </p>
+                {mostrarArchivados ? '▾' : '▸'} Ver archivados ({archivados.length})
+              </button>
+
+              {mostrarArchivados && (
+                <div className="adm-stack" style={{ opacity: 0.6 }}>
+                  {archivados.map((r) => (
+                    <RecursoArchivedRow
+                      key={r.id}
+                      recurso={r}
+                      onRestore={() => handleRestaurar(r)}
+                      restoring={restaurandoId === r.id}
+                    />
+                  ))}
                 </div>
-                <button onClick={() => setEditing(r)} className="adm-link">
-                  Editar →
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+              )}
+            </section>
+          )}
+        </>
       )}
 
-      {editing && (
+      {modal?.mode === 'edit' && (
         <EditarRecursoModal
-          recurso={editing}
-          onClose={() => setEditing(null)}
+          recurso={modal.recurso}
+          onClose={() => setModal(null)}
           onSaved={async () => {
             await refetch();
-            setEditing(null);
+            setModal(null);
           }}
         />
       )}
+
+      {modal?.mode === 'create' && (
+        <EditarRecursoModal
+          recurso={null}
+          onClose={() => setModal(null)}
+          onSaved={async () => {
+            await refetch();
+            setModal(null);
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={archivando !== null}
+        title={archivando ? `¿Archivar “${archivando.nombre}”?` : ''}
+        description="Este estudio dejará de aparecer en la landing y no se podrá reservar. Las reservas históricas no se afectan. Puedes restaurarlo después."
+        confirmLabel="Archivar"
+        variant="warning"
+        onConfirm={handleArchivar}
+        onCancel={() => setArchivando(null)}
+      />
+    </div>
+  );
+}
+
+function RecursoRow({
+  recurso: r,
+  onEdit,
+  onDuplicate,
+  onArchive,
+  duplicating
+}: {
+  recurso: Recurso;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onArchive: () => void;
+  duplicating: boolean;
+}) {
+  return (
+    <div className="ek-card">
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '1rem'
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <h3 className="ek-h3">{r.nombre}</h3>
+          <p style={{ fontSize: '0.875rem', color: 'var(--ek-ink-muted)' }}>
+            Cupos: {r.cupos}
+            {r.capacidad_personas ? ` · Capacidad: ${r.capacidad_personas}` : ''}
+          </p>
+          <p
+            style={{
+              fontSize: '0.8125rem',
+              color: 'var(--ek-ink-muted)',
+              marginTop: '0.25rem'
+            }}
+          >
+            Planes con acceso: {r.tiers_permitidos.join(', ') || '—'}
+          </p>
+          <p
+            style={{
+              fontSize: '0.8125rem',
+              color: 'var(--ek-ink-muted)',
+              marginTop: '0.25rem'
+            }}
+          >
+            Horarios:{' '}
+            {Array.isArray(r.horarios)
+              ? `${(r.horarios as unknown[]).length} bloques`
+              : '—'}
+          </p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '120px' }}>
+          <button onClick={onEdit} className="ek-icon-btn" style={{ width: '100%', padding: '8px 12px', fontSize: '12px' }}>
+            ✏️ Editar
+          </button>
+          <button
+            onClick={onDuplicate}
+            disabled={duplicating}
+            className="ek-icon-btn"
+            style={{ width: '100%', padding: '8px 12px', fontSize: '12px' }}
+          >
+            {duplicating ? 'Duplicando…' : '📋 Duplicar'}
+          </button>
+          <button
+            onClick={onArchive}
+            className="ek-icon-btn"
+            style={{ width: '100%', padding: '8px 12px', fontSize: '12px', color: 'var(--ek-danger)' }}
+          >
+            🗄 Archivar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecursoArchivedRow({
+  recurso: r,
+  onRestore,
+  restoring
+}: {
+  recurso: Recurso;
+  onRestore: () => void;
+  restoring: boolean;
+}) {
+  return (
+    <div className="ek-card">
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '1rem'
+        }}
+      >
+        <div>
+          <h3 className="ek-h3" style={{ textDecoration: 'line-through' }}>{r.nombre}</h3>
+          <p style={{ fontSize: '0.75rem', color: 'var(--ek-ink-faint)' }}>
+            Archivado · slug: {r.slug}
+          </p>
+        </div>
+        <button
+          onClick={onRestore}
+          disabled={restoring}
+          className="ek-icon-btn"
+          style={{ padding: '8px 14px', fontSize: '12px' }}
+        >
+          {restoring ? 'Restaurando…' : '♻️ Restaurar'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -164,36 +384,87 @@ function EditarRecursoModal({
   onClose,
   onSaved
 }: {
-  recurso: Recurso;
+  recurso: Recurso | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
+  const tenant = useTenant();
   const tiersDisponibles = useTiersDelTenant();
+  const esCreacion = recurso === null;
 
-  const [nombre, setNombre] = useState(recurso.nombre);
-  const [descripcion, setDescripcion] = useState(recurso.descripcion ?? '');
-  const [activo, setActivo] = useState(recurso.activo);
+  const [nombre, setNombre] = useState(recurso?.nombre ?? '');
+  const [slug, setSlug] = useState(recurso?.slug ?? '');
+  const [slugTocado, setSlugTocado] = useState(!esCreacion);
+  const [descripcion, setDescripcion] = useState(recurso?.descripcion ?? '');
+  const [activo, setActivo] = useState(recurso?.activo ?? true);
   const [tiersPermitidos, setTiersPermitidos] = useState<string[]>(
-    recurso.tiers_permitidos ?? []
+    recurso?.tiers_permitidos ?? []
   );
   const [horarios, setHorarios] = useState<BloqueHorario[]>(() =>
-    parseHorarios(recurso.horarios)
+    parseHorarios(recurso?.horarios)
   );
-  const [fotoUrl, setFotoUrl] = useState<string>(recurso.foto_url ?? '');
+  const [fotoUrl, setFotoUrl] = useState<string>(recurso?.foto_url ?? '');
   const [capacidadPersonas, setCapacidadPersonas] = useState<number>(
-    recurso.capacidad_personas ?? 0
+    recurso?.capacidad_personas ?? 0
   );
-  const [tipoContenido, setTipoContenido] = useState<string[]>(recurso.tipo_contenido ?? []);
-  const [equipoIncluido, setEquipoIncluido] = useState<string[]>(recurso.equipo_incluido ?? []);
-  const [estiloVisual, setEstiloVisual] = useState<string>(recurso.estilo_visual ?? '');
+  const [tipoContenido, setTipoContenido] = useState<string[]>(recurso?.tipo_contenido ?? []);
+  const [equipoIncluido, setEquipoIncluido] = useState<string[]>(recurso?.equipo_incluido ?? []);
+  const [estiloVisual, setEstiloVisual] = useState<string>(recurso?.estilo_visual ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Slug auto-derivado del nombre en modo crear, hasta que el admin lo edite manualmente
+  useEffect(() => {
+    if (esCreacion && !slugTocado) {
+      setSlug(slugify(nombre));
+    }
+  }, [nombre, esCreacion, slugTocado]);
 
   async function handleSave() {
     setSaving(true);
     setError(null);
 
-    const { error: err } = await updateRecurso(recurso.id, {
+    if (esCreacion) {
+      if (!nombre.trim()) {
+        setError('El nombre es obligatorio.');
+        setSaving(false);
+        return;
+      }
+      const slugFinal = slug.trim() || slugify(nombre);
+      if (!/^[a-z0-9-]+$/.test(slugFinal)) {
+        setError('El slug solo puede contener letras minúsculas, números y guiones.');
+        setSaving(false);
+        return;
+      }
+
+      const { error: err } = await insertRecurso({
+        tenant_id: tenant.id,
+        slug: slugFinal,
+        nombre: nombre.trim(),
+        descripcion: descripcion || null,
+        tipo: 'estudio_individual',
+        cupos: 1,
+        activo,
+        tiers_permitidos: tiersPermitidos,
+        horarios: horarios as never,
+        foto_url: fotoUrl || null,
+        capacidad_personas: capacidadPersonas || null,
+        tipo_contenido: tipoContenido,
+        equipo_incluido: equipoIncluido,
+        estilo_visual: estiloVisual || null
+      });
+
+      if (err) {
+        setError(err);
+        setSaving(false);
+        return;
+      }
+      await onSaved();
+      return;
+    }
+
+    // Edit mode
+    const { error: err } = await updateRecurso(recurso!.id, {
       nombre,
       descripcion: descripcion || null,
       activo,
@@ -214,11 +485,19 @@ function EditarRecursoModal({
     await onSaved();
   }
 
+  // Path prefix para upload de foto: usa el slug si existe, sino "nuevo-{timestamp}".
+  // En modo crear, si el admin sube foto antes de tener slug definitivo, no se mueve.
+  const photoSlug = slug || `nuevo-${Date.now()}`;
+
   return (
     <div className="adm-modal-backdrop" onClick={() => !saving && onClose()}>
       <div className="adm-modal" onClick={(e) => e.stopPropagation()}>
-        <p className="ek-eyebrow ek-eyebrow--mustard">EDITAR ESTUDIO</p>
-        <h3 className="ek-h3" style={{ marginBottom: '1rem' }}>{recurso.nombre}</h3>
+        <p className="ek-eyebrow ek-eyebrow--mustard">
+          {esCreacion ? 'NUEVO ESTUDIO' : 'EDITAR ESTUDIO'}
+        </p>
+        <h3 className="ek-h3" style={{ marginBottom: '1rem' }}>
+          {nombre || 'Sin nombre'}
+        </h3>
 
         <label className="ek-label">
           Nombre
@@ -226,8 +505,28 @@ function EditarRecursoModal({
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
             className="ek-input"
+            placeholder="Ej: Estudio 1"
           />
         </label>
+
+        {esCreacion && (
+          <div className="ek-form-field">
+            <label className="ek-label">Slug (URL)</label>
+            <input
+              value={slug}
+              onChange={(e) => {
+                setSlug(e.target.value);
+                setSlugTocado(true);
+              }}
+              className="ek-input"
+              placeholder="estudio-1"
+              pattern="[a-z0-9-]+"
+            />
+            <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
+              Solo minúsculas, números y guiones. Identificador único, no editable luego.
+            </p>
+          </div>
+        )}
 
         <label className="ek-label">
           Descripción
@@ -270,7 +569,7 @@ function EditarRecursoModal({
         <div style={{ marginTop: '16px' }}>
           <ImageUploader
             bucket="estudios"
-            pathPrefix={`ekko/${recurso.slug}`}
+            pathPrefix={`${tenant.slug}/${photoSlug}`}
             currentUrl={fotoUrl || null}
             onUploaded={setFotoUrl}
             label="Foto del estudio"

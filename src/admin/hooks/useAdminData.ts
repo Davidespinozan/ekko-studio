@@ -154,6 +154,17 @@ export async function updateRecurso(
   return { error: error?.message ?? null };
 }
 
+export async function insertRecurso(
+  payload: Database['public']['Tables']['recursos']['Insert']
+): Promise<{ error: string | null; data: Recurso | null }> {
+  const { data, error } = await supabase
+    .from('recursos')
+    .insert(payload)
+    .select('*')
+    .single();
+  return { error: error?.message ?? null, data: (data as Recurso | null) ?? null };
+}
+
 /**
  * Tiers del tenant.
  */
@@ -184,10 +195,21 @@ export function useTiersAdmin() {
 
 export async function updateTier(
   tierId: string,
-  patch: Partial<Pick<Tier, 'nombre' | 'descripcion' | 'precio_centavos' | 'beneficios' | 'reglas' | 'activo' | 'orden'>>
+  patch: Partial<Pick<Tier, 'nombre' | 'descripcion' | 'precio_centavos' | 'beneficios' | 'reglas' | 'activo' | 'orden' | 'slug'>>
 ): Promise<{ error: string | null }> {
   const { error } = await supabase.from('tiers').update(patch).eq('id', tierId);
   return { error: error?.message ?? null };
+}
+
+export async function insertTier(
+  payload: Database['public']['Tables']['tiers']['Insert']
+): Promise<{ error: string | null; data: Tier | null }> {
+  const { data, error } = await supabase
+    .from('tiers')
+    .insert(payload)
+    .select('*')
+    .single();
+  return { error: error?.message ?? null, data: (data as Tier | null) ?? null };
 }
 
 /**

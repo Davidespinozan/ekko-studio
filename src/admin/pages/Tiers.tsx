@@ -1,72 +1,323 @@
-import { useState } from 'react';
-import { useTiersAdmin, updateTier } from '../hooks/useAdminData';
+import { useMemo, useState } from 'react';
+import { useTiersAdmin, updateTier, insertTier } from '../hooks/useAdminData';
+import {
+  archiveRecord,
+  restoreRecord,
+  generateUniqueSlug,
+  countActiveMembersInTier
+} from '../lib/crudHelpers';
+import { useTenant } from '@shared/hooks/useTenant';
 import Toggle from '../components/Toggle';
+import ConfirmDialog from '../components/ConfirmDialog';
 import type { Database } from '@shared/types/database';
 
 type Tier = Database['public']['Tables']['tiers']['Row'];
 
+type ModalState =
+  | { mode: 'edit'; tier: Tier }
+  | { mode: 'create' }
+  | null;
+
+type ArchivarState =
+  | null
+  | { tier: Tier; status: 'loading' }
+  | { tier: Tier; status: 'ready'; activeMembers: number };
+
 export default function Tiers() {
+  const tenant = useTenant();
   const { tiers, isLoading, refetch } = useTiersAdmin();
-  const [editing, setEditing] = useState<Tier | null>(null);
+  const [modal, setModal] = useState<ModalState>(null);
+  const [archivar, setArchivar] = useState<ArchivarState>(null);
+  const [mostrarArchivados, setMostrarArchivados] = useState(false);
+  const [duplicandoId, setDuplicandoId] = useState<string | null>(null);
+  const [restaurandoId, setRestaurandoId] = useState<string | null>(null);
+
+  const { activos, archivados } = useMemo(() => {
+    return {
+      activos: tiers.filter((t) => t.activo),
+      archivados: tiers.filter((t) => !t.activo)
+    };
+  }, [tiers]);
+
+  async function handleDuplicar(original: Tier) {
+    setDuplicandoId(original.id);
+    const existingSlugs = tiers.map((t) => t.slug);
+    const nuevoSlug = generateUniqueSlug(original.slug, existingSlugs);
+
+    const { error } = await insertTier({
+      tenant_id: tenant.id,
+      slug: nuevoSlug,
+      nombre: `(copia) ${original.nombre}`,
+      descripcion: original.descripcion,
+      precio_centavos: original.precio_centavos,
+      moneda: original.moneda,
+      periodo: original.periodo,
+      beneficios: original.beneficios,
+      reglas: original.reglas,
+      // stripe_price_id: NULL — NUNCA duplicar referencias externas únicas
+      stripe_price_id: null,
+      activo: true,
+      orden: (original.orden ?? 0) + 1
+    });
+
+    setDuplicandoId(null);
+    if (error) {
+      alert(`No se pudo duplicar: ${error}`);
+      return;
+    }
+    await refetch();
+  }
+
+  async function startArchivar(tier: Tier) {
+    setArchivar({ tier, status: 'loading' });
+    const count = await countActiveMembersInTier({
+      tierId: tier.id,
+      tierSlug: tier.slug,
+      tenantId: tenant.id
+    });
+    setArchivar({ tier, status: 'ready', activeMembers: count });
+  }
+
+  async function handleArchivar() {
+    if (!archivar || archivar.status !== 'ready' || archivar.activeMembers > 0) return;
+    const { error } = await archiveRecord('tiers', archivar.tier.id);
+    if (error) {
+      alert(`No se pudo archivar: ${error}`);
+      return;
+    }
+    setArchivar(null);
+    await refetch();
+  }
+
+  async function handleRestaurar(t: Tier) {
+    setRestaurandoId(t.id);
+    const { error } = await restoreRecord('tiers', t.id);
+    setRestaurandoId(null);
+    if (error) {
+      alert(`No se pudo restaurar: ${error}`);
+      return;
+    }
+    await refetch();
+  }
+
+  const archivarTier = archivar?.tier;
+  const archivarBloqueado = archivar?.status === 'ready' && archivar.activeMembers > 0;
+  const archivarConfirmDescription = (() => {
+    if (!archivar) return '';
+    if (archivar.status === 'loading') return 'Verificando miembros activos…';
+    if (archivar.activeMembers > 0) {
+      return `${archivar.activeMembers} miembro(s) activo(s) tienen este plan. Migralos a otro plan antes de archivar este.`;
+    }
+    return 'Este plan dejará de aparecer en signup y landing. Los miembros existentes con este plan no se afectan. Puedes restaurarlo después.';
+  })();
 
   return (
     <div className="adm-page">
-      <div className="adm-page-header">
-        <p className="ek-eyebrow">PLANES</p>
-        <h1 className="ek-h2">Membresías</h1>
+      <div
+        className="adm-page-header"
+        style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}
+      >
+        <div>
+          <p className="ek-eyebrow">PLANES</p>
+          <h1 className="ek-h2">Membresías</h1>
+        </div>
+        <button onClick={() => setModal({ mode: 'create' })} className="ek-cta">
+          + Nueva membresía
+        </button>
       </div>
 
       {isLoading ? (
         <p className="adm-body">Cargando…</p>
       ) : (
-        <div className="adm-stack">
-          {tiers.map((t) => (
-            <div key={t.id} className="ek-card">
-              <div
+        <>
+          <div className="adm-stack">
+            {activos.length === 0 ? (
+              <p className="ek-body-faint" style={{ padding: '20px 0' }}>
+                No hay planes activos. Click en &quot;+ Nueva membresía&quot; para crear el primero.
+              </p>
+            ) : (
+              activos.map((t) => (
+                <TierRow
+                  key={t.id}
+                  tier={t}
+                  onEdit={() => setModal({ mode: 'edit', tier: t })}
+                  onDuplicate={() => handleDuplicar(t)}
+                  onArchive={() => startArchivar(t)}
+                  duplicating={duplicandoId === t.id}
+                />
+              ))
+            )}
+          </div>
+
+          {archivados.length > 0 && (
+            <section style={{ marginTop: '32px' }}>
+              <button
+                type="button"
+                onClick={() => setMostrarArchivados((v) => !v)}
+                className="ek-icon-btn"
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start'
+                  width: 'auto',
+                  padding: '8px 14px',
+                  fontSize: '12px',
+                  marginBottom: '12px'
                 }}
               >
-                <div>
-                  <h3 className="ek-h3">{t.nombre}</h3>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--ek-ink-muted)' }}>
-                    ${(t.precio_centavos / 100).toLocaleString('es-MX')} {t.moneda} /{' '}
-                    {t.periodo}
-                  </p>
-                  <p
-                    style={{
-                      fontSize: '0.8125rem',
-                      color: 'var(--ek-ink-muted)',
-                      marginTop: '0.5rem'
-                    }}
-                  >
-                    {Array.isArray(t.beneficios)
-                      ? `${(t.beneficios as unknown[]).length} beneficios`
-                      : '—'}{' '}
-                    · {t.activo ? 'activo' : 'inactivo'}
-                  </p>
+                {mostrarArchivados ? '▾' : '▸'} Ver archivados ({archivados.length})
+              </button>
+
+              {mostrarArchivados && (
+                <div className="adm-stack" style={{ opacity: 0.6 }}>
+                  {archivados.map((t) => (
+                    <TierArchivedRow
+                      key={t.id}
+                      tier={t}
+                      onRestore={() => handleRestaurar(t)}
+                      restoring={restaurandoId === t.id}
+                    />
+                  ))}
                 </div>
-                <button onClick={() => setEditing(t)} className="adm-link">
-                  Editar →
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+              )}
+            </section>
+          )}
+        </>
       )}
 
-      {editing && (
+      {modal?.mode === 'edit' && (
         <EditarTierModal
-          tier={editing}
-          onClose={() => setEditing(null)}
+          tier={modal.tier}
+          existingSlugs={tiers.map((t) => t.slug)}
+          onClose={() => setModal(null)}
           onSaved={async () => {
             await refetch();
-            setEditing(null);
+            setModal(null);
           }}
         />
       )}
+
+      {modal?.mode === 'create' && (
+        <EditarTierModal
+          tier={null}
+          existingSlugs={tiers.map((t) => t.slug)}
+          onClose={() => setModal(null)}
+          onSaved={async () => {
+            await refetch();
+            setModal(null);
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={archivar !== null}
+        title={archivarTier ? `¿Archivar “${archivarTier.nombre}”?` : ''}
+        description={archivarConfirmDescription}
+        confirmLabel="Archivar"
+        variant={archivarBloqueado ? 'danger' : 'warning'}
+        hideConfirm={archivarBloqueado || archivar?.status === 'loading'}
+        onConfirm={handleArchivar}
+        onCancel={() => setArchivar(null)}
+      />
+    </div>
+  );
+}
+
+function TierRow({
+  tier: t,
+  onEdit,
+  onDuplicate,
+  onArchive,
+  duplicating
+}: {
+  tier: Tier;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onArchive: () => void;
+  duplicating: boolean;
+}) {
+  return (
+    <div className="ek-card">
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '1rem'
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <h3 className="ek-h3">{t.nombre}</h3>
+          <p style={{ fontSize: '0.875rem', color: 'var(--ek-ink-muted)' }}>
+            ${(t.precio_centavos / 100).toLocaleString('es-MX')} {t.moneda} / {t.periodo}
+          </p>
+          <p
+            style={{
+              fontSize: '0.8125rem',
+              color: 'var(--ek-ink-muted)',
+              marginTop: '0.5rem'
+            }}
+          >
+            slug: {t.slug} ·{' '}
+            {Array.isArray(t.beneficios) ? `${(t.beneficios as unknown[]).length} beneficios` : '—'}
+          </p>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '120px' }}>
+          <button onClick={onEdit} className="ek-icon-btn" style={{ width: '100%', padding: '8px 12px', fontSize: '12px' }}>
+            ✏️ Editar
+          </button>
+          <button
+            onClick={onDuplicate}
+            disabled={duplicating}
+            className="ek-icon-btn"
+            style={{ width: '100%', padding: '8px 12px', fontSize: '12px' }}
+          >
+            {duplicating ? 'Duplicando…' : '📋 Duplicar'}
+          </button>
+          <button
+            onClick={onArchive}
+            className="ek-icon-btn"
+            style={{ width: '100%', padding: '8px 12px', fontSize: '12px', color: 'var(--ek-danger)' }}
+          >
+            🗄 Archivar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TierArchivedRow({
+  tier: t,
+  onRestore,
+  restoring
+}: {
+  tier: Tier;
+  onRestore: () => void;
+  restoring: boolean;
+}) {
+  return (
+    <div className="ek-card">
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '1rem'
+        }}
+      >
+        <div>
+          <h3 className="ek-h3" style={{ textDecoration: 'line-through' }}>{t.nombre}</h3>
+          <p style={{ fontSize: '0.75rem', color: 'var(--ek-ink-faint)' }}>
+            Archivado · slug: {t.slug} · ${(t.precio_centavos / 100).toLocaleString('es-MX')} {t.moneda}
+          </p>
+        </div>
+        <button
+          onClick={onRestore}
+          disabled={restoring}
+          className="ek-icon-btn"
+          style={{ padding: '8px 14px', fontSize: '12px' }}
+        >
+          {restoring ? 'Restaurando…' : '♻️ Restaurar'}
+        </button>
+      </div>
     </div>
   );
 }
@@ -88,42 +339,104 @@ function parseBeneficios(raw: unknown): string[] {
 
 function EditarTierModal({
   tier,
+  existingSlugs,
   onClose,
   onSaved
 }: {
-  tier: Tier;
+  tier: Tier | null;
+  existingSlugs: string[];
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const [nombre, setNombre] = useState(tier.nombre);
-  const [precio, setPrecio] = useState(String(tier.precio_centavos / 100));
-  const [descripcion, setDescripcion] = useState(tier.descripcion ?? '');
-  const [activo, setActivo] = useState(tier.activo);
-  const [beneficios, setBeneficios] = useState<string[]>(() => parseBeneficios(tier.beneficios));
+  const tenant = useTenant();
+  const esCreacion = tier === null;
+
+  const [slug, setSlug] = useState(tier?.slug ?? '');
+  const [nombre, setNombre] = useState(tier?.nombre ?? '');
+  const [precio, setPrecio] = useState(
+    tier ? String(tier.precio_centavos / 100) : ''
+  );
+  const [descripcion, setDescripcion] = useState(tier?.descripcion ?? '');
+  const [activo, setActivo] = useState(tier?.activo ?? true);
+  const [beneficios, setBeneficios] = useState<string[]>(() =>
+    tier ? parseBeneficios(tier.beneficios) : []
+  );
   const [maxInvitados, setMaxInvitados] = useState<number>(() => {
-    const reglas = tier.reglas as Record<string, unknown> | null;
+    const reglas = tier?.reglas as Record<string, unknown> | null;
     const raw = reglas?.max_invitados;
     if (typeof raw === 'number') return raw;
-    return tier.slug === 'pro' ? 4 : 2;
+    return tier?.slug === 'pro' ? 4 : 2;
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Validación inline del slug (modo crear)
+  const slugFormatValido = slug === '' || /^[a-z0-9-]+$/.test(slug);
+  const slugChocaConOtro = esCreacion && slug !== '' && existingSlugs.includes(slug);
 
   async function handleSave() {
     setSaving(true);
     setError(null);
 
     const precioCentavos = Math.round(parseFloat(precio) * 100);
-    if (!Number.isFinite(precioCentavos)) {
-      setError('Precio inválido');
+    if (!Number.isFinite(precioCentavos) || precioCentavos < 0) {
+      setError('Precio inválido.');
       setSaving(false);
       return;
     }
 
-    const reglasActuales = (tier.reglas as Record<string, unknown>) ?? {};
+    if (esCreacion) {
+      if (!slug.trim()) {
+        setError('El slug es obligatorio.');
+        setSaving(false);
+        return;
+      }
+      if (!/^[a-z0-9-]+$/.test(slug)) {
+        setError('Slug inválido. Solo minúsculas, números y guiones.');
+        setSaving(false);
+        return;
+      }
+      if (existingSlugs.includes(slug)) {
+        setError(`Ya existe un tier con slug "${slug}". Usá otro.`);
+        setSaving(false);
+        return;
+      }
+      if (!nombre.trim()) {
+        setError('El nombre es obligatorio.');
+        setSaving(false);
+        return;
+      }
+
+      const reglas = { max_invitados: maxInvitados };
+
+      const { error: err } = await insertTier({
+        tenant_id: tenant.id,
+        slug,
+        nombre: nombre.trim(),
+        descripcion: descripcion || null,
+        precio_centavos: precioCentavos,
+        moneda: 'MXN',
+        periodo: 'mensual',
+        beneficios: beneficios as never,
+        reglas: reglas as never,
+        activo,
+        orden: existingSlugs.length + 1
+      });
+
+      if (err) {
+        setError(err);
+        setSaving(false);
+        return;
+      }
+      await onSaved();
+      return;
+    }
+
+    // Edit mode
+    const reglasActuales = (tier!.reglas as Record<string, unknown>) ?? {};
     const reglasNuevas = { ...reglasActuales, max_invitados: maxInvitados };
 
-    const { error: err } = await updateTier(tier.id, {
+    const { error: err } = await updateTier(tier!.id, {
       nombre,
       descripcion: descripcion || null,
       precio_centavos: precioCentavos,
@@ -143,8 +456,40 @@ function EditarTierModal({
   return (
     <div className="adm-modal-backdrop" onClick={() => !saving && onClose()}>
       <div className="adm-modal" onClick={(e) => e.stopPropagation()}>
-        <p className="ek-eyebrow ek-eyebrow--mustard">EDITAR PLAN</p>
-        <h3 className="ek-h3" style={{ marginBottom: '1rem' }}>{tier.nombre}</h3>
+        <p className="ek-eyebrow ek-eyebrow--mustard">
+          {esCreacion ? 'NUEVA MEMBRESÍA' : 'EDITAR PLAN'}
+        </p>
+        <h3 className="ek-h3" style={{ marginBottom: '1rem' }}>
+          {nombre || (esCreacion ? 'Sin nombre' : tier!.nombre)}
+        </h3>
+
+        {esCreacion && (
+          <div className="ek-form-field">
+            <label className="ek-label">Slug (identificador)</label>
+            <input
+              value={slug}
+              onChange={(e) => setSlug(e.target.value)}
+              className="ek-input"
+              placeholder="basica, pro, premium..."
+              pattern="[a-z0-9-]+"
+            />
+            <p
+              style={{
+                fontSize: '11px',
+                color: !slugFormatValido || slugChocaConOtro
+                  ? 'var(--ek-danger)'
+                  : 'var(--ek-ink-faint)',
+                marginTop: '6px'
+              }}
+            >
+              {!slugFormatValido
+                ? 'Solo minúsculas, números y guiones.'
+                : slugChocaConOtro
+                ? `Ya existe un tier con slug "${slug}".`
+                : 'Identificador único, NO editable después. Usado en URLs y en BD.'}
+            </p>
+          </div>
+        )}
 
         <label className="ek-label">
           Nombre
