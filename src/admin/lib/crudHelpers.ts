@@ -177,3 +177,81 @@ export async function hardDeleteRecord(
   const { error } = await supabase.from(table).delete().eq('id', id);
   return { error: error ? new Error(error.message) : null };
 }
+
+// ============================================================================
+// Equipo (Sprint Equipo)
+// ============================================================================
+// Validaciones de IAM: bloquear auto-modificación + bloquear revocación del
+// último admin del tenant. Soft-revoke vía status='revocado'.
+// ============================================================================
+
+export async function countAdminsActivos(tenantId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('count_admins_activos', {
+    p_tenant_id: tenantId
+  });
+  if (error) {
+    console.error('[countAdminsActivos]', error);
+    return 0;
+  }
+  return Number(data ?? 0);
+}
+
+export type TeamModifyAction = 'revoke' | 'change-role-to-recepcionista';
+
+export interface TeamModifyResult {
+  canModify: boolean;
+  reason?: string;
+}
+
+/**
+ * Valida si un miembro del equipo puede ser revocado o cambiado de rol.
+ * Reglas:
+ *  - No puedes modificarte a ti mismo (auto-revoke prevention).
+ *  - No puedes revocar al último admin activo del tenant.
+ *  - No puedes degradar al último admin a recepcionista.
+ *
+ * Para revocar/degradar a un recepcionista NO valida count (siempre permitido).
+ */
+export async function canModifyTeamMember(
+  targetUserId: string,
+  currentUserId: string,
+  targetRol: 'admin' | 'recepcionista',
+  action: TeamModifyAction,
+  tenantId: string
+): Promise<TeamModifyResult> {
+  if (targetUserId === currentUserId) {
+    return {
+      canModify: false,
+      reason: 'No puedes modificarte a ti mismo. Pídele a otro admin que lo haga.'
+    };
+  }
+
+  if (targetRol === 'admin') {
+    const adminsCount = await countAdminsActivos(tenantId);
+    if (adminsCount <= 1) {
+      return {
+        canModify: false,
+        reason:
+          'Es el último administrador del sistema. Debe haber al menos uno. Invita o promueve a alguien antes de modificar este acceso.'
+      };
+    }
+  }
+
+  // Recepcionistas: siempre permitido (no se llama al RPC).
+  void action;
+  return { canModify: true };
+}
+
+/**
+ * Revoca el acceso de una persona del equipo (soft-revoke).
+ * status='revocado' — preserva auditoría, bloquea login.
+ */
+export async function revokeTeamMember(
+  userId: string
+): Promise<{ error: string | null }> {
+  const { error } = await supabase
+    .from('usuarios')
+    .update({ status: 'revocado' })
+    .eq('id', userId);
+  return { error: error?.message ?? null };
+}

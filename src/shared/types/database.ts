@@ -491,6 +491,7 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          invitado: boolean
           membresia_activa_id: string | null
           membresia_tier: string | null
           no_shows_count: number
@@ -513,6 +514,7 @@ export type Database = {
           created_at?: string
           email: string
           id?: string
+          invitado?: boolean
           membresia_activa_id?: string | null
           membresia_tier?: string | null
           no_shows_count?: number
@@ -535,6 +537,7 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+          invitado?: boolean
           membresia_activa_id?: string | null
           membresia_tier?: string | null
           no_shows_count?: number
@@ -607,6 +610,7 @@ export type Database = {
         Returns: Json
       }
       count_active_admins: { Args: { p_tenant_id: string }; Returns: number }
+      count_admins_activos: { Args: { p_tenant_id: string }; Returns: number }
       count_miembros_tier: { Args: { p_tier_id: string }; Returns: number }
       count_reservas_recurso: {
         Args: { p_recurso_id: string }
@@ -622,6 +626,7 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          invitado: boolean
           membresia_activa_id: string | null
           membresia_tier: string | null
           no_shows_count: number

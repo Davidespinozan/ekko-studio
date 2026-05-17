@@ -338,6 +338,61 @@ bottom-right con auto-dismiss + manual close.
 **Reemplaza TODOS los `alert()`** del codebase. Cero `alert()` en src/
 (verificado por grep).
 
+## Separación Miembros vs Equipo (Sprint Equipo)
+
+### Filosofía
+El admin de EKKO separa dos tipos de usuarios:
+1. **Miembros**: clientes pagadores. CRUD frecuente, bajo riesgo.
+2. **Equipo**: staff con acceso al sistema (admins, recepcionistas).
+   CRUD raro, alto riesgo (IAM).
+
+### Por qué separados
+- Diferentes casos de uso (gestionar clientes vs gestionar accesos).
+- Diferentes acciones primarias ("+ Nuevo miembro" vs "+ Invitar persona").
+- Diferentes validaciones (delete cliente vs revocar acceso).
+- Mejor escalabilidad: un yoga studio puede tener 200 clientes + 5
+  instructores; un restaurante puede tener 0 clientes + 12 empleados.
+
+### URLs
+- `/admin/miembros` → SOLO usuarios con `rol='miembro'`.
+- `/admin/equipo` → admins + recepcionistas.
+
+### Validaciones de seguridad
+1. **No auto-modificación**: admin no puede revocar/cambiar su propio rol.
+2. **Último admin protegido**: no se puede revocar al último admin del
+   tenant. Mensaje claro de qué hacer ("invita o promueve a alguien
+   antes").
+3. **Soft-revoke**: `status='revocado'` (no hard delete). Preserva
+   auditoría e historial de acciones. La persona no puede loguear pero
+   su row queda en BD.
+
+### Patrón "Invitar"
+- Crear row con `invitado=true`, `status='pendiente_onboarding'`,
+  `auth_id=null`.
+- UI muestra "Pendiente de aceptar invitación" hasta que la persona
+  complete signup (vinculará su `auth_id`).
+- Email real: pendiente Sprint Stripe + Resend.
+
+### Estados del usuario del equipo
+- `pendiente_onboarding` + `invitado=true`: invitado, no completó signup
+- `activo` + `invitado=false`: trabajando normalmente
+- `revocado`: ya no puede loguear, datos preservados
+- `suspendido`: temporal (futuro, no implementado aún)
+
+### Roles soportados (Sprint Equipo)
+- `admin`: acceso total
+- `recepcionista`: acceso operativo (check-in, reservas, lectura)
+
+Roles futuros (no implementados):
+- `contador`: solo finanzas/reportes
+- `marketing`: solo landing + anuncios
+- Permisos granulares: opt-in checkboxes en lugar de roles fijos
+
+### Helpers
+- `countAdminsActivos(tenantId)` → number — RPC backend
+- `canModifyTeamMember({...})` → { canModify, reason? } — front-end gate
+- `revokeTeamMember(userId)` → soft-revoke (status='revocado')
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

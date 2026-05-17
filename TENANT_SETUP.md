@@ -98,6 +98,13 @@ VALUES (
 > ofrece Editar / Duplicar / Eliminar. VER COMO en el sidebar abre
 > Landing / Miembro / Recepción en pestañas separadas con banner
 > sticky mostaza para volver al admin.
+>
+> **Nota** (post Sprint Equipo): `/admin/miembros` muestra SOLO
+> clientes (`rol='miembro'`). Staff (admins + recepcionistas) se
+> gestiona en `/admin/equipo` con "+ Invitar persona". El primer
+> admin de cada tenant nuevo se crea manualmente vía SQL (Paso 6
+> abajo); una vez logueado, puede invitar al resto del equipo desde
+> la UI sin tocar BD.
 
 ## Paso 2: Crear tiers (membresías)
 

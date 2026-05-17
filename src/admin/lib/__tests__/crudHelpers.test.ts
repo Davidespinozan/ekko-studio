@@ -11,7 +11,8 @@ import { supabase } from '@shared/lib/supabase';
 import {
   generateUniqueSlug,
   canHardDeleteRecurso,
-  canHardDeleteTier
+  canHardDeleteTier,
+  canModifyTeamMember
 } from '../crudHelpers';
 
 describe('generateUniqueSlug', () => {
@@ -103,5 +104,82 @@ describe('canHardDeleteTier', () => {
     const result = await canHardDeleteTier('tier-id');
     expect(result.canDelete).toBe(false);
     expect(result.count).toBe(3);
+  });
+});
+
+describe('canModifyTeamMember', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('bloquea auto-modificación', async () => {
+    const result = await canModifyTeamMember(
+      'user-123',
+      'user-123',
+      'admin',
+      'revoke',
+      'tenant-1'
+    );
+    expect(result.canModify).toBe(false);
+    expect(result.reason).toContain('modificarte a ti mismo');
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it('bloquea revocar último admin', async () => {
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: 1,
+      error: null
+    });
+    const result = await canModifyTeamMember(
+      'user-456',
+      'user-123',
+      'admin',
+      'revoke',
+      'tenant-1'
+    );
+    expect(result.canModify).toBe(false);
+    expect(result.reason).toContain('último administrador');
+  });
+
+  it('permite revocar admin si hay otros activos', async () => {
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: 3,
+      error: null
+    });
+    const result = await canModifyTeamMember(
+      'user-456',
+      'user-123',
+      'admin',
+      'revoke',
+      'tenant-1'
+    );
+    expect(result.canModify).toBe(true);
+  });
+
+  it('permite revocar recepcionista sin validación de count', async () => {
+    const result = await canModifyTeamMember(
+      'user-456',
+      'user-123',
+      'recepcionista',
+      'revoke',
+      'tenant-1'
+    );
+    expect(result.canModify).toBe(true);
+    // No se llama al RPC porque no aplica para recepcionistas
+    expect(supabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it('bloquea degradar último admin a recepcionista', async () => {
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: 1,
+      error: null
+    });
+    const result = await canModifyTeamMember(
+      'user-456',
+      'user-123',
+      'admin',
+      'change-role-to-recepcionista',
+      'tenant-1'
+    );
+    expect(result.canModify).toBe(false);
+    expect(result.reason).toContain('último administrador');
   });
 });

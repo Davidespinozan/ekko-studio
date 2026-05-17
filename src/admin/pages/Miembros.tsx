@@ -6,19 +6,29 @@ import { NuevaPersonaModal } from '../components/NuevaPersonaModal';
 export default function Miembros() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('');
-  const [rolFilter, setRolFilter] = useState<string>('');
   const [showNuevo, setShowNuevo] = useState(false);
-  const { miembros, isLoading, refetch } = useMiembros({ search, status, rol: rolFilter });
+  // Fijamos rol='miembro' para excluir staff (admins, recepcionistas).
+  // El equipo se gestiona desde /admin/equipo (Sprint Equipo).
+  const { miembros, isLoading, refetch } = useMiembros({ search, status, rol: 'miembro' });
 
   return (
     <div className="adm-page">
-      <div className="adm-page-header" style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <div
+        className="adm-page-header"
+        style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}
+      >
         <div>
           <p className="ek-eyebrow">MIEMBROS</p>
-          <h1 className="ek-h2">Personas en EKKO</h1>
+          <h1 className="ek-h2">Tus clientes en EKKO</h1>
+          {!isLoading && (
+            <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '4px' }}>
+              {miembros.length}{' '}
+              {miembros.length === 1 ? 'cliente' : 'clientes'}
+            </p>
+          )}
         </div>
         <button onClick={() => setShowNuevo(true)} className="ek-cta">
-          + Nueva persona
+          + Nuevo miembro
         </button>
       </div>
 
@@ -31,18 +41,6 @@ export default function Miembros() {
           className="ek-input"
           style={{ maxWidth: '280px' }}
         />
-        <select
-          value={rolFilter}
-          onChange={(e) => setRolFilter(e.target.value)}
-          className="ek-input"
-          style={{ maxWidth: '180px' }}
-        >
-          <option value="">Todos los roles</option>
-          <option value="miembro">Miembros</option>
-          <option value="recepcionista">Recepción</option>
-          <option value="staff">Staff (todos)</option>
-          <option value="admin">Admin</option>
-        </select>
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
@@ -69,8 +67,7 @@ export default function Miembros() {
               <tr>
                 <th>Nombre</th>
                 <th>Email</th>
-                <th>Rol</th>
-                <th>Tier</th>
+                <th>Plan</th>
                 <th>Status</th>
                 <th>Alta</th>
                 <th></th>
@@ -81,14 +78,17 @@ export default function Miembros() {
                 <tr key={m.id}>
                   <td>{m.nombre ?? '—'}</td>
                   <td style={{ color: 'var(--ek-ink-muted)' }}>{m.email}</td>
-                  <td><RolBadge rol={m.rol} /></td>
                   <td>{m.membresia_tier ?? '—'}</td>
-                  <td><StatusBadge status={m.status} /></td>
+                  <td>
+                    <StatusBadge status={m.status} />
+                  </td>
                   <td style={{ fontSize: '0.8125rem', color: 'var(--ek-ink-muted)' }}>
                     {new Date(m.created_at).toLocaleDateString('es-MX')}
                   </td>
                   <td>
-                    <Link to={`/admin/miembros/${m.id}`} className="adm-link">Ver →</Link>
+                    <Link to={`/admin/miembros/${m.id}`} className="adm-link">
+                      Ver →
+                    </Link>
                   </td>
                 </tr>
               ))}
@@ -100,33 +100,13 @@ export default function Miembros() {
       {showNuevo && (
         <NuevaPersonaModal
           onClose={() => setShowNuevo(false)}
-          onCreated={async () => { await refetch(); setShowNuevo(false); }}
+          onCreated={async () => {
+            await refetch();
+            setShowNuevo(false);
+          }}
         />
       )}
     </div>
-  );
-}
-
-function RolBadge({ rol }: { rol: string }) {
-  const styles: Record<string, { bg: string; color: string }> = {
-    admin: { bg: 'var(--ek-black)', color: 'var(--ek-mustard)' },
-    staff: { bg: 'var(--ek-ink-muted)', color: 'var(--ek-cream)' },
-    recepcionista: { bg: 'var(--ek-info)', color: 'var(--ek-cream)' },
-    miembro: { bg: 'var(--ek-cream-deep)', color: 'var(--ek-black)' }
-  };
-  const s = styles[rol] ?? styles.miembro;
-  return (
-    <span style={{
-      display: 'inline-block',
-      padding: '2px 8px',
-      borderRadius: '4px',
-      fontSize: '0.75rem',
-      fontWeight: 600,
-      background: s.bg,
-      color: s.color
-    }}>
-      {rol}
-    </span>
   );
 }
 
@@ -140,10 +120,14 @@ function StatusBadge({ status }: { status: string }) {
   };
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem' }}>
-      <span style={{
-        width: '8px', height: '8px', borderRadius: '50%',
-        background: colorMap[status] ?? 'var(--ek-ink-muted)'
-      }} />
+      <span
+        style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          background: colorMap[status] ?? 'var(--ek-ink-muted)'
+        }}
+      />
       {status.replace(/_/g, ' ')}
     </span>
   );
