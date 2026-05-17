@@ -100,6 +100,12 @@ function EditarTierModal({
   const [descripcion, setDescripcion] = useState(tier.descripcion ?? '');
   const [activo, setActivo] = useState(tier.activo);
   const [beneficios, setBeneficios] = useState<string[]>(() => parseBeneficios(tier.beneficios));
+  const [maxInvitados, setMaxInvitados] = useState<number>(() => {
+    const reglas = tier.reglas as Record<string, unknown> | null;
+    const raw = reglas?.max_invitados;
+    if (typeof raw === 'number') return raw;
+    return tier.slug === 'pro' ? 4 : 2;
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,11 +120,15 @@ function EditarTierModal({
       return;
     }
 
+    const reglasActuales = (tier.reglas as Record<string, unknown>) ?? {};
+    const reglasNuevas = { ...reglasActuales, max_invitados: maxInvitados };
+
     const { error: err } = await updateTier(tier.id, {
       nombre,
       descripcion: descripcion || null,
       precio_centavos: precioCentavos,
       beneficios,
+      reglas: reglasNuevas as never,
       activo
     });
 
@@ -168,6 +178,22 @@ function EditarTierModal({
             label="Plan activo"
             description="Si está inactivo, no se puede asignar a nuevos miembros."
           />
+        </div>
+
+        <div className="ek-form-field" style={{ marginTop: '16px' }}>
+          <label className="ek-label">Máximo de invitados por sesión</label>
+          <input
+            type="number"
+            min={0}
+            max={10}
+            value={maxInvitados}
+            onChange={(e) => setMaxInvitados(parseInt(e.target.value) || 0)}
+            className="ek-input"
+          />
+          <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
+            Cantidad de invitados adicionales que el miembro puede traer a cada sesión (no
+            incluye al titular). El RPC de reservas valida este número.
+          </p>
         </div>
 
         <div className="ek-form-field" style={{ marginTop: '16px' }}>

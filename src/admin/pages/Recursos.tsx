@@ -3,6 +3,7 @@ import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useRecursosAdmin, updateRecurso } from '../hooks/useAdminData';
 import Toggle from '../components/Toggle';
+import ImageUploader from '../components/ImageUploader';
 import type { Database } from '@shared/types/database';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
@@ -178,6 +179,13 @@ function EditarRecursoModal({
   const [horarios, setHorarios] = useState<BloqueHorario[]>(() =>
     parseHorarios(recurso.horarios)
   );
+  const [fotoUrl, setFotoUrl] = useState<string>(recurso.foto_url ?? '');
+  const [capacidadPersonas, setCapacidadPersonas] = useState<number>(
+    recurso.capacidad_personas ?? 0
+  );
+  const [tipoContenido, setTipoContenido] = useState<string[]>(recurso.tipo_contenido ?? []);
+  const [equipoIncluido, setEquipoIncluido] = useState<string[]>(recurso.equipo_incluido ?? []);
+  const [estiloVisual, setEstiloVisual] = useState<string>(recurso.estilo_visual ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,7 +198,12 @@ function EditarRecursoModal({
       descripcion: descripcion || null,
       activo,
       tiers_permitidos: tiersPermitidos,
-      horarios: horarios as never
+      horarios: horarios as never,
+      foto_url: fotoUrl || null,
+      capacidad_personas: capacidadPersonas || null,
+      tipo_contenido: tipoContenido,
+      equipo_incluido: equipoIncluido,
+      estilo_visual: estiloVisual || null
     });
 
     if (err) {
@@ -252,6 +265,65 @@ function EditarRecursoModal({
           <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
             Define los días y horas en que este estudio puede reservarse.
           </p>
+        </div>
+
+        <div style={{ marginTop: '16px' }}>
+          <ImageUploader
+            bucket="estudios"
+            pathPrefix={`ekko/${recurso.slug}`}
+            currentUrl={fotoUrl || null}
+            onUploaded={setFotoUrl}
+            label="Foto del estudio"
+            helperText="JPG, PNG o WEBP. Máx 5MB. Aspecto 16:10 recomendado."
+          />
+        </div>
+
+        <div className="ek-form-field" style={{ marginTop: '16px' }}>
+          <label className="ek-label">Capacidad (personas)</label>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={capacidadPersonas || ''}
+            onChange={(e) => setCapacidadPersonas(parseInt(e.target.value) || 0)}
+            className="ek-input"
+            placeholder="Ej: 3"
+          />
+          <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
+            Capacidad máxima total (titular + invitados).
+          </p>
+        </div>
+
+        <div className="ek-form-field" style={{ marginTop: '16px' }}>
+          <label className="ek-label">Tipos de contenido recomendados</label>
+          <ListaEditable
+            value={tipoContenido}
+            onChange={setTipoContenido}
+            placeholder="Ej: Podcast, Video, Entrevistas..."
+          />
+          <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
+            Tags que ayudan a los miembros a elegir el estudio adecuado.
+          </p>
+        </div>
+
+        <div className="ek-form-field" style={{ marginTop: '16px' }}>
+          <label className="ek-label">Equipo incluido</label>
+          <ListaEditable
+            value={equipoIncluido}
+            onChange={setEquipoIncluido}
+            placeholder="Ej: Cámara Sony A7 IV..."
+          />
+        </div>
+
+        <div className="ek-form-field" style={{ marginTop: '16px' }}>
+          <label className="ek-label">Estilo visual</label>
+          <textarea
+            value={estiloVisual}
+            onChange={(e) => setEstiloVisual(e.target.value)}
+            className="ek-input"
+            rows={3}
+            placeholder="Describe el ambiente, iluminación, decoración..."
+          />
         </div>
 
         {error && <p className="ek-error-text">{error}</p>}
@@ -388,6 +460,93 @@ function HorariosEditor({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function ListaEditable({
+  value,
+  onChange,
+  placeholder
+}: {
+  value: string[];
+  onChange: (v: string[]) => void;
+  placeholder: string;
+}) {
+  const [nuevo, setNuevo] = useState('');
+
+  const agregar = () => {
+    const trim = nuevo.trim();
+    if (!trim) return;
+    onChange([...value, trim]);
+    setNuevo('');
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '8px',
+        padding: '12px',
+        background: 'var(--ek-bg-soft)',
+        borderRadius: 'var(--ek-r-md)',
+        border: '0.5px solid var(--ek-line)'
+      }}
+    >
+      {value.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {value.map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 10px',
+                background: 'var(--ek-bg-elevated)',
+                borderRadius: 'var(--ek-r-sm)'
+              }}
+            >
+              <span style={{ color: 'var(--ek-mustard)', fontSize: '12px' }}>✓</span>
+              <span style={{ flex: 1, fontSize: '13px' }}>{item}</span>
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((_, i) => i !== idx))}
+                className="ek-icon-btn"
+                style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--ek-danger)' }}
+                aria-label="Eliminar"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: '8px' }}>
+        <input
+          type="text"
+          placeholder={placeholder}
+          value={nuevo}
+          onChange={(e) => setNuevo(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              agregar();
+            }
+          }}
+          className="ek-input"
+          style={{ flex: 1, fontSize: '13px' }}
+        />
+        <button
+          type="button"
+          onClick={agregar}
+          className="ek-cta"
+          style={{ padding: '8px 14px', fontSize: '12px', whiteSpace: 'nowrap' }}
+        >
+          + Agregar
+        </button>
+      </div>
     </div>
   );
 }

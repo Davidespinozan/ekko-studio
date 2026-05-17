@@ -1,61 +1,131 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { supabase } from '@shared/lib/supabase';
 import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
 
-const ESTUDIOS: EstudioInfo[] = [
-  {
-    slug: 'estudio-1',
-    nombre: 'Estudio 1',
-    tier: 'basica',
-    capacidad: 'Hasta 3 personas',
-    contenido: ['Podcast', 'Video', 'Entrevistas'],
-    descripcion: 'Espacio versátil con iluminación cálida y fondo neutro de madera. Atmósfera profesional pero accesible. Ideal para contenido conversacional y entrevistas.',
-    estiloVisual: 'Iluminación cálida, fondo neutro madera, atmósfera profesional pero accesible.',
-    equipoIncluido: [
-      'Cámara Sony A7 IV',
-      'Micrófono Shure SM7B',
-      'Iluminación LED profesional',
-      'Pantalla verde opcional',
-      'Audio Interface profesional'
-    ]
-  },
-  {
-    slug: 'estudio-2',
-    nombre: 'Estudio 2',
-    tier: 'basica',
-    capacidad: 'Hasta 3 personas',
-    contenido: ['Video', 'Cursos', 'Tutoriales'],
-    descripcion: 'Espacio versátil con fondo intercambiable, ideal para contenido educativo y reviews. Setup pensado para creadores que producen variedad de contenido.',
-    estiloVisual: 'Espacio versátil con fondo intercambiable, ideal para contenido educativo y reviews.',
-    equipoIncluido: [
-      'Cámara Sony A7 IV',
-      'Micrófono Rode NT-USB',
-      'Iluminación LED ajustable',
-      'Audio Interface',
-      'Trípode profesional'
-    ]
-  },
-  {
-    slug: 'black',
-    nombre: 'Black',
-    tier: 'pro',
-    capacidad: 'Hasta 5 personas',
-    contenido: ['Producciones', 'Cinema', 'Comerciales', 'Music Videos'],
-    descripcion: 'Estudio premium con estética cinematográfica. Iluminación dramática controlable. Diseñado para producciones de alto nivel donde cada detalle importa.',
-    estiloVisual: 'Estudio premium con estética cinematográfica. Iluminación dramática controlable. Diseñado para producciones de alto nivel.',
-    equipoIncluido: [
-      'Cámaras Cinema 4K',
-      'Set completo de iluminación cinematográfica',
-      'Micrófonos profesionales (Shure SM7B + Rode lavalier)',
-      'Pantalla LED grande',
-      'Mesa de mezclas',
-      'Asistencia técnica incluida'
-    ]
+interface EstudioPublico {
+  id: string;
+  slug: string;
+  nombre: string;
+  descripcion: string | null;
+  tiers_permitidos: string[];
+  tipo_contenido: string[] | null;
+  equipo_incluido: string[] | null;
+  estilo_visual: string | null;
+  capacidad_personas: number | null;
+  foto_url: string | null;
+}
+
+interface TierPublico {
+  slug: string;
+  nombre: string;
+  precio_centavos: number;
+  descripcion: string | null;
+  beneficios: unknown;
+  reglas: Record<string, unknown> | null;
+  orden: number;
+}
+
+function useEstudiosPublicos() {
+  const [estudios, setEstudios] = useState<EstudioPublico[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      const { data, error } = await supabase
+        .from('recursos')
+        .select(
+          'id, slug, nombre, descripcion, tiers_permitidos, tipo_contenido, equipo_incluido, estilo_visual, capacidad_personas, foto_url'
+        )
+        .eq('activo', true)
+        .order('orden', { ascending: true });
+
+      if (!mounted) return;
+      if (error) console.error('[useEstudiosPublicos]', error);
+      else setEstudios((data ?? []) as EstudioPublico[]);
+      setIsLoading(false);
+    }
+    load();
+    return () => { mounted = false; };
+  }, []);
+
+  return { estudios, isLoading };
+}
+
+function useTiersPublicos() {
+  const [tiers, setTiers] = useState<TierPublico[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      const { data, error } = await supabase
+        .from('tiers')
+        .select('slug, nombre, precio_centavos, descripcion, beneficios, reglas, orden')
+        .eq('activo', true)
+        .order('orden', { ascending: true });
+
+      if (!mounted) return;
+      if (error) console.error('[useTiersPublicos]', error);
+      else setTiers((data ?? []) as TierPublico[]);
+      setIsLoading(false);
+    }
+    load();
+    return () => { mounted = false; };
+  }, []);
+
+  return { tiers, isLoading };
+}
+
+function parseBeneficios(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((b): b is string => typeof b === 'string');
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed)
+        ? parsed.filter((b): b is string => typeof b === 'string')
+        : [];
+    } catch {
+      return [];
+    }
   }
-];
+  return [];
+}
+
+function formatearPesos(centavos: number): string {
+  return `$${Math.round(centavos / 100).toLocaleString('es-MX')}`;
+}
 
 export default function Landing() {
   const [estudioAbierto, setEstudioAbierto] = useState<EstudioInfo | null>(null);
+  const { estudios, isLoading: estudiosLoading } = useEstudiosPublicos();
+  const { tiers, isLoading: tiersLoading } = useTiersPublicos();
+
+  const precioPro = tiers.find((t) => t.slug === 'pro')?.precio_centavos;
+  const precioBasica = tiers.find((t) => t.slug === 'basica')?.precio_centavos;
+
+  const aEstudioInfo = (r: EstudioPublico): EstudioInfo => {
+    const esPro = r.tiers_permitidos.length === 1 && r.tiers_permitidos[0] === 'pro';
+    const tier: 'basica' | 'pro' = esPro ? 'pro' : 'basica';
+    return {
+      slug: r.slug,
+      nombre: r.nombre,
+      tier,
+      capacidad: r.capacidad_personas
+        ? `Hasta ${r.capacidad_personas} personas`
+        : 'Capacidad por confirmar',
+      contenido: r.tipo_contenido ?? [],
+      descripcion: r.descripcion ?? '',
+      estiloVisual: r.estilo_visual ?? '',
+      equipoIncluido: r.equipo_incluido ?? [],
+      fotoUrl: r.foto_url ?? undefined,
+      precioPro: precioPro ? Math.round(precioPro / 100) : undefined,
+      precioBasica: precioBasica ? Math.round(precioBasica / 100) : undefined
+    };
+  };
+
+  const estudiosInfo = estudios.map(aEstudioInfo);
 
   return (
     <div style={{
@@ -211,92 +281,118 @@ export default function Landing() {
           Cada uno diseñado para un tipo de contenido. Elige el que va con tu visión.
         </p>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '20px'
-        }}>
-          {ESTUDIOS.map((s) => (
-            <button
-              key={s.slug}
-              onClick={() => setEstudioAbierto(s)}
-              className="ek-card"
-              style={{
-                padding: 0,
-                overflow: 'hidden',
-                cursor: 'pointer',
-                textAlign: 'left',
-                border: '0.5px solid var(--ek-line)',
-                background: 'var(--ek-bg-soft)',
-                color: 'var(--ek-ink)',
-                transition: 'transform 0.2s ease, border-color 0.2s ease',
-                font: 'inherit'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.borderColor = 'var(--ek-mustard-dim)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.borderColor = 'var(--ek-line)';
-              }}
-            >
-              <div style={{
-                background: 'linear-gradient(135deg, var(--ek-bg-elevated) 0%, var(--ek-bg) 100%)',
-                aspectRatio: '16 / 10',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                position: 'relative'
-              }}>
-                <span
-                  className={s.tier === 'pro' ? 'ek-badge ek-badge--outline' : 'ek-badge'}
-                  style={{ position: 'absolute', top: '14px', left: '14px' }}
-                >
-                  {s.tier === 'pro' ? '★ PRO' : 'BÁSICA'}
-                </span>
-                <span style={{
-                  fontSize: '10px',
-                  color: 'var(--ek-ink-faint)',
-                  letterSpacing: '0.2em',
-                  fontWeight: 600
-                }}>FOTO PRÓXIMAMENTE</span>
-              </div>
-              <div style={{ padding: '20px' }}>
-                <h3 style={{
-                  fontFamily: 'var(--ek-font-display)',
-                  fontSize: '24px',
-                  fontWeight: 700,
-                  margin: 0,
-                  marginBottom: '6px'
-                }}>{s.nombre}</h3>
-                <p style={{
-                  fontSize: '13px',
-                  color: 'var(--ek-ink-muted)',
-                  margin: 0,
-                  marginBottom: '6px'
-                }}>{s.capacidad}</p>
-                <p style={{
-                  fontSize: '12px',
-                  color: 'var(--ek-mustard)',
-                  margin: 0,
-                  marginBottom: '12px',
-                  fontWeight: 600
-                }}>{s.contenido.join(' · ')}</p>
-                <p style={{
-                  fontSize: '11px',
-                  color: 'var(--ek-ink-faint)',
-                  margin: 0,
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
-                  fontWeight: 600
+        {estudiosLoading ? (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '20px'
+          }}>
+            {[1, 2, 3].map((n) => (
+              <div key={n} className="ek-skeleton" style={{ height: '380px', borderRadius: 'var(--ek-r-card)' }} />
+            ))}
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '20px'
+          }}>
+            {estudiosInfo.map((s) => (
+              <button
+                key={s.slug}
+                onClick={() => setEstudioAbierto(s)}
+                className="ek-card"
+                style={{
+                  padding: 0,
+                  overflow: 'hidden',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  border: '0.5px solid var(--ek-line)',
+                  background: 'var(--ek-bg-soft)',
+                  color: 'var(--ek-ink)',
+                  transition: 'transform 0.2s ease, border-color 0.2s ease',
+                  font: 'inherit'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.borderColor = 'var(--ek-mustard-dim)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.borderColor = 'var(--ek-line)';
+                }}
+              >
+                <div style={{
+                  background: 'linear-gradient(135deg, var(--ek-bg-elevated) 0%, var(--ek-bg) 100%)',
+                  aspectRatio: '16 / 10',
+                  position: 'relative',
+                  overflow: 'hidden'
                 }}>
-                  Ver detalle →
-                </p>
-              </div>
-            </button>
-          ))}
-        </div>
+                  {s.fotoUrl ? (
+                    <img
+                      src={s.fotoUrl}
+                      alt={s.nombre}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <span style={{
+                        fontSize: '10px',
+                        color: 'var(--ek-ink-faint)',
+                        letterSpacing: '0.2em',
+                        fontWeight: 600
+                      }}>FOTO PRÓXIMAMENTE</span>
+                    </div>
+                  )}
+                  <span
+                    className={s.tier === 'pro' ? 'ek-badge ek-badge--outline' : 'ek-badge'}
+                    style={{ position: 'absolute', top: '14px', left: '14px' }}
+                  >
+                    {s.tier === 'pro' ? '★ PRO' : 'BÁSICA'}
+                  </span>
+                </div>
+                <div style={{ padding: '20px' }}>
+                  <h3 style={{
+                    fontFamily: 'var(--ek-font-display)',
+                    fontSize: '24px',
+                    fontWeight: 700,
+                    margin: 0,
+                    marginBottom: '6px'
+                  }}>{s.nombre}</h3>
+                  <p style={{
+                    fontSize: '13px',
+                    color: 'var(--ek-ink-muted)',
+                    margin: 0,
+                    marginBottom: '6px'
+                  }}>{s.capacidad}</p>
+                  <p style={{
+                    fontSize: '12px',
+                    color: 'var(--ek-mustard)',
+                    margin: 0,
+                    marginBottom: '12px',
+                    fontWeight: 600
+                  }}>{s.contenido.join(' · ')}</p>
+                  <p style={{
+                    fontSize: '11px',
+                    color: 'var(--ek-ink-faint)',
+                    margin: 0,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    fontWeight: 600
+                  }}>
+                    Ver detalle →
+                  </p>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ============================================================
@@ -316,91 +412,103 @@ export default function Landing() {
           <span style={{ color: 'var(--ek-mustard)' }}>Crece desde el día uno.</span>
         </h2>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '20px'
-        }}>
-          {/* Básica */}
-          <div className="ek-card" style={{ padding: '32px' }}>
-            <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>BÁSICA</p>
-            <p style={{
-              fontFamily: 'var(--ek-font-display)',
-              fontSize: '48px',
-              fontWeight: 700,
-              margin: 0,
-              letterSpacing: '-0.03em',
-              lineHeight: 1
-            }}>$800<span style={{ fontSize: '16px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>/mes</span></p>
-            <p className="ek-body-muted" style={{ marginTop: '8px', marginBottom: '24px' }}>
-              Para empezar. Acceso a los estudios básicos.
-            </p>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {[
-                'Acceso a Estudio 1 y Estudio 2',
-                '2 invitados por sesión',
-                'Equipo profesional incluido',
-                'Reservas hasta con 24h de anticipación',
-                'Compromiso 6 meses'
-              ].map((b) => (
-                <li key={b} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px' }}>
-                  <span style={{ color: 'var(--ek-mustard)' }}>✓</span>{b}
-                </li>
-              ))}
-            </ul>
-            <Link
-              to="/signup?tier=basica"
-              className="ek-cta ek-cta--secondary ek-cta--full"
-              style={{ marginTop: '28px' }}
-            >
-              Empezar con Básica
-            </Link>
+        {tiersLoading ? (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '20px'
+          }}>
+            {[1, 2].map((n) => (
+              <div key={n} className="ek-skeleton" style={{ height: '480px', borderRadius: 'var(--ek-r-card)' }} />
+            ))}
           </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: '20px'
+          }}>
+            {tiers.map((tier) => {
+              const esPro = tier.slug === 'pro';
+              const beneficios = parseBeneficios(tier.beneficios);
 
-          {/* Pro */}
-          <div
-            className="ek-card"
-            style={{
-              padding: '32px',
-              borderColor: 'var(--ek-mustard)',
-              boxShadow: '0 0 0 1px var(--ek-mustard-dim), 0 20px 60px rgba(229, 184, 41, 0.08)'
-            }}
-          >
-            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '12px' }}>★ PRO · RECOMENDADA</p>
-            <p style={{
-              fontFamily: 'var(--ek-font-display)',
-              fontSize: '48px',
-              fontWeight: 700,
-              margin: 0,
-              letterSpacing: '-0.03em',
-              lineHeight: 1
-            }}>$1,200<span style={{ fontSize: '16px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>/mes</span></p>
-            <p className="ek-body-muted" style={{ marginTop: '8px', marginBottom: '24px' }}>
-              Para creadores serios. Acceso completo.
-            </p>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {[
-                'Acceso a TODOS los estudios (incluye Black)',
-                '4 invitados por sesión',
-                'Equipo profesional premium',
-                'Reservas hasta con 24h de anticipación',
-                'Prioridad en bookings de Black',
-                'Compromiso 6 meses'
-              ].map((b) => (
-                <li key={b} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px' }}>
-                  <span style={{ color: 'var(--ek-mustard)' }}>✓</span>{b}
-                </li>
-              ))}
-            </ul>
-            <Link
-              to="/signup?tier=pro"
-              className="ek-cta ek-cta--full"
-              style={{ marginTop: '28px' }}
-            >
-              Quiero la Pro
-            </Link>
+              return (
+                <div
+                  key={tier.slug}
+                  className="ek-card"
+                  style={{
+                    padding: '32px',
+                    ...(esPro && {
+                      borderColor: 'var(--ek-mustard)',
+                      boxShadow:
+                        '0 0 0 1px var(--ek-mustard-dim), 0 20px 60px rgba(229, 184, 41, 0.08)'
+                    })
+                  }}
+                >
+                  <p
+                    className={esPro ? 'ek-eyebrow ek-eyebrow--mustard' : 'ek-eyebrow'}
+                    style={{ marginBottom: '12px' }}
+                  >
+                    {esPro ? '★ PRO · RECOMENDADA' : tier.nombre.toUpperCase()}
+                  </p>
+                  <p style={{
+                    fontFamily: 'var(--ek-font-display)',
+                    fontSize: '48px',
+                    fontWeight: 700,
+                    margin: 0,
+                    letterSpacing: '-0.03em',
+                    lineHeight: 1
+                  }}>
+                    {formatearPesos(tier.precio_centavos)}
+                    <span style={{ fontSize: '16px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>
+                      /mes
+                    </span>
+                  </p>
+                  <p className="ek-body-muted" style={{ marginTop: '8px', marginBottom: '24px' }}>
+                    {tier.descripcion ??
+                      (esPro
+                        ? 'Para creadores serios. Acceso completo.'
+                        : 'Para empezar. Acceso a los estudios básicos.')}
+                  </p>
+                  <ul
+                    style={{
+                      listStyle: 'none',
+                      padding: 0,
+                      margin: 0,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '10px'
+                    }}
+                  >
+                    {beneficios.map((b) => (
+                      <li
+                        key={b}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: '8px',
+                          fontSize: '14px'
+                        }}
+                      >
+                        <span style={{ color: 'var(--ek-mustard)' }}>✓</span>
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    to={`/signup?tier=${tier.slug}`}
+                    className={
+                      esPro ? 'ek-cta ek-cta--full' : 'ek-cta ek-cta--secondary ek-cta--full'
+                    }
+                    style={{ marginTop: '28px' }}
+                  >
+                    {esPro ? 'Quiero la Pro' : `Empezar con ${tier.nombre}`}
+                  </Link>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        )}
       </section>
 
       {/* ============================================================

@@ -135,7 +135,20 @@ export function useRecursosAdmin() {
 
 export async function updateRecurso(
   recursoId: string,
-  patch: Partial<Pick<Recurso, 'nombre' | 'descripcion' | 'horarios' | 'tiers_permitidos' | 'activo' | 'orden' | 'cupos'>>
+  patch: Partial<Pick<Recurso,
+    | 'nombre'
+    | 'descripcion'
+    | 'horarios'
+    | 'tiers_permitidos'
+    | 'activo'
+    | 'orden'
+    | 'cupos'
+    | 'foto_url'
+    | 'capacidad_personas'
+    | 'tipo_contenido'
+    | 'equipo_incluido'
+    | 'estilo_visual'
+  >>
 ): Promise<{ error: string | null }> {
   const { error } = await supabase.from('recursos').update(patch).eq('id', recursoId);
   return { error: error?.message ?? null };

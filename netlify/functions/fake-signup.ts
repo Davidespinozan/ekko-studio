@@ -74,6 +74,23 @@ export const handler: Handler = async (event) => {
       };
     }
 
+    // 1b. Obtener tier real de BD para usar su precio (no hardcode)
+    const { data: tierData, error: tierError } = await supabaseAdmin
+      .from('tiers')
+      .select('precio_centavos')
+      .eq('tenant_id', tenant.id)
+      .eq('slug', tier)
+      .eq('activo', true)
+      .single();
+
+    if (tierError || !tierData) {
+      console.error('[fake-signup] tier error:', tierError);
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: `Plan "${tier}" no encontrado o inactivo.` })
+      };
+    }
+
     // 2. Crear usuario en auth.users — esto dispara el trigger
     //    on_auth_user_created que inserta fila en `usuarios` con
     //    rol='miembro', status='pendiente_onboarding'.
@@ -126,7 +143,7 @@ export const handler: Handler = async (event) => {
     //    stripe_event_type y raw_payload. Usamos prefijos 'fake_' para
     //    distinguir de eventos reales cuando se integre Stripe.
     const fakeEventId = `fake_signup_${authUserId}_${Date.now()}`;
-    const montoCentavos = tier === 'pro' ? 120000 : 80000;
+    const montoCentavos = tierData.precio_centavos;
 
     await supabaseAdmin
       .from('payment_events')

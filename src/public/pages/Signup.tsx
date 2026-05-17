@@ -1,5 +1,5 @@
-import { useState, FormEvent } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useEffect, useState, FormEvent } from 'react';
+import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { supabase } from '@shared/lib/supabase';
 
 type Tier = 'basica' | 'pro';
@@ -11,35 +11,59 @@ interface PlanInfo {
   beneficios: string[];
 }
 
-const PLANES: Record<Tier, PlanInfo> = {
-  basica: {
-    nombre: 'Básica',
-    precio: 800,
-    tier: 'basica',
-    beneficios: [
-      'Acceso a Estudio 1 y Estudio 2',
-      '2 invitados por sesión',
-      'Equipo profesional incluido'
-    ]
-  },
-  pro: {
-    nombre: 'Pro',
-    precio: 1200,
-    tier: 'pro',
-    beneficios: [
-      'Acceso a TODOS los estudios (incluye Black)',
-      '4 invitados por sesión',
-      'Equipo profesional premium',
-      'Prioridad en bookings'
-    ]
+interface TierRow {
+  slug: string;
+  nombre: string;
+  precio_centavos: number;
+  beneficios: unknown;
+}
+
+function parseBeneficios(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw.filter((b): b is string => typeof b === 'string');
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed)
+        ? parsed.filter((b): b is string => typeof b === 'string')
+        : [];
+    } catch {
+      return [];
+    }
   }
-};
+  return [];
+}
+
+function useTierPorSlug(slug: string) {
+  const [tier, setTier] = useState<TierRow | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      const { data, error } = await supabase
+        .from('tiers')
+        .select('slug, nombre, precio_centavos, beneficios')
+        .eq('slug', slug)
+        .eq('activo', true)
+        .maybeSingle();
+
+      if (!mounted) return;
+      if (error) console.error('[useTierPorSlug]', error);
+      else setTier(data as TierRow | null);
+      setIsLoading(false);
+    }
+    load();
+    return () => { mounted = false; };
+  }, [slug]);
+
+  return { tier, isLoading };
+}
 
 export default function Signup() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tierParam = (searchParams.get('tier') as Tier) || 'basica';
-  const plan = PLANES[tierParam] || PLANES.basica;
+  const { tier: tierRow, isLoading: tierLoading } = useTierPorSlug(tierParam);
 
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
@@ -50,6 +74,15 @@ export default function Signup() {
   const [cardCvv, setCardCvv] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const plan: PlanInfo | null = tierRow
+    ? {
+        nombre: tierRow.nombre,
+        precio: Math.round(tierRow.precio_centavos / 100),
+        tier: tierRow.slug as Tier,
+        beneficios: parseBeneficios(tierRow.beneficios).slice(0, 4)
+      }
+    : null;
 
   const handleCardNumber = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 16);
@@ -104,7 +137,7 @@ export default function Signup() {
           nombre,
           email,
           password,
-          tier: plan.tier
+          tier: plan!.tier
         })
       });
 
@@ -130,6 +163,18 @@ export default function Signup() {
       setError(err instanceof Error ? err.message : 'Error inesperado. Intenta de nuevo.');
       setIsProcessing(false);
     }
+  }
+
+  if (tierLoading) {
+    return (
+      <div style={{ maxWidth: '480px', margin: '40px auto', padding: '0 24px' }}>
+        <div className="ek-skeleton" style={{ height: '600px', borderRadius: 'var(--ek-r-card)' }} />
+      </div>
+    );
+  }
+
+  if (!plan) {
+    return <Navigate to="/" replace />;
   }
 
   return (

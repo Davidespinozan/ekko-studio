@@ -10,6 +10,9 @@ export interface EstudioInfo {
   descripcion: string;
   estiloVisual: string;
   equipoIncluido: string[];
+  fotoUrl?: string;
+  precioPro?: number;
+  precioBasica?: number;
 }
 
 interface Props {
@@ -99,18 +102,37 @@ export default function EstudioModal({ estudio, onClose }: Props) {
           background: 'linear-gradient(135deg, var(--ek-bg-elevated) 0%, var(--ek-bg) 100%)',
           aspectRatio: '16 / 9',
           position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          overflow: 'hidden',
           borderTopLeftRadius: 'var(--ek-r-card)',
           borderTopRightRadius: 'var(--ek-r-card)'
         }}>
-          <span style={{
-            fontSize: '11px',
-            color: 'var(--ek-ink-faint)',
-            letterSpacing: '0.2em',
-            fontWeight: 600
-          }}>FOTO PRÓXIMAMENTE</span>
+          {estudio.fotoUrl ? (
+            <img
+              src={estudio.fotoUrl}
+              alt={estudio.nombre}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                display: 'block'
+              }}
+            />
+          ) : (
+            <div style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <span style={{
+                fontSize: '11px',
+                color: 'var(--ek-ink-faint)',
+                letterSpacing: '0.2em',
+                fontWeight: 600
+              }}>FOTO PRÓXIMAMENTE</span>
+            </div>
+          )}
 
           <span
             className={esPro ? 'ek-badge ek-badge--outline' : 'ek-badge'}
@@ -208,7 +230,9 @@ export default function EstudioModal({ estudio, onClose }: Props) {
             className="ek-cta ek-cta--full"
             style={{ padding: '16px', fontSize: '15px', textAlign: 'center' }}
           >
-            {esPro ? 'Quiero la Pro · $1,200/mes' : 'Empezar con Básica · $800/mes'}
+            {esPro
+              ? `Quiero la Pro${estudio.precioPro ? ` · $${estudio.precioPro.toLocaleString('es-MX')}/mes` : ''}`
+              : `Empezar con Básica${estudio.precioBasica ? ` · $${estudio.precioBasica.toLocaleString('es-MX')}/mes` : ''}`}
           </Link>
         </div>
       </div>
