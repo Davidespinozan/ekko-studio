@@ -99,3 +99,81 @@ export async function countActiveMembersInTier(params: {
 
   return usuarioIds.size;
 }
+
+// ============================================================================
+// Hard delete helpers (Sprint D-Admin)
+// ============================================================================
+// El soft delete (activo=false) preserva integridad y permite recuperar.
+// Estos helpers permiten un escape hatch: borrar permanentemente desde la
+// papelera. SOLO se permite si no hay FKs vinculadas (validación via RPC).
+// ============================================================================
+
+export type HardDeleteCheckResult = {
+  canDelete: boolean;
+  reason?: string;
+  count?: number;
+};
+
+export async function canHardDeleteRecurso(
+  recursoId: string
+): Promise<HardDeleteCheckResult> {
+  const { data, error } = await supabase.rpc('count_reservas_recurso', {
+    p_recurso_id: recursoId
+  });
+
+  if (error) {
+    return {
+      canDelete: false,
+      reason: 'Error verificando reservas: ' + error.message
+    };
+  }
+
+  const count = Number(data ?? 0);
+  if (count > 0) {
+    return {
+      canDelete: false,
+      reason: `Hay ${count} reserva(s) vinculadas a este estudio. No se puede eliminar permanentemente.`,
+      count
+    };
+  }
+
+  return { canDelete: true };
+}
+
+export async function canHardDeleteTier(
+  tierId: string
+): Promise<HardDeleteCheckResult> {
+  const { data, error } = await supabase.rpc('count_miembros_tier', {
+    p_tier_id: tierId
+  });
+
+  if (error) {
+    return {
+      canDelete: false,
+      reason: 'Error verificando miembros: ' + error.message
+    };
+  }
+
+  const count = Number(data ?? 0);
+  if (count > 0) {
+    return {
+      canDelete: false,
+      reason: `Hay ${count} miembro(s) vinculados a este plan (activos o históricos). No se puede eliminar permanentemente.`,
+      count
+    };
+  }
+
+  return { canDelete: true };
+}
+
+/**
+ * Hard delete: borra fila de BD. IRREVERSIBLE.
+ * SOLO usar después de validar con canHardDelete*.
+ */
+export async function hardDeleteRecord(
+  table: SoftDeletableTable,
+  id: string
+): Promise<{ error: Error | null }> {
+  const { error } = await supabase.from(table).delete().eq('id', id);
+  return { error: error ? new Error(error.message) : null };
+}

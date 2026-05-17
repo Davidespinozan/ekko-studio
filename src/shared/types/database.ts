@@ -607,6 +607,11 @@ export type Database = {
         Returns: Json
       }
       count_active_admins: { Args: { p_tenant_id: string }; Returns: number }
+      count_miembros_tier: { Args: { p_tier_id: string }; Returns: number }
+      count_reservas_recurso: {
+        Args: { p_recurso_id: string }
+        Returns: number
+      }
       dev_activar_miembro: {
         Args: { p_email: string; p_tier?: string }
         Returns: {

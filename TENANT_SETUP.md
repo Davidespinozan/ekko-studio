@@ -82,6 +82,15 @@ VALUES (
 > obligatorios. El cliente puede crear sus tiers y estudios directamente
 > desde `/admin/tiers` y `/admin/recursos` con los botones "+ Nuevo". Los
 > SQLs siguen siendo útiles para bulk-load inicial (10+ items de una vez).
+>
+> **Nota** (post Sprint D-Admin): el cliente nuevo puede:
+> - Editar contenido de landing desde `/admin/landing`
+> - Configurar WhatsApp + redes desde `/admin/contacto`
+> - Ajustar reglas de reserva desde `/admin/reglas`
+> - Previsualizar el producto desde el sidebar "VER COMO…"
+>
+> Todo sin tocar BD ni código. Hard delete con typed confirmation
+> ("ELIMINAR") disponible solo desde la papelera para casos extremos.
 
 ## Paso 2: Crear tiers (membresías)
 

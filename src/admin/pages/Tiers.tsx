@@ -4,9 +4,12 @@ import {
   archiveRecord,
   restoreRecord,
   generateUniqueSlug,
-  countActiveMembersInTier
+  countActiveMembersInTier,
+  canHardDeleteTier,
+  hardDeleteRecord
 } from '../lib/crudHelpers';
 import { useTenant } from '@shared/hooks/useTenant';
+import { useToast } from '@shared/hooks/useToast';
 import Toggle from '../components/Toggle';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type { Database } from '@shared/types/database';
@@ -23,11 +26,19 @@ type ArchivarState =
   | { tier: Tier; status: 'loading' }
   | { tier: Tier; status: 'ready'; activeMembers: number };
 
+type HardDeleteTierState =
+  | null
+  | { tier: Tier; status: 'loading' }
+  | { tier: Tier; status: 'blocked'; reason: string }
+  | { tier: Tier; status: 'ready' };
+
 export default function Tiers() {
   const tenant = useTenant();
+  const toast = useToast();
   const { tiers, isLoading, refetch } = useTiersAdmin();
   const [modal, setModal] = useState<ModalState>(null);
   const [archivar, setArchivar] = useState<ArchivarState>(null);
+  const [borrarPerm, setBorrarPerm] = useState<HardDeleteTierState>(null);
   const [mostrarArchivados, setMostrarArchivados] = useState(false);
   const [duplicandoId, setDuplicandoId] = useState<string | null>(null);
   const [restaurandoId, setRestaurandoId] = useState<string | null>(null);
@@ -62,9 +73,10 @@ export default function Tiers() {
 
     setDuplicandoId(null);
     if (error) {
-      alert(`No se pudo duplicar: ${error}`);
+      toast.error(`No se pudo duplicar: ${error}`);
       return;
     }
+    toast.success('Plan duplicado.');
     await refetch();
   }
 
@@ -82,10 +94,11 @@ export default function Tiers() {
     if (!archivar || archivar.status !== 'ready' || archivar.activeMembers > 0) return;
     const { error } = await archiveRecord('tiers', archivar.tier.id);
     if (error) {
-      alert(`No se pudo archivar: ${error}`);
+      toast.error(`No se pudo eliminar: ${error}`);
       return;
     }
     setArchivar(null);
+    toast.success('Plan eliminado. Lo encuentras en "Ver eliminados".');
     await refetch();
   }
 
@@ -94,9 +107,32 @@ export default function Tiers() {
     const { error } = await restoreRecord('tiers', t.id);
     setRestaurandoId(null);
     if (error) {
-      alert(`No se pudo restaurar: ${error}`);
+      toast.error(`No se pudo recuperar: ${error}`);
       return;
     }
+    toast.success('Plan recuperado.');
+    await refetch();
+  }
+
+  async function startHardDelete(t: Tier) {
+    setBorrarPerm({ tier: t, status: 'loading' });
+    const check = await canHardDeleteTier(t.id);
+    if (!check.canDelete) {
+      setBorrarPerm({ tier: t, status: 'blocked', reason: check.reason ?? 'No se puede eliminar.' });
+    } else {
+      setBorrarPerm({ tier: t, status: 'ready' });
+    }
+  }
+
+  async function handleHardDelete() {
+    if (!borrarPerm || borrarPerm.status !== 'ready') return;
+    const { error } = await hardDeleteRecord('tiers', borrarPerm.tier.id);
+    if (error) {
+      toast.error(`No se pudo eliminar permanentemente: ${error.message}`);
+      return;
+    }
+    setBorrarPerm(null);
+    toast.success('Plan eliminado permanentemente.');
     await refetch();
   }
 
@@ -106,9 +142,9 @@ export default function Tiers() {
     if (!archivar) return '';
     if (archivar.status === 'loading') return 'Verificando miembros activos…';
     if (archivar.activeMembers > 0) {
-      return `${archivar.activeMembers} miembro(s) activo(s) tienen este plan. Migralos a otro plan antes de archivar este.`;
+      return `${archivar.activeMembers} miembro(s) activo(s) tienen este plan. Migralos a otro plan antes de eliminar este.`;
     }
-    return 'Este plan dejará de aparecer en signup y landing. Los miembros existentes con este plan no se afectan. Puedes restaurarlo después.';
+    return 'Este plan se moverá a Eliminados: deja de aparecer en signup y landing. Los miembros existentes con este plan no se afectan. Lo puedes recuperar después.';
   })();
 
   return (
@@ -162,7 +198,7 @@ export default function Tiers() {
                   marginBottom: '12px'
                 }}
               >
-                {mostrarArchivados ? '▾' : '▸'} Ver archivados ({archivados.length})
+                {mostrarArchivados ? '▾' : '▸'} Ver eliminados ({archivados.length})
               </button>
 
               {mostrarArchivados && (
@@ -172,6 +208,7 @@ export default function Tiers() {
                       key={t.id}
                       tier={t}
                       onRestore={() => handleRestaurar(t)}
+                      onHardDelete={() => startHardDelete(t)}
                       restoring={restaurandoId === t.id}
                     />
                   ))}
@@ -208,13 +245,31 @@ export default function Tiers() {
 
       <ConfirmDialog
         isOpen={archivar !== null}
-        title={archivarTier ? `¿Archivar “${archivarTier.nombre}”?` : ''}
+        title={archivarTier ? `¿Eliminar “${archivarTier.nombre}”?` : ''}
         description={archivarConfirmDescription}
-        confirmLabel="Archivar"
+        confirmLabel="Eliminar"
         variant={archivarBloqueado ? 'danger' : 'warning'}
         hideConfirm={archivarBloqueado || archivar?.status === 'loading'}
         onConfirm={handleArchivar}
         onCancel={() => setArchivar(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={borrarPerm !== null}
+        title={borrarPerm ? `¿Eliminar permanentemente “${borrarPerm.tier.nombre}”?` : ''}
+        description={
+          borrarPerm?.status === 'loading'
+            ? 'Verificando miembros vinculados…'
+            : borrarPerm?.status === 'blocked'
+            ? borrarPerm.reason
+            : 'Esta acción NO se puede deshacer. El plan será borrado permanentemente de la base de datos.'
+        }
+        confirmLabel="Eliminar permanentemente"
+        variant="danger"
+        hideConfirm={borrarPerm?.status !== 'ready'}
+        requireTypedConfirmation={borrarPerm?.status === 'ready' ? 'ELIMINAR' : undefined}
+        onConfirm={handleHardDelete}
+        onCancel={() => setBorrarPerm(null)}
       />
     </div>
   );
@@ -276,7 +331,7 @@ function TierRow({
             className="ek-icon-btn"
             style={{ width: '100%', padding: '8px 12px', fontSize: '12px', color: 'var(--ek-danger)' }}
           >
-            🗄 Archivar
+            🗑 Eliminar
           </button>
         </div>
       </div>
@@ -287,10 +342,12 @@ function TierRow({
 function TierArchivedRow({
   tier: t,
   onRestore,
+  onHardDelete,
   restoring
 }: {
   tier: Tier;
   onRestore: () => void;
+  onHardDelete: () => void;
   restoring: boolean;
 }) {
   return (
@@ -306,17 +363,26 @@ function TierArchivedRow({
         <div>
           <h3 className="ek-h3" style={{ textDecoration: 'line-through' }}>{t.nombre}</h3>
           <p style={{ fontSize: '0.75rem', color: 'var(--ek-ink-faint)' }}>
-            Archivado · slug: {t.slug} · ${(t.precio_centavos / 100).toLocaleString('es-MX')} {t.moneda}
+            Eliminado · slug: {t.slug} · ${(t.precio_centavos / 100).toLocaleString('es-MX')} {t.moneda}
           </p>
         </div>
-        <button
-          onClick={onRestore}
-          disabled={restoring}
-          className="ek-icon-btn"
-          style={{ padding: '8px 14px', fontSize: '12px' }}
-        >
-          {restoring ? 'Restaurando…' : '♻️ Restaurar'}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <button
+            onClick={onRestore}
+            disabled={restoring}
+            className="ek-icon-btn"
+            style={{ padding: '8px 14px', fontSize: '12px' }}
+          >
+            {restoring ? 'Recuperando…' : '♻️ Recuperar'}
+          </button>
+          <button
+            onClick={onHardDelete}
+            className="ek-icon-btn"
+            style={{ padding: '8px 14px', fontSize: '11px', color: 'var(--ek-danger)' }}
+          >
+            ⚠️ Eliminar permanente
+          </button>
+        </div>
       </div>
     </div>
   );

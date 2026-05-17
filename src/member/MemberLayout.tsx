@@ -1,6 +1,7 @@
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
+import { useToast } from '@shared/hooks/useToast';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { BottomNav } from './components/BottomNav';
 
@@ -25,6 +26,7 @@ function mensajeStatus(status: string): string {
 
 export default function MemberLayout() {
   const { authUser, usuario, isLoading, signOut } = useAuth();
+  const toast = useToast();
   const location = useLocation();
   const yaCerrado = useRef(false);
 
@@ -35,10 +37,10 @@ export default function MemberLayout() {
     if (yaCerrado.current) return;
     yaCerrado.current = true;
 
-    alert(mensajeStatus(usuario.status));
+    toast.error(mensajeStatus(usuario.status), 8000);
     // signOut limpia la sesión; el Navigate de abajo redirige a /login
     void signOut();
-  }, [authUser, usuario, isLoading, signOut]);
+  }, [authUser, usuario, isLoading, signOut, toast]);
 
   if (isLoading) return <LoadingScreen />;
   if (!authUser) return <Navigate to="/login" state={{ from: location }} replace />;

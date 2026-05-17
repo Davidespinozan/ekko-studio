@@ -13,6 +13,8 @@ interface ConfirmDialogProps {
   variant?: Variant;
   /** Si true, oculta el botón confirmar (modo "informativo bloqueante"). */
   hideConfirm?: boolean;
+  /** Si se setea, el botón confirmar queda disabled hasta que el usuario tipee exactamente esta palabra. */
+  requireTypedConfirmation?: string;
 }
 
 const VARIANT_STYLES: Record<Variant, { borderColor: string; eyebrowColor: string }> = {
@@ -45,12 +47,15 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
   variant = 'warning',
-  hideConfirm = false
+  hideConfirm = false,
+  requireTypedConfirmation
 }: ConfirmDialogProps) {
   const [submitting, setSubmitting] = useState(false);
+  const [typed, setTyped] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
+    setTyped('');
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !submitting) onCancel();
     };
@@ -64,6 +69,9 @@ export default function ConfirmDialog({
   }, [isOpen, onCancel, submitting]);
 
   if (!isOpen) return null;
+
+  const typedOk = !requireTypedConfirmation || typed === requireTypedConfirmation;
+  const confirmDisabled = submitting || !typedOk;
 
   const style = VARIANT_STYLES[variant];
 
@@ -134,11 +142,28 @@ export default function ConfirmDialog({
             color: 'var(--ek-ink-muted)',
             lineHeight: 1.55,
             margin: 0,
-            marginBottom: '24px'
+            marginBottom: requireTypedConfirmation ? '16px' : '24px'
           }}
         >
           {description}
         </p>
+
+        {requireTypedConfirmation && !hideConfirm && (
+          <div style={{ marginBottom: '20px' }}>
+            <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', marginBottom: '6px' }}>
+              Escribí <strong style={{ color: 'var(--ek-ink)' }}>{requireTypedConfirmation}</strong> para confirmar:
+            </p>
+            <input
+              type="text"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              className="ek-input"
+              autoFocus
+              placeholder={requireTypedConfirmation}
+              style={{ fontFamily: 'var(--ek-font-mono)' }}
+            />
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
@@ -154,10 +179,11 @@ export default function ConfirmDialog({
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={submitting}
+              disabled={confirmDisabled}
               className="ek-cta"
               style={{
                 flex: 1,
+                opacity: confirmDisabled && !submitting ? 0.4 : 1,
                 ...(variant === 'danger' && {
                   background: 'var(--ek-danger-soft)',
                   color: 'var(--ek-danger)',

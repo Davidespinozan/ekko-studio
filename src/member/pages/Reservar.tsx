@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
+import { useToast } from '@shared/hooks/useToast';
 import {
   useRecursosDelTenant,
   fetchReservasDelRecurso,
@@ -26,6 +27,7 @@ function tierTieneAcceso(recurso: Recurso, tier: string | null | undefined): boo
 export default function Reservar() {
   const tenant = useTenant();
   const { usuario } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const recursoSlugParam = searchParams.get('recurso');
@@ -169,7 +171,7 @@ export default function Reservar() {
                   key={r.id}
                   onClick={() => {
                     if (!accesible) {
-                      alert('Tu plan no incluye este estudio. Ve a Estudios para más info.');
+                      toast.warning('Tu plan no incluye este estudio. Ve a Estudios para más info.');
                       return;
                     }
                     setRecursoSel(r);

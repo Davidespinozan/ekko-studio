@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
+import { useToast } from '@shared/hooks/useToast';
 import { useRecursosAdmin, updateRecurso, insertRecurso } from '../hooks/useAdminData';
-import { archiveRecord, restoreRecord, generateUniqueSlug } from '../lib/crudHelpers';
+import {
+  archiveRecord,
+  restoreRecord,
+  generateUniqueSlug,
+  canHardDeleteRecurso,
+  hardDeleteRecord
+} from '../lib/crudHelpers';
 import Toggle from '../components/Toggle';
 import ImageUploader from '../components/ImageUploader';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -76,11 +83,19 @@ function useTiersDelTenant(): TierOption[] {
   return tiers;
 }
 
+type HardDeleteState =
+  | null
+  | { recurso: Recurso; status: 'loading' }
+  | { recurso: Recurso; status: 'blocked'; reason: string }
+  | { recurso: Recurso; status: 'ready' };
+
 export default function Recursos() {
   const tenant = useTenant();
+  const toast = useToast();
   const { recursos, isLoading, refetch } = useRecursosAdmin();
   const [modal, setModal] = useState<ModalState>(null);
   const [archivando, setArchivando] = useState<Recurso | null>(null);
+  const [borrarPerm, setBorrarPerm] = useState<HardDeleteState>(null);
   const [mostrarArchivados, setMostrarArchivados] = useState(false);
   const [duplicandoId, setDuplicandoId] = useState<string | null>(null);
   const [restaurandoId, setRestaurandoId] = useState<string | null>(null);
@@ -118,9 +133,10 @@ export default function Recursos() {
     const { error } = await insertRecurso(payload);
     setDuplicandoId(null);
     if (error) {
-      alert(`No se pudo duplicar: ${error}`);
+      toast.error(`No se pudo duplicar: ${error}`);
       return;
     }
+    toast.success('Estudio duplicado.');
     await refetch();
   }
 
@@ -128,10 +144,11 @@ export default function Recursos() {
     if (!archivando) return;
     const { error } = await archiveRecord('recursos', archivando.id);
     if (error) {
-      alert(`No se pudo archivar: ${error}`);
+      toast.error(`No se pudo eliminar: ${error}`);
       return;
     }
     setArchivando(null);
+    toast.success('Estudio eliminado. Lo encuentras en "Ver eliminados".');
     await refetch();
   }
 
@@ -140,9 +157,32 @@ export default function Recursos() {
     const { error } = await restoreRecord('recursos', r.id);
     setRestaurandoId(null);
     if (error) {
-      alert(`No se pudo restaurar: ${error}`);
+      toast.error(`No se pudo recuperar: ${error}`);
       return;
     }
+    toast.success('Estudio recuperado.');
+    await refetch();
+  }
+
+  async function startHardDelete(r: Recurso) {
+    setBorrarPerm({ recurso: r, status: 'loading' });
+    const check = await canHardDeleteRecurso(r.id);
+    if (!check.canDelete) {
+      setBorrarPerm({ recurso: r, status: 'blocked', reason: check.reason ?? 'No se puede eliminar.' });
+    } else {
+      setBorrarPerm({ recurso: r, status: 'ready' });
+    }
+  }
+
+  async function handleHardDelete() {
+    if (!borrarPerm || borrarPerm.status !== 'ready') return;
+    const { error } = await hardDeleteRecord('recursos', borrarPerm.recurso.id);
+    if (error) {
+      toast.error(`No se pudo eliminar permanentemente: ${error.message}`);
+      return;
+    }
+    setBorrarPerm(null);
+    toast.success('Estudio eliminado permanentemente.');
     await refetch();
   }
 
@@ -197,7 +237,7 @@ export default function Recursos() {
                   marginBottom: '12px'
                 }}
               >
-                {mostrarArchivados ? '▾' : '▸'} Ver archivados ({archivados.length})
+                {mostrarArchivados ? '▾' : '▸'} Ver eliminados ({archivados.length})
               </button>
 
               {mostrarArchivados && (
@@ -207,6 +247,7 @@ export default function Recursos() {
                       key={r.id}
                       recurso={r}
                       onRestore={() => handleRestaurar(r)}
+                      onHardDelete={() => startHardDelete(r)}
                       restoring={restaurandoId === r.id}
                     />
                   ))}
@@ -241,12 +282,30 @@ export default function Recursos() {
 
       <ConfirmDialog
         isOpen={archivando !== null}
-        title={archivando ? `¿Archivar “${archivando.nombre}”?` : ''}
-        description="Este estudio dejará de aparecer en la landing y no se podrá reservar. Las reservas históricas no se afectan. Puedes restaurarlo después."
-        confirmLabel="Archivar"
+        title={archivando ? `¿Eliminar “${archivando.nombre}”?` : ''}
+        description="Este estudio se moverá a Eliminados: deja de aparecer en la landing y no se podrá reservar, pero las reservas históricas se conservan. Lo puedes recuperar después."
+        confirmLabel="Eliminar"
         variant="warning"
         onConfirm={handleArchivar}
         onCancel={() => setArchivando(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={borrarPerm !== null}
+        title={borrarPerm ? `¿Eliminar permanentemente “${borrarPerm.recurso.nombre}”?` : ''}
+        description={
+          borrarPerm?.status === 'loading'
+            ? 'Verificando reservas vinculadas…'
+            : borrarPerm?.status === 'blocked'
+            ? borrarPerm.reason
+            : 'Esta acción NO se puede deshacer. El estudio será borrado permanentemente de la base de datos.'
+        }
+        confirmLabel="Eliminar permanentemente"
+        variant="danger"
+        hideConfirm={borrarPerm?.status !== 'ready'}
+        requireTypedConfirmation={borrarPerm?.status === 'ready' ? 'ELIMINAR' : undefined}
+        onConfirm={handleHardDelete}
+        onCancel={() => setBorrarPerm(null)}
       />
     </div>
   );
@@ -320,7 +379,7 @@ function RecursoRow({
             className="ek-icon-btn"
             style={{ width: '100%', padding: '8px 12px', fontSize: '12px', color: 'var(--ek-danger)' }}
           >
-            🗄 Archivar
+            🗑 Eliminar
           </button>
         </div>
       </div>
@@ -331,10 +390,12 @@ function RecursoRow({
 function RecursoArchivedRow({
   recurso: r,
   onRestore,
+  onHardDelete,
   restoring
 }: {
   recurso: Recurso;
   onRestore: () => void;
+  onHardDelete: () => void;
   restoring: boolean;
 }) {
   return (
@@ -350,17 +411,26 @@ function RecursoArchivedRow({
         <div>
           <h3 className="ek-h3" style={{ textDecoration: 'line-through' }}>{r.nombre}</h3>
           <p style={{ fontSize: '0.75rem', color: 'var(--ek-ink-faint)' }}>
-            Archivado · slug: {r.slug}
+            Eliminado · slug: {r.slug}
           </p>
         </div>
-        <button
-          onClick={onRestore}
-          disabled={restoring}
-          className="ek-icon-btn"
-          style={{ padding: '8px 14px', fontSize: '12px' }}
-        >
-          {restoring ? 'Restaurando…' : '♻️ Restaurar'}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <button
+            onClick={onRestore}
+            disabled={restoring}
+            className="ek-icon-btn"
+            style={{ padding: '8px 14px', fontSize: '12px' }}
+          >
+            {restoring ? 'Recuperando…' : '♻️ Recuperar'}
+          </button>
+          <button
+            onClick={onHardDelete}
+            className="ek-icon-btn"
+            style={{ padding: '8px 14px', fontSize: '11px', color: 'var(--ek-danger)' }}
+          >
+            ⚠️ Eliminar permanente
+          </button>
+        </div>
       </div>
     </div>
   );

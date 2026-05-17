@@ -1,5 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import { generateUniqueSlug } from '../crudHelpers';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('@shared/lib/supabase', () => ({
+  supabase: {
+    rpc: vi.fn(),
+    from: vi.fn()
+  }
+}));
+
+import { supabase } from '@shared/lib/supabase';
+import {
+  generateUniqueSlug,
+  canHardDeleteRecurso,
+  canHardDeleteTier
+} from '../crudHelpers';
 
 describe('generateUniqueSlug', () => {
   it('agrega -copia cuando no hay colisión con el sufijo base', () => {
@@ -27,5 +40,68 @@ describe('generateUniqueSlug', () => {
   it('no se confunde con slugs que solo coinciden parcialmente', () => {
     // "pro-anual" empieza con "pro" pero NO es "pro-copia"
     expect(generateUniqueSlug('pro', ['pro-anual', 'pro-mensual'])).toBe('pro-copia');
+  });
+});
+
+describe('canHardDeleteRecurso', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('permite borrar si no hay reservas', async () => {
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: 0,
+      error: null
+    });
+    const result = await canHardDeleteRecurso('abc-123');
+    expect(result.canDelete).toBe(true);
+    expect(supabase.rpc).toHaveBeenCalledWith('count_reservas_recurso', {
+      p_recurso_id: 'abc-123'
+    });
+  });
+
+  it('bloquea si hay reservas', async () => {
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: 5,
+      error: null
+    });
+    const result = await canHardDeleteRecurso('abc-123');
+    expect(result.canDelete).toBe(false);
+    expect(result.count).toBe(5);
+    expect(result.reason).toContain('5');
+  });
+
+  it('bloquea si hay error de BD', async () => {
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: null,
+      error: { message: 'connection failed' }
+    });
+    const result = await canHardDeleteRecurso('abc-123');
+    expect(result.canDelete).toBe(false);
+    expect(result.reason).toContain('connection failed');
+  });
+});
+
+describe('canHardDeleteTier', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('permite borrar si no hay miembros', async () => {
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: 0,
+      error: null
+    });
+    const result = await canHardDeleteTier('tier-id');
+    expect(result.canDelete).toBe(true);
+    expect(supabase.rpc).toHaveBeenCalledWith('count_miembros_tier', {
+      p_tier_id: 'tier-id'
+    });
+  });
+
+  it('bloquea si hay miembros activos o históricos', async () => {
+    (supabase.rpc as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: 3,
+      error: null
+    });
+    const result = await canHardDeleteTier('tier-id');
+    expect(result.canDelete).toBe(false);
+    expect(result.count).toBe(3);
   });
 });

@@ -5,6 +5,7 @@ interface NavItem {
   to: string;
   label: string;
   icon: React.ReactNode;
+  badge?: string;
 }
 
 interface NavSection {
@@ -83,17 +84,60 @@ const SECTIONS: NavSection[] = [
     label: 'AJUSTES',
     items: [
       {
-        to: '/admin/configuracion',
-        label: 'Configuración',
+        to: '/admin/landing',
+        label: 'Landing',
         icon: (
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+        )
+      },
+      {
+        to: '/admin/contacto',
+        label: 'Contacto',
+        icon: (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2" />
+          </svg>
+        )
+      },
+      {
+        to: '/admin/reglas',
+        label: 'Reglas',
+        icon: (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <polyline points="12 7 12 12 15 14" />
+          </svg>
+        )
+      },
+      {
+        to: '/admin/marca',
+        label: 'Marca',
+        badge: 'PRÓXIMAMENTE',
+        icon: (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <circle cx="12" cy="12" r="4" />
           </svg>
         )
       }
     ]
   }
+];
+
+interface VerComoLink {
+  label: string;
+  icon: string;
+  href: string;
+}
+
+const VER_COMO_LINKS: VerComoLink[] = [
+  { label: 'Landing', icon: '🏠', href: '/' },
+  { label: 'Signup', icon: '✍️', href: '/signup' },
+  { label: 'Miembro', icon: '👤', href: '/app?demo=admin-preview' },
+  { label: 'Recepción', icon: '📋', href: '/recepcion?demo=admin-preview' }
 ];
 
 interface Props {
@@ -162,11 +206,48 @@ export function Sidebar({ onNavigate }: Props = {}) {
                 }
               >
                 <span className="adm-sidebar-item-icon">{item.icon}</span>
-                <span>{item.label}</span>
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {item.badge && (
+                  <span
+                    style={{
+                      fontSize: '8px',
+                      letterSpacing: '0.1em',
+                      color: 'var(--ek-ink-faint)',
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {item.badge}
+                  </span>
+                )}
               </NavLink>
             ))}
           </div>
         ))}
+
+        <div className="adm-sidebar-section">
+          <p className="ek-eyebrow adm-sidebar-section-label">VER COMO…</p>
+          {VER_COMO_LINKS.map((link) => (
+            <a
+              key={link.label}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Abre en nueva pestaña"
+              className="adm-sidebar-item"
+              style={{
+                border: '0.5px solid var(--ek-line)',
+                marginTop: '4px'
+              }}
+            >
+              <span className="adm-sidebar-item-icon" aria-hidden="true">
+                {link.icon}
+              </span>
+              <span style={{ flex: 1 }}>{link.label}</span>
+              <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)' }}>↗</span>
+            </a>
+          ))}
+        </div>
       </nav>
 
       <div className="adm-sidebar-footer">

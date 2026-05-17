@@ -182,6 +182,75 @@ nombre para diferenciación visual inmediata.
   - `hideConfirm` para modo informativo bloqueante (ej: archivar
     tier con miembros activos)
 
+## Patrón Admin Profesional (Sprint D-Admin)
+
+### Filosofía
+El admin de EKKO no es un form-builder genérico. Es producto diseñado
+para dueños de negocio no técnicos. Cada pantalla responde a un caso
+de uso real, no a un schema de BD.
+
+### Estructura del sidebar
+- **OPERACIÓN**: día a día (Dashboard, Miembros, Reservas)
+- **CATÁLOGO**: productos vendibles (Estudios, Planes)
+- **AJUSTES**: 4 páginas dedicadas (Landing, Contacto, Reglas, Marca)
+- **VER COMO…**: previsualización del producto (4 links que abren
+  en nueva pestaña)
+
+### Reglas de UX
+1. **Labels humanos siempre**: nunca mostrar nombres técnicos al
+   admin. `whatsapp_e164` → "Número de WhatsApp".
+2. **Helper text en cada campo crítico**: explicación corta + ejemplo
+   cuando aplica.
+3. **Bloques DEAD no se muestran**: si una config está sembrada en BD
+   pero no consumida en producción, NO va en admin. Solo se muestra
+   lo que afecta al producto real. La página `/admin/reglas` solo
+   expone los 4 campos consumidos por el RPC.
+4. **Feedback de cambios**: indicador "Sin cambios" / "Cambios sin
+   guardar". Botón "Guardar" explícito. Toast al guardar.
+5. **VER COMO**: admin puede previsualizar cualquier vista del producto
+   sin perder su sesión. Demo guard sobre `?demo=admin-preview` (TODO
+   Sprint Stripe).
+
+## Patrón Soft + Hard Delete con Guards (Sprint D-Admin)
+
+### Vocabulario
+- **UI**: "Eliminar" (no "Archivar")
+- **BD**: campo `activo: boolean` (soft delete) — sigue siendo soft
+  delete internamente
+- **Hard delete**: opción "Eliminar permanentemente" desde la papelera
+  con typed confirmation ("ELIMINAR")
+
+### Flow
+1. **Click "Eliminar" en activo** → soft delete (`activo=false`) →
+   confirma con dialog warning → toast "Se moverá a eliminados".
+2. **Click "Recuperar" en eliminado** → `activo=true` → toast.
+3. **Click "Eliminar permanente" en eliminado** → check FKs vía RPC
+   → si OK, typed confirmation ("ELIMINAR") → DELETE FROM table.
+
+### Guards
+- **Recursos**: NO permitir hard delete si hay reservas vinculadas
+  (cualquier estado).
+- **Tiers**: NO permitir hard delete si hay miembros vinculados
+  (activos o históricos, doble fuente: `membresias.tier_id` +
+  `usuarios.membresia_tier`).
+- Hard delete SOLO disponible desde sección "Eliminados".
+- Hard delete SOLO con typed confirmation.
+
+### Helpers
+- `canHardDeleteRecurso(id)` → `{ canDelete, reason?, count? }`
+- `canHardDeleteTier(id)` → idem
+- `hardDeleteRecord(table, id)` — IRREVERSIBLE
+- RPCs SQL: `count_reservas_recurso`, `count_miembros_tier`
+
+## Sistema de Toasts (Sprint D-Admin)
+
+`ToastProvider` global en root. Hook `useToast()` expone 4 métodos:
+`success`, `error`, `warning`, `info`. Stack vertical en esquina
+bottom-right con auto-dismiss + manual close.
+
+**Reemplaza TODOS los `alert()`** del codebase. Cero `alert()` en src/
+(verificado por grep).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.
