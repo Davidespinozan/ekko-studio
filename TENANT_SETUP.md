@@ -91,6 +91,13 @@ VALUES (
 >
 > Todo sin tocar BD ni código. Hard delete con typed confirmation
 > ("ELIMINAR") disponible solo desde la papelera para casos extremos.
+>
+> **Nota** (post Sprint D-Polish): cards de Estudios y Planes son
+> horizontales con foto thumb + menú `⋯`. Click en cualquier parte
+> del card abre el modal de editar. El menú `⋯` evita propagation y
+> ofrece Editar / Duplicar / Eliminar. VER COMO en el sidebar abre
+> Landing / Miembro / Recepción en pestañas separadas con banner
+> sticky mostaza para volver al admin.
 
 ## Paso 2: Crear tiers (membresías)
 

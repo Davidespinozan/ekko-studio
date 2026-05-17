@@ -242,6 +242,93 @@ de uso real, no a un schema de BD.
 - `hardDeleteRecord(table, id)` — IRREVERSIBLE
 - RPCs SQL: `count_reservas_recurso`, `count_miembros_tier`
 
+## Hook reusable: useTenantConfigEditor (Sprint D-Admin)
+
+### Propósito
+Hook que abstrae el patrón de edición de bloques en `tenants.config`
+jsonb. Usado por todas las páginas de AJUSTES (Landing, Contacto,
+Reglas) y disponible para sprints futuros (Marca, FAQ, etc).
+
+### API
+
+```typescript
+const { config, isLoading, isSaving, saveTopLevel, reload } = useTenantConfigEditor();
+```
+
+- `config`: snapshot completo del config (o null mientras carga).
+- `isLoading`/`isSaving`: estados de fetch / mutation.
+- `saveTopLevel(patch)`: hace `UPDATE tenants SET config = { ...config, ...patch }`.
+  El merge es **shallow en top-level** — el caller es responsable de
+  preservar sub-keys no modificadas.
+- `reload()`: re-fetch desde BD (útil para descartar cambios).
+
+### Merge no destructivo (responsabilidad del caller)
+
+Como `saveTopLevel` solo hace merge shallow, cada página que edita un
+sub-objeto anidado (ej. `landing.hero`) tiene que componer el patch
+preservando otras keys del bloque:
+
+```typescript
+const landing = (config?.landing ?? {}) as Record<string, unknown>;
+const patch = {
+  landing: {
+    ...landing,  // preserva cta_final, footer, etc.
+    hero: nuevoHero
+  }
+};
+await saveTopLevel(patch);
+```
+
+Este patrón es lo que protege los bloques DEAD sembrados en BD
+(`config.ui`, `config.acceso`, etc.): nadie los toca, nadie los
+borra, quedan a la espera de un sprint que los consuma o limpie.
+
+### Aplicaciones actuales
+- `AjustesLanding.tsx` — `config.landing.hero`, `cta_final`, `footer`
+- `AjustesContacto.tsx` — `config.contacto`, `config.landing.footer.redes`
+- `AjustesReglas.tsx` — `config.reserva`, `config.penalizaciones`
+
+### Aplicaciones futuras
+- `AjustesMarca.tsx` — `tenants.branding.logo_url`, `colors.*`
+- Sprint C2 — `config.landing.faq`, `config.landing.como_funciona`
+
+## VER COMO… + Demo Mode (Sprint D-Polish)
+
+### Propósito
+Permite al admin previsualizar el producto como lo vería cada tipo de
+usuario, sin perder su sesión de admin.
+
+### Vistas disponibles
+- 🏠 **Landing**: vista pública (`/?demo=admin-preview`)
+- 👤 **Miembro**: app del miembro (`/app?demo=admin-preview`)
+- 📋 **Recepción**: panel de check-in (`/recepcion?demo=admin-preview`)
+
+Signup excluido: el admin ya lo ve en flow normal cuando un visitante
+hace click en una membresía desde Landing.
+
+### Flow técnico
+1. Click VER COMO en sidebar admin → `window.open(url, '_blank')`.
+2. Nueva pestaña carga la ruta con `?demo=admin-preview`.
+3. `useRoleRedirect` detecta el parámetro y **bypassea** el redirect
+   automático a `/admin` que normalmente dispararía con un admin
+   logueado.
+4. `DemoBanner` se renderiza sticky-top con "Volver al admin →".
+5. Click "Volver al admin": `window.close()` con fallback a redirect
+   a `/admin/landing` después de 100ms (cubre el caso de pestañas
+   abiertas manualmente que el navegador no deja cerrar por script).
+
+### Dónde se monta DemoBanner
+- `PublicLayout.tsx` (vista Landing)
+- `MemberLayout.tsx` (vista Miembro)
+- `ReceptionLayout.tsx` (vista Recepción)
+
+### Seguridad (pendiente)
+Hoy el demo mode NO tiene guard estricto: cualquiera con la URL puede
+ver las vistas, pero solo si tiene sesión válida del rol correspondiente
+(el guard de auth sigue activo). Riesgo bajo. TODO Sprint Stripe:
+- Validar admin via JWT custom claim en Edge Function
+- Logging server-side de cada uso de demo mode
+
 ## Sistema de Toasts (Sprint D-Admin)
 
 `ToastProvider` global en root. Hook `useToast()` expone 4 métodos:

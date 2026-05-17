@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useRef } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
+import { DemoBanner } from '@shared/components/DemoBanner';
 import { BottomNav } from './components/BottomNav';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -50,6 +51,7 @@ export default function MemberLayout() {
 
   return (
     <div className="ek-page" style={{ paddingBottom: '88px' /* espacio para bottom nav */ }}>
+      <DemoBanner vista="Miembro" />
       <header className="ek-header-glass">
         <div className="ek-header-inner">
           <Link

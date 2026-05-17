@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTiersAdmin, updateTier, insertTier } from '../hooks/useAdminData';
 import {
   archiveRecord,
@@ -155,7 +155,14 @@ export default function Tiers() {
       >
         <div>
           <p className="ek-eyebrow">PLANES</p>
-          <h1 className="ek-h2">Membresías</h1>
+          <h1 className="ek-h2">Tus membresías disponibles</h1>
+          {!isLoading && (
+            <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '4px' }}>
+              {activos.length} {activos.length === 1 ? 'activo' : 'activos'}
+              {' · '}
+              {archivados.length} {archivados.length === 1 ? 'eliminado' : 'eliminados'}
+            </p>
+          )}
         </div>
         <button onClick={() => setModal({ mode: 'create' })} className="ek-cta">
           + Nueva membresía
@@ -176,6 +183,7 @@ export default function Tiers() {
                 <TierRow
                   key={t.id}
                   tier={t}
+                  tenantId={tenant.id}
                   onEdit={() => setModal({ mode: 'edit', tier: t })}
                   onDuplicate={() => handleDuplicar(t)}
                   onArchive={() => startArchivar(t)}
@@ -275,66 +283,241 @@ export default function Tiers() {
   );
 }
 
+interface DropdownItem {
+  label: string;
+  icon: string;
+  onClick: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  divider?: boolean;
+}
+
+function CardMenuDropdown({ items }: { items: DropdownItem[] }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="ek-icon-btn"
+        aria-label="Acciones"
+        style={{ width: '32px', height: '32px', padding: 0, fontSize: '18px', lineHeight: 1 }}
+      >
+        ⋯
+      </button>
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} aria-hidden="true" />
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 4px)',
+              right: 0,
+              minWidth: '220px',
+              background: 'var(--ek-bg-soft)',
+              border: '0.5px solid var(--ek-line)',
+              borderRadius: '12px',
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
+              padding: '6px',
+              zIndex: 50,
+              animation: 'ek-fade-in 0.12s ease'
+            }}
+            role="menu"
+          >
+            {items.map((item, idx) => (
+              <div key={`${item.label}-${idx}`}>
+                {item.divider && (
+                  <div style={{ height: '0.5px', background: 'var(--ek-line)', margin: '4px 0' }} />
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    if (!item.disabled) item.onClick();
+                  }}
+                  disabled={item.disabled}
+                  role="menuitem"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    width: '100%',
+                    padding: '8px 12px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: item.danger ? 'var(--ek-danger)' : 'var(--ek-ink)',
+                    fontSize: '13px',
+                    fontFamily: 'inherit',
+                    textAlign: 'left',
+                    cursor: item.disabled ? 'not-allowed' : 'pointer',
+                    opacity: item.disabled ? 0.5 : 1
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!item.disabled) e.currentTarget.style.background = 'var(--ek-bg-elevated)';
+                  }}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <span aria-hidden="true">{item.icon}</span>
+                  {item.label}
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function useMemberCount(tier: Tier, tenantId: string): number | null {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    countActiveMembersInTier({ tierId: tier.id, tierSlug: tier.slug, tenantId }).then((n) => {
+      if (mounted) setCount(n);
+    });
+    return () => { mounted = false; };
+  }, [tier.id, tier.slug, tenantId]);
+
+  return count;
+}
+
 function TierRow({
   tier: t,
+  tenantId,
   onEdit,
   onDuplicate,
   onArchive,
   duplicating
 }: {
   tier: Tier;
+  tenantId: string;
   onEdit: () => void;
   onDuplicate: () => void;
   onArchive: () => void;
   duplicating: boolean;
 }) {
+  const memberCount = useMemberCount(t, tenantId);
+  const esPro = t.slug === 'pro';
+  const beneficios = parseBeneficios(t.beneficios);
+  const compromiso = ((t.reglas as Record<string, unknown> | null)?.commitment_meses ?? null) as number | null;
+
   return (
-    <div className="ek-card">
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: '1rem'
-        }}
-      >
-        <div style={{ flex: 1 }}>
-          <h3 className="ek-h3">{t.nombre}</h3>
-          <p style={{ fontSize: '0.875rem', color: 'var(--ek-ink-muted)' }}>
-            ${(t.precio_centavos / 100).toLocaleString('es-MX')} {t.moneda} / {t.periodo}
-          </p>
-          <p
+    <div
+      onClick={onEdit}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onEdit();
+        }
+      }}
+      style={{
+        background: 'var(--ek-bg-soft)',
+        border: esPro ? '0.5px solid var(--ek-mustard-dim)' : '0.5px solid var(--ek-line)',
+        borderRadius: '16px',
+        padding: '20px',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '16px',
+        cursor: 'pointer',
+        transition: 'background 0.18s ease, border-color 0.18s ease',
+        boxShadow: esPro ? '0 0 0 1px var(--ek-mustard-dim)' : 'none'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--ek-mustard-soft)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'var(--ek-bg-soft)';
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px', flexWrap: 'wrap' }}>
+          <h3
             style={{
-              fontSize: '0.8125rem',
-              color: 'var(--ek-ink-muted)',
-              marginTop: '0.5rem'
+              fontFamily: 'var(--ek-font-display)',
+              fontSize: '20px',
+              fontWeight: 600,
+              margin: 0,
+              color: 'var(--ek-ink)',
+              letterSpacing: '-0.02em'
             }}
           >
-            slug: {t.slug} ·{' '}
-            {Array.isArray(t.beneficios) ? `${(t.beneficios as unknown[]).length} beneficios` : '—'}
-          </p>
+            {t.nombre}
+          </h3>
+          {esPro && (
+            <span
+              className="ek-badge"
+              style={{
+                backgroundColor: 'var(--ek-mustard-soft)',
+                color: 'var(--ek-mustard)',
+                fontSize: '10px',
+                fontWeight: 700,
+                padding: '3px 8px',
+                letterSpacing: '0.05em'
+              }}
+            >
+              ★ RECOMENDADO
+            </span>
+          )}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '120px' }}>
-          <button onClick={onEdit} className="ek-icon-btn" style={{ width: '100%', padding: '8px 12px', fontSize: '12px' }}>
-            ✏️ Editar
-          </button>
-          <button
-            onClick={onDuplicate}
-            disabled={duplicating}
-            className="ek-icon-btn"
-            style={{ width: '100%', padding: '8px 12px', fontSize: '12px' }}
+        <p style={{ fontSize: '14px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '8px' }}>
+          ${(t.precio_centavos / 100).toLocaleString('es-MX')} {t.moneda}/{t.periodo}
+          {compromiso ? ` · ${compromiso} meses de compromiso` : ''}
+        </p>
+        {beneficios.slice(0, 3).length > 0 && (
+          <ul
+            style={{
+              listStyle: 'none',
+              padding: 0,
+              margin: '0 0 8px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px'
+            }}
           >
-            {duplicating ? 'Duplicando…' : '📋 Duplicar'}
-          </button>
-          <button
-            onClick={onArchive}
-            className="ek-icon-btn"
-            style={{ width: '100%', padding: '8px 12px', fontSize: '12px', color: 'var(--ek-danger)' }}
-          >
-            🗑 Eliminar
-          </button>
-        </div>
+            {beneficios.slice(0, 3).map((b) => (
+              <li
+                key={b}
+                style={{
+                  fontSize: '13px',
+                  color: 'var(--ek-ink-muted)',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '6px'
+                }}
+              >
+                <span style={{ color: 'var(--ek-mustard)' }}>•</span>
+                <span style={{ flex: 1 }}>{b}</span>
+              </li>
+            ))}
+            {beneficios.length > 3 && (
+              <li style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginLeft: '12px' }}>…</li>
+            )}
+          </ul>
+        )}
+        <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: 0 }}>
+          {memberCount === null
+            ? 'Cargando…'
+            : memberCount === 0
+            ? 'Sin miembros activos'
+            : `${memberCount} ${memberCount === 1 ? 'miembro activo' : 'miembros activos'}`}
+        </p>
       </div>
+      <CardMenuDropdown
+        items={[
+          { label: 'Editar', icon: '✏️', onClick: onEdit },
+          { label: duplicating ? 'Duplicando…' : 'Duplicar', icon: '📋', onClick: onDuplicate, disabled: duplicating },
+          { label: 'Eliminar', icon: '🗑', onClick: onArchive, danger: true, divider: true }
+        ]}
+      />
     </div>
   );
 }
@@ -351,39 +534,43 @@ function TierArchivedRow({
   restoring: boolean;
 }) {
   return (
-    <div className="ek-card">
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '1rem'
-        }}
-      >
-        <div>
-          <h3 className="ek-h3" style={{ textDecoration: 'line-through' }}>{t.nombre}</h3>
-          <p style={{ fontSize: '0.75rem', color: 'var(--ek-ink-faint)' }}>
-            Eliminado · slug: {t.slug} · ${(t.precio_centavos / 100).toLocaleString('es-MX')} {t.moneda}
-          </p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <button
-            onClick={onRestore}
-            disabled={restoring}
-            className="ek-icon-btn"
-            style={{ padding: '8px 14px', fontSize: '12px' }}
-          >
-            {restoring ? 'Recuperando…' : '♻️ Recuperar'}
-          </button>
-          <button
-            onClick={onHardDelete}
-            className="ek-icon-btn"
-            style={{ padding: '8px 14px', fontSize: '11px', color: 'var(--ek-danger)' }}
-          >
-            ⚠️ Eliminar permanente
-          </button>
-        </div>
+    <div
+      style={{
+        background: 'var(--ek-bg-soft)',
+        border: '0.5px solid var(--ek-line)',
+        borderRadius: '16px',
+        padding: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        opacity: 0.6
+      }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h3
+          style={{
+            fontFamily: 'var(--ek-font-display)',
+            fontSize: '18px',
+            fontWeight: 600,
+            margin: 0,
+            marginBottom: '4px',
+            color: 'var(--ek-ink)',
+            textDecoration: 'line-through',
+            letterSpacing: '-0.02em'
+          }}
+        >
+          {t.nombre}
+        </h3>
+        <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: 0 }}>
+          Eliminado · slug: {t.slug} · ${(t.precio_centavos / 100).toLocaleString('es-MX')} {t.moneda}
+        </p>
       </div>
+      <CardMenuDropdown
+        items={[
+          { label: restoring ? 'Recuperando…' : 'Recuperar', icon: '♻️', onClick: onRestore, disabled: restoring },
+          { label: 'Eliminar permanentemente', icon: '⚠️', onClick: onHardDelete, danger: true, divider: true }
+        ]}
+      />
     </div>
   );
 }

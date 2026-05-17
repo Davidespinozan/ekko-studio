@@ -134,8 +134,9 @@ interface VerComoLink {
 }
 
 const VER_COMO_LINKS: VerComoLink[] = [
-  { label: 'Landing', icon: '🏠', href: '/' },
-  { label: 'Signup', icon: '✍️', href: '/signup' },
+  // Signup excluido a propósito (Sprint D-Polish): admin ya lo ve en el
+  // flow normal cuando un visitante hace click en una membresía desde Landing.
+  { label: 'Landing', icon: '🏠', href: '/?demo=admin-preview' },
   { label: 'Miembro', icon: '👤', href: '/app?demo=admin-preview' },
   { label: 'Recepción', icon: '📋', href: '/recepcion?demo=admin-preview' }
 ];

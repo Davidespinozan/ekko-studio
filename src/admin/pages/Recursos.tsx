@@ -194,7 +194,14 @@ export default function Recursos() {
       >
         <div>
           <p className="ek-eyebrow">ESTUDIOS</p>
-          <h1 className="ek-h2">Recursos reservables</h1>
+          <h1 className="ek-h2">Tus espacios reservables</h1>
+          {!isLoading && (
+            <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '4px' }}>
+              {activos.length} {activos.length === 1 ? 'activo' : 'activos'}
+              {' · '}
+              {archivados.length} {archivados.length === 1 ? 'eliminado' : 'eliminados'}
+            </p>
+          )}
         </div>
         <button onClick={() => setModal({ mode: 'create' })} className="ek-cta">
           + Nuevo estudio
@@ -311,6 +318,149 @@ export default function Recursos() {
   );
 }
 
+function FotoThumb({ url, alt }: { url: string | null; alt: string }) {
+  return (
+    <div
+      style={{
+        width: '120px',
+        height: '120px',
+        flexShrink: 0,
+        background: 'var(--ek-bg-elevated)',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      {url ? (
+        <img
+          src={url}
+          alt={alt}
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+      ) : (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '4px',
+            color: 'var(--ek-ink-faint)'
+          }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+            <circle cx="12" cy="13" r="4" />
+          </svg>
+          <span style={{ fontSize: '10px', letterSpacing: '0.1em' }}>SIN FOTO</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface DropdownItem {
+  label: string;
+  icon: string;
+  onClick: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  divider?: boolean;
+}
+
+function CardMenuDropdown({ items }: { items: DropdownItem[] }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+        className="ek-icon-btn"
+        aria-label="Acciones"
+        style={{ width: '32px', height: '32px', padding: 0, fontSize: '18px', lineHeight: 1 }}
+      >
+        ⋯
+      </button>
+      {open && (
+        <>
+          <div
+            onClick={() => setOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+            aria-hidden="true"
+          />
+          <div
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 4px)',
+              right: 0,
+              minWidth: '220px',
+              background: 'var(--ek-bg-soft)',
+              border: '0.5px solid var(--ek-line)',
+              borderRadius: '12px',
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
+              padding: '6px',
+              zIndex: 50,
+              animation: 'ek-fade-in 0.12s ease'
+            }}
+            role="menu"
+          >
+            {items.map((item, idx) => (
+              <div key={`${item.label}-${idx}`}>
+                {item.divider && (
+                  <div
+                    style={{
+                      height: '0.5px',
+                      background: 'var(--ek-line)',
+                      margin: '4px 0'
+                    }}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    if (!item.disabled) item.onClick();
+                  }}
+                  disabled={item.disabled}
+                  role="menuitem"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    width: '100%',
+                    padding: '8px 12px',
+                    background: 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    color: item.danger ? 'var(--ek-danger)' : 'var(--ek-ink)',
+                    fontSize: '13px',
+                    fontFamily: 'inherit',
+                    textAlign: 'left',
+                    cursor: item.disabled ? 'not-allowed' : 'pointer',
+                    opacity: item.disabled ? 0.5 : 1
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!item.disabled) e.currentTarget.style.background = 'var(--ek-bg-elevated)';
+                  }}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <span aria-hidden="true">{item.icon}</span>
+                  {item.label}
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function RecursoRow({
   recurso: r,
   onEdit,
@@ -324,65 +474,90 @@ function RecursoRow({
   onArchive: () => void;
   duplicating: boolean;
 }) {
+  const equipo = (r.equipo_incluido ?? []).slice(0, 3).join(', ');
+  const equipoMas = (r.equipo_incluido?.length ?? 0) > 3 ? '…' : '';
+  const contenido = (r.tipo_contenido ?? []).join(' / ');
+
   return (
-    <div className="ek-card">
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: '1rem'
-        }}
-      >
-        <div style={{ flex: 1 }}>
-          <h3 className="ek-h3">{r.nombre}</h3>
-          <p style={{ fontSize: '0.875rem', color: 'var(--ek-ink-muted)' }}>
-            Cupos: {r.cupos}
-            {r.capacidad_personas ? ` · Capacidad: ${r.capacidad_personas}` : ''}
+    <div
+      onClick={onEdit}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onEdit();
+        }
+      }}
+      style={{
+        background: 'var(--ek-bg-soft)',
+        border: '0.5px solid var(--ek-line)',
+        borderRadius: '16px',
+        padding: '14px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        cursor: 'pointer',
+        transition: 'background 0.18s ease, border-color 0.18s ease'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'var(--ek-mustard-soft)';
+        e.currentTarget.style.borderColor = 'var(--ek-mustard-dim)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'var(--ek-bg-soft)';
+        e.currentTarget.style.borderColor = 'var(--ek-line)';
+      }}
+    >
+      <FotoThumb url={r.foto_url} alt={r.nombre} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h3
+          style={{
+            fontFamily: 'var(--ek-font-display)',
+            fontSize: '18px',
+            fontWeight: 600,
+            margin: 0,
+            marginBottom: '4px',
+            color: 'var(--ek-ink)',
+            letterSpacing: '-0.02em'
+          }}
+        >
+          {r.nombre}
+        </h3>
+        {contenido && (
+          <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '2px' }}>
+            {contenido}
           </p>
+        )}
+        <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '2px' }}>
+          Capacidad: {r.capacidad_personas ?? '—'}
+          {r.capacidad_personas ? ' personas' : ''}
+        </p>
+        <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '2px' }}>
+          Plan: {r.tiers_permitidos.join(', ') || '—'}
+        </p>
+        {equipo && (
           <p
             style={{
-              fontSize: '0.8125rem',
-              color: 'var(--ek-ink-muted)',
-              marginTop: '0.25rem'
+              fontSize: '12px',
+              color: 'var(--ek-ink-faint)',
+              margin: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap'
             }}
           >
-            Planes con acceso: {r.tiers_permitidos.join(', ') || '—'}
+            {equipo}{equipoMas}
           </p>
-          <p
-            style={{
-              fontSize: '0.8125rem',
-              color: 'var(--ek-ink-muted)',
-              marginTop: '0.25rem'
-            }}
-          >
-            Horarios:{' '}
-            {Array.isArray(r.horarios)
-              ? `${(r.horarios as unknown[]).length} bloques`
-              : '—'}
-          </p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '120px' }}>
-          <button onClick={onEdit} className="ek-icon-btn" style={{ width: '100%', padding: '8px 12px', fontSize: '12px' }}>
-            ✏️ Editar
-          </button>
-          <button
-            onClick={onDuplicate}
-            disabled={duplicating}
-            className="ek-icon-btn"
-            style={{ width: '100%', padding: '8px 12px', fontSize: '12px' }}
-          >
-            {duplicating ? 'Duplicando…' : '📋 Duplicar'}
-          </button>
-          <button
-            onClick={onArchive}
-            className="ek-icon-btn"
-            style={{ width: '100%', padding: '8px 12px', fontSize: '12px', color: 'var(--ek-danger)' }}
-          >
-            🗑 Eliminar
-          </button>
-        </div>
+        )}
       </div>
+      <CardMenuDropdown
+        items={[
+          { label: 'Editar', icon: '✏️', onClick: onEdit },
+          { label: duplicating ? 'Duplicando…' : 'Duplicar', icon: '📋', onClick: onDuplicate, disabled: duplicating },
+          { label: 'Eliminar', icon: '🗑', onClick: onArchive, danger: true, divider: true }
+        ]}
+      />
     </div>
   );
 }
@@ -399,39 +574,44 @@ function RecursoArchivedRow({
   restoring: boolean;
 }) {
   return (
-    <div className="ek-card">
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          gap: '1rem'
-        }}
-      >
-        <div>
-          <h3 className="ek-h3" style={{ textDecoration: 'line-through' }}>{r.nombre}</h3>
-          <p style={{ fontSize: '0.75rem', color: 'var(--ek-ink-faint)' }}>
-            Eliminado · slug: {r.slug}
-          </p>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <button
-            onClick={onRestore}
-            disabled={restoring}
-            className="ek-icon-btn"
-            style={{ padding: '8px 14px', fontSize: '12px' }}
-          >
-            {restoring ? 'Recuperando…' : '♻️ Recuperar'}
-          </button>
-          <button
-            onClick={onHardDelete}
-            className="ek-icon-btn"
-            style={{ padding: '8px 14px', fontSize: '11px', color: 'var(--ek-danger)' }}
-          >
-            ⚠️ Eliminar permanente
-          </button>
-        </div>
+    <div
+      style={{
+        background: 'var(--ek-bg-soft)',
+        border: '0.5px solid var(--ek-line)',
+        borderRadius: '16px',
+        padding: '14px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '16px',
+        opacity: 0.6
+      }}
+    >
+      <FotoThumb url={r.foto_url} alt={r.nombre} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <h3
+          style={{
+            fontFamily: 'var(--ek-font-display)',
+            fontSize: '17px',
+            fontWeight: 600,
+            margin: 0,
+            marginBottom: '4px',
+            color: 'var(--ek-ink)',
+            textDecoration: 'line-through',
+            letterSpacing: '-0.02em'
+          }}
+        >
+          {r.nombre}
+        </h3>
+        <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: 0 }}>
+          Eliminado · slug: {r.slug}
+        </p>
       </div>
+      <CardMenuDropdown
+        items={[
+          { label: restoring ? 'Recuperando…' : 'Recuperar', icon: '♻️', onClick: onRestore, disabled: restoring },
+          { label: 'Eliminar permanentemente', icon: '⚠️', onClick: onHardDelete, danger: true, divider: true }
+        ]}
+      />
     </div>
   );
 }
