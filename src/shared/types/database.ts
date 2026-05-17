@@ -645,52 +645,16 @@ export type Database = {
       is_recepcionista: { Args: never; Returns: boolean }
       marcar_no_shows: { Args: never; Returns: Json }
       max_invitados_por_tier: { Args: { p_tier: string }; Returns: number }
-      reservar_recurso_atomic:
-        | {
-            Args: {
-              p_duracion_min: number
-              p_invitados?: number
-              p_notas?: string
-              p_recurso_id: string
-              p_slot_inicio: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_invitados_count?: number
-              p_notas?: string
-              p_recurso_id: string
-              p_slot_inicio: string
-            }
-            Returns: {
-              cancelada_at: string | null
-              cancelada_motivo: string | null
-              check_in_at: string | null
-              check_in_by: string | null
-              check_in_method: string | null
-              created_at: string
-              duracion_min: number
-              folio: string
-              id: string
-              invitados_count: number
-              notas: string | null
-              qr_token_hash: string | null
-              recurso_id: string
-              slot_fin: string
-              slot_inicio: string
-              status: string
-              tenant_id: string
-              updated_at: string
-              usuario_id: string
-            }
-            SetofOptions: {
-              from: "*"
-              to: "reservas"
-              isOneToOne: true
-              isSetofReturn: false
-            }
-          }
+      reservar_recurso_atomic: {
+        Args: {
+          p_duracion_min: number
+          p_invitados?: number
+          p_notas?: string
+          p_recurso_id: string
+          p_slot_inicio: string
+        }
+        Returns: Json
+      }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }

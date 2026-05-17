@@ -31,6 +31,12 @@
 --   - Folio = 'EKK-' || count(*)+1 padded
 -- ============================================================================
 
+-- Eliminar la firma legacy de 4 parámetros (uuid, timestamptz, integer, text)
+-- que viene de la migración 100900. El frontend solo llama a la 5-param
+-- (ver src/member/hooks/useReservas.ts) y la 4-param quedó como overload
+-- huérfano que generaba ambigüedad en COMMENT ON FUNCTION.
+DROP FUNCTION IF EXISTS reservar_recurso_atomic(uuid, timestamptz, integer, text);
+
 CREATE OR REPLACE FUNCTION reservar_recurso_atomic(
   p_recurso_id uuid,
   p_slot_inicio timestamptz,
@@ -227,7 +233,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION reservar_recurso_atomic IS
+COMMENT ON FUNCTION reservar_recurso_atomic(uuid, timestamptz, integer, integer, text) IS
 'Crea una reserva atómica validando status/bloqueo del usuario, anticipación
 mínima (config.reserva.anticipacion_min_horas con fallback a clave plana y
 default 24h), tier permitido, max_invitados (tiers.reglas.max_invitados con
@@ -293,7 +299,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION marcar_no_shows IS
+COMMENT ON FUNCTION marcar_no_shows() IS
 'Marca como no_show las reservas confirmadas cuyo slot_fin+30min ya pasó sin
 check-in, e incrementa no_shows_count + bloqueado_hasta del usuario por la
 cantidad de días definida en tenant.config.penalizaciones.no_show_bloqueo_dias
