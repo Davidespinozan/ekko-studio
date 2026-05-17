@@ -69,13 +69,11 @@ function readLanding(config: Record<string, unknown> | null): LandingDraft {
 function PageHeader({
   title,
   subtitle,
-  dirty,
-  onVerLanding
+  dirty
 }: {
   title: string;
   subtitle: string;
   dirty: boolean;
-  onVerLanding: () => void;
 }) {
   return (
     <div style={{ marginBottom: '24px' }}>
@@ -105,26 +103,16 @@ function PageHeader({
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--ek-ink-muted)', margin: 0 }}>{subtitle}</p>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span
-            style={{
-              fontSize: '11px',
-              color: dirty ? 'var(--ek-mustard)' : 'var(--ek-ink-faint)',
-              fontWeight: 600,
-              letterSpacing: '0.08em'
-            }}
-          >
-            {dirty ? 'CAMBIOS SIN GUARDAR' : 'SIN CAMBIOS'}
-          </span>
-          <button
-            type="button"
-            onClick={onVerLanding}
-            className="ek-icon-btn"
-            style={{ width: 'auto', padding: '8px 14px', fontSize: '12px' }}
-          >
-            Ver landing ↗
-          </button>
-        </div>
+        <span
+          style={{
+            fontSize: '11px',
+            color: dirty ? 'var(--ek-mustard)' : 'var(--ek-ink-faint)',
+            fontWeight: 600,
+            letterSpacing: '0.08em'
+          }}
+        >
+          {dirty ? 'CAMBIOS SIN GUARDAR' : 'SIN CAMBIOS'}
+        </span>
       </div>
     </div>
   );
@@ -233,7 +221,6 @@ export default function AjustesLanding() {
         title="Landing"
         subtitle="Edita el contenido que ven los visitantes en tu página pública."
         dirty={dirty}
-        onVerLanding={() => window.open('/', '_blank', 'noopener,noreferrer')}
       />
 
       <Section title="HERO" description="La primera impresión cuando alguien visita tu landing.">
