@@ -24,6 +24,7 @@ export default function EstudioDetalle() {
         .select('*')
         .eq('tenant_id', tenant.id)
         .eq('slug', slug!)
+        .eq('activo', true)
         .maybeSingle();
 
       if (!mounted) return;

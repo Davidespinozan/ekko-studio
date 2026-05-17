@@ -243,7 +243,7 @@ export function useAdminMetrics() {
           .lt('slot_inicio', inicioHoy.toISOString()),
         supabase
           .from('reservas')
-          .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios(id, nombre, email, membresia_tier)')
+          .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)')
           .eq('tenant_id', tenant.id)
           .eq('status', 'confirmada')
           .gte('slot_inicio', now.toISOString())
@@ -293,7 +293,7 @@ export function useReservasRango(fechaInicio: Date, fechaFin: Date) {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('reservas')
-      .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios(id, nombre, email)')
+      .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)')
       .eq('tenant_id', tenant.id)
       .gte('slot_inicio', new Date(inicioMs).toISOString())
       .lt('slot_inicio', new Date(finMs).toISOString())

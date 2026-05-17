@@ -1,5 +1,5 @@
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { BottomNav } from './components/BottomNav';
@@ -12,12 +12,39 @@ const MiQR = lazy(() => import('./pages/MiQR'));
 const Estudios = lazy(() => import('./pages/Estudios'));
 const EstudioDetalle = lazy(() => import('./pages/EstudioDetalle'));
 
+function mensajeStatus(status: string): string {
+  if (status === 'suspendido')
+    return 'Tu cuenta ha sido suspendida. Contacta al administrador para más información.';
+  if (status === 'cancelado') return 'Tu cuenta ha sido cancelada.';
+  if (status === 'pendiente_onboarding')
+    return 'Tu cuenta aún no completa el onboarding. Contacta al administrador.';
+  if (status === 'pendiente_pago')
+    return 'Tu cuenta está pendiente de pago. Contacta al administrador.';
+  return 'Tu cuenta no está activa. Contacta al administrador.';
+}
+
 export default function MemberLayout() {
-  const { authUser, isLoading } = useAuth();
+  const { authUser, usuario, isLoading, signOut } = useAuth();
   const location = useLocation();
+  const yaCerrado = useRef(false);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!authUser || !usuario) return;
+    if (usuario.status === 'activo') return;
+    if (yaCerrado.current) return;
+    yaCerrado.current = true;
+
+    alert(mensajeStatus(usuario.status));
+    // signOut limpia la sesión; el Navigate de abajo redirige a /login
+    void signOut();
+  }, [authUser, usuario, isLoading, signOut]);
 
   if (isLoading) return <LoadingScreen />;
   if (!authUser) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (usuario && usuario.status !== 'activo') {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
 
   return (
     <div className="ek-page" style={{ paddingBottom: '88px' /* espacio para bottom nav */ }}>
