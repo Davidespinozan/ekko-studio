@@ -1,6 +1,31 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
+
+const SIDEBAR_COLLAPSED_KEY = 'ekko-admin-sidebar-collapsed';
+const VER_COMO_LABEL = 'VER COMO…';
+
+function readCollapsed(): Set<string> {
+  if (typeof localStorage === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeCollapsed(s: Set<string>) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, JSON.stringify(Array.from(s)));
+  } catch {
+    // ignore quota / private mode errors
+  }
+}
 
 interface NavItem {
   to: string;
@@ -166,6 +191,40 @@ export function Sidebar({ onNavigate }: Props = {}) {
   const { usuario, signOut } = useAuth();
   const tenant = useTenant();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => readCollapsed());
+
+  const toggleSection = (label: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      writeCollapsed(next);
+      return next;
+    });
+  };
+
+  // Auto-expandir la sección que contiene la ruta activa, para que el item
+  // current siempre sea visible aunque el admin haya colapsado todo.
+  useEffect(() => {
+    const activeSection = SECTIONS.find((s) =>
+      s.items.some(
+        (item) =>
+          item.to === '/admin'
+            ? location.pathname === '/admin'
+            : location.pathname.startsWith(item.to)
+      )
+    );
+    if (activeSection && collapsed.has(activeSection.label)) {
+      setCollapsed((prev) => {
+        const next = new Set(prev);
+        next.delete(activeSection.label);
+        writeCollapsed(next);
+        return next;
+      });
+    }
+  }, [location.pathname, collapsed]);
 
   const branding = (tenant.branding ?? {}) as Record<string, unknown>;
   const logoUrl =
@@ -228,61 +287,74 @@ export function Sidebar({ onNavigate }: Props = {}) {
       </div>
 
       <nav className="adm-sidebar-nav">
-        {SECTIONS.map((section) => (
-          <div key={section.label} className="adm-sidebar-section">
-            <p className="ek-eyebrow adm-sidebar-section-label">{section.label}</p>
-            {section.items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/admin'}
-                onClick={onNavigate}
-                className={({ isActive }) =>
-                  `adm-sidebar-item ${isActive ? 'adm-sidebar-item--active' : ''}`
-                }
-              >
-                <span className="adm-sidebar-item-icon">{item.icon}</span>
-                <span style={{ flex: 1 }}>{item.label}</span>
-                {item.badge && (
-                  <span
-                    style={{
-                      fontSize: '8px',
-                      letterSpacing: '0.1em',
-                      color: 'var(--ek-ink-faint)',
-                      fontWeight: 700,
-                      whiteSpace: 'nowrap'
-                    }}
+        {SECTIONS.map((section) => {
+          const isCollapsed = collapsed.has(section.label);
+          return (
+            <div key={section.label} className="adm-sidebar-section">
+              <SectionToggle
+                label={section.label}
+                collapsed={isCollapsed}
+                onToggle={() => toggleSection(section.label)}
+              />
+              {!isCollapsed &&
+                section.items.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === '/admin'}
+                    onClick={onNavigate}
+                    className={({ isActive }) =>
+                      `adm-sidebar-item ${isActive ? 'adm-sidebar-item--active' : ''}`
+                    }
                   >
-                    {item.badge}
-                  </span>
-                )}
-              </NavLink>
-            ))}
-          </div>
-        ))}
+                    <span className="adm-sidebar-item-icon">{item.icon}</span>
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                    {item.badge && (
+                      <span
+                        style={{
+                          fontSize: '8px',
+                          letterSpacing: '0.1em',
+                          color: 'var(--ek-ink-faint)',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </NavLink>
+                ))}
+            </div>
+          );
+        })}
 
         <div className="adm-sidebar-section">
-          <p className="ek-eyebrow adm-sidebar-section-label">VER COMO…</p>
-          {VER_COMO_LINKS.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Abre en nueva pestaña"
-              className="adm-sidebar-item"
-              style={{
-                border: '0.5px solid var(--ek-line)',
-                marginTop: '4px'
-              }}
-            >
-              <span className="adm-sidebar-item-icon" aria-hidden="true">
-                {link.icon}
-              </span>
-              <span style={{ flex: 1 }}>{link.label}</span>
-              <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)' }}>↗</span>
-            </a>
-          ))}
+          <SectionToggle
+            label={VER_COMO_LABEL}
+            collapsed={collapsed.has(VER_COMO_LABEL)}
+            onToggle={() => toggleSection(VER_COMO_LABEL)}
+          />
+          {!collapsed.has(VER_COMO_LABEL) &&
+            VER_COMO_LINKS.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Abre en nueva pestaña"
+                className="adm-sidebar-item"
+                style={{
+                  border: '0.5px solid var(--ek-line)',
+                  marginTop: '4px'
+                }}
+              >
+                <span className="adm-sidebar-item-icon" aria-hidden="true">
+                  {link.icon}
+                </span>
+                <span style={{ flex: 1 }}>{link.label}</span>
+                <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)' }}>↗</span>
+              </a>
+            ))}
         </div>
       </nav>
 
@@ -321,5 +393,51 @@ export function Sidebar({ onNavigate }: Props = {}) {
         </button>
       </div>
     </aside>
+  );
+}
+
+function SectionToggle({
+  label,
+  collapsed,
+  onToggle
+}: {
+  label: string;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={!collapsed}
+      className="ek-eyebrow adm-sidebar-section-label"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '8px',
+        width: '100%',
+        padding: '8px 8px 6px',
+        background: 'transparent',
+        border: 'none',
+        color: 'var(--ek-ink-faint)',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        textAlign: 'left'
+      }}
+    >
+      <span>{label}</span>
+      <span
+        aria-hidden="true"
+        style={{
+          fontSize: '10px',
+          transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
+          transition: 'transform 0.18s ease',
+          color: 'var(--ek-ink-faint)'
+        }}
+      >
+        ▾
+      </span>
+    </button>
   );
 }
