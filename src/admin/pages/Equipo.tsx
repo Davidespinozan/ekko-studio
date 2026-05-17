@@ -6,7 +6,8 @@ import { useToast } from '@shared/hooks/useToast';
 import { canModifyTeamMember, revokeTeamMember } from '../lib/crudHelpers';
 import CardMenuDropdown from '../components/CardMenuDropdown';
 import ConfirmDialog from '../components/ConfirmDialog';
-import InvitarPersonaModal from '../components/InvitarPersonaModal';
+import CrearAccesoModal, { type CredencialesCreadas } from '../components/CrearAccesoModal';
+import CredencialesCreadasModal from '../components/CredencialesCreadasModal';
 import CambiarRolModal from '../components/CambiarRolModal';
 import type { Database } from '@shared/types/database';
 
@@ -38,7 +39,8 @@ export default function Equipo() {
 
   const [staff, setStaff] = useState<Usuario[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showInvitar, setShowInvitar] = useState(false);
+  const [showCrearAcceso, setShowCrearAcceso] = useState(false);
+  const [credencialesCreadas, setCredencialesCreadas] = useState<CredencialesCreadas | null>(null);
   const [cambioRol, setCambioRol] = useState<{ usuario: Usuario; rol: RolStaff } | null>(null);
   const [revoke, setRevoke] = useState<RevokeState>(null);
 
@@ -67,22 +69,16 @@ export default function Equipo() {
     void refetch();
   }, [refetch]);
 
-  const { admins, recepcionistas, pendientes } = useMemo(() => {
+  const { admins, recepcionistas } = useMemo(() => {
     const admins: Usuario[] = [];
     const recepcionistas: Usuario[] = [];
-    const pendientes: Usuario[] = [];
 
     staff.forEach((u) => {
-      if (u.invitado) {
-        pendientes.push(u);
-      } else if (u.rol === 'admin') {
-        admins.push(u);
-      } else if (u.rol === 'recepcionista') {
-        recepcionistas.push(u);
-      }
+      if (u.rol === 'admin') admins.push(u);
+      else if (u.rol === 'recepcionista') recepcionistas.push(u);
     });
 
-    return { admins, recepcionistas, pendientes };
+    return { admins, recepcionistas };
   }, [staff]);
 
   const conAcceso = admins.length + recepcionistas.length;
@@ -116,16 +112,6 @@ export default function Equipo() {
     await refetch();
   }
 
-  async function cancelarInvitacion(u: Usuario) {
-    const { error } = await supabase.from('usuarios').delete().eq('id', u.id);
-    if (error) {
-      toast.error(`No se pudo cancelar: ${error.message}`);
-      return;
-    }
-    toast.success('Invitación cancelada.');
-    await refetch();
-  }
-
   return (
     <div className="adm-page">
       <div
@@ -137,13 +123,12 @@ export default function Equipo() {
           <h1 className="ek-h2">Personas con acceso a EKKO admin</h1>
           {!isLoading && (
             <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '4px' }}>
-              {conAcceso} {conAcceso === 1 ? 'con acceso' : 'con acceso'}
-              {pendientes.length > 0 && ` · ${pendientes.length} pendiente${pendientes.length === 1 ? '' : 's'}`}
+              {conAcceso} {conAcceso === 1 ? 'persona con acceso' : 'personas con acceso'}
             </p>
           )}
         </div>
-        <button onClick={() => setShowInvitar(true)} className="ek-cta">
-          + Invitar persona
+        <button onClick={() => setShowCrearAcceso(true)} className="ek-cta">
+          + Crear acceso
         </button>
       </div>
 
@@ -179,35 +164,29 @@ export default function Equipo() {
             </Section>
           )}
 
-          {pendientes.length > 0 && (
-            <Section title="PENDIENTES DE ACEPTAR INVITACIÓN">
-              {pendientes.map((u) => (
-                <PendienteCard
-                  key={u.id}
-                  usuario={u}
-                  onReenviar={() =>
-                    toast.info('El envío real de email se implementa en Sprint Stripe.')
-                  }
-                  onCancelar={() => cancelarInvitacion(u)}
-                />
-              ))}
-            </Section>
-          )}
-
-          {admins.length === 0 && recepcionistas.length === 0 && pendientes.length === 0 && (
+          {admins.length === 0 && recepcionistas.length === 0 && (
             <p className="ek-body-faint" style={{ padding: '20px 0' }}>
-              Sin personas con acceso todavía. Click en &quot;+ Invitar persona&quot; para empezar.
+              Sin personas con acceso todavía. Click en &quot;+ Crear acceso&quot; para empezar.
             </p>
           )}
         </div>
       )}
 
-      {showInvitar && (
-        <InvitarPersonaModal
-          onClose={() => setShowInvitar(false)}
-          onCreated={async () => {
+      {showCrearAcceso && (
+        <CrearAccesoModal
+          onClose={() => setShowCrearAcceso(false)}
+          onSuccess={async (cred) => {
+            setCredencialesCreadas(cred);
             await refetch();
           }}
+        />
+      )}
+
+      {credencialesCreadas && (
+        <CredencialesCreadasModal
+          isOpen={true}
+          credenciales={credencialesCreadas}
+          onClose={() => setCredencialesCreadas(null)}
         />
       )}
 
@@ -332,56 +311,3 @@ function PersonaCard({
   );
 }
 
-function PendienteCard({
-  usuario: u,
-  onReenviar,
-  onCancelar
-}: {
-  usuario: Usuario;
-  onReenviar: () => void;
-  onCancelar: () => void;
-}) {
-  const nombre = capitalizar(u.nombre) || u.email;
-  return (
-    <div
-      style={{
-        background: 'var(--ek-bg-soft)',
-        border: '0.5px solid var(--ek-line)',
-        borderRadius: '16px',
-        padding: '16px 18px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        opacity: 0.7
-      }}
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <h3
-          style={{
-            fontFamily: 'var(--ek-font-display)',
-            fontSize: '17px',
-            fontWeight: 600,
-            margin: 0,
-            marginBottom: '2px',
-            color: 'var(--ek-ink)',
-            letterSpacing: '-0.02em'
-          }}
-        >
-          {nombre}
-        </h3>
-        <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '2px' }}>
-          {u.email}
-        </p>
-        <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: 0 }}>
-          Invitado como {rolLabel(u.rol)}
-        </p>
-      </div>
-      <CardMenuDropdown
-        items={[
-          { label: 'Reenviar invitación', icon: '✉️', onClick: onReenviar },
-          { label: 'Cancelar invitación', icon: '❌', onClick: onCancelar, danger: true, divider: true }
-        ]}
-      />
-    </div>
-  );
-}

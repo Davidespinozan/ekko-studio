@@ -101,10 +101,20 @@ VALUES (
 >
 > **Nota** (post Sprint Equipo): `/admin/miembros` muestra SOLO
 > clientes (`rol='miembro'`). Staff (admins + recepcionistas) se
-> gestiona en `/admin/equipo` con "+ Invitar persona". El primer
-> admin de cada tenant nuevo se crea manualmente vía SQL (Paso 6
-> abajo); una vez logueado, puede invitar al resto del equipo desde
-> la UI sin tocar BD.
+> gestiona en `/admin/equipo`.
+>
+> **Nota** (post Sprint Fix Equipo): el botón es "+ Crear acceso"
+> (antes "+ Invitar persona"). El admin escribe nombre + email +
+> contraseña temporal + rol. La Edge Function
+> `create-team-member` (deployada en Supabase) crea el auth user
+> con esa contraseña + inserta el row en `usuarios` con
+> `status='activo'`. Tras crear, aparece un modal con las
+> credenciales y un botón "Copiar" — admin comparte por WhatsApp.
+> No hay envío automático de email (pendiente Sprint Resend).
+>
+> Para el PRIMER admin de un tenant nuevo (que no tiene admin
+> existente para usar el flow del UI), seguir el Paso 6 abajo:
+> crear auth user en Supabase Dashboard + insertar row manualmente.
 
 ## Paso 2: Crear tiers (membresías)
 

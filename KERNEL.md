@@ -366,18 +366,33 @@ El admin de EKKO separa dos tipos de usuarios:
    auditoría e historial de acciones. La persona no puede loguear pero
    su row queda en BD.
 
-### Patrón "Invitar"
-- Crear row con `invitado=true`, `status='pendiente_onboarding'`,
-  `auth_id=null`.
-- UI muestra "Pendiente de aceptar invitación" hasta que la persona
-  complete signup (vinculará su `auth_id`).
-- Email real: pendiente Sprint Stripe + Resend.
+### Patrón "Crear acceso" (Sprint Fix Equipo)
+- Admin crea usuario del equipo con email + password directos.
+- Edge Function `create-team-member` (deployada en Supabase) usa
+  `service_role` para crear el auth user + insertar en `usuarios`
+  con `auth_id` real y `status='activo'`.
+- Admin recibe modal de confirmación (`CredencialesCreadasModal`)
+  con las credenciales formateadas y botón "Copiar".
+- Comparte credenciales manualmente (WhatsApp, llamada).
+- Si la persona pierde la password: "Olvidé mi contraseña" desde
+  `/login` (flow nativo de Supabase Auth).
+
+### Por qué NO email automático (todavía)
+- Email automático requiere infra adicional (Resend o similar).
+- Templates branded requieren Sprint Marca con logo.
+- Realidad operativa de SMBs LATAM: admins prefieren WhatsApp.
+- Si en el futuro se necesita email automático, agregar como
+  opción adicional sin romper este flow simple.
 
 ### Estados del usuario del equipo
-- `pendiente_onboarding` + `invitado=true`: invitado, no completó signup
-- `activo` + `invitado=false`: trabajando normalmente
-- `revocado`: ya no puede loguear, datos preservados
-- `suspendido`: temporal (futuro, no implementado aún)
+- `activo` + `invitado=false`: trabajando normalmente (default
+  post Sprint Fix Equipo).
+- `revocado`: ya no puede loguear, datos preservados.
+- `suspendido`: temporal (futuro, no implementado aún).
+- `pendiente_onboarding` + `invitado=true`: **LEGACY** del Sprint
+  Equipo original. Ya no se crea con este estado; queda la columna
+  en BD por compatibilidad y para reuso futuro (email automático
+  opt-in).
 
 ### Roles soportados (Sprint Equipo)
 - `admin`: acceso total
