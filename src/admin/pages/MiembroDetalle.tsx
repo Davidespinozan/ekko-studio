@@ -1,6 +1,6 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useMemo } from 'react';
-import { useMiembroDetalle, updateMiembro, adminUpdateRole } from '../hooks/useAdminData';
+import { useState, useEffect } from 'react';
+import { useMiembroDetalle, updateMiembro, adminUpdateRole, adminDeleteUser } from '../hooks/useAdminData';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { formatHora } from '@member/logic/reservaLogic';
@@ -21,15 +21,7 @@ export default function MiembroDetalle() {
   const [eliminarOpen, setEliminarOpen] = useState(false);
   const [eliminando, setEliminando] = useState(false);
 
-  const reservasFuturasConfirmadas = useMemo(
-    () =>
-      reservas.filter(
-        (r) =>
-          r.status === 'confirmada' &&
-          new Date(r.slot_inicio).getTime() > Date.now()
-      ).length,
-    [reservas]
-  );
+  const totalReservas = reservas.length;
 
   useEffect(() => {
     if (miembro) {
@@ -58,16 +50,13 @@ export default function MiembroDetalle() {
   async function handleEliminar() {
     if (!miembro) return;
     setEliminando(true);
-    const { error: err } = await supabase
-      .from('usuarios')
-      .update({ status: 'cancelado' } as never)
-      .eq('id', miembro.id);
+    const { error: err } = await adminDeleteUser({ usuario_id: miembro.id });
     setEliminando(false);
     if (err) {
-      toast.error(`No se pudo eliminar: ${err.message}`);
+      toast.error(err.error || 'No se pudo eliminar el miembro');
       return;
     }
-    toast.success(`${miembro.nombre ?? miembro.email} fue dado de baja.`);
+    toast.success(`${miembro.nombre ?? miembro.email} fue eliminado.`);
     setEliminarOpen(false);
     navigate('/admin/miembros');
   }
@@ -185,16 +174,17 @@ export default function MiembroDetalle() {
         </p>
         <h2 className="ek-h3">Eliminar miembro</h2>
         <p className="adm-body" style={{ marginBottom: '12px' }}>
-          Da de baja al miembro (status <code style={{ fontFamily: 'var(--ek-font-mono)' }}>cancelado</code>).
-          No podrá iniciar sesión. Sus datos y reservas históricas quedan en BD para auditoría.
-          {reservasFuturasConfirmadas > 0 && (
+          <strong>Hard delete</strong>: borra la cuenta de Auth y los datos del miembro de la BD.
+          Libera el email para que pueda volver a ser invitado.
+          Acción <strong style={{ color: 'var(--ek-danger)' }}>irreversible</strong>.
+          {totalReservas > 0 && (
             <>
               {' '}
               <strong style={{ color: 'var(--ek-danger)' }}>
-                Tiene {reservasFuturasConfirmadas}{' '}
-                {reservasFuturasConfirmadas === 1 ? 'reserva futura confirmada' : 'reservas futuras confirmadas'}
-              </strong>{' '}
-              — cancelalas manualmente antes o quedarán pendientes.
+                Tiene {totalReservas} {totalReservas === 1 ? 'reserva en historial' : 'reservas en historial'}
+              </strong>
+              {' '}— el sistema bloqueará la eliminación para preservar auditoría.
+              Cambiá el status a <code style={{ fontFamily: 'var(--ek-font-mono)' }}>cancelado</code> si solo querés darlo de baja.
             </>
           )}
         </p>
@@ -207,19 +197,15 @@ export default function MiembroDetalle() {
             border: '0.5px solid var(--ek-danger)'
           }}
         >
-          Eliminar miembro
+          Eliminar definitivamente
         </button>
       </section>
 
       <ConfirmDialog
         isOpen={eliminarOpen}
         title={`¿Eliminar a ${miembro.nombre ?? miembro.email}?`}
-        description={
-          reservasFuturasConfirmadas > 0
-            ? `Esta acción marca al miembro como cancelado y le impide iniciar sesión. Tiene ${reservasFuturasConfirmadas} ${reservasFuturasConfirmadas === 1 ? 'reserva futura confirmada' : 'reservas futuras confirmadas'} — esas reservas no se cancelan automáticamente. Escribí ELIMINAR para confirmar.`
-            : 'Esta acción marca al miembro como cancelado y le impide iniciar sesión. Los datos quedan en BD para auditoría. Escribí ELIMINAR para confirmar.'
-        }
-        confirmLabel={eliminando ? 'Eliminando…' : 'Eliminar miembro'}
+        description={`Esta acción borra la cuenta de Auth y todos los datos del miembro de la BD (notificaciones, membresías). El email queda libre para volver a invitarse. ${totalReservas > 0 ? `⚠️ Tiene ${totalReservas} ${totalReservas === 1 ? 'reserva' : 'reservas'} en historial — el backend va a bloquear la operación. ` : ''}Escribí ELIMINAR para confirmar.`}
+        confirmLabel={eliminando ? 'Eliminando…' : 'Eliminar definitivamente'}
         variant="danger"
         requireTypedConfirmation="ELIMINAR"
         onConfirm={handleEliminar}

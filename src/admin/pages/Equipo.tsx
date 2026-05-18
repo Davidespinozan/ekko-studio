@@ -4,6 +4,7 @@ import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
 import { canModifyTeamMember, revokeTeamMember } from '../lib/crudHelpers';
+import { adminDeleteUser } from '../hooks/useAdminData';
 import CardMenuDropdown from '../components/CardMenuDropdown';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CrearAccesoModal, { type CredencialesCreadas } from '../components/CrearAccesoModal';
@@ -43,6 +44,7 @@ export default function Equipo() {
   const [credencialesCreadas, setCredencialesCreadas] = useState<CredencialesCreadas | null>(null);
   const [cambioRol, setCambioRol] = useState<{ usuario: Usuario; rol: RolStaff } | null>(null);
   const [revoke, setRevoke] = useState<RevokeState>(null);
+  const [hardDelete, setHardDelete] = useState<Usuario | null>(null);
 
   const refetch = useCallback(async () => {
     setIsLoading(true);
@@ -112,6 +114,18 @@ export default function Equipo() {
     await refetch();
   }
 
+  async function handleHardDelete() {
+    if (!hardDelete) return;
+    const { error } = await adminDeleteUser({ usuario_id: hardDelete.id });
+    if (error) {
+      toast.error(error.error || 'No se pudo eliminar');
+      return;
+    }
+    toast.success(`${capitalizar(hardDelete.nombre) || hardDelete.email} fue eliminado.`);
+    setHardDelete(null);
+    await refetch();
+  }
+
   return (
     <div className="adm-page">
       <div
@@ -145,6 +159,7 @@ export default function Equipo() {
                   currentUserId={currentUser?.id}
                   onCambiarRol={() => setCambioRol({ usuario: u, rol: 'admin' })}
                   onRevoke={() => startRevoke(u)}
+                  onHardDelete={() => setHardDelete(u)}
                 />
               ))}
             </Section>
@@ -159,6 +174,7 @@ export default function Equipo() {
                   currentUserId={currentUser?.id}
                   onCambiarRol={() => setCambioRol({ usuario: u, rol: 'recepcionista' })}
                   onRevoke={() => startRevoke(u)}
+                  onHardDelete={() => setHardDelete(u)}
                 />
               ))}
             </Section>
@@ -219,6 +235,17 @@ export default function Equipo() {
         onConfirm={handleRevoke}
         onCancel={() => setRevoke(null)}
       />
+
+      <ConfirmDialog
+        isOpen={hardDelete !== null}
+        title={hardDelete ? `¿Eliminar definitivamente a ${capitalizar(hardDelete.nombre) || hardDelete.email}?` : ''}
+        description="Hard delete: borra la cuenta de Auth y todos los datos de la BD. Libera el email para volver a invitarse. Acción irreversible. Si tiene reservas en historial, el backend va a bloquear la operación. Escribí ELIMINAR para confirmar."
+        confirmLabel="Eliminar definitivamente"
+        variant="danger"
+        requireTypedConfirmation="ELIMINAR"
+        onConfirm={handleHardDelete}
+        onCancel={() => setHardDelete(null)}
+      />
     </div>
   );
 }
@@ -241,12 +268,14 @@ function PersonaCard({
   usuario: u,
   currentUserId,
   onCambiarRol,
-  onRevoke
+  onRevoke,
+  onHardDelete
 }: {
   usuario: Usuario;
   currentUserId: string | undefined;
   onCambiarRol: () => void;
   onRevoke: () => void;
+  onHardDelete: () => void;
 }) {
   const esYo = u.id === currentUserId;
   const nombre = capitalizar(u.nombre) || u.email;
@@ -304,7 +333,8 @@ function PersonaCard({
       <CardMenuDropdown
         items={[
           { label: 'Cambiar rol', icon: '🔄', onClick: onCambiarRol },
-          { label: 'Revocar acceso', icon: '🚫', onClick: onRevoke, danger: true, divider: true }
+          { label: 'Revocar acceso', icon: '🚫', onClick: onRevoke, danger: true, divider: true },
+          { label: 'Eliminar definitivamente', icon: '🗑️', onClick: onHardDelete, danger: true }
         ]}
       />
     </div>

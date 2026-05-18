@@ -535,3 +535,42 @@ export async function adminUpdateRole(params: {
 }) {
   return backendPost<{ success: boolean }>('admin-update-role', params);
 }
+
+export interface AdminDeleteUserResponse {
+  success: boolean;
+  deleted: { id: string; email: string; nombre?: string | null };
+}
+
+export interface AdminDeleteUserError {
+  error: string;
+  reservas_count?: number;
+}
+
+/**
+ * Hard delete: borra de auth.users → cascadea a public.usuarios,
+ * notificaciones, membresias. Bloquea (409) si target tiene reservas.
+ * Devuelve {data,error} para que el caller surface el mensaje rico
+ * del backend (ej. "tiene N reservas").
+ */
+export async function adminDeleteUser(params: { usuario_id: string }): Promise<{
+  data: AdminDeleteUserResponse | null;
+  error: AdminDeleteUserError | null;
+}> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    return { data: null, error: { error: 'Sesión expirada. Inicia sesión nuevamente.' } };
+  }
+  const res = await fetch('/.netlify/functions/admin-delete-user', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`
+    },
+    body: JSON.stringify(params)
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { data: null, error: body as AdminDeleteUserError };
+  }
+  return { data: body as AdminDeleteUserResponse, error: null };
+}
