@@ -512,6 +512,50 @@ Cualquier validación que falle retorna `400` o `401` con mensaje
 descriptivo. El frontend (`MiQR.tsx`) tiene `traducirErrorQR` que
 mapea esos mensajes a copy para el miembro.
 
+## Cancelación de reservas por miembro (Sprint M2)
+
+Cierra el gap del audit: el helper `cancelarReserva` existía en
+`src/member/hooks/useReservas.ts` pero ninguna UI lo invocaba —
+miembros llamaban a recepción para cancelar. Ahora pueden hacerlo
+desde el Dashboard.
+
+### Distinción clave vs admin
+- **Miembro cancela su propia reserva** → status final `cancelada`,
+  modal `CancelarMiReservaModal` (chips + textarea, 2 pasos
+  info → confirm, sin typed-confirmation).
+- **Admin cancela reserva ajena** → status final `cancelada_admin`,
+  modal `CancelarReservaModal` (typed "CANCELAR", checkbox notificar,
+  sugerencia WhatsApp). Sigue **intacto**.
+
+### Componentes
+- `src/member/hooks/useReglaCancelacion.ts` — lee
+  `tenant.config.reserva.cancelacion_min_horas_antes` (jsonb pattern).
+  Default `0` si no está configurada (permisivo). Helper puro
+  `puedeCancelarReserva(slotInicio, minHorasAntes)` devuelve
+  `{ puede, razon?, horasRestantes }`.
+- `src/member/components/CancelarMiReservaModal.tsx` — modal de 2 pasos
+  con chips de sugerencia (`['Cambio de planes','Salud','Trabajo','Otro']`)
+  + textarea de motivo (opcional, ≤ 280 chars). Llama al helper
+  existente `cancelarReserva` del miembro.
+- `src/member/components/BotonCancelarReserva.tsx` — wrapper que
+  encapsula la lógica "puede / no puede". Si no puede, muestra
+  razón + link WhatsApp con mensaje pre-formateado (sólo si
+  `tenant.config.contacto.whatsapp_e164` existe).
+
+### Backend
+- Reusa RPC `cancelar_reserva_atomic(p_reserva_id, p_motivo)` que ya
+  valida ownership (usuario_id o admin), status `confirmada` y
+  `slot_inicio > now()`. La regla de horas mínimas es **client-side**
+  (UX); el RPC sólo bloquea reservas pasadas.
+- No se modifica el schema. Sólo se usan campos existentes:
+  `status`, `cancelada_at`, `cancelada_motivo`.
+
+### Wiring
+Dashboard hero (`src/member/pages/Dashboard.tsx`) renderiza
+`<BotonCancelarReserva>` debajo del botón "Ver QR" cuando hay
+próxima reserva. `onCancelada` dispara `refetch` de
+`useProximasReservas`, que des-monta el hero al instante.
+
 ## Recepción — Operación (Sprint R1)
 
 ### statusConfig completo

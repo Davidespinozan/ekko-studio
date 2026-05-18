@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
+import { BotonCancelarReserva } from '@member/components/BotonCancelarReserva';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 type Reserva = Database['public']['Tables']['reservas']['Row'];
@@ -46,26 +47,33 @@ function useRecursosActivos() {
 function useProximasReservas(usuarioId: string | undefined) {
   const [reservas, setReservas] = useState<ReservaConRecurso[]>([]);
 
-  useEffect(() => {
-    if (!usuarioId) return;
-    let mounted = true;
-    async function load() {
-      const { data } = await supabase
-        .from('reservas')
-        .select('*, recurso:recursos(id, nombre, slug)')
-        .eq('usuario_id', usuarioId!)
-        .eq('status', 'confirmada')
-        .gte('slot_inicio', new Date().toISOString())
-        .order('slot_inicio', { ascending: true })
-        .limit(5);
-
-      if (mounted) setReservas((data ?? []) as unknown as ReservaConRecurso[]);
+  const refetch = useCallback(async () => {
+    if (!usuarioId) {
+      setReservas([]);
+      return;
     }
-    load();
-    return () => { mounted = false; };
+    const { data } = await supabase
+      .from('reservas')
+      .select('*, recurso:recursos(id, nombre, slug)')
+      .eq('usuario_id', usuarioId)
+      .eq('status', 'confirmada')
+      .gte('slot_inicio', new Date().toISOString())
+      .order('slot_inicio', { ascending: true })
+      .limit(5);
+
+    setReservas((data ?? []) as unknown as ReservaConRecurso[]);
   }, [usuarioId]);
 
-  return { reservas };
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!mounted) return;
+      await refetch();
+    })();
+    return () => { mounted = false; };
+  }, [refetch]);
+
+  return { reservas, refetch };
 }
 
 // ============================================================================
@@ -96,7 +104,7 @@ function capitalizarNombre(nombre: string | null | undefined): string {
 export default function Dashboard() {
   const { usuario } = useAuth();
   const { recursos } = useRecursosActivos();
-  const { reservas: proximasReservas } = useProximasReservas(usuario?.id);
+  const { reservas: proximasReservas, refetch: refetchReservas } = useProximasReservas(usuario?.id);
 
   const ahora = new Date();
   const bloqueado = usuario?.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > ahora;
@@ -153,10 +161,21 @@ export default function Dashboard() {
               {proximaReserva.folio}
             </span>
           </p>
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <Link to={`/app/qr/${proximaReserva.id}`} className="ek-cta">
               Ver QR <span style={{ color: 'var(--ek-mustard)' }}>→</span>
             </Link>
+          </div>
+          <div style={{ marginTop: '14px' }}>
+            <BotonCancelarReserva
+              reserva={{
+                id: proximaReserva.id,
+                slot_inicio: proximaReserva.slot_inicio,
+                folio: proximaReserva.folio,
+                recurso_nombre: proximaReserva.recurso?.nombre ?? 'Estudio'
+              }}
+              onCancelada={refetchReservas}
+            />
           </div>
         </div>
       ) : (
