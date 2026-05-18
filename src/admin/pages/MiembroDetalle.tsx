@@ -1,12 +1,16 @@
-import { useParams, Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
 import { useMiembroDetalle, updateMiembro, adminUpdateRole } from '../hooks/useAdminData';
 import { supabase } from '@shared/lib/supabase';
+import { useToast } from '@shared/hooks/useToast';
 import { formatHora } from '@member/logic/reservaLogic';
+import ConfirmDialog from '../components/ConfirmDialog';
 import type { Database } from '@shared/types/database';
 
 export default function MiembroDetalle() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const toast = useToast();
   const { miembro, reservas, isLoading, refetch } = useMiembroDetalle(id);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -14,6 +18,18 @@ export default function MiembroDetalle() {
     status: '',
     membresia_tier: ''
   });
+  const [eliminarOpen, setEliminarOpen] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+
+  const reservasFuturasConfirmadas = useMemo(
+    () =>
+      reservas.filter(
+        (r) =>
+          r.status === 'confirmada' &&
+          new Date(r.slot_inicio).getTime() > Date.now()
+      ).length,
+    [reservas]
+  );
 
   useEffect(() => {
     if (miembro) {
@@ -37,6 +53,23 @@ export default function MiembroDetalle() {
       await refetch();
     }
     setSaving(false);
+  }
+
+  async function handleEliminar() {
+    if (!miembro) return;
+    setEliminando(true);
+    const { error: err } = await supabase
+      .from('usuarios')
+      .update({ status: 'cancelado' } as never)
+      .eq('id', miembro.id);
+    setEliminando(false);
+    if (err) {
+      toast.error(`No se pudo eliminar: ${err.message}`);
+      return;
+    }
+    toast.success(`${miembro.nombre ?? miembro.email} fue dado de baja.`);
+    setEliminarOpen(false);
+    navigate('/admin/miembros');
   }
 
   return (
@@ -142,6 +175,56 @@ export default function MiembroDetalle() {
           onSaved={refetch}
         />
       </section>
+
+      <section
+        className="adm-section"
+        style={{ borderTop: '0.5px solid var(--ek-danger)', paddingTop: '20px', marginTop: '32px' }}
+      >
+        <p className="ek-eyebrow" style={{ color: 'var(--ek-danger)', marginBottom: '6px' }}>
+          ZONA PELIGROSA
+        </p>
+        <h2 className="ek-h3">Eliminar miembro</h2>
+        <p className="adm-body" style={{ marginBottom: '12px' }}>
+          Da de baja al miembro (status <code style={{ fontFamily: 'var(--ek-font-mono)' }}>cancelado</code>).
+          No podrá iniciar sesión. Sus datos y reservas históricas quedan en BD para auditoría.
+          {reservasFuturasConfirmadas > 0 && (
+            <>
+              {' '}
+              <strong style={{ color: 'var(--ek-danger)' }}>
+                Tiene {reservasFuturasConfirmadas}{' '}
+                {reservasFuturasConfirmadas === 1 ? 'reserva futura confirmada' : 'reservas futuras confirmadas'}
+              </strong>{' '}
+              — cancelalas manualmente antes o quedarán pendientes.
+            </>
+          )}
+        </p>
+        <button
+          onClick={() => setEliminarOpen(true)}
+          className="ek-cta"
+          style={{
+            background: 'var(--ek-danger-soft)',
+            color: 'var(--ek-danger)',
+            border: '0.5px solid var(--ek-danger)'
+          }}
+        >
+          Eliminar miembro
+        </button>
+      </section>
+
+      <ConfirmDialog
+        isOpen={eliminarOpen}
+        title={`¿Eliminar a ${miembro.nombre ?? miembro.email}?`}
+        description={
+          reservasFuturasConfirmadas > 0
+            ? `Esta acción marca al miembro como cancelado y le impide iniciar sesión. Tiene ${reservasFuturasConfirmadas} ${reservasFuturasConfirmadas === 1 ? 'reserva futura confirmada' : 'reservas futuras confirmadas'} — esas reservas no se cancelan automáticamente. Escribí ELIMINAR para confirmar.`
+            : 'Esta acción marca al miembro como cancelado y le impide iniciar sesión. Los datos quedan en BD para auditoría. Escribí ELIMINAR para confirmar.'
+        }
+        confirmLabel={eliminando ? 'Eliminando…' : 'Eliminar miembro'}
+        variant="danger"
+        requireTypedConfirmation="ELIMINAR"
+        onConfirm={handleEliminar}
+        onCancel={() => setEliminarOpen(false)}
+      />
 
       <section className="adm-section">
         <h2 className="ek-h3">Reservas ({reservas.length})</h2>

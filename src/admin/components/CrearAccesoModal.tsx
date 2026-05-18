@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
-import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
 
 type Rol = 'admin' | 'recepcionista';
@@ -19,7 +18,6 @@ interface Props {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function CrearAccesoModal({ onClose, onSuccess }: Props) {
-  const tenant = useTenant();
   const toast = useToast();
 
   const [nombre, setNombre] = useState('');
@@ -65,15 +63,10 @@ export default function CrearAccesoModal({ onClose, onSuccess }: Props) {
         throw new Error('Sesión expirada. Inicia sesión nuevamente.');
       }
 
-      const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-      if (!url) {
-        throw new Error('VITE_SUPABASE_URL no configurada.');
-      }
-
       const emailNorm = email.trim().toLowerCase();
       const nombreNorm = nombre.trim();
 
-      const response = await fetch(`${url}/functions/v1/create-team-member`, {
+      const response = await fetch('/.netlify/functions/admin-create-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,8 +76,7 @@ export default function CrearAccesoModal({ onClose, onSuccess }: Props) {
           email: emailNorm,
           password,
           nombre: nombreNorm,
-          rol,
-          tenant_id: tenant.id
+          rol
         })
       });
 
@@ -92,9 +84,7 @@ export default function CrearAccesoModal({ onClose, onSuccess }: Props) {
 
       if (!response.ok) {
         const msg =
-          response.status === 409
-            ? 'Ya existe un usuario con este email en el tenant.'
-            : (result?.error as string) || `Error creando acceso (HTTP ${response.status})`;
+          (result?.error as string) || `Error creando acceso (HTTP ${response.status})`;
         throw new Error(msg);
       }
 
