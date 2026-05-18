@@ -2,12 +2,14 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
+import { useToast } from '@shared/hooks/useToast';
 import type { Database } from '@shared/types/database';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 
 export default function Estudios() {
   const tenant = useTenant();
+  const toast = useToast();
   const [recursos, setRecursos] = useState<Recurso[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -22,13 +24,17 @@ export default function Estudios() {
         .order('nombre');
 
       if (!mounted) return;
-      if (error) console.error('[Estudios]', error);
-      else setRecursos(data ?? []);
+      if (error) {
+        console.error('[Estudios]', error);
+        toast.warning('No pudimos cargar los estudios · Intentá refrescar');
+      } else {
+        setRecursos(data ?? []);
+      }
       setIsLoading(false);
     }
     load();
     return () => { mounted = false; };
-  }, [tenant.id]);
+  }, [tenant.id, toast]);
 
   if (isLoading) {
     return (

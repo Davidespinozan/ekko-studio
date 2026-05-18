@@ -322,7 +322,7 @@ export async function cancelarReserva(
       usuario_id: usuarioId,
       tipo: 'reserva_cancelada',
       titulo: 'Tu reserva fue cancelada',
-      mensaje: `Tu reserva en ${recursoNombre} para ${fecha} fue cancelada por administración. Motivo: ${motivo}`,
+      mensaje: `Tu reserva en ${recursoNombre} del ${fecha} fue cancelada por el estudio. Motivo: ${motivo}`,
       metadata: {
         reserva_id: reservaId,
         recurso_nombre: recursoNombre,

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import QRCodeStyling from 'qr-code-styling';
 import { supabase } from '@shared/lib/supabase';
@@ -12,12 +12,11 @@ interface IssueResponse {
 
 /**
  * Traduce errores del backend qr-issue a copy human-friendly.
- * Las claves vienen del status de la reserva o del mensaje del servidor.
  */
 function traducirErrorQR(raw: string): string {
   const msg = raw.toLowerCase();
   if (msg.includes('cancelada por admin') || msg.includes('cancelada_admin')) {
-    return 'Esta reserva fue cancelada por administración. Contacta a EKKO si tienes dudas.';
+    return 'Esta reserva fue cancelada por el estudio. Contactanos si tenés dudas.';
   }
   if (msg.includes('cancelada')) {
     return 'Esta reserva fue cancelada.';
@@ -37,6 +36,80 @@ function traducirErrorQR(raw: string): string {
   return raw;
 }
 
+function QRSkeleton() {
+  return (
+    <div
+      className="ek-skeleton"
+      style={{
+        aspectRatio: '1 / 1',
+        width: '100%',
+        borderRadius: 'var(--ek-r-card)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      <span
+        style={{
+          fontSize: '12px',
+          color: 'var(--ek-ink-faint)',
+          letterSpacing: '0.14em',
+          fontWeight: 600
+        }}
+      >
+        GENERANDO TU CÓDIGO…
+      </span>
+    </div>
+  );
+}
+
+function QRError({ mensaje, onReintentar }: { mensaje: string; onReintentar: () => void }) {
+  return (
+    <div
+      style={{
+        aspectRatio: '1 / 1',
+        width: '100%',
+        borderRadius: 'var(--ek-r-card)',
+        background: 'var(--ek-bg-soft)',
+        border: '0.5px solid var(--ek-line)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '14px',
+        padding: '24px',
+        textAlign: 'center'
+      }}
+    >
+      <p
+        style={{
+          fontSize: '14px',
+          color: 'var(--ek-ink)',
+          lineHeight: 1.5,
+          margin: 0
+        }}
+      >
+        {mensaje}
+      </p>
+      <button
+        type="button"
+        onClick={onReintentar}
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--ek-mustard)',
+          fontSize: '13px',
+          fontWeight: 600,
+          cursor: 'pointer',
+          padding: '6px 10px'
+        }}
+      >
+        Reintentar →
+      </button>
+    </div>
+  );
+}
+
 export default function MiQR() {
   const { reservaId } = useParams<{ reservaId: string }>();
   const qrContainerRef = useRef<HTMLDivElement>(null);
@@ -47,11 +120,17 @@ export default function MiQR() {
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
-  // Cargar datos de la reserva y emitir QR
+  const generarQR = useCallback(() => {
+    setRetryTick((t) => t + 1);
+  }, []);
+
   useEffect(() => {
     if (!reservaId) return;
     let mounted = true;
+    setIsLoading(true);
+    setError(null);
 
     async function load() {
       const { data: r } = await supabase
@@ -76,16 +155,15 @@ export default function MiQR() {
         setIsLoading(false);
       } catch (e) {
         if (!mounted) return;
-        setError(e instanceof Error ? e.message : 'Error generando QR');
+        setError(e instanceof Error ? e.message : 'No se pudo generar el QR');
         setIsLoading(false);
       }
     }
 
     load();
     return () => { mounted = false; };
-  }, [reservaId]);
+  }, [reservaId, retryTick]);
 
-  // Renderizar QR con qr-code-styling
   useEffect(() => {
     if (!qrPayload || !qrContainerRef.current) return;
 
@@ -106,67 +184,66 @@ export default function MiQR() {
     qrInstance.current.append(qrContainerRef.current);
   }, [qrPayload]);
 
-  if (isLoading) return <div className="ek-container"><p className="ek-body">Generando QR…</p></div>;
-
-  if (error) {
-    return (
-      <div className="ek-container">
-        <Link to="/app" className="adm-link">← Volver</Link>
-        <p className="ek-error-text" style={{ marginTop: '1rem' }}>{traducirErrorQR(error)}</p>
-      </div>
-    );
-  }
-
   return (
     <div className="ek-container">
-      <div className="ek-stack-xl">
+      <div className="ek-stack-xl" style={{ maxWidth: '24rem', margin: '0 auto', width: '100%' }}>
         <Link to="/app" className="adm-link">← Volver al inicio</Link>
 
-        <div className="ek-stack-md">
-          <p className="ek-eyebrow ek-eyebrow--mustard">TU QR DE ACCESO</p>
-          <h1 className="ek-display-md">{reserva?.recurso?.nombre ?? 'Estudio'}</h1>
-          <p className="ek-body-muted">
-            {new Date(reserva.slot_inicio).toLocaleDateString('es-MX', {
-              weekday: 'long', day: 'numeric', month: 'long'
-            })}
-            <br />
-            {formatHora(new Date(reserva.slot_inicio))} – {formatHora(new Date(reserva.slot_fin))}
-          </p>
-        </div>
+        {reserva && (
+          <div className="ek-stack-md">
+            <p className="ek-eyebrow ek-eyebrow--mustard">TU QR DE ACCESO</p>
+            <h1 className="ek-display-md">{reserva.recurso?.nombre ?? 'Estudio'}</h1>
+            <p className="ek-body-muted">
+              {new Date(reserva.slot_inicio).toLocaleDateString('es-MX', {
+                weekday: 'long', day: 'numeric', month: 'long'
+              })}
+              <br />
+              {formatHora(new Date(reserva.slot_inicio))} – {formatHora(new Date(reserva.slot_fin))}
+            </p>
+          </div>
+        )}
 
-        {/* Contenedor blanco DELIBERADO: el scanner necesita contraste
-            negro-sobre-blanco para decodificar de forma confiable.
-            No cambiar a fondo oscuro. */}
-        <div
-          style={{
-            background: '#FFFFFF',
-            borderRadius: 'var(--ek-r-card)',
-            padding: '24px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '16px'
-          }}
-        >
-          <div ref={qrContainerRef} />
-          <p style={{ fontFamily: 'var(--ek-font-mono)', fontSize: '13px', color: '#0A0A0A' }}>
-            {reserva?.folio}
-          </p>
-        </div>
+        {isLoading ? (
+          <QRSkeleton />
+        ) : error ? (
+          <QRError mensaje={traducirErrorQR(error)} onReintentar={generarQR} />
+        ) : qrPayload ? (
+          /* Contenedor blanco DELIBERADO: el scanner necesita contraste
+             negro-sobre-blanco para decodificar de forma confiable.
+             No cambiar a fondo oscuro. */
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 'var(--ek-r-card)',
+              padding: '24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px'
+            }}
+          >
+            <div ref={qrContainerRef} style={{ width: '100%', maxWidth: '320px' }} />
+            <p style={{ fontFamily: 'var(--ek-font-mono)', fontSize: '13px', color: '#0A0A0A' }}>
+              {reserva?.folio}
+            </p>
+          </div>
+        ) : null}
 
-        <div className="ek-card">
-          <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>INSTRUCCIONES</p>
-          <p className="ek-body-muted">
-            Muestra este código al llegar a EKKO. La recepción lo escanea
-            para confirmar tu entrada.
-            {expiresAt && (
-              <>
-                <br /><br />
-                Válido hasta las {formatHora(expiresAt)} del día de tu sesión.
-              </>
-            )}
-          </p>
-        </div>
+        {!isLoading && !error && (
+          <div className="ek-card">
+            <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>INSTRUCCIONES</p>
+            <p className="ek-body-muted">
+              Mostrá este código al llegar al estudio. La recepción lo escanea
+              para confirmar tu entrada.
+              {expiresAt && (
+                <>
+                  <br /><br />
+                  Válido hasta las {formatHora(expiresAt)} del día de tu sesión.
+                </>
+              )}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -36,7 +36,6 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
   const [chipActivo, setChipActivo] = useState<string | null>(null);
   const [motivo, setMotivo] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -64,7 +63,6 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
   async function handleSubmit() {
     if (submitting) return;
     setSubmitting(true);
-    setError(null);
 
     const motivoFinal = motivo.trim() || chipActivo || undefined;
 
@@ -74,13 +72,12 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
     });
 
     if (err) {
-      setError(err);
-      toast.error(err);
+      toast.error(`No se pudo cancelar: ${err}`);
       setSubmitting(false);
       return;
     }
 
-    toast.success('Reserva cancelada.');
+    toast.success('Tu reserva fue cancelada');
     onCancelada();
     onClose();
   }
@@ -264,8 +261,6 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
                 </p>
               </div>
             )}
-
-            {error && <p className="ek-error-text" style={{ marginBottom: '12px' }}>{error}</p>}
 
             <div style={{ display: 'flex', gap: '8px' }}>
               <button

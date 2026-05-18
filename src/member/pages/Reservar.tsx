@@ -57,7 +57,6 @@ export default function Reservar() {
   const [slotPendiente, setSlotPendiente] = useState<Slot | null>(null);
   const [invitados, setInvitados] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const maxInvitados = usuario?.membresia_tier === 'pro' ? 4 :
                        usuario?.membresia_tier === 'basica' ? 2 : 0;
@@ -115,7 +114,6 @@ export default function Reservar() {
   async function confirmarReserva() {
     if (!slotPendiente || !recursoSel) return;
     setSubmitting(true);
-    setError(null);
     try {
       await crearReserva({
         recursoId: recursoSel.id,
@@ -135,13 +133,21 @@ export default function Reservar() {
       toast.success(`Reserva confirmada · ${fechaFmt}, ${horaFmt}`);
       navigate('/app');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error reservando');
+      const raw = e instanceof Error ? e.message : 'No se pudo crear la reserva';
+      toast.error(raw + ' · Intentalo otra vez');
       setSubmitting(false);
     }
   }
 
   if (loadingRecursos) {
-    return <div className="ek-container"><p className="ek-body">Cargando estudios…</p></div>;
+    return (
+      <div className="ek-container">
+        <div className="ek-stack-md">
+          <div className="ek-skeleton" style={{ height: '40px', width: '60%', borderRadius: 'var(--ek-r-sm)' }} />
+          <div className="ek-skeleton" style={{ height: '120px', borderRadius: 'var(--ek-r-md)' }} />
+        </div>
+      </div>
+    );
   }
 
   if (recursos.length === 0) {
@@ -261,7 +267,15 @@ export default function Reservar() {
         <div className="ek-stack-sm">
           <label className="ek-label">Horario</label>
           {loadingSlots ? (
-            <p className="ek-body-muted">Cargando horarios…</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: '8px' }}>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="ek-skeleton"
+                  style={{ height: '52px', borderRadius: 'var(--ek-r-sm)' }}
+                />
+              ))}
+            </div>
           ) : slots.length === 0 ? (
             <p className="ek-body-muted">
               El estudio no opera este día.
@@ -360,10 +374,6 @@ export default function Reservar() {
                     Total de personas en la grabación: {1 + invitados}
                   </p>
                 </div>
-              )}
-
-              {error && (
-                <p className="ek-error-text" style={{ marginBottom: '1rem' }}>{error}</p>
               )}
 
               <div style={{ display: 'flex', gap: '0.5rem' }}>

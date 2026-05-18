@@ -73,7 +73,7 @@ function badgeParaReserva(status: string): { label: string; className: string } 
   if (status === 'completada') return { label: 'OK', className: 'ek-badge ek-badge--success' };
   if (status === 'cancelada') return { label: 'CANCELADA', className: 'ek-badge ek-badge--neutral' };
   if (status === 'cancelada_admin')
-    return { label: 'CANCELADA · EKKO', className: 'ek-badge ek-badge--danger' };
+    return { label: 'CANCELADA · ESTUDIO', className: 'ek-badge ek-badge--danger' };
   if (status === 'no_show') return { label: 'NO SHOW', className: 'ek-badge ek-badge--danger' };
   return { label: status.toUpperCase(), className: 'ek-badge ek-badge--neutral' };
 }
@@ -247,7 +247,7 @@ export default function Perfil() {
                           }}
                         >
                           {esCanceladaAdmin
-                            ? 'Cancelada por administración'
+                            ? 'Cancelada por el estudio'
                             : 'La cancelaste'}
                           {r.cancelada_motivo && ` · ${r.cancelada_motivo}`}
                         </p>

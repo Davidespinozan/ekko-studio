@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
+import { useToast } from '@shared/hooks/useToast';
 import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
 import { BotonCancelarReserva } from '@member/components/BotonCancelarReserva';
@@ -19,6 +20,7 @@ interface ReservaConRecurso extends Reserva {
 
 function useRecursosActivos() {
   const tenant = useTenant();
+  const toast = useToast();
   const [recursos, setRecursos] = useState<Recurso[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -33,13 +35,17 @@ function useRecursosActivos() {
         .order('nombre');
 
       if (!mounted) return;
-      if (error) console.error('[useRecursosActivos]', error);
-      else setRecursos((data ?? []) as Recurso[]);
+      if (error) {
+        console.error('[useRecursosActivos]', error);
+        toast.warning('No pudimos cargar los estudios · Intentá refrescar');
+      } else {
+        setRecursos((data ?? []) as Recurso[]);
+      }
       setIsLoading(false);
     }
     load();
     return () => { mounted = false; };
-  }, [tenant.id]);
+  }, [tenant.id, toast]);
 
   return { recursos, isLoading };
 }

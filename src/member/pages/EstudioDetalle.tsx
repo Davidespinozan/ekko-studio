@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
+import { useToast } from '@shared/hooks/useToast';
 import type { Database } from '@shared/types/database';
 
 type RecursoDetalle = Database['public']['Tables']['recursos']['Row'];
@@ -11,6 +12,7 @@ export default function EstudioDetalle() {
   const { slug } = useParams<{ slug: string }>();
   const tenant = useTenant();
   const { usuario } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
   const [recurso, setRecurso] = useState<RecursoDetalle | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,13 +30,17 @@ export default function EstudioDetalle() {
         .maybeSingle();
 
       if (!mounted) return;
-      if (error) console.error('[EstudioDetalle]', error);
-      else setRecurso(data);
+      if (error) {
+        console.error('[EstudioDetalle]', error);
+        toast.warning('No pudimos cargar el estudio · Intentá refrescar');
+      } else {
+        setRecurso(data);
+      }
       setIsLoading(false);
     }
     load();
     return () => { mounted = false; };
-  }, [slug, tenant.id]);
+  }, [slug, tenant.id, toast]);
 
   if (isLoading) {
     return (

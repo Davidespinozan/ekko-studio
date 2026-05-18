@@ -604,6 +604,60 @@ para no taparse con el home indicator en iPhone con notch. Mismo patrón
 en `.rec-hoy` paddingBottom (110px + safe-area). `index.html` ya tiene
 `viewport-fit=cover` en el meta viewport.
 
+## UX polish miembro (Sprint M3)
+
+Cierra inconsistencias detectadas en auditoría: toasts/errores
+desigual entre admin y miembro, notificaciones sin polling, QR no
+responsive, copy burocrático, loading states mezclados.
+
+### Toasts estandarizados
+- TODO el módulo miembro consume `useToast()` (mismo patrón que admin).
+- ELIMINADO: `setError` local con JSX condicional, `console.error`
+  como UX silenciosa. Conservamos `console.error` para debugging
+  cuando el fallo es no-bloqueante, **pero siempre acompañado de**
+  `toast.warning(...)` para enterar al miembro.
+- Mensajes warm y human, nunca técnicos:
+  - "No pudimos cargar los estudios · Intentá refrescar"
+  - "Reserva confirmada · lunes 19 de mayo, 09:00"
+  - "Tu reserva fue cancelada"
+
+### Polling de notificaciones in-app
+`src/shared/hooks/useNotificacionesMiembro.ts` ahora hace polling
+cada **30 s** con pausa cuando la tab está inactiva
+(`visibilitychange` API). Al volver a la tab, refetch inmediato +
+reanuda el interval. Errores del polling se loguean en silencio
+(no spamean al miembro). 30 s elegido por consistencia con el
+patrón de recepción.
+
+### QR responsive + estados
+- Wrapper `maxWidth: 24rem` centrado, contenedor con
+  `aspectRatio: '1 / 1'` para mantener proporción cuadrada en mobile.
+- `<QRSkeleton>` con `.ek-skeleton` (shimmer) mientras el backend
+  emite el payload.
+- `<QRError>` muestra mensaje human (vía `traducirErrorQR`) + CTA
+  **"Reintentar →"**. Reintentar usa un `retryTick` como dep del
+  efecto de fetch.
+
+### Copy de cancelación
+- "Cancelada por administración" → **"Cancelada por el estudio"**.
+- "para {fecha}" → **"del {fecha}"** (más natural en español).
+- Label en historial miembro: `CANCELADA · EKKO` → `CANCELADA · ESTUDIO`.
+- Mensaje hardcodeado de `notificaciones` en
+  `src/admin/lib/crudHelpers.ts:cancelarReserva` también actualizado.
+
+### Loading states
+Patrón unificado vía clase `.ek-skeleton` (ya existía con shimmer).
+Reemplaza los `<p>Cargando...</p>` en `Reservar.tsx` (selector de
+recursos + grid de slots). `Estudios.tsx` y `EstudioDetalle.tsx` ya
+usaban skeleton; `MiQR.tsx` ahora también.
+
+### Tests
+`useNotificacionesMiembro.test.tsx` cubre 4 casos del polling:
+refetch inicial, polling cada 30 s mientras visible, pausa al ocultar
+tab, refetch + reanuda al volver. Fake timers + `vi.hoisted` para
+mantener referencia estable de `usuario` (evita re-mount en cada
+re-render).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.
