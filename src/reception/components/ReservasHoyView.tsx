@@ -1,8 +1,83 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@shared/lib/supabase';
+import { useTenant } from '@shared/hooks/useTenant';
 import { useReservasHoy, checkInManual, type ReservaConJoin } from '../hooks/useReservasHoy';
+import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 
 interface Props {
   onManualCheckInSuccess?: (data: any) => void;
+}
+
+interface RecursoOption {
+  id: string;
+  nombre: string;
+}
+
+const FILTRO_RECURSO_KEY = 'ekko-recepcion-filtro-recurso';
+
+function normalizar(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+/**
+ * statusConfig completo — todos los status posibles de reservas mapeados.
+ * NO usar fallback "PENDIENTE" para status desconocidos: un nuevo estado en
+ * BD debe ser obvio para forzar el fix del frontend.
+ *
+ * `cancelada` y `cancelada_admin` comparten visual: recepcionista no necesita
+ * diferenciar quién canceló (info irrelevante para operación).
+ */
+type StatusInfo = { label: string; bg: string; color: string; bloqueaCheckIn: boolean };
+
+const STATUS_CONFIG: Record<string, StatusInfo> = {
+  confirmada: {
+    label: 'PENDIENTE',
+    bg: 'var(--ek-mustard)',
+    color: 'var(--ek-bg)',
+    bloqueaCheckIn: false
+  },
+  completada: {
+    label: '✓ OK',
+    bg: 'var(--ek-success-soft)',
+    color: 'var(--ek-success)',
+    bloqueaCheckIn: true
+  },
+  cancelada: {
+    label: '⛔ CANCELADA',
+    bg: 'var(--ek-danger-soft)',
+    color: 'var(--ek-danger)',
+    bloqueaCheckIn: true
+  },
+  cancelada_admin: {
+    label: '⛔ CANCELADA',
+    bg: 'var(--ek-danger-soft)',
+    color: 'var(--ek-danger)',
+    bloqueaCheckIn: true
+  },
+  no_show: {
+    label: 'NO SHOW',
+    bg: 'var(--ek-danger-soft)',
+    color: 'var(--ek-danger)',
+    bloqueaCheckIn: true
+  }
+};
+
+function getStatusInfo(status: string): StatusInfo {
+  const info = STATUS_CONFIG[status];
+  if (info) return info;
+  // Fallback visible: si aparece un status no mapeado, mejor que falle obvio.
+  if (typeof console !== 'undefined') {
+    console.error('[ReservasHoyView] Status no mapeado:', status);
+  }
+  return {
+    label: `⚠️ ${status.toUpperCase()}`,
+    bg: 'var(--ek-line)',
+    color: 'var(--ek-ink-muted)',
+    bloqueaCheckIn: true
+  };
 }
 
 function capitalizarNombre(s: string | undefined | null): string {
@@ -35,6 +110,7 @@ function formatearDia(fecha: Date): string {
 }
 
 export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
+  const tenant = useTenant();
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -42,6 +118,50 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
   });
   const { reservas, isLoading, refetch } = useReservasHoy(fechaSeleccionada);
   const [selected, setSelected] = useState<ReservaConJoin | null>(null);
+
+  // Búsqueda + debounce
+  const [busqueda, setBusqueda] = useState('');
+  const [busquedaDebounced, setBusquedaDebounced] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setBusquedaDebounced(busqueda.trim()), 200);
+    return () => clearTimeout(t);
+  }, [busqueda]);
+
+  // Filtro por recurso (persistido en localStorage)
+  const [recursoFiltrado, setRecursoFiltrado] = useState<string>(() => {
+    if (typeof localStorage === 'undefined') return 'todos';
+    return localStorage.getItem(FILTRO_RECURSO_KEY) ?? 'todos';
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(FILTRO_RECURSO_KEY, recursoFiltrado);
+    } catch {
+      // ignore quota errors
+    }
+  }, [recursoFiltrado]);
+
+  // Cargar recursos del tenant (solo activos)
+  const [recursos, setRecursos] = useState<RecursoOption[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    void supabase
+      .from('recursos')
+      .select('id, nombre')
+      .eq('tenant_id', tenant.id)
+      .eq('activo', true)
+      .order('nombre', { ascending: true })
+      .then(({ data, error }) => {
+        if (!mounted) return;
+        if (error) {
+          console.error('[ReservasHoyView] recursos:', error);
+          return;
+        }
+        setRecursos(data ?? []);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [tenant.id]);
 
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
@@ -53,11 +173,32 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
     setFechaSeleccionada(nueva);
   };
 
+  // Filtros combinados (recurso + búsqueda)
+  const reservasFiltradas = useMemo(() => {
+    let result = reservas;
+
+    if (recursoFiltrado !== 'todos') {
+      result = result.filter((r) => r.recurso?.id === recursoFiltrado);
+    }
+
+    if (busquedaDebounced) {
+      const q = normalizar(busquedaDebounced);
+      result = result.filter((r) => {
+        const nombre = normalizar(r.usuario?.nombre ?? '');
+        const email = normalizar(r.usuario?.email ?? '');
+        const folio = normalizar(r.folio ?? '');
+        return nombre.includes(q) || email.includes(q) || folio.includes(q);
+      });
+    }
+
+    return result;
+  }, [reservas, recursoFiltrado, busquedaDebounced]);
+
   const { llegando, resto } = useMemo(() => {
     const now = Date.now();
     const llegando: ReservaConJoin[] = [];
     const resto: ReservaConJoin[] = [];
-    reservas.forEach((r) => {
+    reservasFiltradas.forEach((r) => {
       const inicio = new Date(r.slot_inicio).getTime();
       const fin = new Date(r.slot_fin).getTime();
       // "Llegando ahora" solo aplica si la fecha vista es hoy
@@ -72,7 +213,13 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
       }
     });
     return { llegando, resto };
-  }, [reservas, esHoy]);
+  }, [reservasFiltradas, esHoy]);
+
+  const filtrosActivos = recursoFiltrado !== 'todos' || busquedaDebounced.length > 0;
+  const sinResultadosTrasFiltro =
+    filtrosActivos && reservas.length > 0 && reservasFiltradas.length === 0;
+  const recursoFiltradoNombre =
+    recursos.find((r) => r.id === recursoFiltrado)?.nombre ?? '';
 
   if (isLoading) {
     return (
@@ -83,7 +230,10 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
   }
 
   return (
-    <div className="rec-hoy" style={{ paddingBottom: '110px' }}>
+    <div
+      className="rec-hoy"
+      style={{ paddingBottom: 'calc(110px + env(safe-area-inset-bottom, 0px))' }}
+    >
       <div
         style={{
           display: 'flex',
@@ -155,39 +305,185 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
         </button>
       </div>
 
-      <section style={{ marginBottom: '32px', marginTop: '24px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '12px' }}>
-          LLEGANDO AHORA
-        </p>
-        {llegando.length === 0 ? (
-          <p className="ek-body-faint" style={{ padding: '12px 0' }}>
-            No hay reservas próximas a llegar.
-          </p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {llegando.map((r) => (
-              <ReservaCard key={r.id} reserva={r} onSelect={setSelected} highlight />
-            ))}
-          </div>
-        )}
-      </section>
+      {/* Búsqueda + filtro recurso */}
+      <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        <div style={{ position: 'relative' }}>
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar nombre, email o folio…"
+            className="ek-input"
+            style={{ paddingRight: busqueda ? '36px' : undefined, minHeight: '44px' }}
+            aria-label="Buscar reserva"
+          />
+          {busqueda && (
+            <button
+              type="button"
+              onClick={() => setBusqueda('')}
+              aria-label="Limpiar búsqueda"
+              style={{
+                position: 'absolute',
+                top: '50%',
+                right: '8px',
+                transform: 'translateY(-50%)',
+                width: '28px',
+                height: '28px',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--ek-ink-muted)',
+                cursor: 'pointer',
+                fontSize: '16px',
+                lineHeight: 1
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
 
-      <section>
-        <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>
-          {esHoy ? 'RESTO DEL DÍA' : 'RESERVAS DEL DÍA'}
-        </p>
-        {resto.length === 0 ? (
-          <p className="ek-body-faint" style={{ padding: '12px 0' }}>
-            {esHoy ? 'No hay más reservas para este día.' : 'No hay reservas para este día.'}
+        <select
+          value={recursoFiltrado}
+          onChange={(e) => setRecursoFiltrado(e.target.value)}
+          className="ek-input"
+          style={{ minHeight: '44px' }}
+          aria-label="Filtrar por estudio"
+        >
+          <option value="todos">Todos los estudios</option>
+          {recursos.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.nombre}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Pills de filtros activos */}
+      {filtrosActivos && (
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '6px',
+            marginTop: '12px',
+            alignItems: 'center'
+          }}
+        >
+          <span
+            style={{
+              fontSize: '11px',
+              color: 'var(--ek-ink-faint)',
+              letterSpacing: '0.08em',
+              fontWeight: 600
+            }}
+          >
+            FILTROS:
+          </span>
+          {recursoFiltrado !== 'todos' && (
+            <button
+              type="button"
+              onClick={() => setRecursoFiltrado('todos')}
+              className="ek-badge"
+              style={{
+                background: 'var(--ek-mustard-soft)',
+                color: 'var(--ek-mustard)',
+                border: '0.5px solid var(--ek-mustard-dim)',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px'
+              }}
+            >
+              {recursoFiltradoNombre} <span aria-hidden="true">✕</span>
+            </button>
+          )}
+          {busquedaDebounced && (
+            <button
+              type="button"
+              onClick={() => setBusqueda('')}
+              className="ek-badge"
+              style={{
+                background: 'var(--ek-mustard-soft)',
+                color: 'var(--ek-mustard)',
+                border: '0.5px solid var(--ek-mustard-dim)',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '11px'
+              }}
+            >
+              &ldquo;{busquedaDebounced}&rdquo; <span aria-hidden="true">✕</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Empty state cuando filtros no devuelven resultados */}
+      {sinResultadosTrasFiltro ? (
+        <div
+          style={{
+            marginTop: '32px',
+            padding: '32px 16px',
+            textAlign: 'center',
+            background: 'var(--ek-bg-soft)',
+            border: '0.5px dashed var(--ek-line)',
+            borderRadius: 'var(--ek-r-md)'
+          }}
+        >
+          <p className="ek-body-faint" style={{ marginBottom: '12px' }}>
+            No hay reservas que coincidan con los filtros.
           </p>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {resto.map((r) => (
-              <ReservaCard key={r.id} reserva={r} onSelect={setSelected} />
-            ))}
-          </div>
-        )}
-      </section>
+          <button
+            type="button"
+            onClick={() => {
+              setBusqueda('');
+              setRecursoFiltrado('todos');
+            }}
+            className="ek-icon-btn"
+            style={{ width: 'auto', padding: '8px 14px', fontSize: '12px' }}
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      ) : (
+        <>
+          <section style={{ marginBottom: '32px', marginTop: '24px' }}>
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '12px' }}>
+              LLEGANDO AHORA
+            </p>
+            {llegando.length === 0 ? (
+              <p className="ek-body-faint" style={{ padding: '12px 0' }}>
+                No hay reservas próximas a llegar.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {llegando.map((r) => (
+                  <ReservaCard key={r.id} reserva={r} onSelect={setSelected} highlight />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>
+              {esHoy ? 'RESTO DEL DÍA' : 'RESERVAS DEL DÍA'}
+            </p>
+            {resto.length === 0 ? (
+              <p className="ek-body-faint" style={{ padding: '12px 0' }}>
+                {esHoy ? 'No hay más reservas para este día.' : 'No hay reservas para este día.'}
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {resto.map((r) => (
+                  <ReservaCard key={r.id} reserva={r} onSelect={setSelected} />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
       {selected && (
         <ManualCheckInModal
@@ -223,35 +519,13 @@ function ReservaCard({
     capitalizarNombre(reserva.usuario?.nombre) || reserva.usuario?.email || '—';
 
   const tier = reserva.usuario?.membresia_tier;
-  const disabled = reserva.status === 'cancelada' || reserva.status === 'no_show';
-
-  const statusConfig: Record<
-    string,
-    { label: string; bg: string; color: string }
-  > = {
-    confirmada: {
-      label: 'PENDIENTE',
-      bg: 'var(--ek-mustard)',
-      color: 'var(--ek-bg)'
-    },
-    completada: {
-      label: '✓ OK',
-      bg: 'var(--ek-success-soft)',
-      color: 'var(--ek-success)'
-    },
-    cancelada: {
-      label: 'CANCELADA',
-      bg: 'var(--ek-danger-soft)',
-      color: 'var(--ek-danger)'
-    },
-    no_show: {
-      label: 'NO SHOW',
-      bg: 'var(--ek-danger-soft)',
-      color: 'var(--ek-danger)'
-    }
-  };
-
-  const status = statusConfig[reserva.status] ?? statusConfig.confirmada;
+  const status = getStatusInfo(reserva.status);
+  // Disabled si está cancelada (cualquier tipo) o no-show. completada permite
+  // abrir el modal (muestra "ya hizo check-in").
+  const disabled =
+    reserva.status === 'cancelada' ||
+    reserva.status === 'cancelada_admin' ||
+    reserva.status === 'no_show';
 
   return (
     <button
@@ -349,8 +623,10 @@ function ManualCheckInModal({
     setError(null);
     try {
       const result = await checkInManual(reserva.id, motivo.trim() || undefined);
+      playCheckInSuccess();
       await onDone(result);
     } catch (e) {
+      playCheckInError();
       setError(e instanceof Error ? e.message : 'Error en check-in');
       setSubmitting(false);
     }

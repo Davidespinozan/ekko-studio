@@ -512,6 +512,54 @@ Cualquier validación que falle retorna `400` o `401` con mensaje
 descriptivo. El frontend (`MiQR.tsx`) tiene `traducirErrorQR` que
 mapea esos mensajes a copy para el miembro.
 
+## Recepción — Operación (Sprint R1)
+
+### statusConfig completo
+`src/reception/components/ReservasHoyView.tsx` mapea TODOS los status
+posibles (confirmada, completada, cancelada, **cancelada_admin**, no_show).
+`cancelada` y `cancelada_admin` comparten visual: recepcionista no
+diferencia quién canceló (info irrelevante para operación). Cualquier
+status no mapeado renderiza un badge `⚠️` visible — mejor que fallar
+silencioso a un default "PENDIENTE" engañoso.
+
+Cada entry tiene `bloqueaCheckIn: boolean`. Cards con `bloqueaCheckIn=true`
+están `disabled` y no abren el modal de check-in manual. El backend
+(`check_in_atomic` RPC) también valida — esto es defensa UI.
+
+### Búsqueda + filtro por recurso
+- Input search con debounce **200 ms**. Filtra in-memory por nombre,
+  email y folio del miembro. Helper `normalizar()` ignora acentos
+  ("Jose" matchea "José").
+- Dropdown "Todos los estudios" + lista de recursos activos del tenant.
+  Persistido en `localStorage` con key `ekko-recepcion-filtro-recurso`
+  (recepcionista suele filtrar el mismo estudio todo el día).
+- Filtros combinables. Pills clickeables abajo del input muestran qué
+  está activo; click en pill quita ese filtro específico.
+- Empty state propio cuando filtros no devuelven resultados (CTA
+  "Limpiar filtros").
+
+### Feedback sonoro + táctil
+`src/reception/lib/checkInFeedback.ts` expone `playCheckInSuccess()` y
+`playCheckInError()`. Sin dependencias nuevas:
+
+- **Success**: beep 880 Hz / 200 ms (Web Audio API) + vibración 100 ms.
+- **Error**: beep 220 Hz / 400 ms + vibración patrón `[100, 50, 100]`.
+- Falla silenciosamente si `AudioContext` o `navigator.vibrate` no están
+  disponibles. iOS Safari no soporta vibrate — el beep sí funciona si el
+  recepcionista no muteó el dispositivo.
+
+Invocado desde:
+- `CheckInDetail` (1 vez por mount, según `kind === 'success' | 'error'`)
+  para el flow de QR scanner.
+- `ManualCheckInModal.handleConfirm` (success + error) para el flow
+  manual.
+
+### Mobile safe-area
+FAB del Scanner usa `bottom: calc(24px + env(safe-area-inset-bottom, 0px))`
+para no taparse con el home indicator en iPhone con notch. Mismo patrón
+en `.rec-hoy` paddingBottom (110px + safe-area). `index.html` ya tiene
+`viewport-fit=cover` en el meta viewport.
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

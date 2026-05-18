@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 
 interface MiembroData {
   id: string;
@@ -43,6 +44,12 @@ const AUTO_CLOSE_MS = 15_000;
 
 export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMessage, onClose }: Props) {
   const [secondsLeft, setSecondsLeft] = useState(Math.ceil(AUTO_CLOSE_MS / 1000));
+
+  // Feedback sonoro + táctil al abrir el detalle (1 vez)
+  useEffect(() => {
+    if (kind === 'success') playCheckInSuccess();
+    else playCheckInError();
+  }, [kind]);
 
   useEffect(() => {
     const interval = setInterval(() => {
