@@ -9,7 +9,6 @@ import { BottomNav } from './components/BottomNav';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Reservar = lazy(() => import('./pages/Reservar'));
-const Historial = lazy(() => import('./pages/Historial'));
 const Perfil = lazy(() => import('./pages/Perfil'));
 const MiQR = lazy(() => import('./pages/MiQR'));
 const Estudios = lazy(() => import('./pages/Estudios'));
@@ -83,7 +82,8 @@ export default function MemberLayout() {
           <Route path="/reservar" element={<Reservar />} />
           <Route path="/estudios" element={<Estudios />} />
           <Route path="/estudios/:slug" element={<EstudioDetalle />} />
-          <Route path="/historial" element={<Historial />} />
+          {/* /historial removida — redirect a /perfil para no romper bookmarks viejos */}
+          <Route path="/historial" element={<Navigate to="/app/perfil" replace />} />
           <Route path="/perfil" element={<Perfil />} />
           <Route path="/qr/:reservaId" element={<MiQR />} />
         </Routes>

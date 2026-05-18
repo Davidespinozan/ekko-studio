@@ -10,6 +10,33 @@ interface IssueResponse {
   expires_at: string;
 }
 
+/**
+ * Traduce errores del backend qr-issue a copy human-friendly.
+ * Las claves vienen del status de la reserva o del mensaje del servidor.
+ */
+function traducirErrorQR(raw: string): string {
+  const msg = raw.toLowerCase();
+  if (msg.includes('cancelada por admin') || msg.includes('cancelada_admin')) {
+    return 'Esta reserva fue cancelada por administración. Contacta a EKKO si tienes dudas.';
+  }
+  if (msg.includes('cancelada')) {
+    return 'Esta reserva fue cancelada.';
+  }
+  if (msg.includes('completada') || msg.includes('check-in')) {
+    return 'Ya hiciste check-in para esta reserva.';
+  }
+  if (msg.includes('no_show') || msg.includes('no-show')) {
+    return 'Esta reserva expiró sin check-in.';
+  }
+  if (msg.includes('no autorizada') || msg.includes('no encontrada')) {
+    return 'Esta reserva no existe o no es tuya.';
+  }
+  if (msg.includes('fuera de ventana')) {
+    return 'Esta reserva queda fuera de la ventana de QR (más de 7 días).';
+  }
+  return raw;
+}
+
 export default function MiQR() {
   const { reservaId } = useParams<{ reservaId: string }>();
   const qrContainerRef = useRef<HTMLDivElement>(null);
@@ -84,8 +111,8 @@ export default function MiQR() {
   if (error) {
     return (
       <div className="ek-container">
-        <Link to="/app/historial" className="adm-link">← Volver</Link>
-        <p className="ek-error-text" style={{ marginTop: '1rem' }}>{error}</p>
+        <Link to="/app" className="adm-link">← Volver</Link>
+        <p className="ek-error-text" style={{ marginTop: '1rem' }}>{traducirErrorQR(error)}</p>
       </div>
     );
   }
@@ -93,7 +120,7 @@ export default function MiQR() {
   return (
     <div className="ek-container">
       <div className="ek-stack-xl">
-        <Link to="/app/historial" className="adm-link">← Volver al historial</Link>
+        <Link to="/app" className="adm-link">← Volver al inicio</Link>
 
         <div className="ek-stack-md">
           <p className="ek-eyebrow ek-eyebrow--mustard">TU QR DE ACCESO</p>

@@ -471,6 +471,47 @@ Reusa el componente `ImageUploader` existente.
 - OG image y favicon dinámicos via meta tags: **pendiente** hooks
   `useOGTags` y `useFavicon` (Sprint posterior con Marca completa).
 
+## Filtros de status de reserva (Sprint M1)
+
+### Source of truth
+`src/shared/constants/reservaStatus.ts` exporta los conjuntos canónicos.
+Cualquier filtro de UI sobre `reservas.status` debe consumirlos —
+nunca hardcodear arrays inline.
+
+```ts
+ESTADOS_RESERVA_ACTIVOS    = ['confirmada']
+ESTADOS_RESERVA_HISTORICOS = ['completada','no_show','cancelada','cancelada_admin']
+ESTADOS_RESERVA_CANCELADAS = ['cancelada','cancelada_admin']
+```
+
+### Reglas de visibilidad
+- **Dashboard / próxima sesión / próximas reservas**: SOLO `confirmada`
+  (filtro estricto + `slot_inicio > now`).
+- **Perfil / historial**: los 4 estados de `ESTADOS_RESERVA_HISTORICOS`.
+  Badge diferenciado para `cancelada` (neutral, "La cancelaste") vs
+  `cancelada_admin` (danger, "Cancelada por administración"). Si hay
+  `cancelada_motivo`, se muestra inline.
+- **qr-issue Edge Function**: solo emite QR si `status === 'confirmada'`.
+  Cualquier otro retorna `400` con mensaje específico que el frontend
+  traduce a copy human-friendly (`traducirErrorQR` en MiQR.tsx).
+
+## QR de check-in (Sprint M1)
+
+`qr-issue` aplica las siguientes validaciones (defensa profundidad
+encima de RLS):
+
+1. **Auth**: Bearer JWT del usuario autenticado.
+2. **Ownership**: `reserva.usuario_id === usuario_actual.id`. RLS ya
+   filtra, pero validamos explícito por si el client tiene service_role
+   leak en el futuro.
+3. **Tenant**: `reserva.tenant_id === usuario_actual.tenant_id`.
+4. **Status whitelist**: solo `confirmada`.
+5. **Ventana temporal**: ±7 días alrededor de `slot_inicio`.
+
+Cualquier validación que falle retorna `400` o `401` con mensaje
+descriptivo. El frontend (`MiQR.tsx`) tiene `traducirErrorQR` que
+mapea esos mensajes a copy para el miembro.
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

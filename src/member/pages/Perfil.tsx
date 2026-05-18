@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
+import { ESTADOS_RESERVA_HISTORICOS } from '@shared/constants/reservaStatus';
 import type { Database } from '@shared/types/database';
 
 type Reserva = Database['public']['Tables']['reservas']['Row'];
@@ -49,7 +50,7 @@ function useReservasPasadas(usuarioId: string | undefined) {
         .from('reservas')
         .select('*, recurso:recursos(nombre)')
         .eq('usuario_id', usuarioId!)
-        .in('status', ['completada', 'cancelada', 'no_show'])
+        .in('status', ESTADOS_RESERVA_HISTORICOS as unknown as string[])
         .order('slot_inicio', { ascending: false })
         .limit(20);
       if (mounted) setReservas((data ?? []) as unknown as ReservaConRecurso[]);
@@ -66,6 +67,15 @@ function formatearFecha(iso: string): string {
   const fecha = d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
   const hora = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
   return `${fecha} · ${hora}`;
+}
+
+function badgeParaReserva(status: string): { label: string; className: string } {
+  if (status === 'completada') return { label: 'OK', className: 'ek-badge ek-badge--success' };
+  if (status === 'cancelada') return { label: 'CANCELADA', className: 'ek-badge ek-badge--neutral' };
+  if (status === 'cancelada_admin')
+    return { label: 'CANCELADA · EKKO', className: 'ek-badge ek-badge--danger' };
+  if (status === 'no_show') return { label: 'NO SHOW', className: 'ek-badge ek-badge--danger' };
+  return { label: status.toUpperCase(), className: 'ek-badge ek-badge--neutral' };
 }
 
 export default function Perfil() {
@@ -197,37 +207,58 @@ export default function Perfil() {
             <p className="ek-body-muted">Aún no tienes sesiones completadas.</p>
           ) : (
             <div className="ek-stack-sm">
-              {reservas.map((r) => (
-                <div key={r.id} className="ek-card ek-card--md" style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
-                }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <p style={{
-                      fontFamily: 'var(--ek-font-display)',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                      letterSpacing: '-0.02em',
-                      margin: 0
-                    }}>
-                      {r.recurso?.nombre ?? 'Estudio'}
-                    </p>
-                    <p className="ek-body-faint" style={{ marginTop: '2px' }}>
-                      {formatearFecha(r.slot_inicio)}
-                    </p>
+              {reservas.map((r) => {
+                const badge = badgeParaReserva(r.status);
+                const esCanceladaAdmin = r.status === 'cancelada_admin';
+                const esCanceladaUsuario = r.status === 'cancelada';
+                return (
+                  <div
+                    key={r.id}
+                    className="ek-card ek-card--md"
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      gap: '12px'
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p
+                        style={{
+                          fontFamily: 'var(--ek-font-display)',
+                          fontSize: '14px',
+                          fontWeight: 600,
+                          letterSpacing: '-0.02em',
+                          margin: 0
+                        }}
+                      >
+                        {r.recurso?.nombre ?? 'Estudio'}
+                      </p>
+                      <p className="ek-body-faint" style={{ marginTop: '2px' }}>
+                        {formatearFecha(r.slot_inicio)}
+                      </p>
+                      {(esCanceladaAdmin || esCanceladaUsuario) && (
+                        <p
+                          style={{
+                            fontSize: '11px',
+                            color: 'var(--ek-ink-muted)',
+                            marginTop: '4px',
+                            lineHeight: 1.4
+                          }}
+                        >
+                          {esCanceladaAdmin
+                            ? 'Cancelada por administración'
+                            : 'La cancelaste'}
+                          {r.cancelada_motivo && ` · ${r.cancelada_motivo}`}
+                        </p>
+                      )}
+                    </div>
+                    <span className={badge.className} style={{ flexShrink: 0 }}>
+                      {badge.label}
+                    </span>
                   </div>
-                  <span className={
-                    r.status === 'completada' ? 'ek-badge ek-badge--success' :
-                    r.status === 'cancelada' ? 'ek-badge ek-badge--neutral' :
-                    'ek-badge ek-badge--danger'
-                  }>
-                    {r.status === 'completada' ? 'OK' :
-                     r.status === 'cancelada' ? 'CANCELADA' :
-                     'NO SHOW'}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>

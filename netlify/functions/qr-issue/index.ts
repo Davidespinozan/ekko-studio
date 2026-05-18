@@ -52,7 +52,25 @@ export const handler: Handler = async (event) => {
     const supabase = createClient(supabaseUrl, anonKey, {      global: { headers: { Authorization: `Bearer ${userToken}` } }
     });
 
-    // Buscar reserva (RLS valida que sea suya)
+    // Identificar al usuario actual (auth.users.id) para validar ownership.
+    const { data: authData, error: authErr } = await supabase.auth.getUser(userToken);
+    if (authErr || !authData?.user) {
+      return unauthorized('Token inválido');
+    }
+    const authUserId = authData.user.id;
+
+    // Mapear auth_id → usuarios.id + tenant_id (necesario para validar
+    // ownership y tenant; RLS también lo limita, pero somos defensivos).
+    const { data: usuarioRow, error: usuarioErr } = await supabase
+      .from('usuarios')
+      .select('id, tenant_id')
+      .eq('auth_id', authUserId)
+      .maybeSingle();
+    if (usuarioErr || !usuarioRow) {
+      return unauthorized('Usuario no encontrado');
+    }
+
+    // Buscar reserva (RLS valida que sea suya; chequeamos explícito igual).
     const { data: reserva, error } = await supabase
       .from('reservas')
       .select('id, tenant_id, usuario_id, slot_inicio, slot_fin, status')
@@ -63,8 +81,36 @@ export const handler: Handler = async (event) => {
       return unauthorized('Reserva no encontrada o no autorizada');
     }
 
-    if (reserva.status === 'cancelada') {
-      return badRequest('La reserva está cancelada');
+    // Defensa profundidad: ownership + tenant.
+    if (reserva.usuario_id !== usuarioRow.id) {
+      return unauthorized('Reserva de otro usuario');
+    }
+    if (reserva.tenant_id !== usuarioRow.tenant_id) {
+      return unauthorized('Reserva de otro tenant');
+    }
+
+    // Whitelist: solo se emite QR para reservas confirmadas.
+    // Cualquier otro status devuelve mensaje específico para que el
+    // frontend lo traduzca a copy human-friendly.
+    const STATUS_QR_VALIDO = 'confirmada';
+    if (reserva.status !== STATUS_QR_VALIDO) {
+      const motivos: Record<string, string> = {
+        cancelada: 'La reserva fue cancelada',
+        cancelada_admin: 'La reserva fue cancelada por administración',
+        completada: 'Ya hiciste check-in para esta reserva',
+        no_show: 'La reserva expiró sin check-in'
+      };
+      const msg = motivos[reserva.status] ?? `Status no válido para QR: ${reserva.status}`;
+      return badRequest(msg);
+    }
+
+    // Ventana temporal: ±7 días alrededor del slot_inicio. Reservas muy
+    // viejas o muy lejanas no pueden emitir QR (defensa contra abuso).
+    const slotInicio = new Date(reserva.slot_inicio);
+    const ahora = new Date();
+    const diffDias = Math.abs(slotInicio.getTime() - ahora.getTime()) / 86400000;
+    if (diffDias > 7) {
+      return badRequest('Reserva fuera de ventana de QR (más de 7 días)');
     }
 
     // Calcular expiración: slot_fin + 30 min

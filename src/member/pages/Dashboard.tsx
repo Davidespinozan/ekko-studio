@@ -173,21 +173,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Onboarding pendiente */}
-      {usuario?.status === 'pendiente_onboarding' && (
-        <div className="ek-card ek-card--md" style={{
-          borderColor: 'var(--ek-mustard-dim)',
-          background: 'var(--ek-mustard-soft)',
-          marginBottom: '24px'
-        }}>
-          <p className="ek-eyebrow ek-eyebrow--mustard">ONBOARDING PENDIENTE</p>
-          <p className="ek-body" style={{ marginTop: '8px' }}>
-            Aún no completas tu perfil ni activas tu membresía.
-            (Esto se construye en el siguiente prompt.)
-          </p>
-        </div>
-      )}
-
       {/* Estudios disponibles */}
       <div style={{ marginBottom: '16px' }}>
         <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>EXPLORAR</p>
@@ -198,7 +183,7 @@ export default function Dashboard() {
         }}>
           <h2 className="ek-display-md">Estudios</h2>
           <Link
-            to="/app/reservar"
+            to="/app/estudios"
             style={{
               fontSize: '11px',
               fontWeight: 700,
@@ -223,7 +208,7 @@ export default function Dashboard() {
           return (
             <Link
               key={r.id}
-              to="/app/reservar"
+              to={`/app/estudios/${r.slug}`}
               className="ek-card ek-card-interactive"
               style={{
                 padding: 0,

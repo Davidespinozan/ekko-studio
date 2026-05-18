@@ -126,7 +126,14 @@ export default function Reservar() {
       });
       setSlotPendiente(null);
       setSubmitting(false);
-      navigate('/app/historial');
+      const fechaFmt = slotPendiente.inicio.toLocaleDateString('es-MX', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long'
+      });
+      const horaFmt = formatHora(slotPendiente.inicio);
+      toast.success(`Reserva confirmada · ${fechaFmt}, ${horaFmt}`);
+      navigate('/app');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error reservando');
       setSubmitting(false);
