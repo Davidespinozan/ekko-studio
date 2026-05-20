@@ -139,6 +139,8 @@ EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó
 
 #### 🟡 MEDIUM (10 findings — comprimidos)
 
+> **✅ Resueltos en R2 (9/10):** search clear ✕ + edge, filter pills ✕, CameraModal close safe-area, CheckInDetail safe-area lateral, skeleton inicial, CameraModal retry de permiso, status badge contraste, polling pausa con modal abierto. **Pendiente:** #9 ManualCheckInModal safe-area lateral (landscape-only, queda para MA3).
+
 | # | Componente | Issue | Archivo | Fix Quick |
 |---|------------|-------|---------|-----------|
 | 1 | ReservasHoyView | Search clear ✕ es 28×28 | [L321-342](src/reception/components/ReservasHoyView.tsx#L321) | min 44×44 |

@@ -10,7 +10,13 @@ export function CameraModal({ onClose, onScan }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const readerRef = useRef<BrowserMultiFormatReader | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
   const cooldownRef = useRef(0);
+
+  const reintentar = () => {
+    setCameraError(null);
+    setRetryTick((t) => t + 1);
+  };
 
   useEffect(() => {
     const videoEl = videoRef.current;
@@ -60,7 +66,7 @@ export function CameraModal({ onClose, onScan }: Props) {
         stream?.getTracks().forEach((t) => t.stop());
       } catch { /* noop */ }
     };
-  }, [onScan]);
+  }, [onScan, retryTick]);
 
   return (
     <div className="rec-camera-modal" onClick={onClose}>
@@ -69,10 +75,41 @@ export function CameraModal({ onClose, onScan }: Props) {
         <div className="rec-camera-wrap">
           {cameraError ? (
             <div className="rec-camera-error">
-              <p className="ek-h3" style={{ color: 'var(--ek-cream)' }}>Sin cámara</p>
-              <p style={{ color: 'rgba(245,241,232,0.7)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+              <p className="ek-h3" style={{ color: 'var(--ek-ink)' }}>
+                No pudimos acceder a la cámara
+              </p>
+              <p style={{ color: 'var(--ek-ink-muted)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                Verificá que diste permiso de cámara en los ajustes de tu navegador
+                y volvé a intentar.
+              </p>
+              <p style={{ color: 'var(--ek-ink-faint)', fontSize: '0.75rem', marginTop: '0.5rem' }}>
                 {cameraError}
               </p>
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  marginTop: '20px'
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={reintentar}
+                  className="ek-cta"
+                  style={{ minHeight: '44px' }}
+                >
+                  Reintentar
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="ek-cta ek-cta--secondary"
+                  style={{ minHeight: '44px' }}
+                >
+                  Usar check-in manual
+                </button>
+              </div>
             </div>
           ) : (
             <>

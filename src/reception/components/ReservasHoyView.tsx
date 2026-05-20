@@ -6,6 +6,9 @@ import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 
 interface Props {
   onManualCheckInSuccess?: (data: any) => void;
+  /** Pausa el polling de la lista (ej. mientras hay un modal de
+   *  check-in abierto a nivel Scanner). */
+  pausarPolling?: boolean;
 }
 
 interface RecursoOption {
@@ -32,6 +35,9 @@ function normalizar(s: string): string {
  */
 type StatusInfo = { label: string; bg: string; color: string; bloqueaCheckIn: boolean };
 
+// Badges: bg sólido saturado + texto oscuro (var(--ek-bg)) para garantizar
+// contraste WCAG AA ≥4.5:1. Antes completada/cancelada/no_show usaban
+// bg *-soft (alpha 0.12) + texto del mismo color — chip casi invisible.
 const STATUS_CONFIG: Record<string, StatusInfo> = {
   confirmada: {
     label: 'PENDIENTE',
@@ -41,26 +47,26 @@ const STATUS_CONFIG: Record<string, StatusInfo> = {
   },
   completada: {
     label: '✓ OK',
-    bg: 'var(--ek-success-soft)',
-    color: 'var(--ek-success)',
+    bg: 'var(--ek-success)',
+    color: 'var(--ek-bg)',
     bloqueaCheckIn: true
   },
   cancelada: {
     label: '⛔ CANCELADA',
-    bg: 'var(--ek-danger-soft)',
-    color: 'var(--ek-danger)',
+    bg: 'var(--ek-danger)',
+    color: 'var(--ek-bg)',
     bloqueaCheckIn: true
   },
   cancelada_admin: {
     label: '⛔ CANCELADA',
-    bg: 'var(--ek-danger-soft)',
-    color: 'var(--ek-danger)',
+    bg: 'var(--ek-danger)',
+    color: 'var(--ek-bg)',
     bloqueaCheckIn: true
   },
   no_show: {
     label: 'NO SHOW',
-    bg: 'var(--ek-danger-soft)',
-    color: 'var(--ek-danger)',
+    bg: 'var(--ek-danger)',
+    color: 'var(--ek-bg)',
     bloqueaCheckIn: true
   }
 };
@@ -74,8 +80,8 @@ function getStatusInfo(status: string): StatusInfo {
   }
   return {
     label: `⚠️ ${status.toUpperCase()}`,
-    bg: 'var(--ek-line)',
-    color: 'var(--ek-ink-muted)',
+    bg: 'var(--ek-ink)',
+    color: 'var(--ek-bg)',
     bloqueaCheckIn: true
   };
 }
@@ -109,15 +115,20 @@ function formatearDia(fecha: Date): string {
   });
 }
 
-export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
+export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false }: Props = {}) {
   const tenant = useTenant();
   const [fechaSeleccionada, setFechaSeleccionada] = useState(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   });
-  const { reservas, isLoading, refetch } = useReservasHoy(fechaSeleccionada);
   const [selected, setSelected] = useState<ReservaConJoin | null>(null);
+  // Polling pausa si hay un modal de check-in abierto (manual local o
+  // CheckInDetail a nivel Scanner) — evita reordenar la lista debajo.
+  const { reservas, isLoading, refetch } = useReservasHoy(
+    fechaSeleccionada,
+    !selected && !pausarPolling
+  );
 
   // Búsqueda + debounce
   const [busqueda, setBusqueda] = useState('');
@@ -221,13 +232,7 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
   const recursoFiltradoNombre =
     recursos.find((r) => r.id === recursoFiltrado)?.nombre ?? '';
 
-  if (isLoading) {
-    return (
-      <p style={{ color: 'var(--ek-ink-muted)', textAlign: 'center', marginTop: '2rem' }}>
-        Cargando agenda…
-      </p>
-    );
-  }
+  const cargandoInicial = isLoading && reservas.length === 0;
 
   return (
     <div
@@ -314,7 +319,7 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder="Buscar nombre, email o folio…"
             className="ek-input"
-            style={{ paddingRight: busqueda ? '36px' : undefined, minHeight: '44px' }}
+            style={{ paddingRight: busqueda ? '52px' : undefined, minHeight: '44px' }}
             aria-label="Buscar reserva"
           />
           {busqueda && (
@@ -325,10 +330,13 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
               style={{
                 position: 'absolute',
                 top: '50%',
-                right: '8px',
+                right: '4px',
                 transform: 'translateY(-50%)',
-                width: '28px',
-                height: '28px',
+                width: '44px',
+                height: '44px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 border: 'none',
                 background: 'transparent',
                 color: 'var(--ek-ink-muted)',
@@ -392,7 +400,9 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                fontSize: '11px'
+                fontSize: '11px',
+                minHeight: '44px',
+                padding: '0 12px'
               }}
             >
               {recursoFiltradoNombre} <span aria-hidden="true">✕</span>
@@ -411,7 +421,9 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '6px',
-                fontSize: '11px'
+                fontSize: '11px',
+                minHeight: '44px',
+                padding: '0 12px'
               }}
             >
               &ldquo;{busquedaDebounced}&rdquo; <span aria-hidden="true">✕</span>
@@ -420,8 +432,18 @@ export function ReservasHoyView({ onManualCheckInSuccess }: Props = {}) {
         </div>
       )}
 
-      {/* Empty state cuando filtros no devuelven resultados */}
-      {sinResultadosTrasFiltro ? (
+      {/* Skeletons durante la carga inicial (no pantalla vacía) */}
+      {cargandoInicial ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '24px' }}>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="ek-skeleton"
+              style={{ height: '76px', borderRadius: 'var(--ek-r-md)' }}
+            />
+          ))}
+        </div>
+      ) : sinResultadosTrasFiltro ? (
         <div
           style={{
             marginTop: '32px',

@@ -762,6 +762,57 @@ MEDIUM ni LOW (quedan para MA3/MA4).
 - `useVisibilityAwarePolling.test.tsx` — 6 casos (montaje, polling,
   pausa, reanudación, `enabled=false`, montaje con tab oculta).
 
+## Recepción polish (Sprint R2)
+
+Cierra los MEDIUM operativos de recepción del
+[MOBILE_AUDIT_REPORT.md](MOBILE_AUDIT_REPORT.md) §1.2 — deja el
+módulo completo y profesional para el QA con Magaly.
+
+### Loading
+- `ReservasHoyView` muestra 8 skeletons (`.ek-skeleton`) durante el
+  fetch inicial en vez de pantalla con texto "Cargando…". El
+  day-nav + búsqueda + filtros quedan visibles mientras carga.
+
+### CameraModal
+- Botón cerrar: `top: -56px` (podía quedar bajo el notch / fuera de
+  pantalla) → overlay en la esquina con
+  `calc(12px + env(safe-area-inset-top/right))` + backdrop blur.
+- Si la cámara falla / se rechaza el permiso: la vista de error
+  ahora ofrece **Reintentar** (re-pide acceso vía `retryTick`) y
+  **Usar check-in manual** (cierra la cámara → recepcionista busca
+  por nombre). Antes quedaba sin salida.
+
+### CheckInDetail
+- `.rec-detail` añade `padding-left/right: max(32px, env(safe-area-inset-*))`
+  — protege contra el notch lateral en iPad landscape sin reducir
+  el padding de 32px en portrait.
+
+### Touch targets ≥44×44
+- Search clear ✕: 28×28 → 44×44 (input `paddingRight` ajustado).
+- Pills de filtros activos: `minHeight: 44px`. El pill completo es
+  el target (no se puede anidar `<button>` dentro de `<button>`).
+
+### Contraste de status badges (WCAG AA)
+- `completada` / `cancelada` / `no_show` usaban bg `*-soft`
+  (alpha 0.12) + texto del mismo color → chip casi invisible.
+  Ahora bg sólido saturado + texto `var(--ek-bg)` oscuro (≥4.5:1).
+  `confirmada` ya era sólido (mustard + texto oscuro), sin cambios.
+
+### Polling pausado durante modales de check-in
+- `useReservasHoy(fecha, pollingEnabled)` — segundo parámetro
+  threadeado a `useVisibilityAwarePolling`. `ReservasHoyView` pausa
+  el polling cuando hay un modal abierto (manual local `selected`,
+  o `CheckInDetail`/cámara a nivel Scanner vía prop `pausarPolling`).
+  Evita que un refetch reordene la lista mientras la recepcionista
+  revisa un check-in. Al cerrar el modal: refetch inmediato.
+
+### Tests
+- `useReservasHoy.test.tsx` — +2 casos: `pollingEnabled=false` no
+  hace fetch; reanuda al pasar a `true`.
+- `CameraModal.test.tsx` — 3 casos: vista de error con retry +
+  salida manual; "Reintentar" re-pide cámara; "Usar check-in
+  manual" cierra.
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

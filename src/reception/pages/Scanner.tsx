@@ -111,6 +111,7 @@ export default function Scanner() {
         <ReservasHoyView
           key={refreshTick}
           onManualCheckInSuccess={handleManualCheckIn}
+          pausarPolling={detail.kind !== 'none' || cameraOpen}
         />
       </div>
 

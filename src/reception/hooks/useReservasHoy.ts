@@ -22,8 +22,12 @@ export interface ReservaConJoin extends Reserva {
  * (visibilitychange). Al volver a la tab, refetch inmediato + reanuda
  * el interval. Ahorra batería/datos del iPad de recepción en turnos
  * largos. Mismo patrón que `useNotificacionesMiembro` (Sprint M3).
+ *
+ * `pollingEnabled=false` pausa el polling (ej. mientras hay un modal de
+ * check-in abierto: no queremos que un refetch reordene la lista debajo).
+ * El fetch inicial y los refetch manuales siguen disponibles vía `refetch`.
  */
-export function useReservasHoy(fecha?: Date) {
+export function useReservasHoy(fecha?: Date, pollingEnabled = true) {
   const tenant = useTenant();
   const [reservas, setReservas] = useState<ReservaConJoin[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,7 +57,7 @@ export function useReservasHoy(fecha?: Date) {
     setIsLoading(false);
   }, [tenant.id, fechaMs]);
 
-  useVisibilityAwarePolling(refetch, POLLING_INTERVAL_MS);
+  useVisibilityAwarePolling(refetch, POLLING_INTERVAL_MS, pollingEnabled);
 
   return { reservas, isLoading, refetch };
 }
