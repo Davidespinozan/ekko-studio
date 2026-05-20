@@ -186,7 +186,7 @@ export default function MiQR() {
 
   return (
     <div className="ek-container">
-      <div className="ek-stack-xl" style={{ maxWidth: '24rem', margin: '0 auto', width: '100%' }}>
+      <div className="ek-stack-xl" style={{ maxWidth: 'min(24rem, 100%)', margin: '0 auto', width: '100%' }}>
         <Link to="/app" className="adm-link">← Volver al inicio</Link>
 
         {reserva && (

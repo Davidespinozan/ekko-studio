@@ -860,6 +860,30 @@ Endurece la puerta de entrada antes del QA con usuarios reales.
   status desconocido, `bloqueado_hasta` ignorado; errores de auth
   traducidos + fallback que no filtra el mensaje crudo).
 
+## Mobile MEDIUM polish — Member (Sprint MA3-Member)
+
+Cierra los 5 MEDIUM + 3 LOW del módulo miembro
+([MOBILE_AUDIT_REPORT.md](MOBILE_AUDIT_REPORT.md) §1.1). Sube
+Member de C+ a B+. Polish, sin bloqueantes.
+
+- **Reservar — fecha selector:** wrapper `.ek-hscroll-fade` con un
+  `::after` de gradiente en el borde derecho que insinúa "hay más
+  fechas". `scroll-snap` x-proximity en el carril.
+- **CancelarMiReservaModal:** chips de motivo `minHeight: 40px`
+  (eran ~20px); padding del modal `clamp(16px, 5vw, 28px)` para no
+  quedar apretado en 375px.
+- **Dashboard + Estudios grids:** `minmax(180px/240px, 1fr)` →
+  `minmax(min(100%, 160px), 1fr)` — comportamiento consistente
+  entre iPhone SE (375px) y Pro (390px); el `min(100%, …)` evita
+  overflow cuando el viewport es más chico que el mínimo.
+- **Perfil — info grid:** clase `.perfil-info-grid` que en
+  `@media ≤480px` vuelve las celdas filas (label izquierda, valor
+  derecha). No toca el `.adm-info-grid` de admin.
+- **LOW:** botones invitados +/− 40→44px; `MiQR` con
+  `maxWidth: min(24rem, 100%)`; slots disabled ya estaban en
+  `opacity 0.4` + color tenue (el finding apuntaba a una línea
+  equivocada).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

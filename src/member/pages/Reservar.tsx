@@ -226,40 +226,44 @@ export default function Reservar() {
         {/* Selector de fecha */}
         <div className="ek-stack-sm">
           <label className="ek-label">Fecha</label>
-          <div
-            style={{
-              display: 'flex',
-              gap: '0.5rem',
-              overflowX: 'auto',
-              paddingBottom: '0.5rem',
-              scrollbarWidth: 'thin'
-            }}
-          >
-            {fechas.slice(0, 14).map((f) => {
-              const activo = fechaSel === f.fechaISO;
-              return (
-                <button
-                  key={f.fechaISO}
-                  onClick={() => setFechaSel(f.fechaISO)}
-                  style={{
-                    flexShrink: 0,
-                    padding: '10px 14px',
-                    minHeight: '44px',
-                    background: activo ? 'var(--ek-mustard-soft)' : 'var(--ek-bg-soft)',
-                    color: activo ? 'var(--ek-mustard)' : 'var(--ek-ink)',
-                    border: `0.5px solid ${activo ? 'var(--ek-mustard)' : 'var(--ek-line)'}`,
-                    borderRadius: 'var(--ek-r-sm)',
-                    fontWeight: 600,
-                    fontSize: '13px',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                    fontFamily: 'var(--ek-font-body)'
-                  }}
-                >
-                  {f.label}
-                </button>
-              );
-            })}
+          <div className="ek-hscroll-fade">
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.5rem',
+                overflowX: 'auto',
+                paddingBottom: '0.5rem',
+                scrollbarWidth: 'thin',
+                scrollSnapType: 'x proximity'
+              }}
+            >
+              {fechas.slice(0, 14).map((f) => {
+                const activo = fechaSel === f.fechaISO;
+                return (
+                  <button
+                    key={f.fechaISO}
+                    onClick={() => setFechaSel(f.fechaISO)}
+                    style={{
+                      flexShrink: 0,
+                      scrollSnapAlign: 'start',
+                      padding: '10px 14px',
+                      minHeight: '44px',
+                      background: activo ? 'var(--ek-mustard-soft)' : 'var(--ek-bg-soft)',
+                      color: activo ? 'var(--ek-mustard)' : 'var(--ek-ink)',
+                      border: `0.5px solid ${activo ? 'var(--ek-mustard)' : 'var(--ek-line)'}`,
+                      borderRadius: 'var(--ek-r-sm)',
+                      fontWeight: 600,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      fontFamily: 'var(--ek-font-body)'
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -348,7 +352,7 @@ export default function Reservar() {
                       onClick={() => setInvitados(Math.max(0, invitados - 1))}
                       disabled={invitados === 0}
                       className="ek-cta ek-cta--secondary"
-                      style={{ minHeight: '40px', minWidth: '40px', padding: '0 0.75rem' }}
+                      style={{ minHeight: '44px', minWidth: '44px', padding: '0 0.75rem' }}
                     >
                       −
                     </button>
@@ -365,7 +369,7 @@ export default function Reservar() {
                       onClick={() => setInvitados(Math.min(maxInvitados, invitados + 1))}
                       disabled={invitados === maxInvitados}
                       className="ek-cta ek-cta--secondary"
-                      style={{ minHeight: '40px', minWidth: '40px', padding: '0 0.75rem' }}
+                      style={{ minHeight: '44px', minWidth: '44px', padding: '0 0.75rem' }}
                     >
                       +
                     </button>

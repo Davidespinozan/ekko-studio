@@ -44,7 +44,9 @@ EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó
 
 > **✅ Resueltos en MA2** (además de los 5 de MA1): Sidebar drawer safe-area + close 44×44 (CRITICAL #3) · Hamburger 44×44 · `.adm-form-row` apila en mobile · BotonCancelarReserva 44×44 · NotificacionesBanner ✕ 44×44 · ReservasVistaLista scroll + columna sticky · EstudioModal close 44×44 + safe-area. **`useScannerHID` descartado** (Cravia usa solo cámara). Los findings HIGH listados abajo quedan cerrados; los MEDIUM/LOW siguen abiertos para MA3/MA4.
 
-### 1.1 MEMBER — Grade C+ (11 findings)
+### 1.1 MEMBER — Grade C+ → B+ (11 findings, ✅ todos resueltos)
+
+> **✅ MA1:** slot grid. **✅ MA2:** BotonCancelarReserva + NotificacionesBanner ✕. **✅ MA3-Member:** los 5 MEDIUM + 3 LOW — fecha selector affordance, chips + padding de CancelarMiReservaModal, grids Dashboard/Estudios consistentes, Perfil info grid en filas, invitados +/− 44px, MiQR max-width guard, slots disabled (ya estaban OK).
 
 #### 🟠 HIGH
 

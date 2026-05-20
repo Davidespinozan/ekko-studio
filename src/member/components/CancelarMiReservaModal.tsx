@@ -112,7 +112,7 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
           width: '100%',
           maxHeight: '92vh',
           overflowY: 'auto',
-          padding: '28px',
+          padding: 'clamp(16px, 5vw, 28px)',
           animation: 'ek-scale-in 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
       >
@@ -172,7 +172,8 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
                       onClick={() => handleChip(sug)}
                       disabled={submitting}
                       style={{
-                        padding: '6px 12px',
+                        padding: '10px 14px',
+                        minHeight: '40px',
                         borderRadius: '999px',
                         border: `0.5px solid ${activo ? 'var(--ek-mustard)' : 'var(--ek-line)'}`,
                         background: activo ? 'var(--ek-mustard-soft)' : 'transparent',

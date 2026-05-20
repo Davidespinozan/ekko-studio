@@ -722,6 +722,52 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .adm-info-value--mono { font-family: var(--ek-font-mono); font-size: 13px; }
 
+  /* ============================================================================
+     MEMBER — mobile MEDIUM polish (Sprint MA3-Member)
+     ============================================================================ */
+
+  /* Affordance de scroll horizontal: fade en el borde derecho que
+     insinúa "hay más contenido". Se aplica al wrapper estático
+     (no al contenedor que scrollea) para que no se desplace. */
+  .ek-hscroll-fade {
+    position: relative;
+  }
+
+  .ek-hscroll-fade::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 8px; /* deja libre el paddingBottom del scrollbar */
+    width: 28px;
+    pointer-events: none;
+    background: linear-gradient(to right, transparent, var(--ek-bg));
+  }
+
+  /* Perfil: en mobile el info grid se vuelve filas legibles
+     (label izquierda, valor derecha). Solo afecta al Perfil del
+     miembro — el `.adm-info-grid` de admin queda intacto. */
+  @media (max-width: 480px) {
+    .perfil-info-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .perfil-info-grid .adm-info-cell {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+    .perfil-info-grid .adm-info-label {
+      flex-shrink: 0;
+    }
+    .perfil-info-grid .adm-info-value {
+      text-align: right;
+      word-break: break-word;
+    }
+  }
+
   .adm-body {
     font-size: 13px;
     color: var(--ek-ink-muted);

@@ -139,7 +139,7 @@ export default function Perfil() {
           )}
         </div>
 
-        <div className="adm-info-grid">
+        <div className="adm-info-grid perfil-info-grid">
           <div className="adm-info-cell">
             <p className="adm-info-label">Email</p>
             <p className="adm-info-value">{authUser?.email}</p>
