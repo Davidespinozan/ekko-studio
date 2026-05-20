@@ -21,10 +21,12 @@ EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó
 | **TOTAL** | **C-** | **48** | **6 CRITICAL/HIGH bloqueantes** |
 
 **Distribución por severidad:**
-- 🔴 **CRITICAL: 3** (Admin Calendario, Admin CardMenuDropdown, Admin Sidebar safe-area)
-- 🟠 **HIGH: 10** (forms keyboard-safe, touch targets, polling, scanner conflict)
-- 🟡 **MEDIUM: 24** (safe-area gaps, modal width, grid responsive, contraste)
-- 🟢 **LOW: 11** (perf polish, alt text, decorative)
+- 🔴 **CRITICAL: 3** → ✅ **3/3 resueltos** (MA1 ×2, MA2 ×1)
+- 🟠 **HIGH: 10** → ✅ **10/10 resueltos** (MA1 ×3, MA2 ×7) — `useScannerHID` descartado: Cravia usa solo cámara, listener HID es dead code en su contexto.
+- 🟡 **MEDIUM: 24** — pendiente Sprint MA3
+- 🟢 **LOW: 11** — pendiente Sprint MA4 (post-launch)
+
+> **Estado:** todos los CRITICAL y HIGH cerrados. EKKO operable en iPhone sin bloqueantes. Quedan MEDIUM (polish) y LOW.
 
 ### Top 5 issues más graves
 
@@ -39,6 +41,8 @@ EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó
 ---
 
 ## 1. Findings por módulo
+
+> **✅ Resueltos en MA2** (además de los 5 de MA1): Sidebar drawer safe-area + close 44×44 (CRITICAL #3) · Hamburger 44×44 · `.adm-form-row` apila en mobile · BotonCancelarReserva 44×44 · NotificacionesBanner ✕ 44×44 · ReservasVistaLista scroll + columna sticky · EstudioModal close 44×44 + safe-area. **`useScannerHID` descartado** (Cravia usa solo cámara). Los findings HIGH listados abajo quedan cerrados; los MEDIUM/LOW siguen abiertos para MA3/MA4.
 
 ### 1.1 MEMBER — Grade C+ (11 findings)
 

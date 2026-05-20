@@ -38,10 +38,10 @@ export default function AdminLayout() {
               className="ek-icon-btn"
               style={{
                 position: 'absolute',
-                top: '16px',
-                right: '16px',
-                width: '36px',
-                height: '36px',
+                top: 'max(16px, env(safe-area-inset-top, 0px))',
+                right: 'max(16px, env(safe-area-inset-right, 0px))',
+                width: '44px',
+                height: '44px',
                 padding: 0,
                 zIndex: 2
               }}
@@ -59,7 +59,7 @@ export default function AdminLayout() {
             onClick={() => setDrawerOpen(true)}
             aria-label="Abrir menú"
             className="ek-icon-btn"
-            style={{ width: '40px', height: '40px', padding: 0 }}
+            style={{ width: '44px', height: '44px', padding: 0 }}
           >
             <svg
               width="20"
@@ -90,7 +90,7 @@ export default function AdminLayout() {
             </span>
             <span className="ek-eyebrow" style={{ fontSize: '9px' }}>ADMIN</span>
           </div>
-          <div style={{ width: '40px' }} />
+          <div style={{ width: '44px' }} />
         </header>
 
         <main className="adm-main">

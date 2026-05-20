@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
+import { useVisibilityAwarePolling } from '@shared/hooks/useVisibilityAwarePolling';
 import type { Database } from '@shared/types/database';
 
 const POLLING_INTERVAL_MS = 30_000;
@@ -26,7 +27,6 @@ export function useReservasHoy(fecha?: Date) {
   const tenant = useTenant();
   const [reservas, setReservas] = useState<ReservaConJoin[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Normalizar fecha a inicio del día (memoizar para evitar re-render infinito)
   const fechaMs = (fecha ?? new Date()).setHours(0, 0, 0, 0);
@@ -53,41 +53,7 @@ export function useReservasHoy(fecha?: Date) {
     setIsLoading(false);
   }, [tenant.id, fechaMs]);
 
-  useEffect(() => {
-    const startPolling = () => {
-      if (intervalRef.current) return;
-      intervalRef.current = setInterval(() => {
-        void refetch();
-      }, POLLING_INTERVAL_MS);
-    };
-
-    const stopPolling = () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        void refetch();
-        startPolling();
-      } else {
-        stopPolling();
-      }
-    };
-
-    void refetch();
-    if (document.visibilityState === 'visible') {
-      startPolling();
-    }
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      stopPolling();
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, [refetch]);
+  useVisibilityAwarePolling(refetch, POLLING_INTERVAL_MS);
 
   return { reservas, isLoading, refetch };
 }

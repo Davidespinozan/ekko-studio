@@ -76,8 +76,15 @@ export default function NotificacionesBanner() {
               color: 'var(--ek-mustard)',
               cursor: 'pointer',
               fontSize: '16px',
-              padding: '0 4px',
-              lineHeight: 1
+              lineHeight: 1,
+              flexShrink: 0,
+              minWidth: '44px',
+              minHeight: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: '-10px',
+              marginRight: '-10px'
             }}
           >
             ✕

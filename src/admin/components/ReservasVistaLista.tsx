@@ -338,7 +338,7 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
               background: 'var(--ek-bg-soft)',
               border: '0.5px solid var(--ek-line)',
               borderRadius: 'var(--ek-r-md)',
-              overflow: 'hidden'
+              overflowX: 'auto'
             }}
           >
             <div
@@ -347,6 +347,7 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
                 gridTemplateColumns: '120px 90px 1.2fr 1.5fr 90px 130px 40px',
                 gap: '12px',
                 padding: '12px 16px',
+                minWidth: '760px',
                 background: 'var(--ek-bg-elevated)',
                 borderBottom: '0.5px solid var(--ek-line)',
                 fontSize: '10px',
@@ -356,7 +357,16 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
                 textTransform: 'uppercase'
               }}
             >
-              <span>Fecha</span>
+              <span
+                style={{
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 1,
+                  background: 'var(--ek-bg-elevated)'
+                }}
+              >
+                Fecha
+              </span>
               <span>Hora</span>
               <span>Estudio</span>
               <span>Miembro</span>
@@ -455,6 +465,7 @@ function ReservaRow({
         gridTemplateColumns: '120px 90px 1.2fr 1.5fr 90px 130px 40px',
         gap: '12px',
         padding: '12px 16px',
+        minWidth: '760px',
         borderBottom: '0.5px solid var(--ek-line)',
         cursor: 'pointer',
         alignItems: 'center',
@@ -464,7 +475,15 @@ function ReservaRow({
       onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--ek-mustard-soft)')}
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
-      <span style={{ color: 'var(--ek-ink-muted)' }}>
+      <span
+        style={{
+          color: 'var(--ek-ink-muted)',
+          position: 'sticky',
+          left: 0,
+          zIndex: 1,
+          background: 'var(--ek-bg-soft)'
+        }}
+      >
         {fecha.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}
       </span>
       <span style={{ color: 'var(--ek-ink)', fontWeight: 600 }}>

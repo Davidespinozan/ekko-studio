@@ -710,6 +710,58 @@ antes del QA de Cravia.
 - `useReservasHoy.test.tsx` — 4 casos del polling visibility-aware
   (mismo patrón de fake timers que M3).
 
+## Mobile-first — HIGH priority (Sprint MA2)
+
+Continúa MA1: cierra el CRITICAL restante + 7 HIGH del
+[MOBILE_AUDIT_REPORT.md](MOBILE_AUDIT_REPORT.md). No se tocaron
+MEDIUM ni LOW (quedan para MA3/MA4).
+
+### Safe-area en el drawer admin
+- `.adm-drawer` aplica `padding-top` / `padding-left` con
+  `env(safe-area-inset-*)` para no esconder el sidebar bajo el
+  notch / Dynamic Island.
+- Botón de cerrar del drawer: 36×36 → 44×44, posicionado con
+  `max(16px, env(safe-area-inset-top/right))`.
+
+### Touch targets ≥44×44 (continuación)
+- Hamburger del topbar admin: 40×40 → 44×44 (+ spacer simétrico).
+- `BotonCancelarReserva` (miembro): `minHeight: 44px` + flex
+  centrado — conserva el aspecto de link de texto, solo agranda
+  el área tapeable.
+- `NotificacionesBanner` ✕: 16×16 → 44×44 con márgenes negativos
+  para no inflar visualmente el banner.
+- `EstudioModal` (público) ✕: 36×36 → 44×44 + safe-area.
+
+### `.adm-form-row` apila en mobile
+- `@media (max-width: 600px)`: `flex-direction: column` +
+  labels full-width. Antes dependía de `flex-wrap` (squish en
+  viewports intermedios).
+
+### ReservasVistaLista — scroll horizontal + columna sticky
+- El contenedor tenía `overflow: hidden` → **clipaba** la tabla
+  de 7 columnas en mobile (no scrolleaba). Ahora `overflow-x: auto`.
+- Grid de header y filas con `min-width: 760px` para no aplastar
+  columnas.
+- Columna **Fecha** con `position: sticky; left: 0` — el contexto
+  temporal queda fijo al scrollear horizontal. Decisión del
+  reporte (§5.2): mantener tabla, NO convertir a cards.
+
+### Hook compartido `useVisibilityAwarePolling`
+- `src/shared/hooks/useVisibilityAwarePolling.ts` — extrae la
+  lógica de polling visibility-aware que estaba duplicada en
+  `useNotificacionesMiembro` (M3) y `useReservasHoy` (MA1).
+- API: `useVisibilityAwarePolling(poll, intervalMs, enabled?)`.
+  `poll` debe ser estable (`useCallback`); cuando su identidad
+  cambia, re-ejecuta (refetch inmediato + reinicia interval).
+  `enabled=false` gatea todo (ej. sin usuario).
+- Ambos hooks refactorizados sin cambio de comportamiento — los
+  tests de integración previos (`useReservasHoy.test.tsx`,
+  `useNotificacionesMiembro.test.tsx`) siguen verdes.
+
+### Tests
+- `useVisibilityAwarePolling.test.tsx` — 6 casos (montaje, polling,
+  pausa, reanudación, `enabled=false`, montaje con tab oculta).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

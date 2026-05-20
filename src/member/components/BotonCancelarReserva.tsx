@@ -82,7 +82,10 @@ export function BotonCancelarReserva({ reserva, onCancelada }: Props) {
           fontSize: '12px',
           fontWeight: 500,
           cursor: 'pointer',
+          minHeight: '44px',
           padding: '4px 8px',
+          display: 'inline-flex',
+          alignItems: 'center',
           textDecoration: 'underline',
           textUnderlineOffset: '3px'
         }}
