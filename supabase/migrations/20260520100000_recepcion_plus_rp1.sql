@@ -10,9 +10,26 @@
 --   D3: cancelación por un tercero (recepción/admin) → status='cancelada_admin'
 --       + cancelada_por + notificación in-app al miembro.
 --
+-- 0. CHECK de reservas.status — asegurar 'cancelada_admin'
 -- 1. reservar_para_miembro_atomic  (NUEVO)
 -- 2. cancelar_reserva_atomic       (CREATE OR REPLACE — amplía a recepción)
 -- ============================================================================
+
+
+-- ----------------------------------------------------------------------------
+-- 0. CHECK de reservas.status
+-- ----------------------------------------------------------------------------
+-- El schema original (20260514100500_reservas.sql) define
+--   CHECK (status IN ('confirmada','cancelada','completada','no_show'))
+-- pero el código usa 'cancelada_admin' desde el Sprint Final (admin cancela
+-- reserva ajena) y NINGUNA migración lo agregó al CHECK. O el constraint se
+-- amplió a mano en la BD (drift repo↔BD), o el admin-cancela venía fallando
+-- silenciosamente. `cancelar_reserva_atomic` (abajo) escribe 'cancelada_admin',
+-- así que lo dejamos explícito, versionado e idempotente.
+-- ----------------------------------------------------------------------------
+ALTER TABLE reservas DROP CONSTRAINT IF EXISTS reservas_status_check;
+ALTER TABLE reservas ADD CONSTRAINT reservas_status_check
+  CHECK (status IN ('confirmada', 'cancelada', 'completada', 'no_show', 'cancelada_admin'));
 
 
 -- ----------------------------------------------------------------------------
