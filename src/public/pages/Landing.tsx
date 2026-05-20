@@ -198,7 +198,14 @@ export default function Landing() {
         <a
           href={hero.cta_link || '#membresias'}
           className="ek-cta"
-          style={{ padding: '16px 28px', fontSize: '15px', display: 'inline-block' }}
+          style={{
+            padding: '16px 32px',
+            fontSize: '15px',
+            minHeight: '52px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
         >
           {hero.cta_texto}
         </a>
@@ -342,6 +349,8 @@ export default function Landing() {
                     <img
                       src={s.fotoUrl}
                       alt={s.nombre}
+                      loading="lazy"
+                      decoding="async"
                       style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                     />
                   ) : (

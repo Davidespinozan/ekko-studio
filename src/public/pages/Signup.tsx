@@ -228,11 +228,16 @@ export default function Signup() {
         ← Volver a EKKO
       </Link>
 
-      {/* Plan resumen */}
+      {/* Plan resumen — sticky para que el usuario siempre vea qué compra,
+          aunque scrollee el form con el teclado abierto. */}
       <div className="ek-card" style={{
         padding: '24px',
         marginBottom: '32px',
-        borderColor: plan.tier === 'pro' ? 'var(--ek-mustard)' : 'var(--ek-line)'
+        borderColor: plan.tier === 'pro' ? 'var(--ek-mustard)' : 'var(--ek-line)',
+        position: 'sticky',
+        top: 'env(safe-area-inset-top, 0px)',
+        zIndex: 5,
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
       }}>
         <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>
           {plan.tier === 'pro' ? '★ PRO · MEMBRESÍA' : 'MEMBRESÍA BÁSICA'}

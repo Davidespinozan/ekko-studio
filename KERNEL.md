@@ -907,6 +907,31 @@ Verificado ya-resuelto / no-issue:
 - Topbar mobile → no estaba "crowded": es solo hamburger + marca
   "EKKO ADMIN" + spacer, sin page title. Sin cambio.
 
+## Mobile MEDIUM polish — Public (Sprint MA3-Public)
+
+Cierra los MEDIUM del módulo public
+([MOBILE_AUDIT_REPORT.md](MOBILE_AUDIT_REPORT.md) §1.4). Sube Public
+de D+ a B. Polish + conversión.
+
+- **Touch targets 44px:** nav buttons de `PublicLayout` (incl.
+  "Salir"), íconos sociales del `Footer` (36→44), y los links de
+  contacto/navegación del footer (`minHeight: 44px` + inline-flex).
+  El ícono visual sigue siendo ~18-20px, solo crece el área tapeable.
+- **Hero CTA:** `padding 16px 32px` + `minHeight: 52px` +
+  `inline-flex` centrado — CTA principal cómodo de tapear.
+- **Landing — cards de estudios:** `loading="lazy"` +
+  `decoding="async"` en las fotos (están below the fold; el hero no
+  tiene imagen, así que no hay riesgo de LCP).
+- **Signup — plan resumen sticky:** `position: sticky` con
+  `top: env(safe-area-inset-top)` — el usuario sigue viendo qué
+  compra al scrollear el form con el teclado abierto. Coexiste con
+  el layout keyboard-aware de MA1/S1.
+
+Verificado ya-resuelto / no-issue:
+- EstudioModal safe-area: es un modal **centrado** (no fullscreen);
+  el close button ya quedó safe-area en MA2. Sin cambio.
+- Login keyboard-aware: ya resuelto en S1 (`100dvh` + `flex-start`).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

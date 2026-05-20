@@ -237,7 +237,9 @@ EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó
 
 ---
 
-### 1.4 PUBLIC — Grade D+ (13 findings)
+### 1.4 PUBLIC — Grade D+ → B (13 findings, ✅ todos resueltos)
+
+> **✅ MA1:** Signup keyboard-aware. **✅ MA2:** EstudioModal close 44×44 + safe-area. **✅ S1:** Login keyboard-aware. **✅ MA3-Public:** los MEDIUM — nav buttons + footer social/links 44px, Hero CTA padding, lazy loading de cards, Signup plan summary sticky. El #4 (EstudioModal backdrop safe-area) se verificó: es modal centrado, no fullscreen — no aplica. El #7 (Login alignItems center) se resolvió en S1.
 
 #### 🟠 HIGH
 

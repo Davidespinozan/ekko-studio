@@ -116,8 +116,8 @@ export default function Footer() {
                   style={{
                     color: 'var(--ek-ink-muted)',
                     display: 'inline-flex',
-                    width: '36px',
-                    height: '36px',
+                    width: '44px',
+                    height: '44px',
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderRadius: '50%',
@@ -148,11 +148,12 @@ export default function Footer() {
               <a
                 href={`mailto:${footer.email}`}
                 style={{
-                  display: 'block',
+                  display: 'flex',
+                  alignItems: 'center',
+                  minHeight: '44px',
                   fontSize: '13px',
                   color: 'var(--ek-ink-muted)',
-                  textDecoration: 'none',
-                  marginBottom: '6px'
+                  textDecoration: 'none'
                 }}
               >
                 {footer.email}
@@ -179,13 +180,27 @@ export default function Footer() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             <a
               href="/login"
-              style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', textDecoration: 'none' }}
+              style={{
+                fontSize: '13px',
+                color: 'var(--ek-ink-muted)',
+                textDecoration: 'none',
+                minHeight: '44px',
+                display: 'inline-flex',
+                alignItems: 'center'
+              }}
             >
               Iniciar sesión
             </a>
             <a
               href="#contacto"
-              style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', textDecoration: 'none' }}
+              style={{
+                fontSize: '13px',
+                color: 'var(--ek-ink-muted)',
+                textDecoration: 'none',
+                minHeight: '44px',
+                display: 'inline-flex',
+                alignItems: 'center'
+              }}
             >
               Contacto
             </a>
