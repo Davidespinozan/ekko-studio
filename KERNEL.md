@@ -944,6 +944,53 @@ Verificado ya-resuelto / no-issue:
   (Member B+, Admin B, Reception B, Public B).
 - **Pendiente mobile:** solo los 11 LOW (Sprint MA4, post-launch).
 
+## Recepción Plus — Backend (Sprint RP-1)
+
+Eleva el rol `recepcionista` con capacidades de cara al cliente. Este
+sprint es **solo backend** (RPCs + función + gate de rol + tests); la
+UI llega en RP-2/3/4. Plan completo en
+[RECEPCION_PLUS_PLAN.md](RECEPCION_PLUS_PLAN.md).
+
+Todo es **aditivo** — ninguna policy de admin se relajó.
+
+### Piezas nuevas
+- **`reservar_para_miembro_atomic`** (RPC, migración
+  `20260520100000`): recepción/admin reserva un recurso PARA un
+  miembro objetivo. Gate de rol (`admin`/`recepcionista`), valida
+  mismo tenant y `status='activo'` del miembro (D2). **Salta
+  `min_anticipacion_horas`** para walk-ins de mostrador (D1).
+  `bloqueado_hasta` (no-show) SÍ se sigue respetando.
+- **`cancelar_reserva_atomic`** (RPC ampliado, `CREATE OR REPLACE`):
+  recepción puede cancelar. Si la cancela un tercero (recepción/admin),
+  `status='cancelada_admin'` + `cancelada_por` + notificación in-app
+  "por el estudio" (D3). El miembro que cancela lo suyo sigue →
+  `cancelada`. El RPC es `SECURITY DEFINER` → inserta en
+  `notificaciones` sin chocar con la policy admin-only.
+- **`reception-create-member`** (Netlify Function): recepción/admin
+  registra miembros. `rol='miembro'` **hardcodeado** — el body no
+  tiene campo `rol` y el código nunca lo lee → recepción jamás crea
+  staff. `tenant_id` tomado del caller. `status='pendiente_pago'`.
+
+### Lo prohibido sigue prohibido (sin tocar)
+Staff (`admin-create-user`/`admin-delete-user` siguen exigiendo
+`is_admin()`), `membresias`, `payment_events`, config, tenant y
+hard-delete quedan detrás de `is_admin()`.
+
+### Tests
+- `src/__tests__/reception-create-member.test.ts` — 8 casos del gate
+  de seguridad de la función (miembro → 403, `rol` del body ignorado,
+  tenant del caller, etc.).
+- `supabase/tests/rp1_security_checks.sql` — checklist runnable de los
+  RPCs (validación manual con cuentas de prueba por rol; los RPCs
+  dependen de `auth.uid()`, no hay infra pgTAP).
+
+### Diferido
+- **D4** (modelo de membresía → "reservas restantes" del perfil):
+  no se tocó `membresias`. Se decide en RP-2.
+- `status` del miembro creado por recepción quedó `pendiente_pago`
+  (igual que `admin-create-user`). Si debe nacer `activo`, es una
+  decisión a confirmar.
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.
