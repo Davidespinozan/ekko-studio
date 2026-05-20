@@ -1,7 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@shared/lib/supabase';
 import { statusMiembro } from '../lib/miembroStatus';
+import { CrearReservaModal } from '../components/CrearReservaModal';
+import {
+  CancelarReservaRecepcionModal,
+  type ReservaParaCancelar
+} from '../components/CancelarReservaRecepcionModal';
 
 /**
  * Perfil de miembro READ-ONLY para recepción (Sprint RP-2).
@@ -69,6 +74,19 @@ export default function PerfilMiembroRecepcion() {
   const [reservas, setReservas] = useState<ReservaPerfil[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [noEncontrado, setNoEncontrado] = useState(false);
+  const [crearOpen, setCrearOpen] = useState(false);
+  const [cancelarTarget, setCancelarTarget] = useState<ReservaParaCancelar | null>(null);
+
+  const recargarReservas = useCallback(async () => {
+    if (!id) return;
+    const { data } = await supabase
+      .from('reservas')
+      .select('id, slot_inicio, status, folio, recurso:recursos(nombre)')
+      .eq('usuario_id', id)
+      .order('slot_inicio', { ascending: false })
+      .limit(50);
+    setReservas((data ?? []) as unknown as ReservaPerfil[]);
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -91,16 +109,8 @@ export default function PerfilMiembroRecepcion() {
         return;
       }
       setMiembro(m as MiembroPerfil);
-
-      const { data: r } = await supabase
-        .from('reservas')
-        .select('id, slot_inicio, status, folio, recurso:recursos(nombre)')
-        .eq('usuario_id', id!)
-        .order('slot_inicio', { ascending: false })
-        .limit(50);
-
+      await recargarReservas();
       if (!mounted) return;
-      setReservas((r ?? []) as unknown as ReservaPerfil[]);
       setIsLoading(false);
     }
 
@@ -108,7 +118,7 @@ export default function PerfilMiembroRecepcion() {
     return () => {
       mounted = false;
     };
-  }, [id]);
+  }, [id, recargarReservas]);
 
   if (isLoading) {
     return (
@@ -214,14 +224,45 @@ export default function PerfilMiembroRecepcion() {
         <Dato label="Miembro desde" valor={fechaCorta(miembro.created_at)} />
       </div>
 
-      {/* RP-3: acá van las acciones (crear / cancelar / reprogramar reserva).
-          No se implementan en RP-2 — solo el perfil read-only. */}
+      {/* Acciones de reserva (RP-3a). Reprogramar llega en RP-3b. */}
+      <div style={{ marginBottom: '20px' }}>
+        <button
+          type="button"
+          onClick={() => setCrearOpen(true)}
+          disabled={miembro.status !== 'activo'}
+          className="ek-cta"
+          style={{
+            minHeight: '44px',
+            opacity: miembro.status !== 'activo' ? 0.5 : 1,
+            cursor: miembro.status !== 'activo' ? 'not-allowed' : 'pointer'
+          }}
+        >
+          + Crear reserva
+        </button>
+        {miembro.status !== 'activo' && (
+          <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
+            El miembro no está activo — no se puede reservar. Derivá con administración.
+          </p>
+        )}
+      </div>
 
       <Seccion titulo="PRÓXIMAS RESERVAS">
         {proximas.length === 0 ? (
           <p className="ek-body-faint">Sin reservas próximas.</p>
         ) : (
-          proximas.map((r) => <FilaReserva key={r.id} reserva={r} />)
+          proximas.map((r) => (
+            <FilaReserva
+              key={r.id}
+              reserva={r}
+              onCancelar={() =>
+                setCancelarTarget({
+                  id: r.id,
+                  slot_inicio: r.slot_inicio,
+                  recurso_nombre: r.recurso?.nombre ?? 'Estudio'
+                })
+              }
+            />
+          ))
         )}
       </Seccion>
 
@@ -232,6 +273,27 @@ export default function PerfilMiembroRecepcion() {
           historial.slice(0, 15).map((r) => <FilaReserva key={r.id} reserva={r} historico />)
         )}
       </Seccion>
+
+      {crearOpen && (
+        <CrearReservaModal
+          miembro={{
+            id: miembro.id,
+            nombre: capitalizar(miembro.nombre) || miembro.email,
+            membresia_tier: miembro.membresia_tier
+          }}
+          onClose={() => setCrearOpen(false)}
+          onCreada={recargarReservas}
+        />
+      )}
+
+      {cancelarTarget && (
+        <CancelarReservaRecepcionModal
+          reserva={cancelarTarget}
+          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
+          onClose={() => setCancelarTarget(null)}
+          onCancelada={recargarReservas}
+        />
+      )}
     </div>
   );
 }
@@ -258,7 +320,15 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
   );
 }
 
-function FilaReserva({ reserva, historico }: { reserva: ReservaPerfil; historico?: boolean }) {
+function FilaReserva({
+  reserva,
+  historico,
+  onCancelar
+}: {
+  reserva: ReservaPerfil;
+  historico?: boolean;
+  onCancelar?: () => void;
+}) {
   const cancelada = reserva.status === 'cancelada' || reserva.status === 'cancelada_admin';
   return (
     <div
@@ -287,9 +357,33 @@ function FilaReserva({ reserva, historico }: { reserva: ReservaPerfil; historico
       <span style={{ flex: 1, minWidth: 0, fontSize: '13px', color: 'var(--ek-ink-muted)' }}>
         {reserva.recurso?.nombre ?? '—'}
       </span>
-      <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', flexShrink: 0 }}>
-        {reserva.status}
-      </span>
+      {onCancelar ? (
+        <button
+          type="button"
+          onClick={onCancelar}
+          style={{
+            flexShrink: 0,
+            minHeight: '44px',
+            padding: '4px 10px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--ek-danger)',
+            fontSize: '12px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            textDecoration: 'underline',
+            textUnderlineOffset: '3px'
+          }}
+        >
+          Cancelar
+        </button>
+      ) : (
+        <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', flexShrink: 0 }}>
+          {reserva.status}
+        </span>
+      )}
     </div>
   );
 }

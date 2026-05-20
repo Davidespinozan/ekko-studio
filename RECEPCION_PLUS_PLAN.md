@@ -25,7 +25,11 @@ sin abrir acceso a gestión del negocio.
   `main`): tabs de recepción (Check-in · Miembros), `BuscarMiembro`,
   `PerfilMiembroRecepcion` (vista nueva read-only, NO reusa
   `MiembroDetalle` — riesgos R3/R6 respetados). Sin backend nuevo.
-- ⬜ RP-3 — UI crear / cancelar / reprogramar reserva (cuelga del perfil).
+- **✅ RP-3a — UI crear + cancelar reserva** (commit en `main`):
+  `CrearReservaModal` + `CancelarReservaRecepcionModal` colgados del
+  perfil. D1 (walk-ins), D2 (botón disabled si no-activo), D3 (RPC
+  setea cancelada_admin + notifica). Consume los RPCs de RP-1.
+- ⬜ RP-3b — UI reprogramar reserva.
 - ⬜ RP-4 — UI registrar miembro.
 
 ---

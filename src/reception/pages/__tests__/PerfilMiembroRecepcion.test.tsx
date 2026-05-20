@@ -106,4 +106,19 @@ describe('PerfilMiembroRecepcion · read-only', () => {
     expect(screen.getAllByText(/suspendido/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/derivá al cliente con administración/i)).toBeInTheDocument();
   });
+
+  it('D2 — miembro activo: botón "Crear reserva" habilitado', async () => {
+    renderPerfil();
+    await screen.findByText('Ana López');
+    const btn = screen.getByRole('button', { name: /crear reserva/i });
+    expect(btn).not.toBeDisabled();
+  });
+
+  it('D2 — miembro no-activo: botón "Crear reserva" deshabilitado', async () => {
+    hoisted.miembro = { ...hoisted.miembro, status: 'suspendido' };
+    renderPerfil();
+    await screen.findByText('Ana López');
+    const btn = screen.getByRole('button', { name: /crear reserva/i });
+    expect(btn).toBeDisabled();
+  });
 });

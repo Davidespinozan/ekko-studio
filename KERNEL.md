@@ -1079,6 +1079,53 @@ leyendo `membresias` en un sprint posterior.
   (`select`/`input`/`textarea`/reset/eliminar/etc.) — atrapa
   cualquier regresión que meta edición en la vista de recepción.
 
+## Recepción Plus — Crear + cancelar reserva (RP-3a)
+
+Acciones de reserva desde el perfil de un miembro en recepción.
+Consume los RPCs de RP-1 (ya aplicados).
+
+### Crear reserva (walk-in)
+- Botón "+ Crear reserva" en `PerfilMiembroRecepcion` → abre
+  `CrearReservaModal` (recurso → fecha → slot → notas → confirmar).
+- Reusa la lógica de slots del miembro (`reservaLogic`) — no se
+  duplica. **D1:** el config se arma con `anticipacion_min_horas: 0`
+  para que `generarSlotsDisponibles` no esconda los horarios
+  cercanos (recepción reserva walk-ins).
+- **D2:** el botón está `disabled` si el miembro no está `activo`,
+  con mensaje claro. El RPC valida igual (defensa en backend).
+- Llama `reservar_para_miembro_atomic` con `p_usuario_id` = id del
+  miembro objetivo.
+
+### Cancelar reserva
+- Cada reserva en "próximas" del perfil tiene acción "Cancelar" →
+  `CancelarReservaRecepcionModal` (confirmación + motivo opcional).
+- **D3:** el RPC `cancelar_reserva_atomic` detecta que recepción ≠
+  dueño → `status='cancelada_admin'` + `cancelada_por` + notifica al
+  miembro. El front solo llama.
+
+### Errores
+- `traducirErrorReserva` (reception lib): traduce los códigos de
+  los RPCs a mensajes claros. Cubre los nuevos de RP-1
+  (`EKKO_MIEMBRO_*`) y delega los compartidos a `traducirErrorRPC`
+  del módulo miembro. Fallback genérico — nunca expone el crudo.
+
+### Modelo de cobro
+Sin definir → crear reserva NO descuenta saldo (el RPC solo
+registra acceso). Si termina siendo por créditos, se revisa.
+
+### Tests
+- `traducirErrorReserva` — 3 casos (códigos RP-1, delegación,
+  fallback que no filtra el mensaje crudo).
+- `CrearReservaModal` — wiring: confirma → `reservar_para_miembro_atomic`
+  con `p_usuario_id` del miembro; error → toast traducido.
+- `CancelarReservaRecepcionModal` — confirma → `cancelar_reserva_atomic`
+  con el `reserva_id` correcto; error → toast, no cierra.
+- `PerfilMiembroRecepcion` — D2 (botón disabled si no-activo). El
+  test de seguridad de RP-2 sigue verde (las acciones de reserva no
+  son edición de datos del miembro).
+
+Pendiente: RP-3b (reprogramar), RP-4 (registrar miembro).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.
