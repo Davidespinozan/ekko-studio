@@ -21,8 +21,11 @@ sin abrir acceso a gestión del negocio.
   (reprogramar) es de RP-3.
   ⚠️ **Pendiente operativo:** aplicar la migración al Supabase de EKKO
   y correr `supabase/tests/rp1_security_checks.sql`.
-- ⬜ RP-2 — Búsqueda de padrón + perfil read-only.
-- ⬜ RP-3 — UI crear / cancelar / reprogramar reserva.
+- **✅ RP-2 — Navegación + búsqueda + perfil read-only** (commit en
+  `main`): tabs de recepción (Check-in · Miembros), `BuscarMiembro`,
+  `PerfilMiembroRecepcion` (vista nueva read-only, NO reusa
+  `MiembroDetalle` — riesgos R3/R6 respetados). Sin backend nuevo.
+- ⬜ RP-3 — UI crear / cancelar / reprogramar reserva (cuelga del perfil).
 - ⬜ RP-4 — UI registrar miembro.
 
 ---

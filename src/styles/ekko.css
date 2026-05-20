@@ -832,6 +832,90 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     width: 100%;
   }
 
+  /* ----- Navegación de recepción (tabs superiores — Sprint RP-2) ----- */
+  /* Tabs arriba (no bottom-nav): el Scanner tiene un FAB inferior. */
+  .rec-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 6px 24px 0;
+    max-width: 920px;
+    margin: 0 auto;
+    width: 100%;
+    border-bottom: 0.5px solid var(--ek-line);
+    flex-shrink: 0;
+  }
+
+  .rec-tab {
+    flex: 1;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--ek-ink-muted);
+    font-family: var(--ek-font-body);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .rec-tab:hover {
+    color: var(--ek-ink);
+  }
+
+  .rec-tab--active {
+    color: var(--ek-mustard);
+    border-bottom-color: var(--ek-mustard);
+  }
+
+  /* ----- Cards de búsqueda de padrón (RP-2) ----- */
+  .rec-miembro-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    min-height: 64px;
+    padding: 14px 16px;
+    text-align: left;
+    background: var(--ek-bg-soft);
+    border: 0.5px solid var(--ek-line);
+    border-radius: var(--ek-r-md);
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    text-decoration: none;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+
+  .rec-miembro-card:hover {
+    border-color: var(--ek-mustard-dim);
+    background: var(--ek-mustard-soft);
+  }
+
+  .rec-miembro-card-info { flex: 1; min-width: 0; }
+
+  .rec-miembro-card-nombre {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--ek-ink);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .rec-miembro-card-email {
+    font-size: 12px;
+    color: var(--ek-ink-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .rec-day-selector {
     display: flex;
     align-items: center;

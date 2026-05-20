@@ -1,20 +1,9 @@
 import { useCallback, useState } from 'react';
-import { useAuth } from '@shared/hooks/useAuth';
 import { backendPost } from '@shared/lib/backend';
 import { ReservasHoyView } from '../components/ReservasHoyView';
 import { CheckInDetail } from '../components/CheckInDetail';
 import { CameraModal } from '../components/CameraModal';
 import { useScannerHID } from '../hooks/useScannerHID';
-
-function capitalizarNombre(s: string | undefined | null): string {
-  if (!s) return '';
-  return s
-    .toLowerCase()
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
 
 interface VerifyResponse {
   success: boolean;
@@ -34,7 +23,6 @@ type DetailState =
   | { kind: 'error'; message: string };
 
 export default function Scanner() {
-  const { usuario, signOut } = useAuth();
   const [detail, setDetail] = useState<DetailState>({ kind: 'none' });
   const [cameraOpen, setCameraOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -62,51 +50,8 @@ export default function Scanner() {
     setRefreshTick((t) => t + 1);
   };
 
-  const nombreUsuarioFormat = capitalizarNombre(usuario?.nombre) || usuario?.email || '';
-
   return (
-    <div className="rec-shell">
-      <header className="ek-header-glass">
-        <div
-          className="ek-header-inner"
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-        >
-          <div>
-            <p
-              className="ek-eyebrow ek-eyebrow--mustard"
-              style={{ marginBottom: '4px', fontSize: '10px' }}
-            >
-              RECEPCIÓN
-            </p>
-            <p
-              style={{
-                fontFamily: 'var(--ek-font-display)',
-                fontSize: '18px',
-                fontWeight: 700,
-                letterSpacing: '-0.03em',
-                margin: 0,
-                color: 'var(--ek-mustard)'
-              }}
-            >
-              EKKO Studio
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--ek-ink-muted)' }}>
-              {nombreUsuarioFormat}
-            </span>
-            <button
-              onClick={signOut}
-              className="ek-icon-btn"
-              style={{ width: 'auto', padding: '8px 14px', fontSize: '13px' }}
-            >
-              Salir
-            </button>
-          </div>
-        </div>
-      </header>
-
+    <>
       <div className="rec-main">
         <ReservasHoyView
           key={refreshTick}
@@ -187,6 +132,6 @@ export default function Scanner() {
           />
         </div>
       )}
-    </div>
+    </>
   );
 }

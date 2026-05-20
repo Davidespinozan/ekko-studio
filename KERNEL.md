@@ -1027,6 +1027,58 @@ El repo es la fuente de verdad de las funciones Postgres — no
 quedan RPCs fuera de control de versiones. Tras eliminar la Edge
 Function del dashboard, tampoco quedan objetos huérfanos.
 
+## Recepción Plus — UI navegación + búsqueda + perfil (RP-2)
+
+Primera capa de UI de Recepción Plus. Base sobre la que cuelgan
+RP-3 (crear/cancelar/reprogramar) y RP-4 (registrar miembro).
+Sin backend nuevo — recepción ya lee `usuarios`/`reservas` del
+tenant vía RLS.
+
+### Navegación de recepción
+- `ReceptionLayout` ahora rinde el chrome compartido: header
+  (marca + Salir) + **tabs superiores** (Check-in · Miembros).
+  Tabs arriba, no bottom-nav: el Scanner tiene un FAB inferior.
+- `Scanner` se refactorizó — soltó su header propio y el wrapper
+  `rec-shell` (ahora los da el layout). Quedó solo con su
+  contenido + FAB + modales.
+- Rutas: `/recepcion` (Scanner), `/recepcion/miembros`
+  (BuscarMiembro), `/recepcion/miembros/:id` (perfil). Todas bajo
+  el guard de rol existente.
+
+### Búsqueda de padrón
+- `BuscarMiembro`: busca `usuarios` del tenant (`rol='miembro'`)
+  por nombre o email con `ilike`. Debounce 200ms. Input sanitizado
+  (se quitan `,%()_` que rompen `.or()` / son wildcards). Estados:
+  inicial, loading (skeleton), vacío, resultados.
+
+### Perfil read-only
+- `PerfilMiembroRecepcion`: vista **NUEVA**, NO reusa
+  `MiembroDetalle` de admin (riesgo R3 — ese edita status/rol/tier,
+  resetea password, borra). Recepción solo consulta.
+- Muestra: nombre, email, teléfono, plan, estado, inasistencias,
+  alta, próximas reservas e historial. Estado de cuenta con alerta
+  visible (recepción puede explicarle al cliente por qué su cuenta
+  no está activa o está bloqueada por no-show).
+- NO pide `stripe_customer_id` ni `ob_data` en el SELECT (riesgo
+  R6). NO renderiza ningún control de edición.
+- Marcador en el JSX donde RP-3 colgará las acciones de reserva.
+
+### `staff` vs `miembro` en búsqueda
+La búsqueda filtra `rol='miembro'` (el caso de uso es atender
+clientes, no staff).
+
+### D4 diferido
+"Clases restantes" omitido — se asume membresía por tier
+(ilimitada dentro del tier). Si Cravia confirma conteo, se agrega
+leyendo `membresias` en un sprint posterior.
+
+### Tests
+- `miembroStatus.test.ts` — 4 casos del helper de estado.
+- `PerfilMiembroRecepcion.test.tsx` — 3 casos, **de seguridad**:
+  verifica que el perfil NO renderiza controles de edición
+  (`select`/`input`/`textarea`/reset/eliminar/etc.) — atrapa
+  cualquier regresión que meta edición en la vista de recepción.
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.
