@@ -270,7 +270,10 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
               )}
             </Block>
 
-            <div style={{ display: 'flex', gap: '8px', marginTop: '20px' }}>
+            <div
+              className="adm-modal-actions"
+              style={{ display: 'flex', gap: '8px', marginTop: '20px' }}
+            >
               <button
                 type="button"
                 onClick={onClose}

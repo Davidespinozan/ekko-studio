@@ -126,12 +126,14 @@ export default function ConfirmDialog({
           id="confirm-dialog-title"
           style={{
             fontFamily: 'var(--ek-font-display)',
-            fontSize: '20px',
+            fontSize: 'clamp(1rem, 4vw, 1.25rem)',
             fontWeight: 700,
             letterSpacing: '-0.02em',
+            lineHeight: 1.3,
             margin: 0,
             marginBottom: '12px',
-            color: 'var(--ek-ink)'
+            color: 'var(--ek-ink)',
+            overflowWrap: 'break-word'
           }}
         >
           {title}

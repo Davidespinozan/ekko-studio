@@ -168,7 +168,9 @@ EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó
 
 ---
 
-### 1.3 ADMIN — Grade D (16 findings) ⚠️ MÓDULO MÁS CRÍTICO
+### 1.3 ADMIN — Grade D → B (16 findings, ✅ todos resueltos)
+
+> **✅ MA1:** Calendario, CardMenuDropdown. **✅ MA2:** Sidebar drawer safe-area + close, Hamburger, `.adm-form-row`, ReservasVistaLista. **✅ MA3-Admin:** los 7 MEDIUM — `.adm-modal` padding clamp, ConfirmDialog title wrap, `.adm-sidebar-item` 44px, DetalleReservaModal buttons stack, AdminDashboard MetricaCards 2-col. El #3 (topbar) se verificó: no estaba crowded (solo marca, sin page title) — sin cambio. El #7 (sidebar safe-area) ya estaba en MA2.
 
 #### 🔴 CRITICAL
 

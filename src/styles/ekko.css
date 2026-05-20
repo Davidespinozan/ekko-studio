@@ -1410,7 +1410,8 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 12px;
+    min-height: 44px;
+    padding: 10px 16px;
     border-radius: 10px;
     color: var(--ek-ink-muted);
     text-decoration: none;
@@ -1923,7 +1924,8 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     background: var(--ek-bg-soft);
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-card);
-    padding: 24px;
+    /* Padding responsive: 24px desktop, ~16px en 375px (era cramped). */
+    padding: clamp(16px, 4vw, 24px);
     max-width: 600px;
     width: 100%;
     max-height: 90vh;
@@ -1933,6 +1935,33 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     gap: 12px;
     box-shadow: var(--ek-shadow-modal);
     color: var(--ek-ink);
+  }
+
+  /* Fila de acciones de modales admin: en mobile apila vertical
+     full-width para tap cómodo (Sprint MA3-Admin). */
+  @media (max-width: 480px) {
+    .adm-modal-actions {
+      flex-direction: column;
+    }
+    .adm-modal-actions button {
+      width: 100%;
+      min-height: 44px;
+    }
+  }
+
+  /* MetricaCards del AdminDashboard: 2 columnas en mobile (compactas),
+     auto-fit desde 720px. */
+  .adm-metricas-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  @media (min-width: 720px) {
+    .adm-metricas-grid {
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
   }
 
   @media (min-width: 768px) {

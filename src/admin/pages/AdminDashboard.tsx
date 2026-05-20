@@ -284,14 +284,7 @@ function SeccionTuMes({ data }: { data: DashboardData }) {
         subtitle={`${mesActual.charAt(0).toUpperCase() + mesActual.slice(1)} ${ahora.getFullYear()}`}
       />
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-          gap: '12px',
-          marginBottom: '20px'
-        }}
-      >
+      <div className="adm-metricas-grid">
         <MetricaCard
           valor={data.reservasMesActual}
           label="RESERVAS"

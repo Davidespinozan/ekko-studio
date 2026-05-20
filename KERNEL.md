@@ -884,6 +884,29 @@ Member de C+ a B+. Polish, sin bloqueantes.
   `opacity 0.4` + color tenue (el finding apuntaba a una línea
   equivocada).
 
+## Mobile MEDIUM polish — Admin (Sprint MA3-Admin)
+
+Cierra los MEDIUM del módulo admin
+([MOBILE_AUDIT_REPORT.md](MOBILE_AUDIT_REPORT.md) §1.3). Sube Admin
+de D a B. Polish, sin bloqueantes.
+
+- **.adm-modal:** `padding: clamp(16px, 4vw, 24px)` — en 375px ya no
+  queda cramped (usado en NuevaPersonaModal, Recursos, Tiers).
+- **ConfirmDialog:** título con `overflowWrap: break-word` +
+  `fontSize: clamp(1rem, 4vw, 1.25rem)` — títulos largos wrappean.
+- **.adm-sidebar-item:** `min-height: 44px` (era ~34px) — tap
+  target cómodo en el drawer mobile, sigue OK en desktop.
+- **DetalleReservaModal:** la fila de acciones usa `.adm-modal-actions`
+  — en `@media ≤480px` apila los botones vertical full-width.
+- **AdminDashboard MetricaCards:** clase `.adm-metricas-grid` —
+  2 columnas en mobile (compactas), `auto-fit` desde 720px. Antes
+  el `minmax(180px)` daba 1 sola columna en 375px.
+
+Verificado ya-resuelto / no-issue:
+- Sidebar drawer safe-area-top → cerrado en MA2 (CRITICAL #3).
+- Topbar mobile → no estaba "crowded": es solo hamburger + marca
+  "EKKO ADMIN" + spacer, sin page title. Sin cambio.
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.
