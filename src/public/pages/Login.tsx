@@ -1,13 +1,25 @@
-import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState, FormEvent } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@shared/lib/supabase';
+import { validarStatusCuenta, traducirErrorAuth } from '@shared/lib/validarStatusCuenta';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Mensaje que viene del guard de MemberLayout (sesión vieja invalidada).
+  useEffect(() => {
+    const state = location.state as { mensaje?: string } | null;
+    if (state?.mensaje) {
+      setError(state.mensaje);
+      // Limpiar el state para que no reaparezca al refrescar.
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -15,21 +27,48 @@ export default function Login() {
     setIsSubmitting(true);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password
-      });
+      // 1. Autenticar.
+      const { data: authData, error: signInError } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password
+        });
 
-      if (signInError) {
-        setError(traducirError(signInError.message));
+      if (signInError || !authData.user) {
+        setError(traducirErrorAuth(signInError?.message ?? ''));
         setIsSubmitting(false);
         return;
       }
 
-      // El useRoleRedirect del PublicLayout mueve al área correcta según rol.
-      navigate('/', { replace: true });
-    } catch (err) {
-      setError('Error inesperado. Intenta de nuevo.');
+      // 2. Traer perfil + status ANTES de cualquier redirect.
+      const { data: perfil, error: perfilError } = await supabase
+        .from('usuarios')
+        .select('rol, status')
+        .eq('auth_id', authData.user.id)
+        .maybeSingle();
+
+      if (perfilError || !perfil) {
+        await supabase.auth.signOut();
+        setError('No encontramos tu cuenta. Contactá al estudio.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 3. Validar status ANTES del redirect (evita el flash de /app).
+      const validacion = validarStatusCuenta(perfil);
+      if (!validacion.permitido) {
+        await supabase.auth.signOut();
+        setError(validacion.mensaje ?? 'Tu cuenta no está activa.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 4. Status OK — redirect directo según rol (sin saltos intermedios).
+      if (perfil.rol === 'admin') navigate('/admin', { replace: true });
+      else if (perfil.rol === 'recepcionista') navigate('/recepcion', { replace: true });
+      else navigate('/app', { replace: true });
+    } catch {
+      setError('No pudimos iniciar sesión. Intentá de nuevo o contactá al estudio.');
       setIsSubmitting(false);
     }
   }
@@ -103,17 +142,4 @@ export default function Login() {
       </div>
     </div>
   );
-}
-
-function traducirError(message: string): string {
-  if (message.includes('Invalid login credentials')) {
-    return 'Email o contraseña incorrectos';
-  }
-  if (message.includes('Email not confirmed')) {
-    return 'Necesitas confirmar tu email primero';
-  }
-  if (message.includes('Too many requests')) {
-    return 'Demasiados intentos. Espera unos minutos.';
-  }
-  return message;
 }

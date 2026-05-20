@@ -813,6 +813,53 @@ módulo completo y profesional para el QA con Magaly.
   salida manual; "Reintentar" re-pide cámara; "Usar check-in
   manual" cierra.
 
+## Auth hardening (Sprint S1)
+
+Endurece la puerta de entrada antes del QA con usuarios reales.
+
+### Status check antes del redirect
+- **Bug que cierra:** login OK → flash de `/app` → `MemberLayout`
+  deslogueaba con toast → rebote a `/login`. La validación de status
+  ocurría POST-redirect.
+- **Fix:** `Login.tsx` trae el perfil (`rol, status`) y valida
+  **antes** de cualquier redirect. Si el status no permite entrar:
+  `signOut()` + mensaje claro, sin redirect. Si permite: navega
+  directo según rol (`/admin` · `/recepcion` · `/app`), sin saltos
+  intermedios por `useRoleRedirect`.
+
+### `validarStatusCuenta` — fuente única de verdad
+- `src/shared/lib/validarStatusCuenta.ts` — un mensaje claro por
+  estado. Estados reales del enum: `pendiente_onboarding`,
+  `pendiente_pago`, `activo`, `suspendido`, `cancelado`. Maneja
+  `revocado` defensivamente (lo usa código admin pero no está en el
+  CHECK) y cualquier status desconocido → bloquea + loguea.
+- **NO valida `bloqueado_hasta`.** Es penalización de no-show
+  (restricción de RESERVA, no de login): el miembro bloqueado puede
+  entrar y ver el banner "RESTRICCIÓN ACTIVA" del Dashboard.
+
+### `traducirErrorAuth`
+- Traduce errores de Supabase Auth a copy human (credenciales,
+  email no confirmado, rate limit, red). Fallback genérico que
+  **nunca expone el mensaje técnico crudo**.
+
+### MemberLayout guard
+- Sigue como defensa profunda (sesión vieja cuyo status cambió
+  mientras el miembro estaba dentro). Reusa `validarStatusCuenta`;
+  al expulsar, redirige a `/login` con `state.mensaje`. `Login`
+  lee ese state y muestra el mensaje (no deslogueo silencioso).
+
+### Signup
+- Validaciones: nombre ≥2 chars, email con regex + lowercase/trim,
+  password ≥8 (antes 6), confirmación. Email duplicado → mensaje
+  claro sugiriendo iniciar sesión.
+- El mock de tarjeta (sin Luhn) se mantiene — el pago real llega
+  con Stripe.
+
+### Tests
+- `validarStatusCuenta.test.ts` — 14 casos (un estado por case,
+  status desconocido, `bloqueado_hasta` ignorado; errores de auth
+  traducidos + fallback que no filtra el mensaje crudo).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

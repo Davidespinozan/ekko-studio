@@ -18,6 +18,8 @@ interface TierRow {
   beneficios: unknown;
 }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function parseBeneficios(raw: unknown): string[] {
   if (Array.isArray(raw)) return raw.filter((b): b is string => typeof b === 'string');
   if (typeof raw === 'string') {
@@ -114,12 +116,23 @@ export default function Signup() {
     e.preventDefault();
     setError(null);
 
-    if (password !== passwordConfirm) {
-      setError('Las contraseñas no coinciden.');
+    const emailNorm = email.trim().toLowerCase();
+    const nombreNorm = nombre.trim();
+
+    if (nombreNorm.length < 2) {
+      setError('Ingresá tu nombre completo.');
       return;
     }
-    if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.');
+    if (!EMAIL_REGEX.test(emailNorm)) {
+      setError('Ingresá un email válido.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError('Las contraseñas no coinciden.');
       return;
     }
     if (cardNumber.replace(/\s/g, '').length !== 16) {
@@ -145,8 +158,8 @@ export default function Signup() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          nombre,
-          email,
+          nombre: nombreNorm,
+          email: emailNorm,
           password,
           tier: plan!.tier
         })
@@ -155,12 +168,21 @@ export default function Signup() {
       const result = await response.json();
 
       if (!response.ok) {
+        const errMsg = String(result.error ?? '').toLowerCase();
+        if (
+          errMsg.includes('already') ||
+          errMsg.includes('registered') ||
+          errMsg.includes('exists') ||
+          errMsg.includes('duplicate')
+        ) {
+          throw new Error('Ya existe una cuenta con este email. Iniciá sesión.');
+        }
         throw new Error(result.error || 'Error al procesar pago');
       }
 
       // Auto-login
       const { error: loginError } = await supabase.auth.signInWithPassword({
-        email,
+        email: emailNorm,
         password
       });
 
@@ -275,10 +297,11 @@ export default function Signup() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            minLength={6}
+            minLength={8}
             disabled={isProcessing}
             autoComplete="new-password"
           />
+          <p className="ek-helper-text">Mínimo 8 caracteres.</p>
         </div>
 
         <div className="ek-form-field">

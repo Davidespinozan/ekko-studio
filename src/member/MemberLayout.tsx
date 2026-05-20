@@ -1,7 +1,7 @@
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
-import { useToast } from '@shared/hooks/useToast';
+import { validarStatusCuenta } from '@shared/lib/validarStatusCuenta';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { DemoBanner } from '@shared/components/DemoBanner';
 import NotificacionesBanner from './components/NotificacionesBanner';
@@ -14,39 +14,30 @@ const MiQR = lazy(() => import('./pages/MiQR'));
 const Estudios = lazy(() => import('./pages/Estudios'));
 const EstudioDetalle = lazy(() => import('./pages/EstudioDetalle'));
 
-function mensajeStatus(status: string): string {
-  if (status === 'suspendido')
-    return 'Tu cuenta ha sido suspendida. Contacta al administrador para más información.';
-  if (status === 'cancelado') return 'Tu cuenta ha sido cancelada.';
-  if (status === 'pendiente_onboarding')
-    return 'Tu cuenta aún no completa el onboarding. Contacta al administrador.';
-  if (status === 'pendiente_pago')
-    return 'Tu cuenta está pendiente de pago. Contacta al administrador.';
-  return 'Tu cuenta no está activa. Contacta al administrador.';
-}
-
 export default function MemberLayout() {
   const { authUser, usuario, isLoading, signOut } = useAuth();
-  const toast = useToast();
   const location = useLocation();
   const yaCerrado = useRef(false);
+
+  // Defensa profunda: el chequeo principal de status vive en Login (S1).
+  // Acá cubrimos la sesión vieja cuyo status cambió mientras estaba dentro.
+  const validacion = usuario ? validarStatusCuenta(usuario) : null;
 
   useEffect(() => {
     if (isLoading) return;
     if (!authUser || !usuario) return;
-    if (usuario.status === 'activo') return;
+    if (validarStatusCuenta(usuario).permitido) return;
     if (yaCerrado.current) return;
     yaCerrado.current = true;
-
-    toast.error(mensajeStatus(usuario.status), 8000);
     // signOut limpia la sesión; el Navigate de abajo redirige a /login
+    // con el mensaje claro (no flash, no deslogueo silencioso).
     void signOut();
-  }, [authUser, usuario, isLoading, signOut, toast]);
+  }, [authUser, usuario, isLoading, signOut]);
 
   if (isLoading) return <LoadingScreen />;
   if (!authUser) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (usuario && usuario.status !== 'activo') {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  if (usuario && validacion && !validacion.permitido) {
+    return <Navigate to="/login" state={{ mensaje: validacion.mensaje }} replace />;
   }
 
   return (
