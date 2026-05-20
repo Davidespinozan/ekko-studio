@@ -11,22 +11,22 @@
 
 EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó **48 findings** distribuidos en 4 módulos. La buena noticia: el viewport meta está bien configurado (`viewport-fit=cover` + `interactive-widget=resizes-visual`), el patrón `.ek-skeleton` está adoptado en miembro, y BottomNav + Scanner FAB ya usan `env(safe-area-inset-*)`. La mala: **3 issues bloquean operación crítica** (Admin Calendario inutilizable en mobile, Signup oculta CTA detrás del teclado, slot grid del miembro corta horarios).
 
-**Grades por módulo:**
-| Módulo | Grade | Findings | Bloqueantes |
-|--------|-------|----------|-------------|
-| **Member** | C+ | 11 | Slot grid + 2 botones <44px |
-| **Reception** | C+ | 17 | Pause-on-blur + HID conflict |
-| **Admin** | **D** | 16 | Calendario 7-col + CardMenu 32px + Table overflow |
-| **Public** | D+ | 13 | Signup CTA oculto detrás del teclado |
-| **TOTAL** | **C-** | **48** | **6 CRITICAL/HIGH bloqueantes** |
+**Grades por módulo** (inicial → tras MA1/MA2/R2/MA3):
+| Módulo | Grade | Findings | Estado |
+|--------|-------|----------|--------|
+| **Member** | C+ → **B+** | 11 | ✅ todos resueltos |
+| **Reception** | C+ → **B** | 17 | ✅ todos resueltos (`useScannerHID` descartado) |
+| **Admin** | D → **B** | 16 | ✅ todos resueltos |
+| **Public** | D+ → **B** | 13 | ✅ todos resueltos |
+| **TOTAL** | C- → **B** | **48** | ✅ CRITICAL + HIGH + MEDIUM cerrados · quedan 11 LOW (MA4) |
 
 **Distribución por severidad:**
 - 🔴 **CRITICAL: 3** → ✅ **3/3 resueltos** (MA1 ×2, MA2 ×1)
 - 🟠 **HIGH: 10** → ✅ **10/10 resueltos** (MA1 ×3, MA2 ×7) — `useScannerHID` descartado: Cravia usa solo cámara, listener HID es dead code en su contexto.
-- 🟡 **MEDIUM: 24** — pendiente Sprint MA3
+- 🟡 **MEDIUM: 24** → ✅ **24/24 resueltos** (R2, MA3-Member, MA3-Admin, MA3-Public, MA3-Reception)
 - 🟢 **LOW: 11** — pendiente Sprint MA4 (post-launch)
 
-> **Estado:** todos los CRITICAL y HIGH cerrados. EKKO operable en iPhone sin bloqueantes. Quedan MEDIUM (polish) y LOW.
+> **Estado:** MA3 COMPLETO. Todos los CRITICAL, HIGH y MEDIUM cerrados. Los 4 módulos en grade B o mejor (Member B+, Admin B, Reception B, Public B). Solo quedan los 11 LOW (MA4, post-launch).
 
 ### Top 5 issues más graves
 
@@ -141,7 +141,7 @@ EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó
 
 #### 🟡 MEDIUM (10 findings — comprimidos)
 
-> **✅ Resueltos en R2 (9/10):** search clear ✕ + edge, filter pills ✕, CameraModal close safe-area, CheckInDetail safe-area lateral, skeleton inicial, CameraModal retry de permiso, status badge contraste, polling pausa con modal abierto. **Pendiente:** #9 ManualCheckInModal safe-area lateral (landscape-only, queda para MA3).
+> **✅ Resueltos (10/10):** R2 cerró 9 (search clear ✕ + edge, filter pills ✕, CameraModal close safe-area, CheckInDetail safe-area lateral, skeleton inicial, CameraModal retry de permiso, status badge contraste, polling pausa con modal abierto). **MA3-Reception** cerró el #9 (ManualCheckInModal safe-area lateral — `.rec-modal` con `max(24px, env(safe-area-inset-*))`).
 
 | # | Componente | Issue | Archivo | Fix Quick |
 |---|------------|-------|---------|-----------|

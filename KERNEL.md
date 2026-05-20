@@ -932,6 +932,18 @@ Verificado ya-resuelto / no-issue:
   el close button ya quedó safe-area en MA2. Sin cambio.
 - Login keyboard-aware: ya resuelto en S1 (`100dvh` + `flex-start`).
 
+## MA3-Reception (#9) + MA3 COMPLETO
+
+- **ManualCheckInModal:** `.rec-modal` con
+  `padding-left/right: max(24px, env(safe-area-inset-*))` —
+  protege el notch lateral en iPad landscape sin regresar el
+  padding portrait. Mismo patrón que `.rec-detail` (R2).
+- **MA3 cerrado:** los 24 MEDIUM del [MOBILE_AUDIT_REPORT.md](MOBILE_AUDIT_REPORT.md)
+  resueltos. Sumado a MA1/MA2/R2, los 3 CRITICAL + 10 HIGH + 24
+  MEDIUM están cerrados. Los 4 módulos en grade B o mejor
+  (Member B+, Admin B, Reception B, Public B).
+- **Pendiente mobile:** solo los 11 LOW (Sprint MA4, post-launch).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.
