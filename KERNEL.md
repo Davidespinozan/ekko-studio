@@ -991,6 +991,42 @@ hard-delete quedan detrás de `is_admin()`.
   (igual que `admin-create-user`). Si debe nacer `activo`, es una
   decisión a confirmar.
 
+## Seguridad pre-launch (Sprint SEC-CLEANUP)
+
+Limpieza de objetos de BD peligrosos o huérfanos antes del launch
+de Cravia. Verificación previa: grep en el repo → 0 referencias
+activas a los 3 objetos.
+
+### Eliminados
+- **`dev_crear_recepcionista`** — helper DEV que creaba
+  recepcionistas sin cuenta de Auth (agujero si llegaba a prod).
+  **Ya estaba dropeada** por la migración `20260514130000` (corre
+  después de la que la crea). `20260520110000_sec_cleanup.sql`
+  agrega un `DROP IF EXISTS` defensivo e idempotente — deja el repo
+  explícito y cubre el caso de drift.
+- **`generar_clases_recurrentes`** — RPC fantasma: vivía solo en la
+  BD desplegada, nunca en el repo. Concepto "clases recurrentes" de
+  SALA, no de EKKO; su última corrida dio `clases_creadas:0`. La
+  migración la dropea con un bloque `DO` signature-agnóstico (no
+  está versionada, no conocíamos su firma).
+- **`create-team-member`** — Edge Function (Deno) fantasma. Ya no se
+  llama desde el frontend (FIX01 la reemplazó por `admin-create-user`).
+  **No se dropea por SQL** — se elimina del dashboard de Supabase
+  (acción manual: `supabase functions delete create-team-member`).
+
+### Deuda documentada
+- El rol **`staff`** existe en el CHECK de `usuarios.rol`
+  (`admin, recepcionista, staff, miembro`) pero no tiene semántica
+  propia — es efectivamente igual a `miembro` para permisos (RLS,
+  guards). Pendiente: correr `SELECT count(*) FROM usuarios WHERE
+  rol='staff'`; si es 0, removerlo del CHECK en una migración
+  futura es trivial y elimina un estado ambiguo.
+
+### Resultado
+El repo es la fuente de verdad de las funciones Postgres — no
+quedan RPCs fuera de control de versiones. Tras eliminar la Edge
+Function del dashboard, tampoco quedan objetos huérfanos.
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.
