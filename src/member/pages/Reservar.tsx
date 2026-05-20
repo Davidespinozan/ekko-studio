@@ -267,7 +267,7 @@ export default function Reservar() {
         <div className="ek-stack-sm">
           <label className="ek-label">Horario</label>
           {loadingSlots ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               {Array.from({ length: 8 }).map((_, i) => (
                 <div
                   key={i}
@@ -281,7 +281,7 @@ export default function Reservar() {
               El estudio no opera este día.
             </p>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(72px, 1fr))', gap: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               {slots.map((slot, i) => {
                 const tooltip = slot.disponible
                   ? undefined

@@ -36,11 +36,14 @@ export default function Login() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
-      padding: '24px 20px'
+      justifyContent: 'flex-start',
+      padding: '24px 20px',
+      paddingTop: 'clamp(48px, 12vh, 120px)',
+      paddingBottom: 'calc(48px + env(safe-area-inset-bottom, 0px))'
     }}>
       <div style={{ maxWidth: '400px', width: '100%' }}>
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>

@@ -33,7 +33,7 @@ export default function CardMenuDropdown({ items }: Props) {
         className="ek-icon-btn"
         aria-label="Acciones"
         aria-expanded={open}
-        style={{ width: '32px', height: '32px', padding: 0, fontSize: '18px', lineHeight: 1 }}
+        style={{ width: '44px', height: '44px', padding: 0, fontSize: '18px', lineHeight: 1 }}
       >
         ⋯
       </button>
@@ -78,7 +78,8 @@ export default function CardMenuDropdown({ items }: Props) {
                     alignItems: 'center',
                     gap: '8px',
                     width: '100%',
-                    padding: '8px 12px',
+                    minHeight: '44px',
+                    padding: '10px 12px',
                     background: 'transparent',
                     border: 'none',
                     borderRadius: '8px',

@@ -658,6 +658,58 @@ tab, refetch + reanuda al volver. Fake timers + `vi.hoisted` para
 mantener referencia estable de `usuario` (evita re-mount en cada
 re-render).
 
+## Mobile-first — bloqueantes (Sprint MA1)
+
+Cierra los 5 issues más graves del [MOBILE_AUDIT_REPORT.md](MOBILE_AUDIT_REPORT.md)
+(48 findings, grade C-). Desbloquea el uso del sistema en iPhone
+antes del QA de Cravia.
+
+### Admin Calendario — 3 vistas (Día / Semana / Lista)
+- **Día** (default mobile <768px): 1 columna, reservas del día
+  ordenadas por hora, scroll vertical. `VistaDia` en
+  `src/admin/components/calendario/VistaDia.tsx` — fetchea su propio
+  día vía `useReservasRango`.
+- **Semana** (default desktop ≥768px): el grid de 7 columnas. En
+  mobile se oculta (`.adm-cal-semana-desktop` / `.adm-cal-semana-hint`
+  vía media query) con un hint que sugiere cambiar a Día. Las 7
+  columnas a 375px quedaban en ~49px c/u — ilegibles.
+- **Lista**: `ReservasVistaLista` (Sprint 8), sin cambios.
+- Default por viewport + persistencia en
+  `localStorage('ekko-admin-reservas-vista')`. Lógica aislada en
+  `src/admin/lib/calendarioVista.ts` (`readVista`) para testeo.
+  Valor legacy `'calendario'` migra al default por viewport.
+
+### Touch targets ≥44×44 (Apple HIG)
+- `CardMenuDropdown`: trigger ⋯ pasó de 32×32 a 44×44; items del
+  menú con `minHeight: 44px`. El fix se propaga a Recursos, Equipo,
+  Tiers, MiembroDetalle, Cobranza (componente compartido).
+- Toggle de vistas del calendario: `minHeight: 44px` por botón.
+- Botones de navegación de día (← →): 44×44.
+
+### Keyboard-aware forms (iOS)
+- `Signup`: `100vh → 100dvh`, `paddingBottom` con `env(safe-area-inset-bottom)`,
+  y `scroll-into-view` al enfocar inputs (handler en el `<form>`,
+  focus burbujea en React).
+- `Login`: eliminado `alignItems: center` que empujaba el CTA detrás
+  del teclado → `flex-start` + `paddingTop` clamp.
+
+### Pause-on-blur polling
+- `useReservasHoy` (recepción) ahora pausa el polling de 30s cuando
+  la tab está oculta y hace refetch al volver. Mismo patrón que
+  `useNotificacionesMiembro` (M3). Ahorra batería del iPad.
+
+### Reservar slot grid
+- Grid de slots pasó de `repeat(auto-fit, minmax(72px, 1fr))` (3
+  columnas cortadas a 375px) a `repeat(4, 1fr)` (4 columnas
+  garantizadas, ~85px c/u). Slots ya tenían `minHeight: 52px`.
+
+### Tests
+- `calendarioVista.test.ts` — 8 casos de `readVista` (preferencia
+  guardada, default por viewport, breakpoint exacto, migración de
+  valor legacy).
+- `useReservasHoy.test.tsx` — 4 casos del polling visibility-aware
+  (mismo patrón de fake timers que M3).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

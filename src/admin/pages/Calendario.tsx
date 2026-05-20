@@ -6,15 +6,8 @@ import CancelarReservaModal, {
   type ReservaParaCancelar
 } from '../components/CancelarReservaModal';
 import ReservasVistaLista from '../components/ReservasVistaLista';
-
-type Vista = 'calendario' | 'lista';
-const STORAGE_KEY = 'ekko-admin-reservas-vista';
-
-function readVista(): Vista {
-  if (typeof localStorage === 'undefined') return 'calendario';
-  const v = localStorage.getItem(STORAGE_KEY);
-  return v === 'lista' ? 'lista' : 'calendario';
-}
+import VistaDia from '../components/calendario/VistaDia';
+import { readVista, VISTA_STORAGE_KEY, type Vista } from '../lib/calendarioVista';
 
 export default function Calendario() {
   const [vista, setVista] = useState<Vista>(() => readVista());
@@ -24,7 +17,7 @@ export default function Calendario() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, vista);
+      localStorage.setItem(VISTA_STORAGE_KEY, vista);
     } catch {
       // ignore
     }
@@ -53,9 +46,17 @@ export default function Calendario() {
         <VistaToggle value={vista} onChange={setVista} />
       </div>
 
-      {vista === 'calendario' ? (
-        <VistaCalendario refreshTick={refreshTick} onVerDetalle={setDetalleId} />
-      ) : (
+      {vista === 'dia' && (
+        <VistaDia refreshTick={refreshTick} onVerDetalle={setDetalleId} />
+      )}
+      {vista === 'semana' && (
+        <VistaSemana
+          refreshTick={refreshTick}
+          onVerDetalle={setDetalleId}
+          onCambiarVista={setVista}
+        />
+      )}
+      {vista === 'lista' && (
         <ReservasVistaLista
           refreshTick={refreshTick}
           onVerDetalle={setDetalleId}
@@ -88,6 +89,7 @@ export default function Calendario() {
 
 function VistaToggle({ value, onChange }: { value: Vista; onChange: (v: Vista) => void }) {
   const baseBtn: React.CSSProperties = {
+    minHeight: '44px',
     padding: '8px 16px',
     fontSize: '13px',
     fontWeight: 600,
@@ -98,12 +100,18 @@ function VistaToggle({ value, onChange }: { value: Vista; onChange: (v: Vista) =
     transition: 'background 0.18s ease, color 0.18s ease',
     display: 'inline-flex',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: '6px'
   };
   const activeBtn: React.CSSProperties = {
     background: 'var(--ek-mustard)',
     color: 'var(--ek-bg)'
   };
+  const opciones: { vista: Vista; label: string }[] = [
+    { vista: 'dia', label: 'Día' },
+    { vista: 'semana', label: 'Semana' },
+    { vista: 'lista', label: 'Lista' }
+  ];
   return (
     <div
       role="group"
@@ -115,36 +123,35 @@ function VistaToggle({ value, onChange }: { value: Vista; onChange: (v: Vista) =
         overflow: 'hidden'
       }}
     >
-      <button
-        type="button"
-        onClick={() => onChange('calendario')}
-        aria-pressed={value === 'calendario'}
-        style={{ ...baseBtn, ...(value === 'calendario' ? activeBtn : {}) }}
-      >
-        📅 Calendario
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange('lista')}
-        aria-pressed={value === 'lista'}
-        style={{ ...baseBtn, ...(value === 'lista' ? activeBtn : {}) }}
-      >
-        ☰ Lista
-      </button>
+      {opciones.map((o) => (
+        <button
+          key={o.vista}
+          type="button"
+          onClick={() => onChange(o.vista)}
+          aria-pressed={value === o.vista}
+          style={{ ...baseBtn, ...(value === o.vista ? activeBtn : {}) }}
+        >
+          {o.label}
+        </button>
+      ))}
     </div>
   );
 }
 
 // ============================================================================
-// Vista Calendario semanal (la existente, ahora con click en cards)
+// Vista Semana — grid de 7 columnas. Solo apta para ≥768px; en mobile
+// muestra un hint para cambiar a vista Día (las 7 columnas a 375px quedan
+// en ~49px c/u, ilegibles).
 // ============================================================================
 
-function VistaCalendario({
+function VistaSemana({
   refreshTick,
-  onVerDetalle
+  onVerDetalle,
+  onCambiarVista
 }: {
   refreshTick: number;
   onVerDetalle: (id: string) => void;
+  onCambiarVista: (v: Vista) => void;
 }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const weekEnd = useMemo(() => {
@@ -174,6 +181,21 @@ function VistaCalendario({
 
   return (
     <>
+      <div className="adm-cal-semana-hint">
+        <p className="adm-body" style={{ marginBottom: '12px' }}>
+          La vista <strong>Semana</strong> funciona mejor en pantallas grandes.
+        </p>
+        <button
+          type="button"
+          onClick={() => onCambiarVista('dia')}
+          className="ek-cta"
+          style={{ minHeight: '44px' }}
+        >
+          Cambiar a vista Día →
+        </button>
+      </div>
+
+      <div className="adm-cal-semana-desktop">
       <div className="adm-week-nav">
         <button
           onClick={() => setWeekStart(addDays(weekStart, -7))}
@@ -254,6 +276,7 @@ function VistaCalendario({
         <p style={{ fontSize: '0.75rem', color: 'var(--ek-ink-muted)' }}>
           Total recursos: {recursos.length} · Reservas en rango: {reservas.length}
         </p>
+      </div>
       </div>
     </>
   );

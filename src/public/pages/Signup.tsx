@@ -99,6 +99,17 @@ export default function Signup() {
     }
   };
 
+  // Mobile: al enfocar un input, scrollearlo al centro para que el teclado
+  // iOS no lo tape. focus burbujea en React, así lo capturamos en el <form>.
+  const handleFormFocus = (e: React.FocusEvent<HTMLFormElement>) => {
+    const target = e.target;
+    if (target instanceof HTMLInputElement) {
+      setTimeout(() => {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    }
+  };
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -182,7 +193,8 @@ export default function Signup() {
       maxWidth: '480px',
       margin: '0 auto',
       padding: '40px 24px',
-      minHeight: '100vh'
+      paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+      minHeight: '100dvh'
     }}>
       <Link to="/" style={{
         fontSize: '13px',
@@ -223,7 +235,7 @@ export default function Signup() {
         </ul>
       </div>
 
-      <form onSubmit={handleSubmit} className="ek-stack-md">
+      <form onSubmit={handleSubmit} onFocus={handleFormFocus} className="ek-stack-md">
         <p className="ek-eyebrow" style={{ marginBottom: '4px' }}>TUS DATOS</p>
 
         <div className="ek-form-field">
