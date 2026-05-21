@@ -151,7 +151,9 @@ export default function Landing() {
         <div style={{
           position: 'absolute',
           top: '20%',
-          right: '-200px',
+          // Clamp del offset: en pantallas chicas (iPhone SE) -200px tiraba
+          // casi todo el glow fuera de canvas; el clamp lo acerca (MA4).
+          right: 'clamp(-200px, -25vw, -80px)',
           width: '500px',
           height: '500px',
           background: 'radial-gradient(circle, rgba(229, 184, 41, 0.12), transparent 70%)',

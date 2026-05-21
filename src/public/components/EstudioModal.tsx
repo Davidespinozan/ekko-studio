@@ -143,7 +143,7 @@ export default function EstudioModal({ estudio, onClose }: Props) {
           </span>
         </div>
 
-        <div style={{ padding: '32px' }}>
+        <div style={{ padding: 'clamp(16px, 5vw, 32px)' }}>
           <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>ESTUDIO</p>
           <h2 style={{
             fontFamily: 'var(--ek-font-display)',

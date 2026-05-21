@@ -841,11 +841,8 @@ function HorariosEditor({
         return (
           <div
             key={dia.key}
+            className="adm-horario-row"
             style={{
-              display: 'grid',
-              gridTemplateColumns: '110px 1fr 1fr 90px',
-              gap: '12px',
-              alignItems: 'center',
               padding: '10px 12px',
               background: abierto ? 'var(--ek-bg-elevated)' : 'transparent',
               borderRadius: 'var(--ek-r-sm)',
@@ -853,6 +850,7 @@ function HorariosEditor({
             }}
           >
             <span
+              className="adm-horario-dia"
               style={{
                 fontFamily: 'var(--ek-font-display)',
                 fontSize: '14px',
@@ -882,8 +880,8 @@ function HorariosEditor({
               </>
             ) : (
               <span
+                className="adm-horario-cerrado"
                 style={{
-                  gridColumn: '2 / 4',
                   fontSize: '12px',
                   color: 'var(--ek-ink-faint)',
                   fontStyle: 'italic'
@@ -896,8 +894,9 @@ function HorariosEditor({
             <button
               type="button"
               onClick={() => toggleDia(dia.key)}
-              className="ek-icon-btn"
+              className="ek-icon-btn adm-horario-btn"
               style={{
+                minHeight: '40px',
                 padding: '6px 10px',
                 fontSize: '11px',
                 color: abierto ? 'var(--ek-danger)' : 'var(--ek-mustard)',

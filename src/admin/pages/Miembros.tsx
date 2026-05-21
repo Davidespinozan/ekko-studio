@@ -15,7 +15,13 @@ export default function Miembros() {
     <div className="adm-page">
       <div
         className="adm-page-header"
-        style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          justifyContent: 'space-between',
+          alignItems: 'flex-end',
+          gap: '12px'
+        }}
       >
         <div>
           <p className="ek-eyebrow">MIEMBROS</p>

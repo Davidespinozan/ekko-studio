@@ -255,7 +255,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
           onClick={() => cambiarDia(-1)}
           className="ek-icon-btn"
           aria-label="Día anterior"
-          style={{ width: '40px', height: '40px', padding: 0 }}
+          style={{ width: '44px', height: '44px', padding: 0 }}
         >
           <svg
             width="18"
@@ -293,7 +293,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
           onClick={() => cambiarDia(1)}
           className="ek-icon-btn"
           aria-label="Día siguiente"
-          style={{ width: '40px', height: '40px', padding: 0 }}
+          style={{ width: '44px', height: '44px', padding: 0 }}
         >
           <svg
             width="18"
@@ -464,7 +464,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
               setRecursoFiltrado('todos');
             }}
             className="ek-icon-btn"
-            style={{ width: 'auto', padding: '8px 14px', fontSize: '12px' }}
+            style={{ width: 'auto', minHeight: '44px', padding: '10px 16px', fontSize: '12px' }}
           >
             Limpiar filtros
           </button>
@@ -720,7 +720,7 @@ function ManualCheckInModal({
               </p>
             )}
 
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem' }}>
+            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
               <button
                 onClick={onClose}
                 disabled={submitting}

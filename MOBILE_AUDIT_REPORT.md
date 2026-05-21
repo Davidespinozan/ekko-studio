@@ -18,15 +18,15 @@ EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó
 | **Reception** | C+ → **B** | 17 | ✅ todos resueltos (`useScannerHID` descartado) |
 | **Admin** | D → **B** | 16 | ✅ todos resueltos |
 | **Public** | D+ → **B** | 13 | ✅ todos resueltos |
-| **TOTAL** | C- → **B** | **48** | ✅ CRITICAL + HIGH + MEDIUM cerrados · quedan 11 LOW (MA4) |
+| **TOTAL** | C- → **B** | **48** | ✅ **AUDITORÍA COMPLETA — 48/48 findings cerrados** |
 
 **Distribución por severidad:**
 - 🔴 **CRITICAL: 3** → ✅ **3/3 resueltos** (MA1 ×2, MA2 ×1)
 - 🟠 **HIGH: 10** → ✅ **10/10 resueltos** (MA1 ×3, MA2 ×7) — `useScannerHID` descartado: Cravia usa solo cámara, listener HID es dead code en su contexto.
 - 🟡 **MEDIUM: 24** → ✅ **24/24 resueltos** (R2, MA3-Member, MA3-Admin, MA3-Public, MA3-Reception)
-- 🟢 **LOW: 11** — pendiente Sprint MA4 (post-launch)
+- 🟢 **LOW: 11** → ✅ **11/11 resueltos** (Member en MA3-Member · Reception/Admin/Public en MA4)
 
-> **Estado:** MA3 COMPLETO. Todos los CRITICAL, HIGH y MEDIUM cerrados. Los 4 módulos en grade B o mejor (Member B+, Admin B, Reception B, Public B). Solo quedan los 11 LOW (MA4, post-launch).
+> **Estado: AUDITORÍA MOBILE COMPLETA.** Los 48 findings cerrados — 3 CRITICAL + 10 HIGH + 24 MEDIUM + 11 LOW. Los 4 módulos en grade B o mejor (Member B+, Admin B, Reception B, Public B). Sprint MA4 cerró los LOW restantes: Reception (limpiar-filtros 44px, padding safe-area, gap botones, day-nav 44px), Admin (Miembros header, HorariosEditor responsive, SectionToggle 44px), Public (hero gradient clamp, EstudioModal padding clamp, footer AAA con `--ek-ink`). Los LOW de Member ya se habían cerrado en MA3-Member.
 
 ### Top 5 issues más graves
 
@@ -156,14 +156,19 @@ EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó
 | 9 | ManualCheckInModal | Padding 24px sin safe-area-left/right | [L645-723](src/reception/components/ReservasHoyView.tsx#L645) | usar calc + env() |
 | 10 | Scanner+Polling | Polling sigue durante CheckInDetail open | [Scanner.tsx:56-57](src/reception/pages/Scanner.tsx#L56) | pasar flag pause |
 
-#### 🟢 LOW (5 findings)
+#### 🟢 LOW (5 findings) — ✅ resueltos (MA4)
 
-| # | Componente | Issue | Severidad |
-|---|------------|-------|-----------|
-| 1 | "Limpiar filtros" empty state | Botón 32px alto | Low |
-| 2 | ReservasHoyView | Padding L/R sin safe-area-inset | Low |
-| 3 | Manual check-in modal | Gap entre botones 8px (tight) | Low |
-| 4 | Day nav arrows | 40×40 (debajo de 44) | Low |
+> **✅ MA4:** (1) "Limpiar filtros" → `minHeight: 44px`. (2) `.rec-main`
+> padding L/R con `max(24px, env(safe-area-inset-*))`. (3) gap de botones
+> del modal de check-in 8→12px. (4) day-nav arrows 40→44px. (5) N/A —
+> el overflow del nombre ya estaba OK con ellipsis.
+
+| # | Componente | Issue | Estado |
+|---|------------|-------|--------|
+| 1 | "Limpiar filtros" empty state | Botón 32px alto | ✅ MA4 |
+| 2 | ReservasHoyView | Padding L/R sin safe-area-inset | ✅ MA4 |
+| 3 | Manual check-in modal | Gap entre botones 8px (tight) | ✅ MA4 |
+| 4 | Day nav arrows | 40×40 (debajo de 44) | ✅ MA4 |
 | 5 | Card name overflow | OK con ellipsis, no fix | N/A |
 
 ---
@@ -227,13 +232,19 @@ EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó
 | 6 | AdminDashboard | MetricaCards grid no optimizado | explicit 1fr mobile |
 | 7 | Sidebar drawer | Safe-area-top no aplicado | env(safe-area-inset-top) |
 
-#### 🟢 LOW (3)
+#### 🟢 LOW (3) — ✅ resueltos (MA4)
 
-| # | Componente | Issue |
-|---|------------|-------|
-| 1 | Miembros header CTA | Title + button wrap mal |
-| 2 | Tiers HorariosEditor | Grid 110px 1fr 1fr 90px squish |
-| 3 | Sidebar SectionToggle | Sin minHeight explícito |
+> **✅ MA4:** (1) Miembros header → `flex-wrap` + gap (title y CTA ya no
+> se pisan a 375px). (2) `HorariosEditor` → grid pasa a clase
+> `.adm-horario-row` con media query: en ≤560px apila a 2 columnas y los
+> inputs de hora dejan de quedar squish; desktop intacto. (3)
+> `SectionToggle` → `minHeight: 44px`.
+
+| # | Componente | Issue | Estado |
+|---|------------|-------|--------|
+| 1 | Miembros header CTA | Title + button wrap mal | ✅ MA4 |
+| 2 | Tiers HorariosEditor | Grid 110px 1fr 1fr 90px squish | ✅ MA4 |
+| 3 | Sidebar SectionToggle | Sin minHeight explícito | ✅ MA4 |
 
 ---
 
@@ -269,13 +280,20 @@ EKKO se ve **premium en desktop pero frágil en mobile**. La auditoría detectó
 | 7 | Login form | minHeight 100vh + alignItems center oculta CTA | Medium |
 | 8 | Signup plan summary | No sticky → se pierde al scrollear con teclado | Quick |
 
-#### 🟢 LOW (3)
+#### 🟢 LOW (3) — ✅ resueltos (MA4)
 
-| # | Componente | Issue |
-|---|------------|-------|
-| 1 | Hero gradient | right: -200px desperdiciado en SE |
-| 2 | EstudioModal | Padding no clamp |
-| 3 | Footer links | Contraste 4.5:1 (falla AAA) |
+> **✅ MA4:** (1) Hero gradient → `right: clamp(-200px, -25vw, -80px)` —
+> en pantallas chicas el glow ya no se va casi todo fuera de canvas. (2)
+> `EstudioModal` → padding del cuerpo `clamp(16px, 5vw, 32px)`. (3)
+> Footer links de contacto/navegación → `--ek-ink` en vez de
+> `--ek-ink-muted`: contraste ≈17:1 sobre el fondo oscuro, **alcanza
+> AAA** (≥7:1). No chocó con el diseño — links de footer legibles.
+
+| # | Componente | Issue | Estado |
+|---|------------|-------|--------|
+| 1 | Hero gradient | right: -200px desperdiciado en SE | ✅ MA4 |
+| 2 | EstudioModal | Padding no clamp | ✅ MA4 |
+| 3 | Footer links | Contraste 4.5:1 (falla AAA) | ✅ MA4 (AAA) |
 
 ---
 

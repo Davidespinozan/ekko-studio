@@ -152,7 +152,9 @@ export default function Footer() {
                   alignItems: 'center',
                   minHeight: '44px',
                   fontSize: '13px',
-                  color: 'var(--ek-ink-muted)',
+                  // --ek-ink (no -muted): contraste AAA ≥7:1 sobre el fondo
+                  // oscuro del footer (MA4 · audit LOW Public #3).
+                  color: 'var(--ek-ink)',
                   textDecoration: 'none'
                 }}
               >
@@ -163,7 +165,7 @@ export default function Footer() {
               <p
                 style={{
                   fontSize: '13px',
-                  color: 'var(--ek-ink-muted)',
+                  color: 'var(--ek-ink)',
                   margin: 0,
                   lineHeight: 1.5
                 }}
@@ -182,7 +184,7 @@ export default function Footer() {
               href="/login"
               style={{
                 fontSize: '13px',
-                color: 'var(--ek-ink-muted)',
+                color: 'var(--ek-ink)',
                 textDecoration: 'none',
                 minHeight: '44px',
                 display: 'inline-flex',
@@ -195,7 +197,7 @@ export default function Footer() {
               href="#contacto"
               style={{
                 fontSize: '13px',
-                color: 'var(--ek-ink-muted)',
+                color: 'var(--ek-ink)',
                 textDecoration: 'none',
                 minHeight: '44px',
                 display: 'inline-flex',

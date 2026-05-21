@@ -424,6 +424,7 @@ function SectionToggle({
         justifyContent: 'space-between',
         gap: '8px',
         width: '100%',
+        minHeight: '44px',
         padding: '8px 8px 6px',
         background: 'transparent',
         border: 'none',

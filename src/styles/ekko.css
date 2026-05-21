@@ -826,7 +826,10 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   .rec-main {
     flex: 1;
     overflow-y: auto;
-    padding: 20px 24px 32px;
+    /* L/R con safe-area-inset para que el contenido no quede bajo el
+       notch/curvatura en landscape o en pantallas con bordes (MA4). */
+    padding: 20px max(24px, env(safe-area-inset-right)) 32px
+      max(24px, env(safe-area-inset-left));
     max-width: 920px;
     margin: 0 auto;
     width: 100%;
@@ -1638,6 +1641,23 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+
+  /* HorariosEditor (Recursos · Tiers) — fila por día. En desktop:
+     [día] [hora inicio] [hora fin] [Abrir/Cerrar]. En mobile apila a
+     2 columnas para que los inputs de hora no queden squish (MA4). */
+  .adm-horario-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 1fr 90px;
+    gap: 12px;
+    align-items: center;
+  }
+  .adm-horario-cerrado { grid-column: 2 / 4; }
+  @media (max-width: 560px) {
+    .adm-horario-row { grid-template-columns: 1fr 1fr; }
+    .adm-horario-dia { grid-column: 1 / -1; }
+    .adm-horario-cerrado { grid-column: 1 / -1; }
+    .adm-horario-btn { grid-column: 1 / -1; }
   }
 
   .adm-stack { display: flex; flex-direction: column; gap: 12px; }

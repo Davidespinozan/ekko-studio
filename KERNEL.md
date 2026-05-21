@@ -942,7 +942,28 @@ Verificado ya-resuelto / no-issue:
   resueltos. Sumado a MA1/MA2/R2, los 3 CRITICAL + 10 HIGH + 24
   MEDIUM están cerrados. Los 4 módulos en grade B o mejor
   (Member B+, Admin B, Reception B, Public B).
-- **Pendiente mobile:** solo los 11 LOW (Sprint MA4, post-launch).
+
+## Mobile LOW polish (Sprint MA4) — AUDIT COMPLETO
+
+Último tramo del audit: los 11 LOW (polish cosmético — touch targets
+menores, padding, contraste, gradientes). Solo CSS/visual.
+
+- **Reception:** "Limpiar filtros" del empty state → `minHeight: 44px`;
+  `.rec-main` con padding L/R `max(24px, env(safe-area-inset-*))`; gap
+  entre botones del modal de check-in 8→12px; day-nav arrows 40→44px.
+- **Admin:** header de Miembros con `flex-wrap` + gap (title y CTA ya no
+  se pisan); `HorariosEditor` con clase `.adm-horario-row` + media query
+  (≤560px apila a 2 columnas — los inputs de hora dejan de quedar
+  squish; desktop intacto); `SectionToggle` del sidebar `minHeight: 44px`.
+- **Public:** hero gradient `right: clamp(-200px, -25vw, -80px)` (no
+  desperdicia el glow en pantallas chicas); `EstudioModal` padding del
+  cuerpo `clamp(16px, 5vw, 32px)`; footer links de contacto/navegación a
+  `--ek-ink` → contraste **AAA** (≈17:1) sobre el fondo oscuro.
+- Los LOW de Member ya se habían resuelto en MA3-Member.
+- Deuda: los LOW son CSS/visual → sin tests automatizados (declarado).
+
+**Auditoría mobile COMPLETA: 48 findings cerrados** (3 CRITICAL + 10
+HIGH + 24 MEDIUM + 11 LOW). Los 4 módulos en grade B/B+.
 
 ## Recepción Plus — Backend (Sprint RP-1)
 
