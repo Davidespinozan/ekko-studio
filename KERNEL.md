@@ -1292,6 +1292,36 @@ habría roto `marcar_no_shows` — un RPC `SECURITY DEFINER` corre con
 `current_user`=dueño, no `service_role`. El trigger actual,
 `current_user='authenticated' AND NOT is_admin()`, lo maneja bien.)*
 
+## Fixes de lógica (Sprint LOGIC-FIX)
+
+Cierre de los bloqueantes de [LOGIC_AUDIT.md](LOGIC_AUDIT.md) antes del launch.
+Migración `20260522100000_logic_fix.sql` — `CREATE OR REPLACE` de 3 RPCs core.
+
+- **L-01 — horario sensible a la timezone de sesión.** `reservar_recurso_atomic`
+  comparaba `p_slot_inicio::time` y `EXTRACT(DOW FROM p_slot_inicio)` contra
+  `recursos.horarios` — ambos dependen del `timezone` de la sesión Postgres. El
+  front manda instantes UTC; los bloques de horario están en hora de Culiacán.
+  Con sesión UTC (default de Supabase), los slots de la tarde-noche se rechazaban
+  con `EKKO_FUERA_DE_HORARIO`. Fix: anclar la conversión a `'America/Mazatlan'`
+  (`tstz AT TIME ZONE 'America/Mazatlan'`) — correcto sea cual sea la TZ de
+  sesión. Hardcodeado (single-tenant); mover a `tenants.config` con el 2º tenant.
+- **L-02 — check-in aceptaba `cancelada_admin`.** `check_in_atomic` y
+  `check_in_manual_atomic` validaban el estado con `IF` positivos enumerados;
+  `cancelada_admin` (estado de RP-1, posterior a estas funciones) no matcheaba
+  ninguno → una reserva cancelada por el estudio pasaba a `completada`. Fix: la
+  rama de `cancelada` incluye `cancelada_admin` + un check negativo final
+  (`!= 'confirmada'`) que atrapa cualquier estado futuro.
+- **L-03 — `revocado` fuera del `CHECK`.** `revokeTeamMember()` escribe
+  `status='revocado'` pero el `CHECK` de `usuarios.status` no lo admitía. La
+  migración versiona el `CHECK` con `revocado` (idempotente — si la BD tenía
+  drift, lo deja explícito).
+- **L-15 — no se incluye:** `qr_token_hash` resultó columna muerta (nunca se
+  escribe ni se lee — `qr-verify` valida el JWT por firma). Nulearla al cancelar
+  sería un no-op. El riesgo real (QR viejo tras cancelar) lo cierra L-02.
+
+Verificación: `supabase/tests/logic_fix_checks.sql`. Los 13 MEDIUM (−2 resueltos)
++ 5 LOW del audit quedan como hardening post-launch.
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.
