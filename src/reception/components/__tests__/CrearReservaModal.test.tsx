@@ -6,12 +6,22 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
  * `reservar_para_miembro_atomic` con `p_usuario_id` = id del MIEMBRO
  * objetivo (no del recepcionista). La lógica de slots (reservaLogic)
  * se mockea — tiene sus propios tests; acá probamos el wiring.
+ *
+ * IMPORTANTE: los mocks de hooks (`useTenant`, `useRecursosDelTenant`)
+ * devuelven SIEMPRE la misma referencia. El componente memoiza `config`
+ * sobre `tenant.config` y lo usa como dependencia de un `useEffect`; si
+ * el mock devolviera un objeto nuevo en cada render (cosa que los hooks
+ * reales no hacen — `useTenant` lee de un `useState`) se dispararía un
+ * bucle infinito de renders. Las constantes van en `vi.hoisted`.
  */
 
 const h = vi.hoisted(() => ({
   slotInicio: new Date('2026-07-01T16:00:00.000Z'),
+  slotFin: new Date('2026-07-01T17:00:00.000Z'),
   rpc: vi.fn(),
-  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+  tenant: { id: 't-1', config: { reserva: {} } },
+  recursos: [{ id: 'rec-1', nombre: 'Estudio A', tiers_permitidos: ['pro'], horarios: [] }]
 }));
 
 vi.mock('@shared/lib/supabase', () => ({
@@ -19,14 +29,11 @@ vi.mock('@shared/lib/supabase', () => ({
 }));
 vi.mock('@shared/hooks/useToast', () => ({ useToast: () => h.toast }));
 vi.mock('@shared/hooks/useTenant', () => ({
-  useTenant: () => ({ id: 't-1', config: { reserva: {} } })
+  useTenant: () => h.tenant
 }));
 
 vi.mock('@member/hooks/useReservas', () => ({
-  useRecursosDelTenant: () => ({
-    recursos: [{ id: 'rec-1', nombre: 'Estudio A', tiers_permitidos: ['pro'], horarios: [] }],
-    isLoading: false
-  }),
+  useRecursosDelTenant: () => ({ recursos: h.recursos, isLoading: false }),
   fetchReservasDelRecurso: () => Promise.resolve([]),
   fetchReservasDelUsuario: () => Promise.resolve([])
 }));
@@ -36,7 +43,7 @@ vi.mock('@member/logic/reservaLogic', () => ({
     { fechaISO: '2026-07-01', date: new Date('2026-07-01T00:00:00'), label: 'Hoy' }
   ],
   generarSlotsDisponibles: () => [
-    { inicio: h.slotInicio, fin: new Date('2026-07-01T17:00:00.000Z'), disponible: true }
+    { inicio: h.slotInicio, fin: h.slotFin, disponible: true }
   ],
   filtrarRecursosPorTier: (recursos: unknown[]) => recursos,
   formatHora: () => '10:00',
