@@ -100,4 +100,40 @@ describe('CrearReservaModal · wiring', () => {
     expect(onCreada).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it('reprogramar: muestra el contexto y al confirmar orquesta crear + cancelar', async () => {
+    h.rpc.mockResolvedValue({ error: null });
+    const onCreada = vi.fn();
+    const onClose = vi.fn();
+    const reprogramarDe = {
+      id: 'res-vieja',
+      recurso_id: 'rec-1',
+      recurso_nombre: 'Estudio A',
+      // Lejos del slot nuevo → orden crear→cancelar.
+      slot_inicio: '2026-06-20T12:00:00.000Z',
+      slot_fin: '2026-06-20T13:00:00.000Z'
+    };
+
+    render(
+      <CrearReservaModal
+        miembro={MIEMBRO}
+        reprogramarDe={reprogramarDe}
+        onClose={onClose}
+        onCreada={onCreada}
+      />
+    );
+
+    expect(screen.getByText('REPROGRAMAR RESERVA')).toBeInTheDocument();
+    expect(screen.getByText(/MOVIENDO ESTA RESERVA/i)).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: '10:00' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reprogramar' }));
+
+    // Orquesta los dos RPCs de RP-1: crear la nueva + cancelar la vieja.
+    await waitFor(() => expect(h.rpc).toHaveBeenCalledTimes(2));
+    const fns = h.rpc.mock.calls.map((c) => c[0]);
+    expect(fns).toContain('reservar_para_miembro_atomic');
+    expect(fns).toContain('cancelar_reserva_atomic');
+    await waitFor(() => expect(onCreada).toHaveBeenCalled());
+  });
 });

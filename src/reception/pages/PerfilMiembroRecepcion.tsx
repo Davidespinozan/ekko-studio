@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '@shared/lib/supabase';
 import { statusMiembro } from '../lib/miembroStatus';
-import { CrearReservaModal } from '../components/CrearReservaModal';
+import { CrearReservaModal, type ReservaOriginal } from '../components/CrearReservaModal';
 import {
   CancelarReservaRecepcionModal,
   type ReservaParaCancelar
@@ -35,8 +35,10 @@ interface MiembroPerfil {
 interface ReservaPerfil {
   id: string;
   slot_inicio: string;
+  slot_fin: string;
   status: string;
   folio: string;
+  recurso_id: string;
   recurso: { nombre: string } | null;
 }
 
@@ -76,12 +78,13 @@ export default function PerfilMiembroRecepcion() {
   const [noEncontrado, setNoEncontrado] = useState(false);
   const [crearOpen, setCrearOpen] = useState(false);
   const [cancelarTarget, setCancelarTarget] = useState<ReservaParaCancelar | null>(null);
+  const [reprogramarTarget, setReprogramarTarget] = useState<ReservaOriginal | null>(null);
 
   const recargarReservas = useCallback(async () => {
     if (!id) return;
     const { data } = await supabase
       .from('reservas')
-      .select('id, slot_inicio, status, folio, recurso:recursos(nombre)')
+      .select('id, slot_inicio, slot_fin, status, folio, recurso_id, recurso:recursos(nombre)')
       .eq('usuario_id', id)
       .order('slot_inicio', { ascending: false })
       .limit(50);
@@ -224,7 +227,7 @@ export default function PerfilMiembroRecepcion() {
         <Dato label="Miembro desde" valor={fechaCorta(miembro.created_at)} />
       </div>
 
-      {/* Acciones de reserva (RP-3a). Reprogramar llega en RP-3b. */}
+      {/* Acciones de reserva: crear (RP-3a) + reprogramar/cancelar por fila (RP-3a/3b). */}
       <div style={{ marginBottom: '20px' }}>
         <button
           type="button"
@@ -261,6 +264,16 @@ export default function PerfilMiembroRecepcion() {
                   recurso_nombre: r.recurso?.nombre ?? 'Estudio'
                 })
               }
+              onReprogramar={() =>
+                setReprogramarTarget({
+                  id: r.id,
+                  recurso_id: r.recurso_id,
+                  recurso_nombre: r.recurso?.nombre ?? 'Estudio',
+                  slot_inicio: r.slot_inicio,
+                  slot_fin: r.slot_fin
+                })
+              }
+              reprogramarBloqueado={miembro.status !== 'activo'}
             />
           ))
         )}
@@ -294,6 +307,19 @@ export default function PerfilMiembroRecepcion() {
           onCancelada={recargarReservas}
         />
       )}
+
+      {reprogramarTarget && (
+        <CrearReservaModal
+          miembro={{
+            id: miembro.id,
+            nombre: capitalizar(miembro.nombre) || miembro.email,
+            membresia_tier: miembro.membresia_tier
+          }}
+          reprogramarDe={reprogramarTarget}
+          onClose={() => setReprogramarTarget(null)}
+          onCreada={recargarReservas}
+        />
+      )}
     </div>
   );
 }
@@ -323,19 +349,24 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
 function FilaReserva({
   reserva,
   historico,
-  onCancelar
+  onCancelar,
+  onReprogramar,
+  reprogramarBloqueado
 }: {
   reserva: ReservaPerfil;
   historico?: boolean;
   onCancelar?: () => void;
+  onReprogramar?: () => void;
+  reprogramarBloqueado?: boolean;
 }) {
   const cancelada = reserva.status === 'cancelada' || reserva.status === 'cancelada_admin';
+  const conAcciones = onCancelar != null || onReprogramar != null;
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '12px',
+        gap: '10px',
         padding: '10px 14px',
         background: 'var(--ek-bg-soft)',
         border: '0.5px solid var(--ek-line)',
@@ -354,31 +385,69 @@ function FilaReserva({
       >
         {fechaHora(reserva.slot_inicio)}
       </span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: '13px', color: 'var(--ek-ink-muted)' }}>
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          fontSize: '13px',
+          color: 'var(--ek-ink-muted)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}
+      >
         {reserva.recurso?.nombre ?? '—'}
       </span>
-      {onCancelar ? (
-        <button
-          type="button"
-          onClick={onCancelar}
-          style={{
-            flexShrink: 0,
-            minHeight: '44px',
-            padding: '4px 10px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            background: 'transparent',
-            border: 'none',
-            color: 'var(--ek-danger)',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            textDecoration: 'underline',
-            textUnderlineOffset: '3px'
-          }}
-        >
-          Cancelar
-        </button>
+      {conAcciones ? (
+        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          {onReprogramar && (
+            <button
+              type="button"
+              onClick={onReprogramar}
+              disabled={reprogramarBloqueado}
+              title={
+                reprogramarBloqueado
+                  ? 'El miembro no está activo — no se puede reprogramar'
+                  : undefined
+              }
+              style={{
+                minHeight: '44px',
+                padding: '4px 8px',
+                background: 'transparent',
+                border: 'none',
+                color: reprogramarBloqueado ? 'var(--ek-ink-faint)' : 'var(--ek-mustard)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: reprogramarBloqueado ? 'not-allowed' : 'pointer',
+                opacity: reprogramarBloqueado ? 0.5 : 1,
+                textDecoration: 'underline',
+                textUnderlineOffset: '3px'
+              }}
+            >
+              Reprogramar
+            </button>
+          )}
+          {onCancelar && (
+            <button
+              type="button"
+              onClick={onCancelar}
+              style={{
+                minHeight: '44px',
+                padding: '4px 8px',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--ek-danger)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                textUnderlineOffset: '3px'
+              }}
+            >
+              Cancelar
+            </button>
+          )}
+        </div>
       ) : (
         <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', flexShrink: 0 }}>
           {reserva.status}

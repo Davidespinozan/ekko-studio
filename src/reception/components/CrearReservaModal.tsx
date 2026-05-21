@@ -17,6 +17,7 @@ import {
 } from '@member/logic/reservaLogic';
 import type { Database } from '@shared/types/database';
 import { traducirErrorReserva } from '../lib/traducirErrorReserva';
+import { reprogramarReserva } from '../lib/reprogramarReserva';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 
@@ -26,25 +27,64 @@ export interface MiembroParaReserva {
   membresia_tier: string | null;
 }
 
+/** Reserva existente que se está reprogramando (Sprint RP-3b). */
+export interface ReservaOriginal {
+  id: string;
+  recurso_id: string;
+  recurso_nombre: string;
+  slot_inicio: string; // ISO
+  slot_fin: string; // ISO
+}
+
 interface Props {
   miembro: MiembroParaReserva;
   onClose: () => void;
   onCreada: () => void;
+  /** Si se pasa, el modal opera en modo "reprogramar" (RP-3b): el flujo
+   *  de selección es el mismo, pero al confirmar orquesta crear + cancelar. */
+  reprogramarDe?: ReservaOriginal;
+}
+
+function fechaHoraCorta(iso: string): string {
+  return new Date(iso).toLocaleString('es-MX', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
 }
 
 /**
- * Crear una reserva PARA un miembro desde recepción (Sprint RP-3a).
+ * Quita UNA reserva de la lista por coincidencia de `slot_inicio`. Se usa
+ * en modo reprogramar para sacar la reserva vieja de las listas que
+ * alimentan la grilla — si no, su propio slot saldría 'ocupado' y los
+ * contiguos 'continuo', y recepción no podría moverla a ±1 slot.
+ */
+function quitarReservaPorSlot<T extends { slot_inicio: string }>(
+  lista: T[],
+  slotInicioISO: string
+): T[] {
+  const objetivo = new Date(slotInicioISO).getTime();
+  const idx = lista.findIndex((r) => new Date(r.slot_inicio).getTime() === objetivo);
+  return idx === -1 ? lista : [...lista.slice(0, idx), ...lista.slice(idx + 1)];
+}
+
+/**
+ * Crear una reserva PARA un miembro desde recepción (Sprint RP-3a) y
+ * reprogramar una reserva existente (Sprint RP-3b, prop `reprogramarDe`).
  *
  * Reusa la lógica de slots del módulo miembro (`reservaLogic`). La
  * diferencia clave (D1): recepción reserva walk-ins → se construye el
  * config con `anticipacion_min_horas: 0`, así `generarSlotsDisponibles`
- * no marca los horarios cercanos como no disponibles. El RPC
- * `reservar_para_miembro_atomic` ya permite saltar la anticipación.
+ * no marca los horarios cercanos como no disponibles.
  */
-export function CrearReservaModal({ miembro, onClose, onCreada }: Props) {
+export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }: Props) {
   const tenant = useTenant();
   const toast = useToast();
   const { recursos, isLoading: loadingRecursos } = useRecursosDelTenant();
+  const esReprogramar = reprogramarDe != null;
 
   // Config del tenant — anticipación a 0 para no esconder walk-ins (D1).
   const config = useMemo<TenantReservaConfig>(() => {
@@ -75,12 +115,15 @@ export function CrearReservaModal({ miembro, onClose, onCreada }: Props) {
   const [notas, setNotas] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Auto-seleccionar el primer recurso accesible.
+  // Auto-seleccionar el recurso inicial. En modo reprogramar, el de la
+  // reserva original (recepción puede cambiarlo).
   useEffect(() => {
-    if (!recursoSel && recursosAccesibles.length > 0) {
-      setRecursoSel(recursosAccesibles[0]);
-    }
-  }, [recursosAccesibles, recursoSel]);
+    if (recursoSel || recursosAccesibles.length === 0) return;
+    const inicial = reprogramarDe
+      ? recursosAccesibles.find((r) => r.id === reprogramarDe.recurso_id) ?? recursosAccesibles[0]
+      : recursosAccesibles[0];
+    setRecursoSel(inicial);
+  }, [recursosAccesibles, recursoSel, reprogramarDe]);
 
   // Recargar slots al cambiar recurso o fecha.
   useEffect(() => {
@@ -97,8 +140,18 @@ export function CrearReservaModal({ miembro, onClose, onCreada }: Props) {
       fetchReservasDelUsuario(miembro.id, fechaInicio, fechaFin)
     ]).then(([reservasRecurso, reservasMiembro]) => {
       if (!mounted) return;
+      let resRecurso = reservasRecurso;
+      let resMiembro = reservasMiembro;
+      // Reprogramar: sacar la reserva vieja de la grilla para que su slot
+      // y los contiguos vuelvan a ofrecerse.
+      if (reprogramarDe) {
+        resMiembro = quitarReservaPorSlot(resMiembro, reprogramarDe.slot_inicio);
+        if (recursoSel.id === reprogramarDe.recurso_id) {
+          resRecurso = quitarReservaPorSlot(resRecurso, reprogramarDe.slot_inicio);
+        }
+      }
       setSlots(
-        generarSlotsDisponibles(recursoSel, fechaSel, config, reservasRecurso, reservasMiembro)
+        generarSlotsDisponibles(recursoSel, fechaSel, config, resRecurso, resMiembro)
       );
       setLoadingSlots(false);
     });
@@ -106,12 +159,59 @@ export function CrearReservaModal({ miembro, onClose, onCreada }: Props) {
     return () => {
       mounted = false;
     };
-  }, [recursoSel, fechaSel, config, miembro.id]);
+  }, [recursoSel, fechaSel, config, miembro.id, reprogramarDe]);
 
   async function handleConfirmar() {
     if (!recursoSel || !slotSel || submitting) return;
     setSubmitting(true);
 
+    // ---- Modo reprogramar (RP-3b): orquesta crear + cancelar. ----
+    if (reprogramarDe) {
+      const mismoSlot =
+        recursoSel.id === reprogramarDe.recurso_id &&
+        slotSel.inicio.getTime() === new Date(reprogramarDe.slot_inicio).getTime();
+      if (mismoSlot) {
+        toast.error('Ese es el horario actual de la reserva. Elegí uno distinto.');
+        setSubmitting(false);
+        return;
+      }
+
+      const resultado = await reprogramarReserva({
+        reservaOriginalId: reprogramarDe.id,
+        usuarioId: miembro.id,
+        original: {
+          recursoId: reprogramarDe.recurso_id,
+          inicio: new Date(reprogramarDe.slot_inicio),
+          fin: new Date(reprogramarDe.slot_fin)
+        },
+        nuevo: {
+          recursoId: recursoSel.id,
+          slotInicio: slotSel.inicio,
+          duracionMin: config.duracion_default_min,
+          notas: notas.trim() || null
+        }
+      });
+
+      if (resultado.estado === 'ok') {
+        toast.success(resultado.mensaje);
+        onCreada();
+        onClose();
+      } else if (resultado.estado === 'error_crear' || resultado.estado === 'error_cancelar') {
+        // Nada cambió — la reserva original sigue en pie. El modal queda
+        // abierto para reintentar con otro horario.
+        toast.error(resultado.mensaje);
+        setSubmitting(false);
+      } else {
+        // Fallo parcial: refrescar el perfil para reflejar la realidad y
+        // cerrar. El toast lleva la instrucción — nunca en silencio.
+        toast.error(resultado.mensaje);
+        onCreada();
+        onClose();
+      }
+      return;
+    }
+
+    // ---- Modo crear (RP-3a). ----
     // Cast a `any`: reservar_para_miembro_atomic es un RPC nuevo (RP-1) que
     // todavía no está en los tipos generados de Supabase. Mismo patrón que
     // `crearReserva` en useReservas.ts.
@@ -145,7 +245,7 @@ export function CrearReservaModal({ miembro, onClose, onCreada }: Props) {
       onClick={() => !submitting && onClose()}
       role="dialog"
       aria-modal="true"
-      aria-label="Crear reserva"
+      aria-label={esReprogramar ? 'Reprogramar reserva' : 'Crear reserva'}
       style={{
         position: 'fixed',
         inset: 0,
@@ -168,14 +268,14 @@ export function CrearReservaModal({ miembro, onClose, onCreada }: Props) {
           borderRadius: 'var(--ek-r-card)',
           maxWidth: '480px',
           width: '100%',
-          maxHeight: '92vh',
+          maxHeight: '92dvh',
           overflowY: 'auto',
           padding: 'clamp(16px, 5vw, 28px)',
           animation: 'ek-scale-in 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
       >
         <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '4px' }}>
-          CREAR RESERVA
+          {esReprogramar ? 'REPROGRAMAR RESERVA' : 'CREAR RESERVA'}
         </p>
         <h3
           style={{
@@ -183,12 +283,40 @@ export function CrearReservaModal({ miembro, onClose, onCreada }: Props) {
             fontSize: '20px',
             fontWeight: 700,
             margin: 0,
-            marginBottom: '16px',
+            marginBottom: esReprogramar ? '12px' : '16px',
             letterSpacing: '-0.02em'
           }}
         >
           Para {miembro.nombre}
         </h3>
+
+        {reprogramarDe && (
+          <div
+            style={{
+              background: 'var(--ek-bg-elevated)',
+              border: '0.5px solid var(--ek-line)',
+              borderRadius: 'var(--ek-r-md)',
+              padding: '10px 14px',
+              marginBottom: '16px'
+            }}
+          >
+            <p
+              style={{
+                fontSize: '10px',
+                letterSpacing: '0.1em',
+                fontWeight: 700,
+                color: 'var(--ek-ink-faint)',
+                margin: 0,
+                marginBottom: '3px'
+              }}
+            >
+              MOVIENDO ESTA RESERVA
+            </p>
+            <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0 }}>
+              {reprogramarDe.recurso_nombre} · {fechaHoraCorta(reprogramarDe.slot_inicio)}
+            </p>
+          </div>
+        )}
 
         {loadingRecursos ? (
           <div className="ek-skeleton" style={{ height: '120px', borderRadius: 'var(--ek-r-md)' }} />
@@ -353,7 +481,9 @@ export function CrearReservaModal({ miembro, onClose, onCreada }: Props) {
                 className="ek-cta"
                 style={{ flex: 1, minHeight: '44px', opacity: submitting || !slotSel ? 0.5 : 1 }}
               >
-                {submitting ? 'Creando…' : 'Crear reserva'}
+                {esReprogramar
+                  ? submitting ? 'Reprogramando…' : 'Reprogramar'
+                  : submitting ? 'Creando…' : 'Crear reserva'}
               </button>
             </div>
           </>

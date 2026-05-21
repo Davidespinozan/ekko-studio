@@ -20,8 +20,20 @@ const hoisted = vi.hoisted(() => ({
     no_shows_count: 0,
     bloqueado_hasta: null as string | null,
     created_at: '2026-01-10T12:00:00Z'
-  } as Record<string, unknown>
+  } as Record<string, unknown>,
+  reservas: [] as Record<string, unknown>[]
 }));
+
+// Reserva próxima (confirmada + futura) — habilita las acciones de la fila.
+const RESERVA_PROXIMA = {
+  id: 'res-1',
+  slot_inicio: '2030-01-01T10:00:00.000Z',
+  slot_fin: '2030-01-01T11:00:00.000Z',
+  status: 'confirmada',
+  folio: 'EKK-000001',
+  recurso_id: 'rec-1',
+  recurso: { nombre: 'Estudio A' }
+};
 
 vi.mock('@shared/lib/supabase', () => ({
   supabase: {
@@ -40,7 +52,7 @@ vi.mock('@shared/lib/supabase', () => ({
         select: () => ({
           eq: () => ({
             order: () => ({
-              limit: () => Promise.resolve({ data: [], error: null })
+              limit: () => Promise.resolve({ data: hoisted.reservas, error: null })
             })
           })
         })
@@ -74,6 +86,7 @@ describe('PerfilMiembroRecepcion · read-only', () => {
       bloqueado_hasta: null,
       created_at: '2026-01-10T12:00:00Z'
     };
+    hoisted.reservas = [];
   });
 
   it('muestra los datos del miembro', async () => {
@@ -119,6 +132,23 @@ describe('PerfilMiembroRecepcion · read-only', () => {
     renderPerfil();
     await screen.findByText('Ana López');
     const btn = screen.getByRole('button', { name: /crear reserva/i });
+    expect(btn).toBeDisabled();
+  });
+
+  it('D2 (RP-3b) — miembro activo: acción "Reprogramar" habilitada', async () => {
+    hoisted.reservas = [RESERVA_PROXIMA];
+    renderPerfil();
+    await screen.findByText('Ana López');
+    const btn = await screen.findByRole('button', { name: /reprogramar/i });
+    expect(btn).not.toBeDisabled();
+  });
+
+  it('D2 (RP-3b) — miembro no-activo: acción "Reprogramar" deshabilitada', async () => {
+    hoisted.miembro = { ...hoisted.miembro, status: 'suspendido' };
+    hoisted.reservas = [RESERVA_PROXIMA];
+    renderPerfil();
+    await screen.findByText('Ana López');
+    const btn = await screen.findByRole('button', { name: /reprogramar/i });
     expect(btn).toBeDisabled();
   });
 });

@@ -36,9 +36,16 @@ sin abrir acceso a gestión del negocio.
   campo de rol (hardcode 'miembro'), sin tier, sin cobro. El miembro
   nace `pendiente_pago` con aviso explícito de "pendiente de
   activación" (D2). `traducirErrorRegistro` para errores. Solo UI.
-- ⬜ RP-3b — UI reprogramar reserva (espera al QA).
+- **✅ RP-3b — UI reprogramar reserva** (commit en `main`): "Reprogramar"
+  en cada reserva próxima del perfil. Reusa `CrearReservaModal` con la
+  prop `reprogramarDe`. D6: cancelar + crear (no atómico) vía los RPCs de
+  RP-1, orquestado en `reception/lib/reprogramarReserva.ts` con orden
+  seguro híbrido (`debeCancelarPrimero`): crear→cancelar si no choca,
+  cancelar→crear si el nuevo horario es contiguo/solapa. Fallos parciales
+  siempre avisados. D2 (acción bloqueada si no-activo). Solo UI.
 
-**Recepción Plus completo salvo RP-3b.**
+**Recepción Plus COMPLETO** — buscar · perfil · crear · cancelar ·
+reprogramar · registrar miembro.
 
 ---
 

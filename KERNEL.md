@@ -1124,7 +1124,7 @@ registra acceso). Si termina siendo por créditos, se revisa.
   test de seguridad de RP-2 sigue verde (las acciones de reserva no
   son edición de datos del miembro).
 
-Pendiente: RP-3b (reprogramar), RP-4 (registrar miembro).
+Pendiente: RP-3b (reprogramar) — ver más abajo.
 
 ## Recepción Plus — Registrar miembro (RP-4)
 
@@ -1167,7 +1167,52 @@ Function `reception-create-member` (backend de RP-1) — RP-4 es solo UI.
   de form, email duplicado → toast traducido, y seguridad (el modal
   no expone ningún campo de rol).
 
-Recepción Plus COMPLETO salvo RP-3b (reprogramar, espera al QA).
+## Recepción Plus — Reprogramar (RP-3b) — COMPLETO
+
+Reprogramar una reserva próxima de un miembro a un nuevo horario/recurso,
+desde el perfil de recepción.
+
+- "Reprogramar" en cada reserva próxima del perfil (`PerfilMiembroRecepcion`,
+  junto a "Cancelar"). **D2:** la acción se deshabilita si el miembro no
+  está activo (crear la nueva reserva requiere miembro activo).
+- Reusa `CrearReservaModal` (RP-3a) con la prop `reprogramarDe`: mismo
+  flujo de selección (recurso → fecha → slot), con un encabezado de
+  contexto "MOVIENDO ESTA RESERVA" y la reserva original excluida de la
+  grilla (si no, su propio slot saldría 'ocupado' y los contiguos
+  'continuo', y no se podría mover a ±1 slot).
+- **D6: reprogramar = cancelar + crear, NO atómico.** Reusa los RPCs de
+  RP-1 (`reservar_para_miembro_atomic` + `cancelar_reserva_atomic`).
+  Orquestación en `reception/lib/reprogramarReserva.ts`.
+- **Orden seguro híbrido** (`debeCancelarPrimero`): el RPC de crear
+  rechaza `EKKO_CONTINUA` (hora contigua) y `EKKO_SLOT_OCUPADO` (solape
+  mismo recurso). Mientras la vieja siga 'confirmada' puede disparar
+  esos errores, así que:
+  - Nuevo horario NO choca → **crear → cancelar** (si crear falla, la
+    original queda intacta; el miembro nunca se queda sin reserva).
+  - Nuevo horario SÍ choca (contiguo, o solape mismo recurso) →
+    **cancelar → crear** (crear-primero fallaría por la propia vieja).
+- **Fallos parciales SIEMPRE avisados** (nunca en silencio):
+  - `parcial_sin_cancelar` — la nueva se creó pero la vieja no se
+    canceló → toast pide cancelarla manual; el refresco la muestra.
+  - `parcial_sin_recrear` — la vieja se canceló pero la nueva no se
+    creó → toast avisa que el miembro quedó sin reserva.
+- Tradeoff (D6): al no ser atómico, un fallo entre las dos operaciones
+  deja estado parcial. Plan B documentado si molesta: RPC
+  `reprogramar_reserva_atomic` (NO implementado — fuera de scope).
+- Errores traducidos con `traducirErrorReserva` (RP-3a). Toast, no alert.
+
+### Tests RP-3b
+- `reprogramarReserva` — `debeCancelarPrimero` (contiguo, solape mismo
+  recurso, solape distinto recurso, lejano) + orquestación: éxito
+  crear→cancelar, fallo crear (no toca la vieja), `parcial_sin_cancelar`,
+  éxito cancelar→crear, `parcial_sin_recrear`, fallo cancelar.
+- `CrearReservaModal` — modo reprogramar: muestra el contexto y al
+  confirmar orquesta los dos RPCs.
+- `PerfilMiembroRecepcion` — D2: "Reprogramar" habilitada si activo,
+  deshabilitada si no-activo.
+
+**Recepción Plus COMPLETO:** buscar · perfil · crear · cancelar ·
+reprogramar · registrar miembro.
 
 ## Onboarding de un tenant nuevo
 
