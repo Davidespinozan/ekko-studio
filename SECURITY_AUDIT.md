@@ -26,9 +26,19 @@ El sprint **SEC-FIX** cerró los 3 CRITICAL + los 6 HIGH:
 | H5 cron-no-shows | ✅ Mitigado | `marcar_no_shows` restringida a `service_role` (verificación HTTP → operativa) |
 | H6 QR_JWT_SECRET | ⚪ Verificado | El código lee de env var; valor de prod → operativo (David) |
 
+**SEC-FIX-2 — corrección del test C2.** Al correr `sec_fix_checks.sql` en vivo,
+C2b (status) dio un ❌ FAIL **engañoso**: el test ponía `status='activo'` sobre
+un miembro que ya estaba `activo` → `UPDATE` no-op → el trigger (con razón) no
+dispara → parecía un agujero. **El trigger siempre protegió `status`** — las 6
+columnas privilegiadas se chequean en el mismo `IF`. Se endureció el test: cada
+ataque usa un valor genuinamente distinto del actual, cubre las 6 columnas + las
+2 vías legítimas (admin / service_role), y devuelve filas. Ningún cambio de
+trigger fue necesario.
+
 **Pendiente operativo:** aplicar `20260521100000_sec_fix.sql`, correr
-`supabase/tests/sec_fix_checks.sql`, confirmar `QR_JWT_SECRET` en Netlify prod.
-Los 8 MEDIUM + 6 LOW siguen como hardening post-launch.
+`supabase/tests/sec_fix_checks.sql` (esperar todo ✅ PASS), confirmar
+`QR_JWT_SECRET` en Netlify prod. Los 8 MEDIUM + 6 LOW siguen como hardening
+post-launch.
 
 ---
 

@@ -1280,6 +1280,18 @@ Tests: `supabase/tests/sec_fix_checks.sql` (explotación: C2/C3/H1/H2/H3/H5
 contra la BD) + `src/__tests__/fake-signup.test.ts` (C1). Los 8 MEDIUM +
 6 LOW del audit quedan como hardening post-launch.
 
+**SEC-FIX-2 — corrección del test, no del trigger.** Correr el test en vivo
+mostró un ❌ FAIL engañoso en C2b: ponía `status='activo'` sobre un miembro
+que ya estaba `activo` → `UPDATE` no-op → el trigger no dispara (correcto) →
+parecía un agujero. El trigger **siempre** protegió `status` — las 6 columnas
+privilegiadas están en el mismo `IF`. `sec_fix_checks.sql` se endureció: cada
+ataque usa un valor distinto del actual, cubre las 6 columnas + las 2 vías
+legítimas (admin por JWT, service_role) y devuelve filas. Sin migración nueva.
+*(Nota: el approach `current_user='service_role' OR is_admin()` que se evaluó
+habría roto `marcar_no_shows` — un RPC `SECURITY DEFINER` corre con
+`current_user`=dueño, no `service_role`. El trigger actual,
+`current_user='authenticated' AND NOT is_admin()`, lo maneja bien.)*
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.
