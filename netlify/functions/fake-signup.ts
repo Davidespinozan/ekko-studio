@@ -13,14 +13,18 @@ import { createClient } from '@supabase/supabase-js';
  * POST /fake-signup
  * Body: { nombre, email, password, tier: 'basica' | 'pro' }
  *
- * Crea cuenta de prueba con pago simulado:
+ * Alta pública de un miembro PENDIENTE DE PAGO (Stripe aún no integrado):
  * - auth.admin.createUser (email confirmado automáticamente)
  * - El trigger on_auth_user_created inserta fila en `usuarios`
- * - UPDATE para setear tier, status='activo', tenant=ekko, notas_admin
- * - Log en payment_events con stripe_event_type='fake_signup'
+ * - UPDATE para setear nombre/tier/tenant y status='pendiente_pago'
  *
- * Cuando se integre Stripe real, esta función se reemplaza por el webhook
- * de Stripe. El cliente Signup.tsx no cambia.
+ * SEC-FIX (C1): este endpoint es público y sin auth. Antes creaba cuentas
+ * `status='activo'` + un payment_event 'fake_succeeded' → cualquiera con
+ * `curl` se daba de alta una cuenta activa gratis (bypass de monetización).
+ * Ahora la cuenta nace `pendiente_pago`: NO puede reservar (el RPC valida
+ * status='activo') hasta que admin/Stripe la active. Ya no se finge un
+ * pago: sin `payment_events`. Cuando se integre Stripe real, el webhook
+ * reemplaza esta función y es quien activa la cuenta al cobrar.
  */
 
 const TIERS_VALIDOS = ['basica', 'pro'] as const;
@@ -74,10 +78,10 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    // 1b. Obtener tier real de BD para usar su precio (no hardcode)
+    // 1b. Validar que el tier exista y esté activo en el tenant.
     const { data: tierData, error: tierError } = await supabaseAdmin
       .from('tiers')
-      .select('precio_centavos')
+      .select('slug')
       .eq('tenant_id', tenant.id)
       .eq('slug', tier)
       .eq('activo', true)
@@ -111,7 +115,9 @@ export const handler: Handler = async (event) => {
 
     const authUserId = authData.user.id;
 
-    // 3. Actualizar la fila que creó el trigger con tier + status activo.
+    // 3. Actualizar la fila que creó el trigger con nombre/tier/tenant.
+    //    status='pendiente_pago' (SEC-FIX C1): la cuenta nace inerte — no
+    //    puede reservar hasta que admin/Stripe la active. NO se finge un pago.
     //    NOTA: la columna FK a auth.users se llama `auth_id` (no auth_user_id).
     const fechaHoy = new Date().toLocaleDateString('es-MX');
     const { data: usuarioUpdated, error: updateError } = await supabaseAdmin
@@ -119,10 +125,10 @@ export const handler: Handler = async (event) => {
       .update({
         nombre,
         membresia_tier: tier,
-        status: 'activo',
+        status: 'pendiente_pago',
         rol: 'miembro',
         tenant_id: tenant.id,
-        notas_admin: `CUENTA DE PRUEBA — PAGO FAKE — ${fechaHoy}`
+        notas_admin: `Alta por signup público — pendiente de pago (${fechaHoy})`
       })
       .eq('auth_id', authUserId)
       .select('id')
@@ -134,30 +140,12 @@ export const handler: Handler = async (event) => {
       await supabaseAdmin.auth.admin.deleteUser(authUserId);
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: 'Error al activar cuenta' })
+        body: JSON.stringify({ error: 'Error al registrar la cuenta' })
       };
     }
 
-    // 4. Registrar evento de pago fake en payment_events.
-    //    El schema real es Stripe-céntrico: necesita stripe_event_id único,
-    //    stripe_event_type y raw_payload. Usamos prefijos 'fake_' para
-    //    distinguir de eventos reales cuando se integre Stripe.
-    const fakeEventId = `fake_signup_${authUserId}_${Date.now()}`;
-    const montoCentavos = tierData.precio_centavos;
-
-    await supabaseAdmin
-      .from('payment_events')
-      .insert({
-        stripe_event_id: fakeEventId,
-        stripe_event_type: 'fake_signup',
-        tenant_id: tenant.id,
-        usuario_id: usuarioUpdated.id,
-        monto_centavos: montoCentavos,
-        moneda: 'MXN',
-        status: 'fake_succeeded',
-        raw_payload: { tier, fake: true, fecha: fechaHoy, source: 'fake-signup function' },
-        processed_at: new Date().toISOString()
-      });
+    // SEC-FIX (C1): NO se inserta payment_event — no hubo pago. El webhook
+    // real de Stripe será el único que escriba en `payment_events`.
 
     return {
       statusCode: 200,

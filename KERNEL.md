@@ -1235,6 +1235,51 @@ desde el perfil de recepción.
 **Recepción Plus COMPLETO:** buscar · perfil · crear · cancelar ·
 reprogramar · registrar miembro.
 
+## Fixes de seguridad (Sprint SEC-FIX)
+
+Cierre de los 3 CRITICAL + 6 HIGH de [SECURITY_AUDIT.md](SECURITY_AUDIT.md)
+antes del launch. Migración `20260521100000_sec_fix.sql` + cambios en 2
+Netlify Functions.
+
+- **C1 — `fake-signup`:** endpoint público sin auth que creaba cuentas
+  `status='activo'` + `payment_event` falso. Ahora crea `pendiente_pago`
+  (inerte — `reservar_recurso_atomic` exige `status='activo'`) y NO escribe
+  payment_events. El registro sigue funcionando; la cuenta nace pendiente.
+- **C2 — auto-elevación de rol:** RLS es row-level, no column-level → un
+  miembro podía `UPDATE usuarios SET rol='admin'` en su propia fila.
+  Trigger `BEFORE UPDATE` `trg_proteger_columnas_usuarios`: rechaza cambios
+  a `rol/tenant_id/status/membresia_tier/no_shows_count/bloqueado_hasta`
+  cuando el caller es un usuario logueado normal. La función es
+  **`SECURITY INVOKER`** (no DEFINER) a propósito: distingue las vías por
+  `current_user` — `'authenticated'` (ataque) vs `'service_role'` (Netlify)
+  vs dueño de RPC SECURITY DEFINER. Con DEFINER, `current_user` sería el
+  dueño del trigger y rompería los flujos de admin/service_role.
+- **C3 — funciones dev:** `dev_activar_miembro` se escapó de SEC-CLEANUP.
+  La migración dropea dinámicamente **toda** función `public.dev_*`.
+- **H1 — columnas sensibles:** `ob_data` y `stripe_customer_id` salieron de
+  `usuarios` a `usuarios_datos_privados` (RLS: dueño lee lo suyo, admin del
+  tenant todo; recepción no entra). RLS no puede column-level y un GRANT de
+  columnas no distingue admin de recepción (mismo rol Postgres). `SELECT *`
+  sobre `usuarios` sigue funcionando → cero cambios de frontend.
+- **H3 — `cancelar_reserva_atomic`:** ampliado en RP-1 sin validar tenant.
+  Ahora, si la cancela un tercero (recepción/admin), exige que la reserva
+  sea de su tenant (`EKKO_TENANT_DIFERENTE`).
+- **H5 — `marcar_no_shows`:** estaba `GRANT ... TO authenticated`. Ahora
+  solo `service_role`. La exposición HTTP de `cron-no-shows` (scheduled
+  function) queda como verificación operativa de Netlify.
+- **H2 — verificado:** `reservar_recurso_atomic` y
+  `reservar_para_miembro_atomic` ya validan `status='activo'` en backend —
+  la operación sensible (reservar) no se puede hacer suspendido. Sin código
+  nuevo; test de regresión que fija el gate.
+- **H4 — verificado:** ni `admin-create-user` ni `reception-create-member`
+  loguean el password ni la respuesta. Se agregaron comentarios-guarda.
+- **H6 — verificado:** `qr-issue`/`qr-verify` leen `QR_JWT_SECRET` de env
+  var (no hardcodeado). El valor fuerte en prod es operativo.
+
+Tests: `supabase/tests/sec_fix_checks.sql` (explotación: C2/C3/H1/H2/H3/H5
+contra la BD) + `src/__tests__/fake-signup.test.ts` (C1). Los 8 MEDIUM +
+6 LOW del audit quedan como hardening post-launch.
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

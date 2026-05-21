@@ -132,10 +132,14 @@ export const handler: Handler = async (event) => {
         email: body.email.trim().toLowerCase(),
         nombre: body.nombre.trim(),
         rol: 'miembro',
-        password: body.password // se muestra a recepción para dárselo al cliente
+        // SEC-FIX (H4): el password se muestra a recepción para dárselo al
+        // cliente, pero NO debe llegar a ningún log — no hacer console.log
+        // de este objeto ni de la respuesta.
+        password: body.password
       }
     });
   } catch (e) {
+    // Loguear SOLO el Error — nunca el body ni el password.
     console.error('[reception-create-member]', e);
     return serverError(e instanceof Error ? e.message : 'Error desconocido');
   }
