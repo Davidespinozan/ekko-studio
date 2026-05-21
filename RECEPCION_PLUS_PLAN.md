@@ -29,8 +29,16 @@ sin abrir acceso a gestión del negocio.
   `CrearReservaModal` + `CancelarReservaRecepcionModal` colgados del
   perfil. D1 (walk-ins), D2 (botón disabled si no-activo), D3 (RPC
   setea cancelada_admin + notifica). Consume los RPCs de RP-1.
-- ⬜ RP-3b — UI reprogramar reserva.
-- ⬜ RP-4 — UI registrar miembro.
+- **✅ RP-4 — UI registrar miembro** (commit en `main`): botón
+  "+ Registrar miembro" en `BuscarMiembro` (header + CTA en estado
+  vacío), `RegistrarMiembroModal` de dos fases (datos básicos →
+  credenciales) → `reception-create-member` (backend de RP-1). Sin
+  campo de rol (hardcode 'miembro'), sin tier, sin cobro. El miembro
+  nace `pendiente_pago` con aviso explícito de "pendiente de
+  activación" (D2). `traducirErrorRegistro` para errores. Solo UI.
+- ⬜ RP-3b — UI reprogramar reserva (espera al QA).
+
+**Recepción Plus completo salvo RP-3b.**
 
 ---
 

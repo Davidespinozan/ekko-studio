@@ -1126,6 +1126,49 @@ registra acceso). Si termina siendo por créditos, se revisa.
 
 Pendiente: RP-3b (reprogramar), RP-4 (registrar miembro).
 
+## Recepción Plus — Registrar miembro (RP-4)
+
+Registrar un miembro nuevo desde el mostrador. Consume la Netlify
+Function `reception-create-member` (backend de RP-1) — RP-4 es solo UI.
+
+- "+ Registrar miembro" en la pantalla de Miembros de recepción
+  (`BuscarMiembro`): botón en el header + CTA en el estado "sin
+  resultados" ("¿No lo encontrás? Registrá un miembro nuevo").
+- `RegistrarMiembroModal` → `reception-create-member`. Modal de dos
+  fases: (1) datos básicos, (2) credenciales para el cliente.
+- Datos básicos: nombre, email, teléfono (opcional), password
+  temporal autogenerada (alfabeto sin ambiguos, 12 chars; recepción
+  puede regenerarla o escribirla). **NO** campo de rol (la función lo
+  fija a 'miembro' — la UI tampoco lo expone, defensa en profundidad),
+  **NO** tier (config), **NO** cobro (Stripe pendiente).
+- Llama con `fetch` crudo, no `backendPost`: `backendPost` descarta el
+  body del error y solo deja el status; se necesita `result.error`
+  para traducir "email duplicado". NO se manda `rol` ni `tenant_id`.
+- El miembro nace `pendiente_pago` → la vista de credenciales muestra
+  un aviso explícito: "PENDIENTE DE ACTIVACIÓN — se activa al
+  confirmar pago/plan con administración; mientras tanto no podrá
+  reservar" (coherente con D2; registrar ≠ activar).
+- Credenciales mostradas (nombre, email, password) con botón de
+  copiar, para dárselas al cliente.
+- Post-registro: al cerrar la vista de credenciales, el email queda
+  pre-cargado en la búsqueda → el nuevo miembro aparece en resultados
+  con badge `pendiente_pago`. El backend no devuelve el `id`, por eso
+  no se navega directo al perfil.
+- Errores: `traducirErrorRegistro` (reception lib) — email duplicado,
+  password corta, permiso, sesión. Fallback genérico que tapa el
+  `serverError` crudo de Supabase. Toast, no alert.
+
+### Tests RP-4
+- `traducirErrorRegistro` — 6 casos (duplicado y variantes, password,
+  permiso, sesión, crudo→fallback sin filtrar, vacío).
+- `RegistrarMiembroModal` — wiring (llama la función sin `rol`/
+  `tenant_id`/`membresia_tier`, email normalizado, avanza a
+  credenciales con el aviso de pendiente de activación), validaciones
+  de form, email duplicado → toast traducido, y seguridad (el modal
+  no expone ningún campo de rol).
+
+Recepción Plus COMPLETO salvo RP-3b (reprogramar, espera al QA).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

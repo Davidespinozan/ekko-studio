@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { statusMiembro } from '../lib/miembroStatus';
+import { RegistrarMiembroModal } from '../components/RegistrarMiembroModal';
 
 interface MiembroResultado {
   id: string;
@@ -32,6 +33,7 @@ export default function BuscarMiembro() {
   const [debounced, setDebounced] = useState('');
   const [resultados, setResultados] = useState<MiembroResultado[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showRegistrar, setShowRegistrar] = useState(false);
 
   // Debounce del input (200ms, mismo criterio que la búsqueda de R1).
   useEffect(() => {
@@ -80,9 +82,33 @@ export default function BuscarMiembro() {
 
   return (
     <div className="rec-main">
-      <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '12px' }}>
-        BUSCAR MIEMBRO
-      </p>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          marginBottom: '12px'
+        }}
+      >
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ margin: 0 }}>
+          BUSCAR MIEMBRO
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowRegistrar(true)}
+          className="ek-cta"
+          style={{
+            minHeight: '44px',
+            padding: '8px 16px',
+            fontSize: '13px',
+            flexShrink: 0,
+            whiteSpace: 'nowrap'
+          }}
+        >
+          + Registrar miembro
+        </button>
+      </div>
 
       <div style={{ position: 'relative', marginBottom: '20px' }}>
         <input
@@ -137,9 +163,19 @@ export default function BuscarMiembro() {
           ))}
         </div>
       ) : resultados.length === 0 ? (
-        <p className="ek-body-faint" style={{ padding: '24px 0', textAlign: 'center' }}>
-          No se encontraron miembros que coincidan.
-        </p>
+        <div style={{ padding: '24px 0', textAlign: 'center' }}>
+          <p className="ek-body-faint" style={{ marginBottom: '14px' }}>
+            No se encontraron miembros que coincidan.
+          </p>
+          <button
+            type="button"
+            onClick={() => setShowRegistrar(true)}
+            className="ek-cta ek-cta--secondary"
+            style={{ minHeight: '44px', padding: '10px 18px', fontSize: '13px' }}
+          >
+            ¿No lo encontrás? Registrá un miembro nuevo
+          </button>
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {resultados.map((m) => {
@@ -180,6 +216,19 @@ export default function BuscarMiembro() {
             );
           })}
         </div>
+      )}
+
+      {showRegistrar && (
+        <RegistrarMiembroModal
+          onClose={() => setShowRegistrar(false)}
+          onRegistrado={(email) => {
+            setShowRegistrar(false);
+            // Pre-cargar el email en la búsqueda: el nuevo miembro aparece
+            // en resultados (con badge pendiente_pago). El backend no
+            // devuelve el id, así que no se puede navegar directo al perfil.
+            setQuery(email);
+          }}
+        />
       )}
     </div>
   );
