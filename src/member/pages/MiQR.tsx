@@ -12,8 +12,9 @@ interface IssueResponse {
 
 /**
  * Traduce errores del backend qr-issue a copy human-friendly.
+ * Exportada para test (ERROR-UI-FIX E-05).
  */
-function traducirErrorQR(raw: string): string {
+export function traducirErrorQR(raw: string): string {
   const msg = raw.toLowerCase();
   if (msg.includes('cancelada por admin') || msg.includes('cancelada_admin')) {
     return 'Esta reserva fue cancelada por el estudio. Contactanos si tenés dudas.';
@@ -33,7 +34,9 @@ function traducirErrorQR(raw: string): string {
   if (msg.includes('fuera de ventana')) {
     return 'Esta reserva queda fuera de la ventana de QR (más de 7 días).';
   }
-  return raw;
+  // Fallback (ERROR-UI-FIX E-05): nunca mostrar el mensaje crudo de
+  // Supabase/HTTP. Cualquier código no contemplado cae a un genérico.
+  return 'No se pudo generar tu código QR. Intentá de nuevo.';
 }
 
 function QRSkeleton() {

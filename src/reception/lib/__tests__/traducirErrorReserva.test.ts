@@ -18,7 +18,9 @@ describe('traducirErrorReserva', () => {
   it('fallback genérico — nunca expone el mensaje técnico crudo', () => {
     const crudo = 'PGRST301: jwt expired at column 9';
     const out = traducirErrorReserva(crudo);
-    expect(out).toBe('No se pudo completar la acción. Intentá de nuevo.');
+    // Delega en traducirErrorRPC, cuyo fallback genérico (ERROR-UI-FIX E-04)
+    // es "...la operación...". Lo importante: NUNCA el crudo.
+    expect(out).toBe('No se pudo completar la operación. Intentá de nuevo.');
     expect(out).not.toContain('jwt');
     expect(out).not.toContain('PGRST');
   });

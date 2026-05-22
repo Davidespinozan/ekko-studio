@@ -338,9 +338,11 @@ export function useDashboardData() {
   const tenant = useTenant();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const refetch = useCallback(async () => {
     setIsLoading(true);
+    setError(false);
     const now = new Date();
     const inicioHoy = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const finHoy = new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
@@ -430,6 +432,20 @@ export function useDashboardData() {
         .lt('slot_inicio', finHoy.toISOString())
     ]);
 
+    // ERROR-UI-FIX E-03: si CUALQUIERA de las 9 queries falló, no pintar un
+    // dashboard en cero como si fuera dato válido — exponer el error.
+    const fallo = [
+      reservasHoy, reservasMesActual, reservasMesAnterior,
+      miembrosMesActual, miembrosMesAnterior, noShowsActual,
+      noShowsAnterior, reservasMesAnteriorTotales, reservas30d
+    ].find((r) => r.error);
+    if (fallo) {
+      console.error('[useDashboardData]', fallo.error);
+      setError(true);
+      setIsLoading(false);
+      return;
+    }
+
     // Agrupar reservas por día (YYYY-MM-DD)
     const conteoPorDia: Record<string, number> = {};
     for (let i = 0; i < 30; i++) {
@@ -463,7 +479,7 @@ export function useDashboardData() {
     void refetch();
   }, [refetch]);
 
-  return { data, isLoading, refetch };
+  return { data, isLoading, error, refetch };
 }
 
 /**

@@ -72,7 +72,12 @@ export function TenantProvider({ children }: TenantProviderProps) {
         if (!isMounted) return;
 
         if (queryError) {
-          setError(new Error(`No se pudo cargar el tenant: ${queryError.message}`));
+          // ERROR-UI-FIX E-01: copy fijo human-friendly en la pantalla pública
+          // de arranque; el detalle técnico va a consola, nunca a la UI.
+          console.error('[TenantProvider] queryError al cargar el tenant:', queryError);
+          setError(new Error(
+            'No pudimos cargar la configuración del estudio. Verificá tu conexión e intentá de nuevo.'
+          ));
           setIsLoading(false);
           return;
         }
@@ -105,7 +110,12 @@ export function TenantProvider({ children }: TenantProviderProps) {
         }
       } catch (err) {
         if (!isMounted) return;
-        setError(err instanceof Error ? err : new Error(String(err)));
+        // ERROR-UI-FIX E-01: mismo copy fijo que la rama queryError — ningún
+        // path debe filtrar el mensaje crudo a la pantalla de arranque.
+        console.error('[TenantProvider] excepción al cargar el tenant:', err);
+        setError(new Error(
+          'No pudimos cargar la configuración del estudio. Verificá tu conexión e intentá de nuevo.'
+        ));
         setIsLoading(false);
       }
     }
@@ -143,8 +153,26 @@ export function TenantProvider({ children }: TenantProviderProps) {
             No se pudo cargar la configuración
           </h1>
           <p style={{ color: 'var(--ek-ink-muted)', maxWidth: '32rem' }}>
-            {error?.message ?? 'Tenant no disponible'}
+            {error?.message ?? 'No pudimos cargar la configuración del estudio. Verificá tu conexión e intentá de nuevo.'}
           </p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              marginTop: '1.25rem',
+              minHeight: '44px',
+              padding: '10px 22px',
+              background: 'var(--ek-black)',
+              color: 'var(--ek-cream)',
+              border: 'none',
+              borderRadius: 'var(--ek-r-sm)',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              cursor: 'pointer'
+            }}
+          >
+            Recargar
+          </button>
         </div>
       </div>
     );

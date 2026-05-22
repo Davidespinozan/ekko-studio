@@ -34,19 +34,37 @@ function calcTendencia(actual: number, anterior: number): number | null {
 
 export default function AdminDashboard() {
   const { usuario } = useAuth();
-  const { data, isLoading, refetch } = useDashboardData();
+  const { data, isLoading, error, refetch } = useDashboardData();
   const [cancelar, setCancelar] = useState<ReservaParaCancelar | null>(null);
 
   const saludo = saludoTiming();
   const nombre = capitalizar(usuario?.nombre).split(' ')[0] || '';
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <div>
         <div className="ek-skeleton" style={{ height: '40px', width: '260px', marginBottom: '12px' }} />
         <div className="ek-skeleton" style={{ height: '20px', width: '180px', marginBottom: '32px' }} />
         <div className="ek-skeleton" style={{ height: '300px', marginBottom: '20px' }} />
         <div className="ek-skeleton" style={{ height: '200px' }} />
+      </div>
+    );
+  }
+
+  // ERROR-UI-FIX E-03: si alguna query del dashboard falló, mostrar el error
+  // con opción de reintentar — NO un dashboard en cero que parece real.
+  if (error || !data) {
+    return (
+      <div className="ek-card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+        <p className="ek-eyebrow" style={{ color: 'var(--ek-danger)', marginBottom: '8px' }}>
+          ERROR
+        </p>
+        <p className="ek-body" style={{ marginBottom: '20px' }}>
+          No se pudo cargar el dashboard. Verificá tu conexión e intentá de nuevo.
+        </p>
+        <button type="button" onClick={() => void refetch()} className="ek-cta" style={{ minHeight: '44px' }}>
+          Reintentar
+        </button>
       </div>
     );
   }

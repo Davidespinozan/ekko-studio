@@ -23,9 +23,8 @@ export function traducirErrorReserva(message: string): string {
   }
 
   // Códigos compartidos (slot ocupado, reserva no cancelable, etc.).
-  const compartido = traducirErrorRPC(message);
-  if (compartido !== message) return compartido;
-
-  // Fallback: nunca mostrar el mensaje crudo del servidor.
-  return 'No se pudo completar la acción. Intentá de nuevo.';
+  // `traducirErrorRPC` ya trae su propio fallback genérico (ERROR-UI-FIX
+  // E-04): nunca devuelve el mensaje crudo del servidor, así que se puede
+  // delegar directo sin el viejo chequeo `!== message`.
+  return traducirErrorRPC(message);
 }

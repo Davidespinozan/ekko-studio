@@ -50,15 +50,22 @@ function useRecursosActivos() {
   return { recursos, isLoading };
 }
 
-function useProximasReservas(usuarioId: string | undefined) {
+// Exportada para test (ERROR-UI-FIX E-02).
+export function useProximasReservas(usuarioId: string | undefined) {
   const [reservas, setReservas] = useState<ReservaConRecurso[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const refetch = useCallback(async () => {
     if (!usuarioId) {
       setReservas([]);
+      setError(false);
+      setIsLoading(false);
       return;
     }
-    const { data } = await supabase
+    setIsLoading(true);
+    setError(false);
+    const { data, error: queryError } = await supabase
       .from('reservas')
       .select('*, recurso:recursos(id, nombre, slug)')
       .eq('usuario_id', usuarioId)
@@ -67,7 +74,15 @@ function useProximasReservas(usuarioId: string | undefined) {
       .order('slot_inicio', { ascending: true })
       .limit(5);
 
+    // ERROR-UI-FIX E-02: distinguir "sin reservas" de "falló la carga".
+    if (queryError) {
+      console.error('[Dashboard] próximas reservas:', queryError);
+      setError(true);
+      setIsLoading(false);
+      return;
+    }
     setReservas((data ?? []) as unknown as ReservaConRecurso[]);
+    setIsLoading(false);
   }, [usuarioId]);
 
   useEffect(() => {
@@ -79,7 +94,7 @@ function useProximasReservas(usuarioId: string | undefined) {
     return () => { mounted = false; };
   }, [refetch]);
 
-  return { reservas, refetch };
+  return { reservas, isLoading, error, refetch };
 }
 
 // ============================================================================
@@ -110,7 +125,12 @@ function capitalizarNombre(nombre: string | null | undefined): string {
 export default function Dashboard() {
   const { usuario } = useAuth();
   const { recursos } = useRecursosActivos();
-  const { reservas: proximasReservas, refetch: refetchReservas } = useProximasReservas(usuario?.id);
+  const {
+    reservas: proximasReservas,
+    isLoading: loadingReservas,
+    error: errorReservas,
+    refetch: refetchReservas
+  } = useProximasReservas(usuario?.id);
 
   const ahora = new Date();
   const bloqueado = usuario?.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > ahora;
@@ -150,8 +170,25 @@ export default function Dashboard() {
         </h1>
       </div>
 
-      {/* Próxima sesión (hero) o empty state */}
-      {proximaReserva ? (
+      {/* Próxima sesión: cargando / error / hero / empty (ERROR-UI-FIX E-02) */}
+      {loadingReservas ? (
+        <div
+          className="ek-skeleton"
+          style={{ height: '220px', borderRadius: 'var(--ek-r-card)', marginBottom: '24px' }}
+        />
+      ) : errorReservas ? (
+        <div className="ek-card" style={{ marginBottom: '24px', textAlign: 'center' }}>
+          <p className="ek-eyebrow" style={{ color: 'var(--ek-danger)', marginBottom: '12px' }}>
+            NO SE PUDO CARGAR
+          </p>
+          <p className="ek-body" style={{ marginBottom: '20px' }}>
+            No pudimos cargar tu próxima sesión. Verificá tu conexión.
+          </p>
+          <button type="button" onClick={() => void refetchReservas()} className="ek-cta">
+            Reintentar
+          </button>
+        </div>
+      ) : proximaReserva ? (
         <div className="ek-card--hero" style={{ marginBottom: '24px' }}>
           <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>
             PRÓXIMA SESIÓN

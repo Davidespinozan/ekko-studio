@@ -238,5 +238,12 @@ export function traducirErrorRPC(message: string): string {
   if (message.includes('EKKO_NO_AUTORIZADO')) return 'No puedes hacer esta acción.';
   if (message.includes('EKKO_RESERVA_NO_CANCELABLE')) return 'Esta reserva no se puede cancelar.';
   if (message.includes('EKKO_RESERVA_PASADA')) return 'No puedes cancelar una reserva que ya pasó.';
-  return message;
+  if (message.includes('EKKO_FUERA_DE_HORARIO')) return 'Ese horario está fuera del horario del estudio.';
+  if (message.includes('EKKO_TENANT_DIFERENTE')) return 'Esa reserva pertenece a otro estudio.';
+  // EKKO_NO_AUTH va DESPUÉS de EKKO_NO_AUTORIZADO: 'EKKO_NO_AUTH' es
+  // substring de 'EKKO_NO_AUTORIZADO' y matchearía de más si fuera antes.
+  if (message.includes('EKKO_NO_AUTH')) return 'Tu sesión expiró. Iniciá sesión de nuevo.';
+  // Fallback (ERROR-UI-FIX E-04): nunca exponer el mensaje crudo de
+  // Postgres/Supabase/HTTP. Mismo criterio que traducirErrorReserva.
+  return 'No se pudo completar la operación. Intentá de nuevo.';
 }
