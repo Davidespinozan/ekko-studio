@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       membresias: {
@@ -564,10 +539,8 @@ export type Database = {
           no_shows_count: number
           nombre: string | null
           notas_admin: string | null
-          ob_data: Json | null
           rol: string
           status: string
-          stripe_customer_id: string | null
           telefono: string | null
           tenant_id: string
           trial_ends_at: string | null
@@ -587,10 +560,8 @@ export type Database = {
           no_shows_count?: number
           nombre?: string | null
           notas_admin?: string | null
-          ob_data?: Json | null
           rol?: string
           status?: string
-          stripe_customer_id?: string | null
           telefono?: string | null
           tenant_id: string
           trial_ends_at?: string | null
@@ -610,10 +581,8 @@ export type Database = {
           no_shows_count?: number
           nombre?: string | null
           notas_admin?: string | null
-          ob_data?: Json | null
           rol?: string
           status?: string
-          stripe_customer_id?: string | null
           telefono?: string | null
           tenant_id?: string
           trial_ends_at?: string | null
@@ -632,6 +601,48 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usuarios_datos_privados: {
+        Row: {
+          created_at: string
+          ob_data: Json | null
+          stripe_customer_id: string | null
+          tenant_id: string
+          updated_at: string
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string
+          ob_data?: Json | null
+          stripe_customer_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string
+          ob_data?: Json | null
+          stripe_customer_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usuarios_datos_privados_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usuarios_datos_privados_usuario_id_fkey"
+            columns: ["usuario_id"]
+            isOneToOne: true
+            referencedRelation: "usuarios"
             referencedColumns: ["id"]
           },
         ]
@@ -685,38 +696,6 @@ export type Database = {
         Args: { p_recurso_id: string }
         Returns: number
       }
-      dev_activar_miembro: {
-        Args: { p_email: string; p_tier?: string }
-        Returns: {
-          auth_id: string | null
-          avatar_url: string | null
-          bloqueado_hasta: string | null
-          commitment_ends_at: string | null
-          created_at: string
-          email: string
-          id: string
-          invitado: boolean
-          membresia_activa_id: string | null
-          membresia_tier: string | null
-          no_shows_count: number
-          nombre: string | null
-          notas_admin: string | null
-          ob_data: Json | null
-          rol: string
-          status: string
-          stripe_customer_id: string | null
-          telefono: string | null
-          tenant_id: string
-          trial_ends_at: string | null
-          updated_at: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "usuarios"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
       get_my_rol: { Args: never; Returns: string }
       get_my_tenant_id: { Args: never; Returns: string }
       get_my_user_id: { Args: never; Returns: string }
@@ -724,6 +703,17 @@ export type Database = {
       is_recepcionista: { Args: never; Returns: boolean }
       marcar_no_shows: { Args: never; Returns: Json }
       max_invitados_por_tier: { Args: { p_tier: string }; Returns: number }
+      reservar_para_miembro_atomic: {
+        Args: {
+          p_duracion_min: number
+          p_invitados?: number
+          p_notas?: string
+          p_recurso_id: string
+          p_slot_inicio: string
+          p_usuario_id: string
+        }
+        Returns: Json
+      }
       reservar_recurso_atomic: {
         Args: {
           p_duracion_min: number
@@ -864,9 +854,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
