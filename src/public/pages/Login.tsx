@@ -86,15 +86,11 @@ export default function Login() {
     }}>
       <div style={{ maxWidth: '400px', width: '100%' }}>
         <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <h1 style={{
-            fontFamily: 'var(--ek-font-display)',
-            fontSize: '36px',
-            fontWeight: 700,
-            letterSpacing: '-0.04em',
-            color: 'var(--ek-mustard)',
-            margin: 0
-          }}>EKKO</h1>
-          <p className="ek-eyebrow" style={{ marginTop: '6px' }}>STUDIO</p>
+          <img
+            src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_STUDIO_logo_transparente.png"
+            alt="EKKO Studio"
+            style={{ height: '90px', width: 'auto', display: 'block', margin: '0 auto' }}
+          />
         </div>
 
         <div className="ek-card">

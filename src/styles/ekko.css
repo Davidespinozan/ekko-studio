@@ -2162,3 +2162,36 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   .ek-eyebrow {
     letter-spacing: 0.12em;
   }
+
+/* ============================================================
+   HERO — imagen de fondo SOLO en desktop (>=1024px).
+   En móvil/tablet se mantiene el gradiente decorativo actual
+   (el ::before no se aplica fuera de esta media query).
+   El overlay oscuro (linear-gradient sobre la imagen) mantiene
+   el texto legible.
+   ============================================================ */
+@media (min-width: 1024px) {
+  .ek-hero {
+    /* Crea stacking context para que el ::before quede detrás del texto */
+    z-index: 0;
+  }
+  .ek-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* Full-bleed: el fondo cubre todo el ancho del viewport, no solo
+       el contenedor de 1200px del hero. */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100vw;
+    background:
+      /* Overlay horizontal: oscuro a la izquierda (texto) → transparente
+         a la derecha (se aprecia el estudio). */
+      linear-gradient(to right, rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.15)),
+      url('https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_studio.jpg')
+        center / cover no-repeat;
+    z-index: -1;
+    pointer-events: none;
+  }
+}

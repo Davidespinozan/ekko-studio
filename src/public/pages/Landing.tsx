@@ -140,7 +140,7 @@ export default function Landing() {
       {/* ============================================================
           HERO
           ============================================================ */}
-      <section style={{
+      <section className="ek-hero" style={{
         minHeight: '90vh',
         display: 'flex',
         flexDirection: 'column',
@@ -239,20 +239,37 @@ export default function Landing() {
             {
               n: '01',
               title: 'Reserva tu sesión',
-              body: 'Elige estudio, fecha y horario desde la app. Sin llamadas, sin esperas. 24 horas de anticipación mínima.'
+              body: 'Elige estudio, fecha y horario desde la app. Sin llamadas, sin esperas. 24 horas de anticipación mínima.',
+              img: null // TODO: pegar URL de imagen del paso 01
             },
             {
               n: '02',
               title: 'Llega y graba',
-              body: 'Equipo profesional ya montado. Cámaras, micrófonos, iluminación. Tú llegas con tu contenido en la cabeza.'
+              body: 'Equipo profesional ya montado. Cámaras, micrófonos, iluminación. Tú llegas con tu contenido en la cabeza.',
+              img: 'https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/ChatGPT%20Image%2030%20may%202026,%2005_45_11%20p.m..jpg'
             },
             {
               n: '03',
               title: 'Recibe tu material',
-              body: 'Te entregamos los archivos limpios después de cada sesión. Tú decides cómo editarlo y publicarlo.'
+              body: 'Te entregamos los archivos limpios después de cada sesión. Tú decides cómo editarlo y publicarlo.',
+              img: null // TODO: pegar URL de imagen del paso 03
             }
           ].map((paso) => (
             <div key={paso.n} className="ek-card">
+              {paso.img && (
+                <img
+                  src={paso.img}
+                  alt={paso.title}
+                  style={{
+                    width: '100%',
+                    aspectRatio: '4 / 3',
+                    objectFit: 'cover',
+                    borderRadius: 'var(--ek-r-sm)',
+                    display: 'block',
+                    marginBottom: '20px'
+                  }}
+                />
+              )}
               <p style={{
                 fontFamily: 'var(--ek-font-display)',
                 fontSize: '32px',

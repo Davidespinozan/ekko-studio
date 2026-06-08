@@ -1,6 +1,5 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
-import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useRoleRedirect } from '@shared/hooks/useRoleRedirect';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
@@ -11,7 +10,6 @@ const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
 
 export default function PublicLayout() {
-  const tenant = useTenant();
   const { authUser, signOut } = useAuth();
   const location = useLocation();
   const enLogin = location.pathname === '/login';
@@ -29,8 +27,12 @@ export default function PublicLayout() {
           alignItems: 'center'
         }}
       >
-        <Link to="/" style={{ fontWeight: 700, fontSize: '1.125rem' }}>
-          {tenant.nombre}
+        <Link to="/" style={{ display: 'inline-flex', alignItems: 'center' }}>
+          <img
+            src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_STUDIO_logo_transparente.png"
+            alt="EKKO Studio"
+            style={{ height: '56px', width: 'auto', display: 'block' }}
+          />
         </Link>
         <nav style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           {authUser ? (
