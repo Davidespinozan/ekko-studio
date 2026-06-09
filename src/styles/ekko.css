@@ -2413,16 +2413,17 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   cursor: pointer;
   text-align: left;
   border: 0.5px solid var(--ek-line);
+  border-left: 3px solid var(--ek-mustard);
   border-radius: var(--ek-r-card);
   box-shadow: var(--ek-shadow-card);
   background: var(--ek-bg-soft);
   color: var(--ek-ink);
   font: inherit;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .ek-estudio-card:hover {
   transform: translateY(-2px);
-  border-color: var(--ek-mustard-dim);
+  box-shadow: 0 14px 30px rgba(229, 184, 41, 0.16);
 }
 .ek-estudio-media {
   position: relative;
@@ -2433,11 +2434,10 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-estudio-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ek-estudio-body {
   padding: 20px;
-  /* Info en crema: se ve mejor que el gris oscuro */
-  background: linear-gradient(160deg, #faf7ef 0%, #ece4d2 100%);
-  color: var(--ek-bg);
+  /* Oscuro con tinte cálido, como los pasos (no crema). */
+  background: linear-gradient(150deg, rgba(229, 184, 41, 0.05), var(--ek-bg-soft) 60%);
+  color: var(--ek-ink);
 }
-.ek-estudio-body .ek-estudio-title { color: var(--ek-bg) !important; }
 .ek-estudio-detalle { display: inline-flex; }
 
 @media (max-width: 600px) {
@@ -2788,3 +2788,16 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   color: rgba(10, 10, 10, 0.6) !important;
 }
 .adm-sidebar .ek-icon-btn:hover { background: rgba(10, 10, 10, 0.1) !important; color: var(--ek-bg) !important; }
+
+/* ============================================================================
+   MENÚ INFERIOR DEL MEMBER EN CLARO (como el sidebar de admin)
+   ============================================================================ */
+.ek-bottom-nav {
+  background: rgba(247, 243, 234, 0.92) !important;
+  border-top-color: rgba(10, 10, 10, 0.1) !important;
+}
+.ek-bottom-nav-item-label { color: rgba(10, 10, 10, 0.5) !important; }
+.ek-bottom-nav-icon { color: rgba(10, 10, 10, 0.55) !important; }
+.ek-bottom-nav-item--active { background: var(--ek-mustard-soft) !important; }
+.ek-bottom-nav-item--active .ek-bottom-nav-item-label { color: #8a6d12 !important; }
+.ek-bottom-nav-item--active .ek-bottom-nav-icon { color: #8a6d12 !important; }

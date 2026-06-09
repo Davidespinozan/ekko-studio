@@ -357,20 +357,20 @@ export default function Landing() {
                   }}>{s.nombre}</h3>
                   <p style={{
                     fontSize: '13px',
-                    color: 'rgba(10, 10, 10, 0.58)',
+                    color: 'var(--ek-ink-muted)',
                     margin: 0,
                     marginBottom: '6px'
                   }}>{s.capacidad}</p>
                   <p style={{
                     fontSize: '12px',
-                    color: '#9a7b16',
+                    color: 'var(--ek-mustard)',
                     margin: 0,
                     marginBottom: '12px',
                     fontWeight: 700
                   }}>{s.contenido.join(' · ')}</p>
                   <p className="ek-estudio-detalle" style={{
                     fontSize: '11px',
-                    color: 'rgba(10, 10, 10, 0.5)',
+                    color: 'var(--ek-ink-faint)',
                     margin: 0,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',

@@ -144,13 +144,8 @@ export default function EstudioModal({ estudio, onClose }: Props) {
           </span>
         </div>
 
-        <div className="ek-card--cream" style={{
-          padding: 'clamp(16px, 5vw, 32px)',
-          background: 'linear-gradient(160deg, #faf7ef 0%, #ece4d2 100%)',
-          borderBottomLeftRadius: 'var(--ek-r-card)',
-          borderBottomRightRadius: 'var(--ek-r-card)'
-        }}>
-          <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>ESTUDIO</p>
+        <div style={{ padding: 'clamp(16px, 5vw, 32px)' }}>
+          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>ESTUDIO</p>
           <h2 style={{
             fontFamily: 'var(--ek-font-display)',
             fontSize: 'clamp(28px, 5vw, 40px)',
