@@ -144,7 +144,12 @@ export default function EstudioModal({ estudio, onClose }: Props) {
           </span>
         </div>
 
-        <div style={{ padding: 'clamp(16px, 5vw, 32px)' }}>
+        <div className="ek-card--cream" style={{
+          padding: 'clamp(16px, 5vw, 32px)',
+          background: 'linear-gradient(160deg, #faf7ef 0%, #ece4d2 100%)',
+          borderBottomLeftRadius: 'var(--ek-r-card)',
+          borderBottomRightRadius: 'var(--ek-r-card)'
+        }}>
           <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>ESTUDIO</p>
           <h2 style={{
             fontFamily: 'var(--ek-font-display)',
@@ -229,7 +234,7 @@ export default function EstudioModal({ estudio, onClose }: Props) {
 
           <Link
             to={`/signup?tier=${estudio.tier}`}
-            className="ek-cta ek-cta--full"
+            className="ek-cta ek-cta--gold ek-cta--full"
             style={{ padding: '16px', fontSize: '15px', textAlign: 'center' }}
           >
             {esPro

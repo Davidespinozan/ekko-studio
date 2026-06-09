@@ -2624,6 +2624,17 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 }
 .ek-card--cream .ek-icon-btn { color: rgba(10, 10, 10, 0.5) !important; }
 .ek-card--cream .ek-icon-btn:hover { background: rgba(10, 10, 10, 0.06) !important; }
+/* chips neutrales legibles sobre cream */
+.ek-card--cream .ek-badge--neutral {
+  background: rgba(10, 10, 10, 0.06) !important;
+  color: rgba(10, 10, 10, 0.62) !important;
+  border-color: rgba(10, 10, 10, 0.12) !important;
+}
+/* stat-card embebida en cream */
+.ek-card--cream .ek-stat-card {
+  background: rgba(10, 10, 10, 0.04) !important;
+  border-color: rgba(10, 10, 10, 0.10) !important;
+}
 
 /* --- Reservar: chips y slots con vida (más mostaza, menos gris) --- */
 
