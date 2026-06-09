@@ -105,20 +105,25 @@ export default function Estudios() {
                 <TierBadge pro={esPro} style={{ position: 'absolute', top: '12px', left: '12px' }} />
               </div>
 
-              <div style={{ padding: '18px' }}>
+              <div style={{
+                padding: '18px',
+                background: 'linear-gradient(160deg, #faf7ef 0%, #ece4d2 100%)',
+                color: 'var(--ek-bg)'
+              }}>
                 <h3 style={{
                   fontFamily: 'var(--ek-font-display)',
                   fontSize: '20px',
                   fontWeight: 700,
                   letterSpacing: '-0.03em',
                   margin: 0,
-                  marginBottom: '6px'
+                  marginBottom: '6px',
+                  color: 'var(--ek-bg)'
                 }}>{r.nombre}</h3>
 
                 {r.descripcion && (
                   <p style={{
                     fontSize: '13px',
-                    color: 'var(--ek-ink-muted)',
+                    color: 'rgba(10, 10, 10, 0.6)',
                     margin: 0,
                     marginBottom: '14px',
                     lineHeight: 1.4
@@ -128,7 +133,17 @@ export default function Estudios() {
                 {tiposContenido.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
                     {tiposContenido.slice(0, 3).map((tipo) => (
-                      <span key={tipo} className="ek-badge ek-badge--neutral">
+                      <span key={tipo} style={{
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        padding: '4px 10px',
+                        borderRadius: 'var(--ek-r-pill)',
+                        background: 'rgba(10, 10, 10, 0.06)',
+                        color: 'rgba(10, 10, 10, 0.6)',
+                        border: '0.5px solid rgba(10, 10, 10, 0.12)'
+                      }}>
                         {tipo}
                       </span>
                     ))}
@@ -140,14 +155,14 @@ export default function Estudios() {
                   justifyContent: 'space-between',
                   alignItems: 'center',
                   fontSize: '12px',
-                  color: 'var(--ek-ink-muted)'
+                  color: 'rgba(10, 10, 10, 0.55)'
                 }}>
                   <span>
                     {(r.capacidad_personas ?? 0) > 0
                       ? `Hasta ${r.capacidad_personas} personas`
                       : 'Capacidad por confirmar'}
                   </span>
-                  <span style={{ color: 'var(--ek-mustard)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <span style={{ color: '#9a7b16', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
                     Ver detalle <ArrowRight size={13} aria-hidden="true" />
                   </span>
                 </div>
