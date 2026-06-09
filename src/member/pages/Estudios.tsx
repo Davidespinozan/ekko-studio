@@ -74,8 +74,7 @@ export default function Estudios() {
                 overflow: 'hidden',
                 textDecoration: 'none',
                 color: 'inherit',
-                borderRadius: 'var(--ek-r-md)',
-                borderLeft: '3px solid var(--ek-mustard)'
+                borderRadius: 'var(--ek-r-md)'
               }}
             >
               <div style={{

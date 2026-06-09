@@ -2413,7 +2413,6 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   cursor: pointer;
   text-align: left;
   border: 0.5px solid var(--ek-line);
-  border-left: 3px solid var(--ek-mustard);
   border-radius: var(--ek-r-card);
   box-shadow: var(--ek-shadow-card);
   background: var(--ek-bg-soft);
@@ -2801,3 +2800,25 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-bottom-nav-item--active { background: var(--ek-mustard-soft) !important; }
 .ek-bottom-nav-item--active .ek-bottom-nav-item-label { color: #8a6d12 !important; }
 .ek-bottom-nav-item--active .ek-bottom-nav-icon { color: #8a6d12 !important; }
+
+/* ============================================================================
+   PROFUNDIDAD DE CARDS EN TODO EL SISTEMA
+   ============================================================================
+   Problema: las cards base se desvanecían a #0a0a0a (igual que el fondo) y se
+   "fundían" sin sensación de profundidad. Solución: una superficie cálida que
+   se queda en el tono elevado (como los pasos), claramente más clara que el
+   fondo. Sin la línea de acento — solo el contraste card↔fondo.
+   ============================================================================ */
+:root {
+  --ek-surface: linear-gradient(150deg, rgba(229, 184, 41, 0.05) 0%, var(--ek-bg-soft) 58%);
+}
+.ek-card:not(.ek-card--gold):not(.ek-card--cream),
+.ek-card--md:not(.ek-card--gold):not(.ek-card--cream),
+.ek-card--hero:not(.ek-card--gold):not(.ek-card--cream),
+.ek-stat-card:not(.ek-card--gold):not(.ek-card--cream),
+.rec-card,
+.rec-miembro-card,
+.rec-detail,
+.adm-stat-card {
+  background: var(--ek-surface) !important;
+}
