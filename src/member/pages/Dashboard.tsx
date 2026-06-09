@@ -194,7 +194,6 @@ export default function Dashboard() {
             icon={CalendarPlus}
             title="Sin sesiones agendadas"
             hint="Reserva tu próxima grabación y aparecerá acá."
-            action={<Link to="/app/reservar" className="ek-cta">Reservar ahora</Link>}
           />
         </div>
       )}

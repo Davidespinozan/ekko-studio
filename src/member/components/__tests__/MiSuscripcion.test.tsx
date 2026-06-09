@@ -3,12 +3,14 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 /**
  * MiSuscripcion: muestra el plan actual con datos reales del tier, estado
- * vacío de pagos cuando no hay historial, y abre el modal de cambio de plan.
+ * vacío de pagos, y permite cambiar de plan IN-APP (vía backend change-plan,
+ * no WhatsApp).
  */
 
 const h = vi.hoisted(() => ({
   tiers: [] as unknown[],
-  pagos: [] as unknown[]
+  pagos: [] as unknown[],
+  changePlan: vi.fn()
 }));
 
 vi.mock('@shared/lib/supabase', () => {
@@ -24,8 +26,13 @@ vi.mock('@shared/lib/supabase', () => {
   return { supabase: { from: (t: string) => builderFor(t) } };
 });
 
-vi.mock('@shared/hooks/useTenant', () => ({
-  useTenant: () => ({ id: 't-1', config: { contacto: { whatsapp_e164: '+521112223333' } } })
+vi.mock('@shared/lib/backend', () => ({
+  backendPost: (path: string, body: unknown) => h.changePlan(path, body)
+}));
+
+vi.mock('@shared/hooks/useTenant', () => ({ useTenant: () => ({ id: 't-1', config: {} }) }));
+vi.mock('@shared/hooks/useToast', () => ({
+  useToast: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() })
 }));
 
 import { MiSuscripcion } from '../MiSuscripcion';
@@ -36,12 +43,11 @@ beforeEach(() => {
     { slug: 'pro', nombre: 'Pro', precio_centavos: 120000, beneficios: ['Todo Básica', 'Estudios pro'], descripcion: null }
   ];
   h.pagos = [];
+  h.changePlan = vi.fn().mockResolvedValue({ success: true });
 });
 
 function renderComp(tierSlug: string | null = 'pro') {
-  return render(
-    <MiSuscripcion usuarioId="u-1" tierSlug={tierSlug} status="activa" nombre="Ana" />
-  );
+  return render(<MiSuscripcion usuarioId="u-1" tierSlug={tierSlug} status="activa" />);
 }
 
 describe('MiSuscripcion', () => {
@@ -58,12 +64,13 @@ describe('MiSuscripcion', () => {
     await waitFor(() => expect(screen.getByText('Sin pagos registrados')).toBeInTheDocument());
   });
 
-  it('abre el modal de cambio de plan y lista los otros planes', async () => {
+  it('cambia de plan in-app (llama a change-plan) y refleja el nuevo plan', async () => {
     renderComp('pro');
     await waitFor(() => expect(screen.getByText('Cambiar de plan')).toBeInTheDocument());
     fireEvent.click(screen.getByText('Cambiar de plan'));
     await waitFor(() => expect(screen.getByText('CAMBIAR DE PLAN')).toBeInTheDocument());
-    // el plan no-actual (Básica) ofrece solicitar
-    expect(screen.getByText('Solicitar')).toBeInTheDocument();
+    // El plan no-actual (Básica) ofrece cambiar
+    fireEvent.click(screen.getByText('Cambiar a este'));
+    await waitFor(() => expect(h.changePlan).toHaveBeenCalledWith('change-plan', { tier: 'basica' }));
   });
 });

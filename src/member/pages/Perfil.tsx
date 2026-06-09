@@ -174,13 +174,8 @@ export default function Perfil() {
             usuarioId={usuario.id}
             tierSlug={usuario.membresia_tier ?? null}
             status={usuario.status}
-            nombre={usuario.nombre}
           />
         )}
-
-        <button onClick={signOut} className="ek-cta ek-cta--secondary ek-cta--full">
-          <LogOut size={16} aria-hidden="true" /> Cerrar sesión
-        </button>
 
         {/* Stat del mes */}
         <section style={{ marginTop: '32px', marginBottom: '24px' }}>
@@ -276,6 +271,10 @@ export default function Perfil() {
             </div>
           )}
         </section>
+
+        <button onClick={signOut} className="ek-cta ek-cta--secondary ek-cta--full">
+          <LogOut size={16} aria-hidden="true" /> Cerrar sesión
+        </button>
       </div>
     </div>
   );

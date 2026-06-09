@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Sparkles, Check, CreditCard, ArrowRight, X, MessageCircle } from 'lucide-react';
+import { Sparkles, Check, CreditCard, ArrowRight, X } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { backendPost } from '@shared/lib/backend';
 import { useTenant } from '@shared/hooks/useTenant';
+import { useToast } from '@shared/hooks/useToast';
 import { TierBadge } from '@shared/components/TierBadge';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Spinner } from '@shared/components/Spinner';
@@ -39,16 +41,6 @@ function formatearPesos(centavos: number): string {
   return `$${Math.round(centavos / 100).toLocaleString('es-MX')}`;
 }
 
-function getWhatsappNumber(config: unknown): string | null {
-  if (!config || typeof config !== 'object') return null;
-  const contacto = (config as Record<string, unknown>).contacto;
-  if (!contacto || typeof contacto !== 'object') return null;
-  const numero = (contacto as Record<string, unknown>).whatsapp_e164;
-  if (typeof numero !== 'string') return null;
-  const limpio = numero.replace(/\D/g, '');
-  return limpio.length >= 10 ? limpio : null;
-}
-
 const STATUS_META: Record<string, { texto: string; clase: string }> = {
   activa: { texto: 'Activa', clase: 'ek-badge--success' },
   active: { texto: 'Activa', clase: 'ek-badge--success' },
@@ -61,15 +53,17 @@ interface Props {
   usuarioId: string;
   tierSlug: string | null;
   status: string | null | undefined;
-  nombre: string | null | undefined;
 }
 
-export function MiSuscripcion({ usuarioId, tierSlug, status, nombre }: Props) {
+export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const tenant = useTenant();
+  const toast = useToast();
   const [tiers, setTiers] = useState<TierInfo[]>([]);
   const [pagos, setPagos] = useState<PagoInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [cambiarOpen, setCambiarOpen] = useState(false);
+  const [currentSlug, setCurrentSlug] = useState<string | null>(tierSlug);
+  const [cambiando, setCambiando] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -105,16 +99,21 @@ export function MiSuscripcion({ usuarioId, tierSlug, status, nombre }: Props) {
     return () => { mounted = false; };
   }, [tenant.id, usuarioId]);
 
-  const planActual = tiers.find((t) => t.slug === tierSlug) ?? null;
+  const planActual = tiers.find((t) => t.slug === currentSlug) ?? null;
   const statusMeta = STATUS_META[status ?? ''] ?? { texto: status ?? '—', clase: 'ek-badge--neutral' };
-  const whatsapp = getWhatsappNumber(tenant.config);
 
-  function solicitarCambio(destino: TierInfo) {
-    const msg = `Hola, soy ${nombre ?? 'un miembro'}. Quiero cambiar mi membresía a ${destino.nombre} (${formatearPesos(destino.precio_centavos)}/mes).`;
-    if (whatsapp) {
-      window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(msg)}`, '_blank', 'noopener');
+  async function cambiarPlan(destino: TierInfo) {
+    setCambiando(destino.slug);
+    try {
+      await backendPost('change-plan', { tier: destino.slug });
+      setCurrentSlug(destino.slug);
+      setCambiarOpen(false);
+      toast.success(`Tu plan ahora es ${destino.nombre}.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No pudimos cambiar tu plan. Intentá de nuevo.');
+    } finally {
+      setCambiando(null);
     }
-    setCambiarOpen(false);
   }
 
   return (
@@ -247,10 +246,12 @@ export function MiSuscripcion({ usuarioId, tierSlug, status, nombre }: Props) {
                         type="button"
                         className="ek-cta"
                         style={{ padding: '10px 16px', fontSize: '13px' }}
-                        onClick={() => solicitarCambio(t)}
-                        disabled={!whatsapp}
+                        onClick={() => cambiarPlan(t)}
+                        disabled={cambiando !== null}
                       >
-                        <MessageCircle size={15} aria-hidden="true" /> Solicitar
+                        {cambiando === t.slug
+                          ? <Spinner size={15} />
+                          : <>Cambiar a este <ArrowRight size={15} aria-hidden="true" /></>}
                       </button>
                     )}
                   </div>
@@ -258,11 +259,9 @@ export function MiSuscripcion({ usuarioId, tierSlug, status, nombre }: Props) {
               })}
             </div>
 
-            {!whatsapp && (
-              <p className="ek-helper-text" style={{ marginTop: '14px' }}>
-                El estudio aún no configuró su WhatsApp de contacto.
-              </p>
-            )}
+            <p className="ek-helper-text" style={{ marginTop: '14px' }}>
+              El cambio se aplica al instante. El cobro proporcional se gestiona en tu próximo período.
+            </p>
           </div>
         </div>
       )}
