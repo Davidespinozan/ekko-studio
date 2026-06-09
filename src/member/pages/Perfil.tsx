@@ -4,6 +4,7 @@ import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
 import { EmptyState } from '@shared/components/EmptyState';
+import { MiSuscripcion } from '@member/components/MiSuscripcion';
 import { ESTADOS_RESERVA_HISTORICOS } from '@shared/constants/reservaStatus';
 import type { Database } from '@shared/types/database';
 
@@ -165,13 +166,17 @@ export default function Perfil() {
             <p className="adm-info-label">Status</p>
             <p className="adm-info-value adm-info-value--mono">{usuario?.status}</p>
           </div>
-          {usuario?.membresia_tier && (
-            <div className="adm-info-cell">
-              <p className="adm-info-label">Plan</p>
-              <p className="adm-info-value adm-info-value--mono">{usuario.membresia_tier}</p>
-            </div>
-          )}
         </div>
+
+        {/* Mi suscripción */}
+        {usuario?.id && (
+          <MiSuscripcion
+            usuarioId={usuario.id}
+            tierSlug={usuario.membresia_tier ?? null}
+            status={usuario.status}
+            nombre={usuario.nombre}
+          />
+        )}
 
         <button onClick={signOut} className="ek-cta ek-cta--secondary ek-cta--full">
           <LogOut size={16} aria-hidden="true" /> Cerrar sesión
