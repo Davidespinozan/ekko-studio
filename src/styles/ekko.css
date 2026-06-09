@@ -2222,10 +2222,10 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     background:
       linear-gradient(
         180deg,
-        rgba(10, 10, 10, 0.28) 0%,
-        rgba(10, 10, 10, 0.22) 38%,
-        rgba(10, 10, 10, 0.72) 76%,
-        rgba(10, 10, 10, 0.96) 100%
+        rgba(10, 10, 10, 0.26) 0%,
+        rgba(10, 10, 10, 0.20) 38%,
+        rgba(10, 10, 10, 0.62) 76%,
+        rgba(10, 10, 10, 0.86) 100%
       ),
       url('https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/ce7cba08-3986-466f-84de-c924fed1cc49.jpg')
         center / cover no-repeat;
@@ -2752,3 +2752,39 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   .ek-step-title { font-size: 16px !important; margin-bottom: 3px !important; }
   .ek-step-body { font-size: 13px !important; }
 }
+
+/* ============================================================================
+   ADMIN SIDEBAR EN CLARO (más luz, menos gris)
+   ============================================================================
+   El menú de admin pasa de gris oscuro a crema claro (como las cards de la
+   landing). Cubre el sidebar desktop y el drawer móvil (ambos usan .adm-sidebar).
+   ============================================================================ */
+.adm-sidebar-desktop {
+  background: #f7f3ea !important;
+  border-right-color: rgba(10, 10, 10, 0.1) !important;
+}
+.adm-sidebar {
+  background: linear-gradient(180deg, #faf7ef 0%, #f0e9d8 100%) !important;
+}
+.adm-sidebar-brand { border-bottom-color: rgba(10, 10, 10, 0.1) !important; }
+.adm-sidebar .ek-eyebrow,
+.adm-sidebar .adm-sidebar-section-label { color: rgba(10, 10, 10, 0.42) !important; }
+.adm-sidebar-item { color: rgba(10, 10, 10, 0.66) !important; }
+.adm-sidebar-item:hover { background: rgba(10, 10, 10, 0.06) !important; color: var(--ek-bg) !important; }
+.adm-sidebar-item--active {
+  background: var(--ek-mustard-soft) !important;
+  color: #8a6d12 !important;
+  box-shadow: none !important;
+}
+.adm-sidebar-item--active::before { background: var(--ek-mustard) !important; }
+.adm-sidebar-item[style] { border-color: rgba(10, 10, 10, 0.12) !important; }
+.adm-sidebar-footer { border-top-color: rgba(10, 10, 10, 0.1) !important; }
+/* nombre del usuario conectado (tiene color: var(--ek-ink) inline → oscuro) */
+.adm-sidebar-footer p:not(.ek-eyebrow) { color: var(--ek-bg) !important; }
+/* botones de icono del footer (salir, colapsar) en modo claro */
+.adm-sidebar .ek-icon-btn {
+  background: rgba(10, 10, 10, 0.05) !important;
+  border-color: rgba(10, 10, 10, 0.12) !important;
+  color: rgba(10, 10, 10, 0.6) !important;
+}
+.adm-sidebar .ek-icon-btn:hover { background: rgba(10, 10, 10, 0.1) !important; color: var(--ek-bg) !important; }
