@@ -156,7 +156,7 @@ export default function Dashboard() {
           </button>
         </div>
       ) : proximaReserva ? (
-        <div className="ek-card--hero" style={{ marginBottom: '24px' }}>
+        <div className="ek-card--hero ek-card--gold" style={{ marginBottom: '24px' }}>
           <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>
             PRÓXIMA SESIÓN
           </p>
@@ -201,7 +201,7 @@ export default function Dashboard() {
       {/* Accesos rápidos */}
       <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>ACCESOS RÁPIDOS</p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <Link to="/app/reservar" className="ek-card ek-card-interactive ek-quick-action ek-quick-action--accent">
+        <Link to="/app/reservar" className="ek-card ek-card-interactive ek-quick-action ek-card--gold">
           <span className="ek-empty-icon" style={{ width: 44, height: 44, margin: 0 }}>
             <CalendarPlus size={20} aria-hidden="true" />
           </span>

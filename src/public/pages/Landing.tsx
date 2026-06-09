@@ -261,8 +261,6 @@ export default function Landing() {
               key={paso.n}
               className="ek-card ek-card--md ek-step-card"
             >
-              <span aria-hidden="true" className="ek-step-num">{paso.n}</span>
-
               <span className="ek-empty-icon ek-step-icon" style={{ width: 44, height: 44 }}>
                 <paso.Icon size={20} aria-hidden="true" />
               </span>
@@ -429,16 +427,8 @@ export default function Landing() {
               return (
                 <div
                   key={tier.slug}
-                  className="ek-card ek-pricing-card"
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    ...(esPro && {
-                      borderColor: 'var(--ek-mustard)',
-                      boxShadow:
-                        '0 0 0 1px var(--ek-mustard-dim), 0 20px 60px rgba(229, 184, 41, 0.08)'
-                    })
-                  }}
+                  className={`ek-card ek-pricing-card ${esPro ? 'ek-card--gold' : 'ek-card--cream'}`}
+                  style={{ display: 'flex', flexDirection: 'column' }}
                 >
                   <p
                     className={esPro ? 'ek-eyebrow ek-eyebrow--mustard' : 'ek-eyebrow'}

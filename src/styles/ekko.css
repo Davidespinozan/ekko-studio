@@ -2473,20 +2473,99 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 14px;
 }
-.ek-step-card { position: relative; overflow: hidden; }
-.ek-step-icon { margin: 0 0 14px !important; }
-.ek-step-num {
-  position: absolute;
-  top: -6px;
-  right: 6px;
-  font-family: var(--ek-font-display);
-  font-size: 64px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -0.05em;
-  color: rgba(245, 241, 232, 0.05);
-  pointer-events: none;
+.ek-step-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
+.ek-step-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--ek-mustard) !important;
+  box-shadow: 0 12px 28px rgba(229, 184, 41, 0.14);
+}
+/* icono en gold sólido (más vida que el tinte) */
+.ek-step-icon {
+  margin: 0 0 14px !important;
+  background: linear-gradient(150deg, var(--ek-mustard), #d8a91f) !important;
+  border-color: transparent !important;
+  color: var(--ek-bg) !important;
+  box-shadow: 0 6px 16px rgba(229, 184, 41, 0.3) !important;
+}
+
+/* --- Tarjeta "gold": relleno mostaza + texto oscuro para dar vida -------- */
+.ek-card--gold {
+  background: linear-gradient(150deg, var(--ek-mustard) 0%, #d8a91f 100%) !important;
+  border-color: transparent !important;
+  color: var(--ek-bg) !important;
+  box-shadow: 0 14px 34px rgba(229, 184, 41, 0.28) !important;
+}
+.ek-card--gold::before { display: none !important; } /* mata el glow del hero */
+.ek-card--gold h1,
+.ek-card--gold h2,
+.ek-card--gold h3,
+.ek-card--gold .ek-display-lg,
+.ek-card--gold .ek-display-md,
+.ek-card--gold .ek-kpi { color: var(--ek-bg) !important; }
+.ek-card--gold .ek-eyebrow,
+.ek-card--gold .ek-eyebrow--mustard,
+.ek-card--gold .ek-body,
+.ek-card--gold .ek-body-muted { color: rgba(10, 10, 10, 0.75) !important; }
+.ek-card--gold .ek-body-faint { color: rgba(10, 10, 10, 0.55) !important; }
+.ek-card--gold .ek-eyebrow--bar::before { background: rgba(10, 10, 10, 0.55); }
+/* CTA dentro de la card gold → pill oscura sólida (alto contraste) */
+.ek-card--gold .ek-cta {
+  background: var(--ek-bg) !important;
+  color: var(--ek-ink) !important;
+  border-color: rgba(10, 10, 10, 0.25) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25) !important;
+}
+.ek-card--gold .ek-cta:hover { background: #000 !important; transform: translateY(-1px); }
+.ek-card--gold .ek-empty-icon {
+  background: rgba(10, 10, 10, 0.12);
+  border-color: rgba(10, 10, 10, 0.18);
+  color: var(--ek-bg);
+}
+.ek-card--gold .ek-quick-action-label { color: var(--ek-bg); }
+.ek-card--gold .ek-quick-action-arrow { color: rgba(10, 10, 10, 0.55); }
+.ek-card--gold:hover .ek-quick-action-arrow { color: var(--ek-bg); }
+/* overrides para precios sobre fondo gold (spans/checks con color inline) */
+.ek-card--gold .ek-pricing-price span { color: rgba(10, 10, 10, 0.6) !important; }
+.ek-card--gold li svg { color: var(--ek-bg) !important; }
+
+/* --- Tarjeta "cream": relleno claro + texto oscuro (alterna con gold) ----- */
+.ek-card--cream {
+  background: linear-gradient(160deg, #faf7ef 0%, #ece4d2 100%) !important;
+  border-color: rgba(10, 10, 10, 0.10) !important;
+  color: var(--ek-bg) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4) !important;
+}
+.ek-card--cream::before { display: none !important; }
+.ek-card--cream h1,
+.ek-card--cream h2,
+.ek-card--cream h3,
+.ek-card--cream .ek-display-lg,
+.ek-card--cream .ek-display-md,
+.ek-card--cream .ek-kpi,
+.ek-card--cream .ek-pricing-price { color: var(--ek-bg) !important; }
+.ek-card--cream .ek-eyebrow,
+.ek-card--cream .ek-body,
+.ek-card--cream .ek-body-muted { color: rgba(10, 10, 10, 0.62) !important; }
+.ek-card--cream .ek-pricing-price span { color: rgba(10, 10, 10, 0.55) !important; }
+.ek-card--cream li svg { color: var(--ek-bg) !important; }
+/* CTA outline oscuro sobre cream */
+.ek-card--cream .ek-cta {
+  background: transparent !important;
+  color: var(--ek-bg) !important;
+  border-color: rgba(10, 10, 10, 0.28) !important;
+  box-shadow: none !important;
+}
+.ek-card--cream .ek-cta:hover {
+  background: var(--ek-bg) !important;
+  color: var(--ek-ink) !important;
+  border-color: var(--ek-bg) !important;
+}
+
+/* --- Reservar: chips y slots con vida (más mostaza, menos gris) --- */
 
 /* --- Reservar: chips y slots con vida (más mostaza, menos gris) --- */
 .ek-slot {
