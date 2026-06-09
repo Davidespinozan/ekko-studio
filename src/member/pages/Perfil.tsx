@@ -179,7 +179,7 @@ export default function Perfil() {
 
         {/* Stat del mes */}
         <section style={{ marginTop: '32px', marginBottom: '24px' }}>
-          <div className="ek-stat-card" style={{
+          <div className="ek-stat-card ek-card--gold" style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center'
