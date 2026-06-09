@@ -235,13 +235,16 @@ export function Sidebar({ onNavigate }: Props = {}) {
     }
   }, [location.pathname]);
 
+  // Logo EKKO oficial (mismo que header/login/footer). Fallback cuando el
+  // tenant no tiene branding.logo_url, para no caer a texto plano.
+  const EKKO_LOGO = 'https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_STUDIO_logo_transparente.png';
   const branding = (tenant.branding ?? {}) as Record<string, unknown>;
   const logoUrl =
     typeof branding.logo_url_dark === 'string'
       ? branding.logo_url_dark
       : typeof branding.logo_url === 'string'
         ? (branding.logo_url as string)
-        : null;
+        : EKKO_LOGO;
   const brandShort = (tenant.nombre || 'EKKO').split(/\s+/)[0];
 
   const nombreFormat =

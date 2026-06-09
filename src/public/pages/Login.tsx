@@ -92,7 +92,7 @@ export default function Login() {
           <img
             src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_STUDIO_logo_transparente.png"
             alt="EKKO Studio"
-            style={{ height: '90px', width: 'auto', display: 'block', margin: '0 auto' }}
+            style={{ height: '116px', width: 'auto', display: 'block', margin: '0 auto' }}
           />
         </div>
 

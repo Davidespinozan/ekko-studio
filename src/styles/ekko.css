@@ -2210,8 +2210,17 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     left: 50%;
     transform: translateX(-50%);
     width: 100vw;
+    /* Overlay reforzado: oscuro arriba (título) y abajo (CTA) para que el
+       texto y los botones resalten; deja ver el estudio en la franja media.
+       Antes (0.6 plano) lavaba el contenido en móvil. */
     background:
-      linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+      linear-gradient(
+        180deg,
+        rgba(10, 10, 10, 0.86) 0%,
+        rgba(10, 10, 10, 0.58) 42%,
+        rgba(10, 10, 10, 0.78) 78%,
+        rgba(10, 10, 10, 0.95) 100%
+      ),
       url('https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/ce7cba08-3986-466f-84de-c924fed1cc49.jpg')
         center / cover no-repeat;
     z-index: -1;
@@ -2375,4 +2384,81 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-stagger > *:nth-child(8) { animation-delay: 0.30s; }
 @media (prefers-reduced-motion: reduce) {
   .ek-stagger > * { animation: none; }
+}
+
+/* ============================================================================
+   LANDING — DENSIDAD RESPONSIVE
+   ============================================================================
+   En móvil las fotos de estudios y las tarjetas de precio robaban demasiado
+   alto. Desktop: tarjetas verticales con imagen grande / precios espaciosos.
+   Móvil: estudios como fila compacta (thumbnail + texto) y precios en 2
+   columnas horizontales más densas. "Menos es más".
+   ============================================================================ */
+
+/* --- Estudios --- */
+.ek-estudio-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+.ek-estudio-card {
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  border: 0.5px solid var(--ek-line);
+  border-radius: var(--ek-r-card);
+  box-shadow: var(--ek-shadow-card);
+  background: var(--ek-bg-soft);
+  color: var(--ek-ink);
+  font: inherit;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.ek-estudio-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--ek-mustard-dim);
+}
+.ek-estudio-media {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  background: linear-gradient(135deg, var(--ek-bg-elevated) 0%, var(--ek-bg) 100%);
+}
+.ek-estudio-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ek-estudio-body { padding: 20px; }
+.ek-estudio-detalle { display: inline-flex; }
+
+@media (max-width: 600px) {
+  .ek-estudio-grid { grid-template-columns: 1fr; gap: 10px; }
+  .ek-estudio-card {
+    display: grid;
+    grid-template-columns: 112px 1fr;
+    align-items: stretch;
+    border-radius: var(--ek-r-md);
+  }
+  .ek-estudio-media { aspect-ratio: auto; height: 100%; min-height: 112px; }
+  .ek-estudio-body { padding: 14px 16px; display: flex; flex-direction: column; justify-content: center; }
+  .ek-estudio-title { font-size: 18px !important; margin-bottom: 4px !important; }
+  /* el "ver detalle" sobra en la fila compacta — toda la fila es tappable */
+  .ek-estudio-detalle { display: none; }
+}
+
+/* --- Precios / membresías --- */
+.ek-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+.ek-pricing-card { padding: 32px; }
+.ek-pricing-price { font-size: 48px; }
+
+@media (max-width: 720px) {
+  .ek-pricing-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ek-pricing-card { padding: 18px !important; }
+  .ek-pricing-price { font-size: 30px !important; }
+  .ek-pricing-card .ek-cta { padding: 12px 12px !important; font-size: 13px !important; }
+  .ek-pricing-card .ek-pricing-benefit { font-size: 12.5px !important; }
+}
+@media (max-width: 380px) {
+  .ek-pricing-price { font-size: 26px !important; }
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ArrowRight, Check } from 'lucide-react';
+import { Star, ArrowRight, Check, CalendarCheck, Clapperboard, FolderDown, ImageIcon, Sparkles } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useLandingConfig } from '@shared/hooks/useLandingConfig';
 import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
@@ -200,17 +200,21 @@ export default function Landing() {
 
         <a
           href={hero.cta_link || '#membresias'}
-          className="ek-cta"
+          className="ek-cta ek-hero-cta"
           style={{
-            padding: '16px 32px',
+            padding: '15px 30px',
             fontSize: '15px',
             minHeight: '52px',
+            alignSelf: 'flex-start',
+            width: 'auto',
             display: 'inline-flex',
             alignItems: 'center',
-            justifyContent: 'center'
+            justifyContent: 'center',
+            gap: '8px'
           }}
         >
           {hero.cta_texto}
+          <ArrowRight size={17} aria-hidden="true" />
         </a>
       </section>
 
@@ -233,62 +237,64 @@ export default function Landing() {
 
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-          gap: '20px'
+          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
+          gap: '14px'
         }}>
           {[
             {
               n: '01',
+              Icon: CalendarCheck,
               title: 'Reserva tu sesión',
-              body: 'Elige estudio, fecha y horario desde la app. Sin llamadas, sin esperas. 24 horas de anticipación mínima.',
-              img: null // TODO: pegar URL de imagen del paso 01
+              body: 'Elige estudio, fecha y horario desde la app. Sin llamadas, sin esperas.'
             },
             {
               n: '02',
+              Icon: Clapperboard,
               title: 'Llega y graba',
-              body: 'Equipo profesional ya montado. Cámaras, micrófonos, iluminación. Tú llegas con tu contenido en la cabeza.',
-              img: 'https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/ChatGPT%20Image%2030%20may%202026,%2005_45_11%20p.m..jpg'
+              body: 'Equipo profesional ya montado: cámaras, micrófonos, iluminación. Tú solo traés tu contenido.'
             },
             {
               n: '03',
+              Icon: FolderDown,
               title: 'Recibe tu material',
-              body: 'Te entregamos los archivos limpios después de cada sesión. Tú decides cómo editarlo y publicarlo.',
-              img: null // TODO: pegar URL de imagen del paso 03
+              body: 'Te entregamos los archivos limpios después de cada sesión. Vos decidís cómo publicarlo.'
             }
           ].map((paso) => (
-            <div key={paso.n} className="ek-card">
-              {paso.img && (
-                <img
-                  src={paso.img}
-                  alt={paso.title}
-                  style={{
-                    width: '100%',
-                    aspectRatio: '4 / 3',
-                    objectFit: 'cover',
-                    borderRadius: 'var(--ek-r-sm)',
-                    display: 'block',
-                    marginBottom: '20px'
-                  }}
-                />
-              )}
-              <p style={{
+            <div
+              key={paso.n}
+              className="ek-card ek-card--md"
+              style={{ position: 'relative', overflow: 'hidden' }}
+            >
+              {/* Número fantasma de fondo */}
+              <span aria-hidden="true" style={{
+                position: 'absolute',
+                top: '-6px',
+                right: '6px',
                 fontFamily: 'var(--ek-font-display)',
-                fontSize: '32px',
+                fontSize: '64px',
                 fontWeight: 700,
-                color: 'var(--ek-mustard)',
-                margin: 0,
-                marginBottom: '12px',
-                letterSpacing: '-0.04em'
-              }}>{paso.n}</p>
+                lineHeight: 1,
+                letterSpacing: '-0.05em',
+                color: 'rgba(245, 241, 232, 0.05)',
+                pointerEvents: 'none'
+              }}>{paso.n}</span>
+
+              <span className="ek-empty-icon" style={{ width: 44, height: 44, margin: '0 0 14px' }}>
+                <paso.Icon size={20} aria-hidden="true" />
+              </span>
+              <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '6px' }}>
+                PASO {paso.n}
+              </p>
               <h3 style={{
                 fontFamily: 'var(--ek-font-display)',
-                fontSize: '20px',
+                fontSize: '18px',
                 fontWeight: 600,
                 margin: 0,
-                marginBottom: '8px'
+                marginBottom: '6px',
+                letterSpacing: '-0.02em'
               }}>{paso.title}</h3>
               <p style={{
-                fontSize: '14px',
+                fontSize: '13.5px',
                 color: 'var(--ek-ink-muted)',
                 lineHeight: 1.5,
                 margin: 0
@@ -329,76 +335,38 @@ export default function Landing() {
             ))}
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '20px'
-          }}>
+          <div className="ek-estudio-grid">
             {estudiosInfo.map((s) => (
               <button
                 key={s.slug}
                 onClick={() => setEstudioAbierto(s)}
-                className="ek-card"
-                style={{
-                  padding: 0,
-                  overflow: 'hidden',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  border: '0.5px solid var(--ek-line)',
-                  background: 'var(--ek-bg-soft)',
-                  color: 'var(--ek-ink)',
-                  transition: 'transform 0.2s ease, border-color 0.2s ease',
-                  font: 'inherit'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.borderColor = 'var(--ek-mustard-dim)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.borderColor = 'var(--ek-line)';
-                }}
+                className="ek-estudio-card"
               >
-                <div style={{
-                  background: 'linear-gradient(135deg, var(--ek-bg-elevated) 0%, var(--ek-bg) 100%)',
-                  aspectRatio: '16 / 10',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}>
+                <div className="ek-estudio-media">
                   {s.fotoUrl ? (
-                    <img
-                      src={s.fotoUrl}
-                      alt={s.nombre}
-                      loading="lazy"
-                      decoding="async"
-                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                    />
+                    <img src={s.fotoUrl} alt={s.nombre} loading="lazy" decoding="async" />
                   ) : (
                     <div style={{
                       width: '100%',
                       height: '100%',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      color: 'var(--ek-ink-faint)'
                     }}>
-                      <span style={{
-                        fontSize: '10px',
-                        color: 'var(--ek-ink-faint)',
-                        letterSpacing: '0.2em',
-                        fontWeight: 600
-                      }}>FOTO PRÓXIMAMENTE</span>
+                      <ImageIcon size={22} strokeWidth={1.5} aria-hidden="true" />
                     </div>
                   )}
                   <span
                     className={s.tier === 'pro' ? 'ek-badge ek-badge--outline' : 'ek-badge'}
-                    style={{ position: 'absolute', top: '14px', left: '14px' }}
+                    style={{ position: 'absolute', top: '12px', left: '12px' }}
                   >
                     {s.tier === 'pro' && <Star size={11} fill="currentColor" aria-hidden="true" />}
                     {s.tier === 'pro' ? 'PRO' : 'BÁSICA'}
                   </span>
                 </div>
-                <div style={{ padding: '20px' }}>
-                  <h3 style={{
+                <div className="ek-estudio-body">
+                  <h3 className="ek-estudio-title" style={{
                     fontFamily: 'var(--ek-font-display)',
                     fontSize: '24px',
                     fontWeight: 700,
@@ -418,14 +386,13 @@ export default function Landing() {
                     marginBottom: '12px',
                     fontWeight: 600
                   }}>{s.contenido.join(' · ')}</p>
-                  <p style={{
+                  <p className="ek-estudio-detalle" style={{
                     fontSize: '11px',
                     color: 'var(--ek-ink-faint)',
                     margin: 0,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
                     fontWeight: 600,
-                    display: 'inline-flex',
                     alignItems: 'center',
                     gap: '5px'
                   }}>
@@ -466,11 +433,7 @@ export default function Landing() {
             ))}
           </div>
         ) : (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: '20px'
-          }}>
+          <div className="ek-pricing-grid">
             {tiers.map((tier) => {
               const esPro = tier.slug === 'pro';
               const beneficios = parseBeneficios(tier.beneficios);
@@ -478,9 +441,10 @@ export default function Landing() {
               return (
                 <div
                   key={tier.slug}
-                  className="ek-card"
+                  className="ek-card ek-pricing-card"
                   style={{
-                    padding: '32px',
+                    display: 'flex',
+                    flexDirection: 'column',
                     ...(esPro && {
                       borderColor: 'var(--ek-mustard)',
                       boxShadow:
@@ -495,20 +459,19 @@ export default function Landing() {
                     {esPro && <Star size={12} fill="currentColor" aria-hidden="true" />}
                     {esPro ? 'PRO · RECOMENDADA' : tier.nombre.toUpperCase()}
                   </p>
-                  <p style={{
+                  <p className="ek-pricing-price" style={{
                     fontFamily: 'var(--ek-font-display)',
-                    fontSize: '48px',
                     fontWeight: 700,
                     margin: 0,
                     letterSpacing: '-0.03em',
                     lineHeight: 1
                   }}>
                     {formatearPesos(tier.precio_centavos)}
-                    <span style={{ fontSize: '16px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>
+                    <span style={{ fontSize: '15px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>
                       /mes
                     </span>
                   </p>
-                  <p className="ek-body-muted" style={{ marginTop: '8px', marginBottom: '24px' }}>
+                  <p className="ek-body-muted ek-pricing-benefit" style={{ marginTop: '8px', marginBottom: '20px' }}>
                     {tier.descripcion ??
                       (esPro
                         ? 'Para creadores serios. Acceso completo.'
@@ -521,12 +484,14 @@ export default function Landing() {
                       margin: 0,
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: '10px'
+                      gap: '9px',
+                      flex: 1
                     }}
                   >
                     {beneficios.map((b) => (
                       <li
                         key={b}
+                        className="ek-pricing-benefit"
                         style={{
                           display: 'flex',
                           alignItems: 'flex-start',
@@ -534,7 +499,7 @@ export default function Landing() {
                           fontSize: '14px'
                         }}
                       >
-                        <Check size={16} style={{ color: 'var(--ek-mustard)', flexShrink: 0, marginTop: '1px' }} aria-hidden="true" />
+                        <Check size={15} style={{ color: 'var(--ek-mustard)', flexShrink: 0, marginTop: '2px' }} aria-hidden="true" />
                         {b}
                       </li>
                     ))}
@@ -544,7 +509,7 @@ export default function Landing() {
                     className={
                       esPro ? 'ek-cta ek-cta--full' : 'ek-cta ek-cta--secondary ek-cta--full'
                     }
-                    style={{ marginTop: '28px' }}
+                    style={{ marginTop: '24px' }}
                   >
                     {esPro ? 'Quiero la Pro' : `Empezar con ${tier.nombre}`}
                   </Link>
@@ -627,70 +592,83 @@ export default function Landing() {
       {/* ============================================================
           CTA + CONTACTO
           ============================================================ */}
-      <section id="contacto" style={{ padding: '100px 0' }}>
+      <section id="contacto" style={{ padding: 'clamp(64px, 10vw, 100px) 0' }}>
         <div style={{
-          background: 'linear-gradient(135deg, var(--ek-bg-elevated) 0%, var(--ek-bg) 100%)',
+          background:
+            'radial-gradient(ellipse 90% 70% at 50% 0%, rgba(229, 184, 41, 0.10), transparent 60%),' +
+            'linear-gradient(160deg, var(--ek-bg-elevated) 0%, var(--ek-bg-soft) 60%, var(--ek-bg) 100%)',
           border: '0.5px solid var(--ek-mustard-dim)',
           borderRadius: 'var(--ek-r-card)',
-          padding: 'clamp(32px, 6vw, 64px)',
+          padding: 'clamp(40px, 7vw, 72px) clamp(24px, 5vw, 56px)',
           textAlign: 'center',
           position: 'relative',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          boxShadow: 'inset 0 1px 0 rgba(245, 241, 232, 0.06), 0 24px 60px rgba(0, 0, 0, 0.4)'
         }}>
-          <div style={{
-            position: 'absolute',
-            top: '-100px',
-            right: '-100px',
-            width: '300px',
-            height: '300px',
-            background: 'radial-gradient(circle, rgba(229, 184, 41, 0.1), transparent 70%)',
-            borderRadius: '50%',
-            pointerEvents: 'none'
+          {/* glows en dos esquinas para profundidad */}
+          <div aria-hidden="true" style={{
+            position: 'absolute', top: '-120px', right: '-90px', width: '320px', height: '320px',
+            background: 'radial-gradient(circle, rgba(229, 184, 41, 0.14), transparent 70%)',
+            borderRadius: '50%', pointerEvents: 'none'
+          }} />
+          <div aria-hidden="true" style={{
+            position: 'absolute', bottom: '-140px', left: '-100px', width: '320px', height: '320px',
+            background: 'radial-gradient(circle, rgba(229, 184, 41, 0.07), transparent 70%)',
+            borderRadius: '50%', pointerEvents: 'none'
           }} />
 
-          {cta_final.eyebrow && (
-            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '16px' }}>
-              {cta_final.eyebrow}
-            </p>
-          )}
-          <h2 style={{
-            fontFamily: 'var(--ek-font-display)',
-            fontSize: 'clamp(32px, 5vw, 48px)',
-            fontWeight: 700,
-            letterSpacing: '-0.04em',
-            margin: 0,
-            marginBottom: '16px',
-            lineHeight: 1.1
-          }}>
-            {cta_final.titulo}
-          </h2>
-          {cta_final.subtitulo && (
-            <p className="ek-body-muted" style={{ marginBottom: '32px', maxWidth: '500px', marginLeft: 'auto', marginRight: 'auto' }}>
-              {cta_final.subtitulo}
-            </p>
-          )}
-          {ctaWhatsappUrl ? (
-            <a
-              href={ctaWhatsappUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ek-cta"
-              style={{ padding: '18px 32px', fontSize: '15px' }}
-            >
-              {cta_final.cta_texto}
-            </a>
-          ) : (
-            <span
-              style={{
-                fontSize: '12px',
-                color: 'var(--ek-ink-faint)',
-                fontStyle: 'italic'
-              }}
-              title="Configura el WhatsApp en /admin/configuracion"
-            >
-              (Contacto sin configurar)
+          <div style={{ position: 'relative' }}>
+            <span className="ek-empty-icon" style={{ width: 56, height: 56, marginBottom: '20px' }}>
+              <Sparkles size={24} aria-hidden="true" />
             </span>
-          )}
+
+            {cta_final.eyebrow && (
+              <p className="ek-eyebrow ek-eyebrow--mustard" style={{
+                marginBottom: '16px', justifyContent: 'center', display: 'flex'
+              }}>
+                {cta_final.eyebrow}
+              </p>
+            )}
+            <h2 style={{
+              fontFamily: 'var(--ek-font-display)',
+              fontSize: 'clamp(30px, 5vw, 52px)',
+              fontWeight: 700,
+              letterSpacing: '-0.04em',
+              margin: '0 auto 16px',
+              maxWidth: '14ch',
+              lineHeight: 1.05
+            }}>
+              {cta_final.titulo}
+            </h2>
+            {cta_final.subtitulo && (
+              <p className="ek-body-muted" style={{ marginBottom: '32px', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
+                {cta_final.subtitulo}
+              </p>
+            )}
+            {ctaWhatsappUrl ? (
+              <a
+                href={ctaWhatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ek-cta"
+                style={{ padding: '16px 34px', fontSize: '15px', minHeight: '54px', gap: '8px' }}
+              >
+                {cta_final.cta_texto}
+                <ArrowRight size={18} aria-hidden="true" />
+              </a>
+            ) : (
+              <span
+                style={{
+                  fontSize: '12px',
+                  color: 'var(--ek-ink-faint)',
+                  fontStyle: 'italic'
+                }}
+                title="Configura el WhatsApp en /admin/configuracion"
+              >
+                (Contacto sin configurar)
+              </span>
+            )}
+          </div>
         </div>
       </section>
 
