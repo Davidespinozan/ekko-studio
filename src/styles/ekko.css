@@ -2195,3 +2195,33 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     pointer-events: none;
   }
 }
+
+/* ============================================================
+   HERO — imagen de fondo SOLO en móvil/tablet (<1024px).
+   Reemplaza el gradiente decorativo en estos tamaños. Overlay
+   uniforme (no horizontal): en pantallas angostas el texto ocupa
+   casi todo el ancho, así un overlay parejo mantiene la legibilidad.
+   No afecta a la imagen de desktop (vive en @min-width:1024px).
+   ============================================================ */
+@media (max-width: 1023.98px) {
+  .ek-hero {
+    /* Crea stacking context para que el ::before quede detrás del texto */
+    z-index: 0;
+  }
+  .ek-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* Full-bleed: cubre todo el ancho del viewport (edge to edge). */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100vw;
+    background:
+      linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.6)),
+      url('https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/ce7cba08-3986-466f-84de-c924fed1cc49.jpg')
+        center / cover no-repeat;
+    z-index: -1;
+    pointer-events: none;
+  }
+}
