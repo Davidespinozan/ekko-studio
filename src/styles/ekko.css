@@ -2462,3 +2462,43 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 @media (max-width: 380px) {
   .ek-pricing-price { font-size: 26px !important; }
 }
+
+/* --- Cómo funciona / tres pasos --- */
+.ek-step-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 14px;
+}
+.ek-step-card { position: relative; overflow: hidden; }
+.ek-step-icon { margin: 0 0 14px !important; }
+.ek-step-num {
+  position: absolute;
+  top: -6px;
+  right: 6px;
+  font-family: var(--ek-font-display);
+  font-size: 64px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  color: rgba(245, 241, 232, 0.05);
+  pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  /* Fila compacta: icono a la izquierda, texto a la derecha. Mucho menos
+     alto que las tarjetas verticales (las grandes "robaban" pantalla). */
+  .ek-step-grid { gap: 10px; }
+  .ek-step-card {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    column-gap: 14px;
+    align-items: center;
+    padding: 16px 18px !important;
+  }
+  .ek-step-icon { margin: 0 !important; align-self: start; }
+  .ek-step-text { min-width: 0; }
+  .ek-step-num { font-size: 38px; top: 10px; right: 14px; }
+  .ek-step-card .ek-eyebrow { margin-bottom: 3px !important; }
+  .ek-step-title { font-size: 16px !important; margin-bottom: 3px !important; }
+  .ek-step-body { font-size: 13px !important; }
+}

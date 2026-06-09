@@ -228,6 +228,7 @@ export default function Landing() {
           fontSize: 'clamp(36px, 6vw, 56px)',
           fontWeight: 700,
           letterSpacing: '-0.04em',
+          lineHeight: 1.08,
           margin: 0,
           marginBottom: '48px'
         }}>
@@ -235,11 +236,7 @@ export default function Landing() {
           <span style={{ color: 'var(--ek-mustard)' }}>En tres pasos.</span>
         </h2>
 
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
-          gap: '14px'
-        }}>
+        <div className="ek-step-grid">
           {[
             {
               n: '01',
@@ -262,43 +259,32 @@ export default function Landing() {
           ].map((paso) => (
             <div
               key={paso.n}
-              className="ek-card ek-card--md"
-              style={{ position: 'relative', overflow: 'hidden' }}
+              className="ek-card ek-card--md ek-step-card"
             >
-              {/* Número fantasma de fondo */}
-              <span aria-hidden="true" style={{
-                position: 'absolute',
-                top: '-6px',
-                right: '6px',
-                fontFamily: 'var(--ek-font-display)',
-                fontSize: '64px',
-                fontWeight: 700,
-                lineHeight: 1,
-                letterSpacing: '-0.05em',
-                color: 'rgba(245, 241, 232, 0.05)',
-                pointerEvents: 'none'
-              }}>{paso.n}</span>
+              <span aria-hidden="true" className="ek-step-num">{paso.n}</span>
 
-              <span className="ek-empty-icon" style={{ width: 44, height: 44, margin: '0 0 14px' }}>
+              <span className="ek-empty-icon ek-step-icon" style={{ width: 44, height: 44 }}>
                 <paso.Icon size={20} aria-hidden="true" />
               </span>
-              <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '6px' }}>
-                PASO {paso.n}
-              </p>
-              <h3 style={{
-                fontFamily: 'var(--ek-font-display)',
-                fontSize: '18px',
-                fontWeight: 600,
-                margin: 0,
-                marginBottom: '6px',
-                letterSpacing: '-0.02em'
-              }}>{paso.title}</h3>
-              <p style={{
-                fontSize: '13.5px',
-                color: 'var(--ek-ink-muted)',
-                lineHeight: 1.5,
-                margin: 0
-              }}>{paso.body}</p>
+              <div className="ek-step-text">
+                <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '6px' }}>
+                  PASO {paso.n}
+                </p>
+                <h3 className="ek-step-title" style={{
+                  fontFamily: 'var(--ek-font-display)',
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  margin: 0,
+                  marginBottom: '6px',
+                  letterSpacing: '-0.02em'
+                }}>{paso.title}</h3>
+                <p className="ek-step-body" style={{
+                  fontSize: '13.5px',
+                  color: 'var(--ek-ink-muted)',
+                  lineHeight: 1.5,
+                  margin: 0
+                }}>{paso.body}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -314,6 +300,7 @@ export default function Landing() {
           fontSize: 'clamp(36px, 6vw, 56px)',
           fontWeight: 700,
           letterSpacing: '-0.04em',
+          lineHeight: 1.08,
           margin: 0,
           marginBottom: '16px'
         }}>
@@ -415,6 +402,7 @@ export default function Landing() {
           fontSize: 'clamp(36px, 6vw, 56px)',
           fontWeight: 700,
           letterSpacing: '-0.04em',
+          lineHeight: 1.08,
           margin: 0,
           marginBottom: '48px'
         }}>
@@ -530,6 +518,7 @@ export default function Landing() {
           fontSize: 'clamp(36px, 6vw, 56px)',
           fontWeight: 700,
           letterSpacing: '-0.04em',
+          lineHeight: 1.08,
           margin: 0,
           marginBottom: '48px'
         }}>
