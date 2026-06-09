@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, AlertTriangle, CalendarPlus } from 'lucide-react';
+import { ArrowRight, AlertTriangle, CalendarPlus, ImageIcon } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
@@ -291,15 +291,19 @@ export default function Dashboard() {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
+                {r.foto_url ? (
+                  <img
+                    src={r.foto_url}
+                    alt={r.nombre}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', color: 'var(--ek-ink-faint)' }}>
+                    <ImageIcon size={20} strokeWidth={1.5} aria-hidden="true" />
+                    <span style={{ fontSize: '9px', letterSpacing: '0.18em', fontWeight: 600 }}>FOTO PRÓXIMAMENTE</span>
+                  </div>
+                )}
                 <TierBadge pro={esPro} style={{ position: 'absolute', top: '10px', left: '10px' }} />
-                <span style={{
-                  fontSize: '9px',
-                  color: 'var(--ek-ink-faint)',
-                  letterSpacing: '0.18em',
-                  fontWeight: 600
-                }}>
-                  FOTO PRÓXIMAMENTE
-                </span>
               </div>
 
               <div style={{ padding: '14px' }}>
