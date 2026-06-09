@@ -2753,53 +2753,26 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 }
 
 /* ============================================================================
-   ADMIN SIDEBAR EN CLARO (más luz, menos gris)
+   MENÚS OSCUROS DIFERENCIADOS (admin sidebar + member bottom-nav)
    ============================================================================
-   El menú de admin pasa de gris oscuro a crema claro (como las cards de la
-   landing). Cubre el sidebar desktop y el drawer móvil (ambos usan .adm-sidebar).
+   Vuelven a oscuro (nada de blanco), pero MÁS oscuros que el contenido —
+   ahora que las cards usan un gris cálido más claro, el menú se lee como un
+   "marco" oscuro distinto, con borde y sombra marcados para separarlo.
    ============================================================================ */
 .adm-sidebar-desktop {
-  background: #f7f3ea !important;
-  border-right-color: rgba(10, 10, 10, 0.1) !important;
+  background: #070707 !important;
+  border-right: 1px solid var(--ek-line-strong) !important;
+  box-shadow: 1px 0 16px rgba(0, 0, 0, 0.55);
 }
 .adm-sidebar {
-  background: linear-gradient(180deg, #faf7ef 0%, #f0e9d8 100%) !important;
+  background: linear-gradient(180deg, #0a0a09 0%, #070706 100%) !important;
 }
-.adm-sidebar-brand { border-bottom-color: rgba(10, 10, 10, 0.1) !important; }
-.adm-sidebar .ek-eyebrow,
-.adm-sidebar .adm-sidebar-section-label { color: rgba(10, 10, 10, 0.42) !important; }
-.adm-sidebar-item { color: rgba(10, 10, 10, 0.66) !important; }
-.adm-sidebar-item:hover { background: rgba(10, 10, 10, 0.06) !important; color: var(--ek-bg) !important; }
-.adm-sidebar-item--active {
-  background: var(--ek-mustard-soft) !important;
-  color: #8a6d12 !important;
-  box-shadow: none !important;
-}
-.adm-sidebar-item--active::before { background: var(--ek-mustard) !important; }
-.adm-sidebar-item[style] { border-color: rgba(10, 10, 10, 0.12) !important; }
-.adm-sidebar-footer { border-top-color: rgba(10, 10, 10, 0.1) !important; }
-/* nombre del usuario conectado (tiene color: var(--ek-ink) inline → oscuro) */
-.adm-sidebar-footer p:not(.ek-eyebrow) { color: var(--ek-bg) !important; }
-/* botones de icono del footer (salir, colapsar) en modo claro */
-.adm-sidebar .ek-icon-btn {
-  background: rgba(10, 10, 10, 0.05) !important;
-  border-color: rgba(10, 10, 10, 0.12) !important;
-  color: rgba(10, 10, 10, 0.6) !important;
-}
-.adm-sidebar .ek-icon-btn:hover { background: rgba(10, 10, 10, 0.1) !important; color: var(--ek-bg) !important; }
 
-/* ============================================================================
-   MENÚ INFERIOR DEL MEMBER EN CLARO (como el sidebar de admin)
-   ============================================================================ */
 .ek-bottom-nav {
-  background: rgba(247, 243, 234, 0.92) !important;
-  border-top-color: rgba(10, 10, 10, 0.1) !important;
+  background: rgba(7, 7, 7, 0.94) !important;
+  border-top: 1px solid var(--ek-line-strong) !important;
+  box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.55);
 }
-.ek-bottom-nav-item-label { color: rgba(10, 10, 10, 0.5) !important; }
-.ek-bottom-nav-icon { color: rgba(10, 10, 10, 0.55) !important; }
-.ek-bottom-nav-item--active { background: var(--ek-mustard-soft) !important; }
-.ek-bottom-nav-item--active .ek-bottom-nav-item-label { color: #8a6d12 !important; }
-.ek-bottom-nav-item--active .ek-bottom-nav-icon { color: #8a6d12 !important; }
 
 /* ============================================================================
    PROFUNDIDAD DE CARDS EN TODO EL SISTEMA
