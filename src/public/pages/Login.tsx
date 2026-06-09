@@ -96,7 +96,7 @@ export default function Login() {
           />
         </div>
 
-        <div className="ek-card">
+        <div className="ek-card ek-card--cream">
           <form onSubmit={handleSubmit} className="ek-stack-md">
             <div className="ek-form-field">
               <label htmlFor="email" className="ek-label">Email</label>
@@ -148,7 +148,7 @@ export default function Login() {
 
             <button
               type="submit"
-              className="ek-cta ek-cta--full"
+              className="ek-cta ek-cta--gold ek-cta--full"
               disabled={isSubmitting || !email || !password}
             >
               {isSubmitting ? <Spinner size={16} label="Iniciando sesión…" /> : 'Iniciar sesión'}

@@ -145,9 +145,7 @@ export default function Landing() {
         minHeight: '86vh',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'flex-end',
-        position: 'relative',
-        padding: '40px 0 56px'
+        position: 'relative'
       }}>
         <div style={{
           position: 'absolute',
@@ -163,7 +161,7 @@ export default function Landing() {
         }} />
 
         {hero.eyebrow && (
-          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '20px' }}>
+          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>
             {hero.eyebrow}
           </p>
         )}
@@ -175,7 +173,7 @@ export default function Landing() {
           letterSpacing: '-0.05em',
           lineHeight: 0.95,
           margin: 0,
-          marginBottom: '24px'
+          marginBottom: '16px'
         }}>
           {hero.titulo}
           {hero.titulo_accent && (
@@ -192,7 +190,7 @@ export default function Landing() {
             color: 'var(--ek-ink-muted)',
             maxWidth: '600px',
             lineHeight: 1.5,
-            marginBottom: '40px'
+            marginBottom: '28px'
           }}>
             {hero.subtitulo}
           </p>

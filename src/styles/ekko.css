@@ -2217,13 +2217,15 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     /* Overlay reforzado: oscuro arriba (título) y abajo (CTA) para que el
        texto y los botones resalten; deja ver el estudio en la franja media.
        Antes (0.6 plano) lavaba el contenido en móvil. */
+    /* Overlay más liviano arriba (imagen viva) y oscuro abajo, donde el texto
+       del hero queda alineado en móvil. */
     background:
       linear-gradient(
         180deg,
-        rgba(10, 10, 10, 0.86) 0%,
-        rgba(10, 10, 10, 0.58) 42%,
-        rgba(10, 10, 10, 0.78) 78%,
-        rgba(10, 10, 10, 0.95) 100%
+        rgba(10, 10, 10, 0.28) 0%,
+        rgba(10, 10, 10, 0.22) 38%,
+        rgba(10, 10, 10, 0.72) 76%,
+        rgba(10, 10, 10, 0.96) 100%
       ),
       url('https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/ce7cba08-3986-466f-84de-c924fed1cc49.jpg')
         center / cover no-repeat;
@@ -2473,6 +2475,18 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   .ek-pricing-price { font-size: 26px !important; }
 }
 
+/* --- Hero: centrado en desktop; texto abajo SOLO en móvil --------------- */
+.ek-hero {
+  justify-content: center;
+  padding: 40px 0;
+}
+@media (max-width: 768px) {
+  .ek-hero {
+    justify-content: flex-end;
+    padding: 40px 0 56px;
+  }
+}
+
 /* --- Cómo funciona / tres pasos --- */
 .ek-step-grid {
   display: grid;
@@ -2482,20 +2496,18 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-step-card {
   position: relative;
   overflow: hidden;
-  /* Fondo claro: las cards informativas se ven mejor en crema que en gris */
-  background: linear-gradient(160deg, #faf7ef 0%, #ece4d2 100%) !important;
-  border-color: rgba(10, 10, 10, 0.10) !important;
-  color: var(--ek-bg) !important;
+  /* Oscuro pero distinto de los estudios (crema) y con vida: tinte cálido +
+     acento mostaza a la izquierda + icono gold. */
+  background: linear-gradient(150deg, rgba(229, 184, 41, 0.06), var(--ek-bg-soft) 55%) !important;
+  border-color: var(--ek-line) !important;
+  border-left: 3px solid var(--ek-mustard) !important;
+  color: var(--ek-ink) !important;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .ek-step-card:hover {
   transform: translateY(-3px);
-  border-color: var(--ek-mustard) !important;
-  box-shadow: 0 14px 30px rgba(229, 184, 41, 0.2);
+  box-shadow: 0 14px 30px rgba(229, 184, 41, 0.16);
 }
-.ek-step-card .ek-step-title { color: var(--ek-bg) !important; }
-.ek-step-card .ek-step-body { color: rgba(10, 10, 10, 0.6) !important; }
-.ek-step-card .ek-eyebrow--mustard { color: #9a7b16 !important; }
 /* icono en gold sólido (más vida que el tinte) */
 .ek-step-icon {
   margin: 0 0 14px !important;
@@ -2592,6 +2604,26 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   color: var(--ek-ink) !important;
   border-color: var(--ek-bg) !important;
 }
+/* gold CTA dentro de cream conserva su estilo (no lo apaga el override de arriba) */
+.ek-card--cream .ek-cta--gold {
+  background: linear-gradient(150deg, var(--ek-mustard) 0%, #d8a91f 100%) !important;
+  color: var(--ek-bg) !important;
+  border-color: transparent !important;
+}
+/* Inputs/labels en modo claro dentro de una card cream (ej. login) */
+.ek-card--cream .ek-label { color: rgba(10, 10, 10, 0.6) !important; }
+.ek-card--cream .ek-input {
+  background: #fff !important;
+  color: var(--ek-bg) !important;
+  border-color: rgba(10, 10, 10, 0.15) !important;
+}
+.ek-card--cream .ek-input::placeholder { color: rgba(10, 10, 10, 0.38) !important; }
+.ek-card--cream .ek-input:focus {
+  border-color: var(--ek-mustard) !important;
+  box-shadow: 0 0 0 3px rgba(229, 184, 41, 0.2) !important;
+}
+.ek-card--cream .ek-icon-btn { color: rgba(10, 10, 10, 0.5) !important; }
+.ek-card--cream .ek-icon-btn:hover { background: rgba(10, 10, 10, 0.06) !important; }
 
 /* --- Reservar: chips y slots con vida (más mostaza, menos gris) --- */
 

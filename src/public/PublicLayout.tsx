@@ -31,7 +31,7 @@ export default function PublicLayout() {
           <img
             src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_STUDIO_logo_transparente.png"
             alt="EKKO Studio"
-            style={{ height: '72px', width: 'auto', display: 'block' }}
+            style={{ height: '86px', width: 'auto', display: 'block' }}
           />
         </Link>
         <nav style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
