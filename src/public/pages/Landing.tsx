@@ -142,12 +142,12 @@ export default function Landing() {
           HERO
           ============================================================ */}
       <section className="ek-hero" style={{
-        minHeight: '90vh',
+        minHeight: '86vh',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'flex-end',
         position: 'relative',
-        padding: '40px 0'
+        padding: '40px 0 56px'
       }}>
         <div style={{
           position: 'absolute',
@@ -200,7 +200,7 @@ export default function Landing() {
 
         <a
           href={hero.cta_link || '#membresias'}
-          className="ek-cta ek-hero-cta"
+          className="ek-cta ek-cta--gold ek-hero-cta"
           style={{
             padding: '15px 30px',
             fontSize: '15px',
@@ -214,14 +214,13 @@ export default function Landing() {
           }}
         >
           {hero.cta_texto}
-          <ArrowRight size={17} aria-hidden="true" />
         </a>
       </section>
 
       {/* ============================================================
           CÓMO FUNCIONA
           ============================================================ */}
-      <section style={{ padding: '80px 0' }}>
+      <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
         <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>CÓMO FUNCIONA</p>
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
@@ -230,7 +229,7 @@ export default function Landing() {
           letterSpacing: '-0.04em',
           lineHeight: 1.08,
           margin: 0,
-          marginBottom: '48px'
+          marginBottom: '28px'
         }}>
           De la idea al contenido.<br />
           <span style={{ color: 'var(--ek-mustard)' }}>En tres pasos.</span>
@@ -291,7 +290,7 @@ export default function Landing() {
       {/* ============================================================
           ESTUDIOS
           ============================================================ */}
-      <section style={{ padding: '80px 0' }}>
+      <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
         <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>NUESTROS ESPACIOS</p>
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
@@ -360,24 +359,24 @@ export default function Landing() {
                   }}>{s.nombre}</h3>
                   <p style={{
                     fontSize: '13px',
-                    color: 'var(--ek-ink-muted)',
+                    color: 'rgba(10, 10, 10, 0.58)',
                     margin: 0,
                     marginBottom: '6px'
                   }}>{s.capacidad}</p>
                   <p style={{
                     fontSize: '12px',
-                    color: 'var(--ek-mustard)',
+                    color: '#9a7b16',
                     margin: 0,
                     marginBottom: '12px',
-                    fontWeight: 600
+                    fontWeight: 700
                   }}>{s.contenido.join(' · ')}</p>
                   <p className="ek-estudio-detalle" style={{
                     fontSize: '11px',
-                    color: 'var(--ek-ink-faint)',
+                    color: 'rgba(10, 10, 10, 0.5)',
                     margin: 0,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
-                    fontWeight: 600,
+                    fontWeight: 700,
                     alignItems: 'center',
                     gap: '5px'
                   }}>
@@ -393,7 +392,7 @@ export default function Landing() {
       {/* ============================================================
           MEMBRESÍAS
           ============================================================ */}
-      <section id="membresias" style={{ padding: '80px 0' }}>
+      <section id="membresias" style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
         <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>MEMBRESÍAS</p>
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
@@ -402,7 +401,7 @@ export default function Landing() {
           letterSpacing: '-0.04em',
           lineHeight: 1.08,
           margin: 0,
-          marginBottom: '48px'
+          marginBottom: '28px'
         }}>
           Elige tu nivel.<br />
           <span style={{ color: 'var(--ek-mustard)' }}>Crece desde el día uno.</span>
@@ -501,7 +500,7 @@ export default function Landing() {
       {/* ============================================================
           FAQ
           ============================================================ */}
-      <section style={{ padding: '80px 0' }}>
+      <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
         <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>PREGUNTAS FRECUENTES</p>
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
@@ -510,7 +509,7 @@ export default function Landing() {
           letterSpacing: '-0.04em',
           lineHeight: 1.08,
           margin: 0,
-          marginBottom: '48px'
+          marginBottom: '28px'
         }}>
           Lo que probablemente quieres saber.
         </h2>
@@ -571,7 +570,7 @@ export default function Landing() {
       {/* ============================================================
           CTA + CONTACTO
           ============================================================ */}
-      <section id="contacto" style={{ padding: 'clamp(64px, 10vw, 100px) 0' }}>
+      <section id="contacto" style={{ padding: 'clamp(44px, 8vw, 72px) 0' }}>
         <div style={{
           background:
             'radial-gradient(ellipse 90% 70% at 50% 0%, rgba(229, 184, 41, 0.10), transparent 60%),' +

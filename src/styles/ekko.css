@@ -2429,7 +2429,13 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   background: linear-gradient(135deg, var(--ek-bg-elevated) 0%, var(--ek-bg) 100%);
 }
 .ek-estudio-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.ek-estudio-body { padding: 20px; }
+.ek-estudio-body {
+  padding: 20px;
+  /* Info en crema: se ve mejor que el gris oscuro */
+  background: linear-gradient(160deg, #faf7ef 0%, #ece4d2 100%);
+  color: var(--ek-bg);
+}
+.ek-estudio-body .ek-estudio-title { color: var(--ek-bg) !important; }
 .ek-estudio-detalle { display: inline-flex; }
 
 @media (max-width: 600px) {
@@ -2476,13 +2482,20 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-step-card {
   position: relative;
   overflow: hidden;
+  /* Fondo claro: las cards informativas se ven mejor en crema que en gris */
+  background: linear-gradient(160deg, #faf7ef 0%, #ece4d2 100%) !important;
+  border-color: rgba(10, 10, 10, 0.10) !important;
+  color: var(--ek-bg) !important;
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 .ek-step-card:hover {
   transform: translateY(-3px);
   border-color: var(--ek-mustard) !important;
-  box-shadow: 0 12px 28px rgba(229, 184, 41, 0.14);
+  box-shadow: 0 14px 30px rgba(229, 184, 41, 0.2);
 }
+.ek-step-card .ek-step-title { color: var(--ek-bg) !important; }
+.ek-step-card .ek-step-body { color: rgba(10, 10, 10, 0.6) !important; }
+.ek-step-card .ek-eyebrow--mustard { color: #9a7b16 !important; }
 /* icono en gold sólido (más vida que el tinte) */
 .ek-step-icon {
   margin: 0 0 14px !important;
@@ -2532,6 +2545,20 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-card--gold .ek-pricing-price span { color: rgba(10, 10, 10, 0.6) !important; }
 .ek-card--gold .ek-kpi span { color: rgba(10, 10, 10, 0.65) !important; }
 .ek-card--gold li svg { color: var(--ek-bg) !important; }
+
+/* --- CTA gold: relleno mostaza + texto negro (botón principal con vida) -- */
+.ek-cta--gold {
+  background: linear-gradient(150deg, var(--ek-mustard) 0%, #d8a91f 100%) !important;
+  color: var(--ek-bg) !important;
+  border-color: transparent !important;
+  box-shadow: 0 8px 24px rgba(229, 184, 41, 0.3) !important;
+}
+.ek-cta--gold:hover {
+  box-shadow: 0 12px 32px rgba(229, 184, 41, 0.45) !important;
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+.ek-cta--gold:active { transform: scale(0.98); }
 
 /* --- Tarjeta "cream": relleno claro + texto oscuro (alterna con gold) ----- */
 .ek-card--cream {

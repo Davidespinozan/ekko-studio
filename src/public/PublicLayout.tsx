@@ -37,7 +37,7 @@ export default function PublicLayout() {
         <nav style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           {authUser ? (
             <>
-              <Link to="/app" className="ek-cta" style={{ padding: '0.625rem 1.25rem', minHeight: '44px', display: 'inline-flex', alignItems: 'center' }}>
+              <Link to="/app" className="ek-cta ek-cta--gold" style={{ padding: '0.625rem 1.25rem', minHeight: '44px', display: 'inline-flex', alignItems: 'center' }}>
                 Mi cuenta
               </Link>
               <button
@@ -57,7 +57,7 @@ export default function PublicLayout() {
           ) : !enLogin ? (
             <Link
               to="/login"
-              className="ek-cta"
+              className="ek-cta ek-cta--gold"
               style={{ padding: '0.625rem 1.25rem', minHeight: '44px', display: 'inline-flex', alignItems: 'center' }}
             >
               Iniciar sesión
