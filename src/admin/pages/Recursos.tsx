@@ -1,4 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  ChevronDown,
+  ChevronRight,
+  Pencil,
+  Copy,
+  Trash2,
+  RotateCcw,
+  AlertTriangle,
+  Check,
+  Circle,
+  X,
+  Clapperboard
+} from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
@@ -10,6 +23,8 @@ import {
   canHardDeleteRecurso,
   hardDeleteRecord
 } from '../lib/crudHelpers';
+import { Spinner } from '@shared/components/Spinner';
+import { EmptyState } from '@shared/components/EmptyState';
 import Toggle from '../components/Toggle';
 import ImageUploader from '../components/ImageUploader';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -194,7 +209,7 @@ export default function Recursos() {
         style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}
       >
         <div>
-          <p className="ek-eyebrow">ESTUDIOS</p>
+          <p className="ek-eyebrow ek-eyebrow--mustard">ESTUDIOS</p>
           <h1 className="ek-h2">Tus espacios reservables</h1>
           {!isLoading && (
             <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '4px' }}>
@@ -210,14 +225,21 @@ export default function Recursos() {
       </div>
 
       {isLoading ? (
-        <p className="adm-body">Cargando…</p>
+        <Spinner label="Cargando…" />
       ) : (
         <>
           <div className="adm-stack">
             {activos.length === 0 ? (
-              <p className="ek-body-faint" style={{ padding: '20px 0' }}>
-                No hay estudios activos. Click en &quot;+ Nuevo estudio&quot; para crear el primero.
-              </p>
+              <EmptyState
+                icon={Clapperboard}
+                title="No hay estudios activos."
+                hint='Click en "+ Nuevo estudio" para crear el primero.'
+                action={
+                  <button onClick={() => setModal({ mode: 'create' })} className="ek-cta">
+                    + Nuevo estudio
+                  </button>
+                }
+              />
             ) : (
               activos.map((r) => (
                 <RecursoRow
@@ -242,10 +264,18 @@ export default function Recursos() {
                   width: 'auto',
                   padding: '8px 14px',
                   fontSize: '12px',
-                  marginBottom: '12px'
+                  marginBottom: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
-                {mostrarArchivados ? '▾' : '▸'} Ver eliminados ({archivados.length})
+                {mostrarArchivados ? (
+                  <ChevronDown size={14} aria-hidden="true" />
+                ) : (
+                  <ChevronRight size={14} aria-hidden="true" />
+                )}
+                Ver eliminados ({archivados.length})
               </button>
 
               {mostrarArchivados && (
@@ -453,9 +483,9 @@ function RecursoRow({
       </div>
       <CardMenuDropdown
         items={[
-          { label: 'Editar', icon: '✏️', onClick: onEdit },
-          { label: duplicating ? 'Duplicando…' : 'Duplicar', icon: '📋', onClick: onDuplicate, disabled: duplicating },
-          { label: 'Eliminar', icon: '🗑', onClick: onArchive, danger: true, divider: true }
+          { label: 'Editar', icon: Pencil, onClick: onEdit },
+          { label: duplicating ? 'Duplicando…' : 'Duplicar', icon: Copy, onClick: onDuplicate, disabled: duplicating },
+          { label: 'Eliminar', icon: Trash2, onClick: onArchive, danger: true, divider: true }
         ]}
       />
     </div>
@@ -508,8 +538,8 @@ function RecursoArchivedRow({
       </div>
       <CardMenuDropdown
         items={[
-          { label: restoring ? 'Recuperando…' : 'Recuperar', icon: '♻️', onClick: onRestore, disabled: restoring },
-          { label: 'Eliminar permanentemente', icon: '⚠️', onClick: onHardDelete, danger: true, divider: true }
+          { label: restoring ? 'Recuperando…' : 'Recuperar', icon: RotateCcw, onClick: onRestore, disabled: restoring },
+          { label: 'Eliminar permanentemente', icon: AlertTriangle, onClick: onHardDelete, danger: true, divider: true }
         ]}
       />
     </div>
@@ -956,16 +986,18 @@ function ListaEditable({
                 borderRadius: 'var(--ek-r-sm)'
               }}
             >
-              <span style={{ color: 'var(--ek-mustard)', fontSize: '12px' }}>✓</span>
+              <span style={{ color: 'var(--ek-mustard)', display: 'inline-flex' }}>
+                <Check size={13} aria-hidden="true" />
+              </span>
               <span style={{ flex: 1, fontSize: '13px' }}>{item}</span>
               <button
                 type="button"
                 onClick={() => onChange(value.filter((_, i) => i !== idx))}
                 className="ek-icon-btn"
-                style={{ padding: '4px 8px', fontSize: '11px', color: 'var(--ek-danger)' }}
+                style={{ padding: '4px 8px', color: 'var(--ek-danger)' }}
                 aria-label="Eliminar"
               >
-                ✕
+                <X size={13} aria-hidden="true" />
               </button>
             </div>
           ))}
@@ -1055,7 +1087,13 @@ function MultiSelectTiers({
                 transition: 'all 0.18s ease'
               }}
             >
-              <span style={{ fontSize: '14px' }}>{selected ? '✓' : '○'}</span>
+              <span style={{ display: 'inline-flex' }}>
+                {selected ? (
+                  <Check size={14} aria-hidden="true" />
+                ) : (
+                  <Circle size={14} aria-hidden="true" />
+                )}
+              </span>
               {opt.nombre}
             </button>
           );

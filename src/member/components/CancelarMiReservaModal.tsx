@@ -91,9 +91,9 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'var(--ek-backdrop)',
+        backdropFilter: 'blur(var(--ek-backdrop-blur))',
+        WebkitBackdropFilter: 'blur(var(--ek-backdrop-blur))',
         zIndex: 110,
         display: 'flex',
         alignItems: 'center',
@@ -116,7 +116,7 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
           animation: 'ek-scale-in 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
       >
-        <p className="ek-eyebrow" style={{ marginBottom: '6px' }}>
+        <p className="ek-eyebrow" style={{ marginBottom: '6px', color: 'var(--ek-danger)' }}>
           {step === 'info' ? 'CANCELAR RESERVA' : 'CONFIRMAR CANCELACIÓN'}
         </p>
         <h3

@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { X, Search, UserX } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
+import { EmptyState } from '@shared/components/EmptyState';
+import { TierBadge } from '@shared/components/TierBadge';
 import { statusMiembro } from '../lib/miembroStatus';
 import { RegistrarMiembroModal } from '../components/RegistrarMiembroModal';
 
@@ -91,7 +94,7 @@ export default function BuscarMiembro() {
           marginBottom: '12px'
         }}
       >
-        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ margin: 0 }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ margin: 0 }}>
           BUSCAR MIEMBRO
         </p>
         <button
@@ -139,19 +142,21 @@ export default function BuscarMiembro() {
               background: 'transparent',
               color: 'var(--ek-ink-muted)',
               cursor: 'pointer',
-              fontSize: '16px',
               lineHeight: 1
             }}
           >
-            ✕
+            <X size={18} aria-hidden="true" />
           </button>
         )}
       </div>
 
       {sinBusqueda ? (
-        <p className="ek-body-faint" style={{ padding: '24px 0', textAlign: 'center' }}>
-          Buscá un miembro por nombre o email para ver su perfil.
-        </p>
+        <EmptyState
+          icon={Search}
+          title="Buscá un miembro"
+          hint="Ingresá nombre o email para ver su perfil."
+          tone="neutral"
+        />
       ) : isLoading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {Array.from({ length: 6 }).map((_, i) => (
@@ -163,19 +168,21 @@ export default function BuscarMiembro() {
           ))}
         </div>
       ) : resultados.length === 0 ? (
-        <div style={{ padding: '24px 0', textAlign: 'center' }}>
-          <p className="ek-body-faint" style={{ marginBottom: '14px' }}>
-            No se encontraron miembros que coincidan.
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowRegistrar(true)}
-            className="ek-cta ek-cta--secondary"
-            style={{ minHeight: '44px', padding: '10px 18px', fontSize: '13px' }}
-          >
-            ¿No lo encontrás? Registrá un miembro nuevo
-          </button>
-        </div>
+        <EmptyState
+          icon={UserX}
+          title="Sin coincidencias"
+          hint="No se encontraron miembros que coincidan."
+          action={
+            <button
+              type="button"
+              onClick={() => setShowRegistrar(true)}
+              className="ek-cta ek-cta--secondary"
+              style={{ minHeight: '44px', padding: '10px 18px', fontSize: '13px' }}
+            >
+              ¿No lo encontrás? Registrá un miembro nuevo
+            </button>
+          }
+        />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {resultados.map((m) => {
@@ -188,17 +195,11 @@ export default function BuscarMiembro() {
                   </p>
                   <p className="rec-miembro-card-email">{m.email}</p>
                 </div>
-                {m.membresia_tier && (
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      color: 'var(--ek-ink-muted)',
-                      flexShrink: 0
-                    }}
-                  >
-                    {m.membresia_tier}
-                  </span>
+                {(m.membresia_tier === 'pro' || m.membresia_tier === 'basica') && (
+                  <TierBadge
+                    pro={m.membresia_tier === 'pro'}
+                    style={{ flexShrink: 0 }}
+                  />
                 )}
                 <span
                   className="ek-badge"

@@ -1,9 +1,11 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { ArrowLeft, AlertTriangle, Check } from 'lucide-react';
 import { useMiembroDetalle, updateMiembro, adminUpdateRole, adminDeleteUser } from '../hooks/useAdminData';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { formatHora } from '@member/logic/reservaLogic';
+import { Spinner } from '@shared/components/Spinner';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type { Database } from '@shared/types/database';
 
@@ -29,7 +31,7 @@ export default function MiembroDetalle() {
     }
   }, [miembro]);
 
-  if (isLoading) return <p className="adm-body">Cargando…</p>;
+  if (isLoading) return <Spinner label="Cargando…" />;
   if (!miembro) return <p className="adm-body">Miembro no encontrado.</p>;
 
   async function handleSave() {
@@ -63,10 +65,17 @@ export default function MiembroDetalle() {
 
   return (
     <div className="adm-page">
-      <Link to="/admin/miembros" className="adm-link">← Volver</Link>
+      <Link
+        to="/admin/miembros"
+        className="adm-link"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+      >
+        <ArrowLeft size={14} aria-hidden="true" />
+        Volver
+      </Link>
 
       <div className="adm-page-header" style={{ marginTop: '1rem' }}>
-        <p className="ek-eyebrow">MIEMBRO</p>
+        <p className="ek-eyebrow ek-eyebrow--mustard">MIEMBRO</p>
         <h1 className="ek-h2">{miembro.nombre ?? miembro.email}</h1>
       </div>
 
@@ -204,7 +213,7 @@ export default function MiembroDetalle() {
       <ConfirmDialog
         isOpen={eliminarOpen}
         title={`¿Eliminar a ${miembro.nombre ?? miembro.email}?`}
-        description={`Esta acción borra la cuenta de Auth y todos los datos del miembro de la BD (notificaciones, membresías). El email queda libre para volver a invitarse. ${totalReservas > 0 ? `⚠️ Tiene ${totalReservas} ${totalReservas === 1 ? 'reserva' : 'reservas'} en historial — el backend va a bloquear la operación. ` : ''}Escribí ELIMINAR para confirmar.`}
+        description={`Esta acción borra la cuenta de Auth y todos los datos del miembro de la BD (notificaciones, membresías). El email queda libre para volver a invitarse. ${totalReservas > 0 ? `Atención: tiene ${totalReservas} ${totalReservas === 1 ? 'reserva' : 'reservas'} en historial — el backend va a bloquear la operación. ` : ''}Escribí ELIMINAR para confirmar.`}
         confirmLabel={eliminando ? 'Eliminando…' : 'Eliminar definitivamente'}
         variant="danger"
         requireTypedConfirmation="ELIMINAR"
@@ -309,12 +318,13 @@ function CambiarRolControl({ usuarioId, rolActual, onChanged }: {
         className="ek-cta"
         style={{ alignSelf: 'flex-end' }}
       >
-        {saving ? '…' : needsConfirm && nuevoRol === 'admin' ? 'Confirmar admin' : 'Cambiar rol'}
+        {saving ? <Spinner /> : needsConfirm && nuevoRol === 'admin' ? 'Confirmar admin' : 'Cambiar rol'}
       </button>
       {error && <p className="ek-error-text">{error}</p>}
       {needsConfirm && nuevoRol === 'admin' && (
-        <p style={{ fontSize: '0.8125rem', color: 'var(--ek-danger)', flexBasis: '100%', marginTop: '0.5rem' }}>
-          ⚠️ Promover a admin da acceso TOTAL al negocio. Click "Confirmar admin" para proceder.
+        <p style={{ fontSize: '0.8125rem', color: 'var(--ek-danger)', flexBasis: '100%', marginTop: '0.5rem', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+          <AlertTriangle size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
+          <span>Promover a admin da acceso TOTAL al negocio. Click &quot;Confirmar admin&quot; para proceder.</span>
         </p>
       )}
     </div>
@@ -453,7 +463,12 @@ function EditarDatosForm({ miembro, onSaved }: {
         >
           {saving ? 'Guardando…' : 'Guardar cambios'}
         </button>
-        {saved && <span style={{ color: 'var(--ek-success)', fontSize: '0.875rem' }}>✓ Guardado</span>}
+        {saved && (
+          <span style={{ color: 'var(--ek-success)', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Check size={14} aria-hidden="true" />
+            Guardado
+          </span>
+        )}
         {error && <span style={{ color: 'var(--ek-danger)', fontSize: '0.875rem' }}>{error}</span>}
       </div>
     </div>
@@ -483,8 +498,9 @@ function ResetPasswordControl({ email }: { email: string }) {
 
   if (sent) {
     return (
-      <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--ek-success)' }}>
-        ✓ Email de recuperación enviado a {email}
+      <p style={{ marginTop: '1rem', fontSize: '0.875rem', color: 'var(--ek-success)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Check size={15} aria-hidden="true" />
+        Email de recuperación enviado a {email}
       </p>
     );
   }
@@ -543,7 +559,12 @@ function NotasControl({ usuarioId, notasIniciales, onSaved }: {
           {notas.length}/500 caracteres
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {saved && <span style={{ color: 'var(--ek-success)', fontSize: '0.875rem' }}>✓ Guardado</span>}
+          {saved && (
+          <span style={{ color: 'var(--ek-success)', fontSize: '0.875rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <Check size={14} aria-hidden="true" />
+            Guardado
+          </span>
+        )}
           {error && <span style={{ color: 'var(--ek-danger)', fontSize: '0.875rem' }}>{error}</span>}
           <button onClick={handleSave} disabled={saving} className="ek-cta">
             {saving ? 'Guardando…' : 'Guardar notas'}

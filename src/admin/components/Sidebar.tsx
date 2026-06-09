@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Home, User, ClipboardList, ChevronDown, ExternalLink, ArrowRight } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 
@@ -171,16 +173,16 @@ const SECTIONS: NavSection[] = [
 
 interface VerComoLink {
   label: string;
-  icon: string;
+  icon: LucideIcon;
   href: string;
 }
 
 const VER_COMO_LINKS: VerComoLink[] = [
   // Signup excluido a propósito (Sprint D-Polish): admin ya lo ve en el
   // flow normal cuando un visitante hace click en una membresía desde Landing.
-  { label: 'Landing', icon: '🏠', href: '/?demo=admin-preview' },
-  { label: 'Miembro', icon: '👤', href: '/app?demo=admin-preview' },
-  { label: 'Recepción', icon: '📋', href: '/recepcion?demo=admin-preview' }
+  { label: 'Landing', icon: Home, href: '/?demo=admin-preview' },
+  { label: 'Miembro', icon: User, href: '/app?demo=admin-preview' },
+  { label: 'Recepción', icon: ClipboardList, href: '/recepcion?demo=admin-preview' }
 ];
 
 interface Props {
@@ -342,7 +344,9 @@ export function Sidebar({ onNavigate }: Props = {}) {
             onToggle={() => toggleSection(VER_COMO_LABEL)}
           />
           {!collapsed.has(VER_COMO_LABEL) &&
-            VER_COMO_LINKS.map((link) => (
+            VER_COMO_LINKS.map((link) => {
+              const LinkIcon = link.icon;
+              return (
               <a
                 key={link.label}
                 href={link.href}
@@ -356,12 +360,13 @@ export function Sidebar({ onNavigate }: Props = {}) {
                 }}
               >
                 <span className="adm-sidebar-item-icon" aria-hidden="true">
-                  {link.icon}
+                  <LinkIcon size={18} />
                 </span>
                 <span style={{ flex: 1 }}>{link.label}</span>
-                <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)' }}>↗</span>
+                <ExternalLink size={13} aria-hidden="true" style={{ color: 'var(--ek-ink-faint)' }} />
               </a>
-            ))}
+              );
+            })}
         </div>
       </nav>
 
@@ -393,10 +398,15 @@ export function Sidebar({ onNavigate }: Props = {}) {
             width: '100%',
             padding: '10px',
             fontSize: '13px',
-            textAlign: 'center'
+            textAlign: 'center',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
           }}
         >
-          Cerrar sesión →
+          Cerrar sesión
+          <ArrowRight size={14} aria-hidden="true" />
         </button>
       </div>
     </aside>
@@ -435,17 +445,15 @@ function SectionToggle({
       }}
     >
       <span>{label}</span>
-      <span
+      <ChevronDown
+        size={14}
         aria-hidden="true"
         style={{
-          fontSize: '10px',
           transform: collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
           transition: 'transform 0.18s ease',
           color: 'var(--ek-ink-faint)'
         }}
-      >
-        ▾
-      </span>
+      />
     </button>
   );
 }

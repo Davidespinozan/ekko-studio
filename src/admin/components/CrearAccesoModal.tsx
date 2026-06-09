@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 
@@ -107,9 +108,9 @@ export default function CrearAccesoModal({ onClose, onSuccess }: Props) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'var(--ek-backdrop)',
+        backdropFilter: 'blur(var(--ek-backdrop-blur))',
+        WebkitBackdropFilter: 'blur(var(--ek-backdrop-blur))',
         zIndex: 100,
         display: 'flex',
         alignItems: 'center',
@@ -198,9 +199,9 @@ export default function CrearAccesoModal({ onClose, onSuccess }: Props) {
               onClick={() => setShowPassword((v) => !v)}
               className="ek-icon-btn"
               aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              style={{ width: '44px', padding: 0, fontSize: '16px' }}
+              style={{ width: '44px', padding: 0 }}
             >
-              {showPassword ? '🙈' : '👁'}
+              {showPassword ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
             </button>
           </div>
           <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>

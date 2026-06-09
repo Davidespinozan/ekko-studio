@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ArrowRight, AlertTriangle, CalendarPlus } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
 import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
 import { BotonCancelarReserva } from '@member/components/BotonCancelarReserva';
+import { TierBadge } from '@shared/components/TierBadge';
+import { EmptyState } from '@shared/components/EmptyState';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 type Reserva = Database['public']['Tables']['reservas']['Row'];
@@ -145,8 +148,8 @@ export default function Dashboard() {
           background: 'var(--ek-danger-soft)',
           marginBottom: '24px'
         }}>
-          <p className="ek-eyebrow" style={{ color: 'var(--ek-danger)' }}>
-            RESTRICCIÓN ACTIVA
+          <p className="ek-eyebrow" style={{ color: 'var(--ek-danger)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <AlertTriangle size={13} aria-hidden="true" /> RESTRICCIÓN ACTIVA
           </p>
           <p className="ek-body" style={{ marginTop: '8px' }}>
             Podrás reservar nuevamente el{' '}
@@ -164,7 +167,7 @@ export default function Dashboard() {
 
       {/* Greeting */}
       <div style={{ marginBottom: '28px' }}>
-        <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>BIENVENIDA</p>
+        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>BIENVENIDA</p>
         <h1 className="ek-display-xl">
           Hola, {nombreFormat}.
         </h1>
@@ -206,7 +209,7 @@ export default function Dashboard() {
           </p>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <Link to={`/app/qr/${proximaReserva.id}`} className="ek-cta">
-              Ver QR <span style={{ color: 'var(--ek-mustard)' }}>→</span>
+              Ver QR <ArrowRight size={16} aria-hidden="true" />
             </Link>
           </div>
           <div style={{ marginTop: '14px' }}>
@@ -222,22 +225,19 @@ export default function Dashboard() {
           </div>
         </div>
       ) : (
-        <div className="ek-card" style={{ marginBottom: '24px', textAlign: 'center' }}>
-          <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>
-            SIN SESIONES AGENDADAS
-          </p>
-          <p className="ek-body" style={{ marginBottom: '20px' }}>
-            Reserva tu próxima grabación.
-          </p>
-          <Link to="/app/reservar" className="ek-cta">
-            Reservar ahora
-          </Link>
+        <div className="ek-card" style={{ marginBottom: '24px' }}>
+          <EmptyState
+            icon={CalendarPlus}
+            title="Sin sesiones agendadas"
+            hint="Reserva tu próxima grabación y aparecerá acá."
+            action={<Link to="/app/reservar" className="ek-cta">Reservar ahora</Link>}
+          />
         </div>
       )}
 
       {/* Estudios disponibles */}
       <div style={{ marginBottom: '16px' }}>
-        <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>EXPLORAR</p>
+        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '8px' }}>EXPLORAR</p>
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -252,10 +252,13 @@ export default function Dashboard() {
               color: 'var(--ek-mustard)',
               letterSpacing: '0.14em',
               textDecoration: 'none',
-              textTransform: 'uppercase'
+              textTransform: 'uppercase',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '5px'
             }}
           >
-            Ver todos →
+            Ver todos <ArrowRight size={13} aria-hidden="true" />
           </Link>
         </div>
       </div>
@@ -288,12 +291,7 @@ export default function Dashboard() {
                 alignItems: 'center',
                 justifyContent: 'center'
               }}>
-                <span
-                  className={esPro ? 'ek-badge ek-badge--outline' : 'ek-badge'}
-                  style={{ position: 'absolute', top: '10px', left: '10px' }}
-                >
-                  {esPro ? '★ PRO' : 'BÁSICA'}
-                </span>
+                <TierBadge pro={esPro} style={{ position: 'absolute', top: '10px', left: '10px' }} />
                 <span style={{
                   fontSize: '9px',
                   color: 'var(--ek-ink-faint)',
@@ -322,7 +320,7 @@ export default function Dashboard() {
                   }}>{r.descripcion}</p>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span className="ek-status-dot ek-status-dot--success" />
+                  <span className="ek-status-dot ek-status-dot--success ek-status-dot--live" />
                   <span style={{
                     fontSize: '10px',
                     fontWeight: 600,

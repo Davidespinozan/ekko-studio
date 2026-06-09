@@ -1,9 +1,12 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { ArrowLeft, ArrowRight, Check, ImageIcon, Users, SearchX } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
+import { TierBadge } from '@shared/components/TierBadge';
+import { EmptyState } from '@shared/components/EmptyState';
 import type { Database } from '@shared/types/database';
 
 type RecursoDetalle = Database['public']['Tables']['recursos']['Row'];
@@ -53,12 +56,13 @@ export default function EstudioDetalle() {
   if (!recurso) {
     return (
       <div className="ek-container">
-        <div className="ek-empty">
-          <p className="ek-empty-title">Estudio no encontrado</p>
-          <Link to="/app/estudios" className="ek-cta" style={{ marginTop: '16px' }}>
-            Ver todos los estudios
-          </Link>
-        </div>
+        <EmptyState
+          icon={SearchX}
+          tone="neutral"
+          title="Estudio no encontrado"
+          hint="El estudio que buscás no existe o ya no está disponible."
+          action={<Link to="/app/estudios" className="ek-cta">Ver todos los estudios</Link>}
+        />
       </div>
     );
   }
@@ -75,9 +79,9 @@ export default function EstudioDetalle() {
       <button
         onClick={() => navigate(-1)}
         className="ek-icon-btn"
-        style={{ marginBottom: '16px', width: 'auto', padding: '8px 14px', fontSize: '13px' }}
+        style={{ marginBottom: '16px', width: 'auto', padding: '8px 14px', fontSize: '13px', gap: '6px' }}
       >
-        ← Volver
+        <ArrowLeft size={15} aria-hidden="true" /> Volver
       </button>
 
       {/* Foto grande */}
@@ -100,25 +104,18 @@ export default function EstudioDetalle() {
             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           />
         ) : (
-          <span style={{
-            fontSize: '11px',
-            color: 'var(--ek-ink-faint)',
-            letterSpacing: '0.2em',
-            fontWeight: 600
-          }}>FOTO PRÓXIMAMENTE</span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', color: 'var(--ek-ink-faint)' }}>
+            <ImageIcon size={30} strokeWidth={1.5} aria-hidden="true" />
+            <span style={{ fontSize: '11px', letterSpacing: '0.2em', fontWeight: 600 }}>FOTO PRÓXIMAMENTE</span>
+          </div>
         )}
 
-        <span
-          className={esPro ? 'ek-badge ek-badge--outline' : 'ek-badge'}
-          style={{ position: 'absolute', top: '16px', left: '16px' }}
-        >
-          {esPro ? '★ PRO' : 'BÁSICA'}
-        </span>
+        <TierBadge pro={esPro} style={{ position: 'absolute', top: '16px', left: '16px' }} />
       </div>
 
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>ESTUDIO</p>
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: "8px" }}>ESTUDIO</p>
         <h1 style={{
           fontFamily: 'var(--ek-font-display)',
           fontSize: 'clamp(32px, 8vw, 48px)',
@@ -136,7 +133,7 @@ export default function EstudioDetalle() {
 
       {tipoContenido.length > 0 && (
         <div style={{ marginBottom: '32px' }}>
-          <p className="ek-eyebrow" style={{ marginBottom: '10px' }}>IDEAL PARA</p>
+          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>IDEAL PARA</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {tipoContenido.map((tipo) => (
               <span key={tipo} className="ek-badge ek-badge--neutral" style={{ padding: '8px 14px' }}>
@@ -148,17 +145,22 @@ export default function EstudioDetalle() {
       )}
 
       {(recurso.capacidad_personas ?? 0) > 0 && (
-        <div className="ek-stat-card" style={{ marginBottom: '24px' }}>
-          <p className="ek-eyebrow" style={{ marginBottom: '6px' }}>CAPACIDAD</p>
-          <p className="ek-kpi">
-            {recurso.capacidad_personas}{' '}
-            <span style={{
-              fontSize: '15px',
-              fontWeight: 500,
-              color: 'var(--ek-ink-muted)',
-              letterSpacing: 'normal'
-            }}>personas</span>
-          </p>
+        <div className="ek-stat-card ek-stat-card--accent" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <span className="ek-empty-icon" style={{ width: 48, height: 48, margin: 0 }}>
+            <Users size={20} aria-hidden="true" />
+          </span>
+          <div>
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '6px' }}>CAPACIDAD</p>
+            <p className="ek-kpi">
+              {recurso.capacidad_personas}{' '}
+              <span style={{
+                fontSize: '15px',
+                fontWeight: 500,
+                color: 'var(--ek-ink-muted)',
+                letterSpacing: 'normal'
+              }}>personas</span>
+            </p>
+          </div>
         </div>
       )}
 
@@ -186,7 +188,7 @@ export default function EstudioDetalle() {
                   color: 'var(--ek-ink)'
                 }}
               >
-                <span style={{ color: 'var(--ek-mustard)', marginTop: '2px' }}>✓</span>
+                <Check size={16} style={{ color: 'var(--ek-mustard)', flexShrink: 0, marginTop: '2px' }} aria-hidden="true" />
                 {item}
               </li>
             ))}
@@ -196,7 +198,7 @@ export default function EstudioDetalle() {
 
       {recurso.estilo_visual && (
         <div className="ek-card" style={{ marginBottom: '24px' }}>
-          <p className="ek-eyebrow" style={{ marginBottom: '10px' }}>ESTILO</p>
+          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>ESTILO</p>
           <p className="ek-body" style={{ lineHeight: 1.6 }}>
             {recurso.estilo_visual}
           </p>
@@ -210,7 +212,7 @@ export default function EstudioDetalle() {
             className="ek-cta ek-cta--full"
             style={{ minHeight: '52px', fontSize: '15px' }}
           >
-            Reservar este estudio →
+            Reservar este estudio <ArrowRight size={17} aria-hidden="true" />
           </Link>
         ) : (
           <div className="ek-card" style={{

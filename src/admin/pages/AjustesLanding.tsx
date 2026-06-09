@@ -77,7 +77,7 @@ function PageHeader({
 }) {
   return (
     <div style={{ marginBottom: '24px' }}>
-      <p className="ek-eyebrow">AJUSTES</p>
+      <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar">AJUSTES</p>
       <div
         style={{
           display: 'flex',

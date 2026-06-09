@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshCw, Ban, Trash2, UserPlus } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
+import { Spinner } from '@shared/components/Spinner';
+import { EmptyState } from '@shared/components/EmptyState';
 import { canModifyTeamMember, revokeTeamMember } from '../lib/crudHelpers';
 import { adminDeleteUser } from '../hooks/useAdminData';
 import CardMenuDropdown from '../components/CardMenuDropdown';
@@ -133,7 +136,7 @@ export default function Equipo() {
         style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}
       >
         <div>
-          <p className="ek-eyebrow">EQUIPO</p>
+          <p className="ek-eyebrow ek-eyebrow--mustard">EQUIPO</p>
           <h1 className="ek-h2">Personas con acceso a EKKO admin</h1>
           {!isLoading && (
             <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '4px' }}>
@@ -147,7 +150,7 @@ export default function Equipo() {
       </div>
 
       {isLoading ? (
-        <p className="adm-body">Cargando…</p>
+        <Spinner label="Cargando…" />
       ) : (
         <div className="adm-stack" style={{ gap: '32px' }}>
           {admins.length > 0 && (
@@ -181,9 +184,16 @@ export default function Equipo() {
           )}
 
           {admins.length === 0 && recepcionistas.length === 0 && (
-            <p className="ek-body-faint" style={{ padding: '20px 0' }}>
-              Sin personas con acceso todavía. Click en &quot;+ Crear acceso&quot; para empezar.
-            </p>
+            <EmptyState
+              icon={UserPlus}
+              title="Sin personas con acceso todavía."
+              hint='Click en "+ Crear acceso" para empezar.'
+              action={
+                <button onClick={() => setShowCrearAcceso(true)} className="ek-cta">
+                  + Crear acceso
+                </button>
+              }
+            />
           )}
         </div>
       )}
@@ -332,9 +342,9 @@ function PersonaCard({
       </div>
       <CardMenuDropdown
         items={[
-          { label: 'Cambiar rol', icon: '🔄', onClick: onCambiarRol },
-          { label: 'Revocar acceso', icon: '🚫', onClick: onRevoke, danger: true, divider: true },
-          { label: 'Eliminar definitivamente', icon: '🗑️', onClick: onHardDelete, danger: true }
+          { label: 'Cambiar rol', icon: RefreshCw, onClick: onCambiarRol },
+          { label: 'Revocar acceso', icon: Ban, onClick: onRevoke, danger: true, divider: true },
+          { label: 'Eliminar definitivamente', icon: Trash2, onClick: onHardDelete, danger: true }
         ]}
       />
     </div>

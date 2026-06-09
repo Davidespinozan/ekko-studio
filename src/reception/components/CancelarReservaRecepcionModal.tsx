@@ -72,9 +72,9 @@ export function CancelarReservaRecepcionModal({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'var(--ek-backdrop)',
+        backdropFilter: 'blur(var(--ek-backdrop-blur))',
+        WebkitBackdropFilter: 'blur(var(--ek-backdrop-blur))',
         zIndex: 110,
         display: 'flex',
         alignItems: 'center',

@@ -88,7 +88,7 @@ export default function AjustesMarca() {
 
   return (
     <div className="adm-page">
-      <p className="ek-eyebrow" style={{ marginBottom: '4px' }}>AJUSTES</p>
+      <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '4px' }}>AJUSTES</p>
       <h1
         style={{
           fontFamily: 'var(--ek-font-display)',

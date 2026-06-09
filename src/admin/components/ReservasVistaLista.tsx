@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Eye, Ban, ChevronLeft, ChevronRight, SearchX } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
+import { StatusBadge } from '@shared/components/StatusBadge';
+import { Spinner } from '@shared/components/Spinner';
+import { EmptyState } from '@shared/components/EmptyState';
 import CardMenuDropdown from './CardMenuDropdown';
 import type { Database } from '@shared/types/database';
 
@@ -21,14 +25,6 @@ export interface ReservaListada {
 }
 
 const PAGE_SIZE = 25;
-
-const ESTADOS_LABEL: Record<string, { texto: string; color: string }> = {
-  confirmada: { texto: 'Confirmada', color: 'var(--ek-success)' },
-  completada: { texto: 'Completada', color: 'var(--ek-success)' },
-  cancelada: { texto: 'Cancelada', color: 'var(--ek-danger)' },
-  cancelada_admin: { texto: 'Cancelada admin', color: 'var(--ek-danger)' },
-  no_show: { texto: 'No-show', color: 'var(--ek-mustard)' }
-};
 
 function capitalizar(s: string | null | undefined): string {
   if (!s) return '';
@@ -301,11 +297,13 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
             marginTop: '14px'
           }}
         >
-          <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0 }}>
-            {isLoading
-              ? 'Cargando…'
-              : `${reservas.length} ${reservas.length === 1 ? 'reserva encontrada' : 'reservas encontradas'}`}
-          </p>
+          <div style={{ fontSize: '13px', color: 'var(--ek-ink-muted)' }}>
+            {isLoading ? (
+              <Spinner label="Cargando…" />
+            ) : (
+              `${reservas.length} ${reservas.length === 1 ? 'reserva encontrada' : 'reservas encontradas'}`
+            )}
+          </div>
           <button
             type="button"
             onClick={limpiarFiltros}
@@ -318,18 +316,22 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
       </div>
 
       {!isLoading && reservas.length === 0 ? (
-        <div className="ek-card" style={{ padding: '40px 20px', textAlign: 'center' }}>
-          <p className="ek-body-faint" style={{ margin: 0, marginBottom: '12px' }}>
-            No hay reservas que coincidan con los filtros.
-          </p>
-          <button
-            type="button"
-            onClick={limpiarFiltros}
-            className="ek-cta ek-cta--secondary"
-            style={{ padding: '10px 20px', fontSize: '13px' }}
-          >
-            Limpiar filtros
-          </button>
+        <div className="ek-card" style={{ padding: '40px 20px' }}>
+          <EmptyState
+            icon={SearchX}
+            title="No hay reservas que coincidan con los filtros."
+            tone="neutral"
+            action={
+              <button
+                type="button"
+                onClick={limpiarFiltros}
+                className="ek-cta ek-cta--secondary"
+                style={{ padding: '10px 20px', fontSize: '13px' }}
+              >
+                Limpiar filtros
+              </button>
+            }
+          />
         </div>
       ) : (
         <>
@@ -407,9 +409,10 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
                 onClick={() => setPagina((p) => Math.max(1, p - 1))}
                 disabled={paginaActual === 1}
                 className="ek-icon-btn"
-                style={{ width: 'auto', padding: '8px 14px', fontSize: '12px' }}
+                style={{ width: 'auto', padding: '8px 14px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
-                ← Anterior
+                <ChevronLeft size={14} aria-hidden="true" />
+                Anterior
               </button>
               <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: 0 }}>
                 Página {paginaActual} de {totalPaginas}
@@ -419,9 +422,10 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
                 onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
                 disabled={paginaActual === totalPaginas}
                 className="ek-icon-btn"
-                style={{ width: 'auto', padding: '8px 14px', fontSize: '12px' }}
+                style={{ width: 'auto', padding: '8px 14px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
               >
-                Siguiente →
+                Siguiente
+                <ChevronRight size={14} aria-hidden="true" />
               </button>
             </div>
           )}
@@ -444,10 +448,6 @@ function ReservaRow({
   const esFutura = fecha.getTime() > Date.now();
   const esConfirmada = reserva.status === 'confirmada';
   const puedeCancelar = esFutura && esConfirmada;
-  const estado = ESTADOS_LABEL[reserva.status] ?? {
-    texto: reserva.status,
-    color: 'var(--ek-ink-muted)'
-  };
 
   return (
     <div
@@ -512,17 +512,17 @@ function ReservaRow({
       <span style={{ color: 'var(--ek-ink-muted)', fontSize: '12px' }}>
         {reserva.tier ?? '—'}
       </span>
-      <span style={{ color: estado.color, fontWeight: 600, fontSize: '12px' }}>
-        {estado.texto}
+      <span>
+        <StatusBadge status={reserva.status} size={11} />
       </span>
       <CardMenuDropdown
         items={[
-          { label: 'Ver detalle', icon: '👁', onClick: onVerDetalle },
+          { label: 'Ver detalle', icon: Eye, onClick: onVerDetalle },
           ...(puedeCancelar
             ? [
                 {
                   label: 'Cancelar reserva',
-                  icon: '🚫',
+                  icon: Ban,
                   onClick: onCancelar,
                   danger: true,
                   divider: true

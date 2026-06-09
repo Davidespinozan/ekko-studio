@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
+import { StatusBadge } from '@shared/components/StatusBadge';
+import { Spinner } from '@shared/components/Spinner';
 
 interface ReservaDetalle {
   id: string;
@@ -65,14 +67,6 @@ function formatearCreatedAt(iso: string): string {
     minute: '2-digit'
   });
 }
-
-const STATUS_LABEL: Record<string, { texto: string; color: string; icon: string }> = {
-  confirmada: { texto: 'Confirmada', color: 'var(--ek-success)', icon: '✓' },
-  completada: { texto: 'Completada', color: 'var(--ek-success)', icon: '✓' },
-  cancelada: { texto: 'Cancelada por el miembro', color: 'var(--ek-danger)', icon: '✕' },
-  cancelada_admin: { texto: 'Cancelada por admin', color: 'var(--ek-danger)', icon: '✕' },
-  no_show: { texto: 'No-show', color: 'var(--ek-mustard)', icon: '⚠' }
-};
 
 export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: Props) {
   const toast = useToast();
@@ -153,7 +147,6 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
 
   if (!reservaId) return null;
 
-  const status = data ? STATUS_LABEL[data.status] ?? { texto: data.status, color: 'var(--ek-ink-muted)', icon: '·' } : null;
   const esFutura = data ? new Date(data.slot_inicio).getTime() > Date.now() : false;
   const esConfirmada = data ? data.status === 'confirmada' : false;
   const puedeCancelar = esFutura && esConfirmada;
@@ -167,9 +160,9 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'var(--ek-backdrop)',
+        backdropFilter: 'blur(var(--ek-backdrop-blur))',
+        WebkitBackdropFilter: 'blur(var(--ek-backdrop-blur))',
         zIndex: 100,
         display: 'flex',
         alignItems: 'center',
@@ -206,10 +199,10 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
             color: 'var(--ek-ink-muted)'
           }}
         >
-          {data ? `Folio ${data.folio}` : 'Cargando…'}
+          {data ? `Folio ${data.folio}` : <Spinner label="Cargando…" />}
         </h3>
 
-        {loading || !data || !status ? (
+        {loading || !data ? (
           <div className="ek-skeleton" style={{ height: '300px' }} />
         ) : (
           <>
@@ -240,17 +233,9 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
             </Block>
 
             <Block label="ESTADO">
-              <p
-                style={{
-                  fontSize: '15px',
-                  fontWeight: 600,
-                  margin: 0,
-                  marginBottom: '4px',
-                  color: status.color
-                }}
-              >
-                {status.icon} {status.texto}
-              </p>
+              <div style={{ marginBottom: '4px' }}>
+                <StatusBadge status={data.status} />
+              </div>
               {yaCancelada && data.cancelada_at && (
                 <>
                   <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '4px' }}>

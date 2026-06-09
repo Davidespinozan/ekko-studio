@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { CheckCircle2, XCircle, AlertTriangle, History, LogOut, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
+import { EmptyState } from '@shared/components/EmptyState';
 import { ESTADOS_RESERVA_HISTORICOS } from '@shared/constants/reservaStatus';
 import type { Database } from '@shared/types/database';
 
@@ -69,13 +71,13 @@ function formatearFecha(iso: string): string {
   return `${fecha} · ${hora}`;
 }
 
-function badgeParaReserva(status: string): { label: string; className: string } {
-  if (status === 'completada') return { label: 'OK', className: 'ek-badge ek-badge--success' };
-  if (status === 'cancelada') return { label: 'CANCELADA', className: 'ek-badge ek-badge--neutral' };
+function badgeParaReserva(status: string): { label: string; className: string; icon: LucideIcon } {
+  if (status === 'completada') return { label: 'OK', className: 'ek-badge ek-badge--success', icon: CheckCircle2 };
+  if (status === 'cancelada') return { label: 'CANCELADA', className: 'ek-badge ek-badge--neutral', icon: XCircle };
   if (status === 'cancelada_admin')
-    return { label: 'CANCELADA · ESTUDIO', className: 'ek-badge ek-badge--danger' };
-  if (status === 'no_show') return { label: 'NO SHOW', className: 'ek-badge ek-badge--danger' };
-  return { label: status.toUpperCase(), className: 'ek-badge ek-badge--neutral' };
+    return { label: 'CANCELADA · ESTUDIO', className: 'ek-badge ek-badge--danger', icon: XCircle };
+  if (status === 'no_show') return { label: 'NO SHOW', className: 'ek-badge ek-badge--danger', icon: AlertTriangle };
+  return { label: status.toUpperCase(), className: 'ek-badge ek-badge--neutral', icon: AlertTriangle };
 }
 
 export default function Perfil() {
@@ -101,42 +103,43 @@ export default function Perfil() {
     <div className="ek-container">
       <div className="ek-stack-xl">
         <div className="ek-stack-md">
-          <p className="ek-eyebrow">PERFIL</p>
+          <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar">PERFIL</p>
           <h1 className="ek-display-md">{nombreFormat || 'Tu cuenta'}</h1>
         </div>
 
         {/* Avatar */}
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          {usuario?.avatar_url ? (
-            <img
-              src={usuario.avatar_url}
-              alt={usuario.nombre ?? 'Avatar'}
-              style={{
+          <span className="ek-avatar-ring">
+            {usuario?.avatar_url ? (
+              <img
+                src={usuario.avatar_url}
+                alt={usuario.nombre ?? 'Avatar'}
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  borderRadius: '50%',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <div style={{
                 width: '120px',
                 height: '120px',
                 borderRadius: '50%',
-                objectFit: 'cover',
-                border: '0.5px solid var(--ek-line)'
-              }}
-            />
-          ) : (
-            <div style={{
-              width: '120px',
-              height: '120px',
-              borderRadius: '50%',
-              background: 'var(--ek-mustard)',
-              color: 'var(--ek-bg)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontFamily: 'var(--ek-font-display)',
-              fontSize: '40px',
-              fontWeight: 700,
-              letterSpacing: '-0.04em'
-            }}>
-              {initials}
-            </div>
-          )}
+                background: 'linear-gradient(135deg, var(--ek-bg-elevated), var(--ek-bg-soft))',
+                color: 'var(--ek-mustard)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: 'var(--ek-font-display)',
+                fontSize: '40px',
+                fontWeight: 700,
+                letterSpacing: '-0.04em'
+              }}>
+                {initials}
+              </div>
+            )}
+          </span>
         </div>
 
         <div className="adm-info-grid perfil-info-grid">
@@ -171,7 +174,7 @@ export default function Perfil() {
         </div>
 
         <button onClick={signOut} className="ek-cta ek-cta--secondary ek-cta--full">
-          Cerrar sesión
+          <LogOut size={16} aria-hidden="true" /> Cerrar sesión
         </button>
 
         {/* Stat del mes */}
@@ -182,7 +185,7 @@ export default function Perfil() {
             alignItems: 'center'
           }}>
             <div>
-              <p className="ek-eyebrow" style={{ marginBottom: '6px' }}>ESTE MES</p>
+              <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '6px' }}>ESTE MES</p>
               <p className="ek-kpi">
                 {sesionesEsteMes}{' '}
                 <span style={{
@@ -200,11 +203,16 @@ export default function Perfil() {
 
         {/* Reservas pasadas */}
         <section>
-          <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>HISTORIAL</p>
+          <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>HISTORIAL</p>
           <h2 className="ek-display-md" style={{ marginBottom: '16px' }}>Reservas pasadas</h2>
 
           {reservas.length === 0 ? (
-            <p className="ek-body-muted">Aún no tienes sesiones completadas.</p>
+            <EmptyState
+              icon={History}
+              tone="neutral"
+              title="Sin historial todavía"
+              hint="Aún no tienes sesiones completadas. Cuando termines una grabación aparecerá acá."
+            />
           ) : (
             <div className="ek-stack-sm">
               {reservas.map((r) => {
@@ -254,6 +262,7 @@ export default function Perfil() {
                       )}
                     </div>
                     <span className={badge.className} style={{ flexShrink: 0 }}>
+                      <badge.icon size={12} aria-hidden="true" />
                       {badge.label}
                     </span>
                   </div>

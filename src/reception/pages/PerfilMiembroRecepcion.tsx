@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { ArrowLeft, UserX } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { EmptyState } from '@shared/components/EmptyState';
+import { TierBadge } from '@shared/components/TierBadge';
+import { StatusBadge } from '@shared/components/StatusBadge';
 import { statusMiembro } from '../lib/miembroStatus';
 import { CrearReservaModal, type ReservaOriginal } from '../components/CrearReservaModal';
 import {
@@ -135,8 +139,20 @@ export default function PerfilMiembroRecepcion() {
   if (noEncontrado || !miembro) {
     return (
       <div className="rec-main">
-        <Link to="/recepcion/miembros" className="adm-link">← Volver a búsqueda</Link>
-        <p className="ek-body" style={{ marginTop: '16px' }}>Miembro no encontrado.</p>
+        <Link
+          to="/recepcion/miembros"
+          className="adm-link"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          <ArrowLeft size={15} aria-hidden="true" />
+          Volver a búsqueda
+        </Link>
+        <EmptyState
+          icon={UserX}
+          title="Miembro no encontrado"
+          hint="No pudimos cargar este perfil. Volvé a la búsqueda e intentá de nuevo."
+          tone="danger"
+        />
       </div>
     );
   }
@@ -154,10 +170,17 @@ export default function PerfilMiembroRecepcion() {
 
   return (
     <div className="rec-main">
-      <Link to="/recepcion/miembros" className="adm-link">← Volver a búsqueda</Link>
+      <Link
+        to="/recepcion/miembros"
+        className="adm-link"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+      >
+        <ArrowLeft size={15} aria-hidden="true" />
+        Volver a búsqueda
+      </Link>
 
       <div style={{ marginTop: '12px', marginBottom: '20px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '4px' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '4px' }}>
           MIEMBRO
         </p>
         <h1
@@ -218,7 +241,16 @@ export default function PerfilMiembroRecepcion() {
       >
         <Dato label="Email" valor={miembro.email} />
         {miembro.telefono && <Dato label="Teléfono" valor={miembro.telefono} />}
-        <Dato label="Plan" valor={miembro.membresia_tier ?? 'Sin plan'} />
+        <Dato
+          label="Plan"
+          valor={
+            miembro.membresia_tier === 'pro' || miembro.membresia_tier === 'basica' ? (
+              <TierBadge pro={miembro.membresia_tier === 'pro'} />
+            ) : (
+              'Sin plan'
+            )
+          }
+        />
         <Dato
           label="Estado"
           valor={<span style={{ color: st.color, fontWeight: 600 }}>{st.label}</span>}
@@ -449,8 +481,8 @@ function FilaReserva({
           )}
         </div>
       ) : (
-        <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', flexShrink: 0 }}>
-          {reserva.status}
+        <span style={{ flexShrink: 0 }}>
+          <StatusBadge status={reserva.status} size={11} />
         </span>
       )}
     </div>

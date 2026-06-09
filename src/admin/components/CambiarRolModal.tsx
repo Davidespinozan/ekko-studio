@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
@@ -90,9 +91,9 @@ export default function CambiarRolModal({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'var(--ek-backdrop)',
+        backdropFilter: 'blur(var(--ek-backdrop-blur))',
+        WebkitBackdropFilter: 'blur(var(--ek-backdrop-blur))',
         zIndex: 100,
         display: 'flex',
         alignItems: 'center',
@@ -182,11 +183,17 @@ export default function CambiarRolModal({
               borderRadius: 'var(--ek-r-sm)',
               margin: 0,
               marginBottom: '16px',
-              lineHeight: 1.5
+              lineHeight: 1.5,
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '8px'
             }}
           >
-            ⚠️ Cambiar a Administrador le dará acceso completo al sistema, incluyendo gestión
-            de equipo y reglas de negocio.
+            <AlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
+            <span>
+              Cambiar a Administrador le dará acceso completo al sistema, incluyendo gestión
+              de equipo y reglas de negocio.
+            </span>
           </p>
         )}
 

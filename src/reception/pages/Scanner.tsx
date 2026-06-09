@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { Camera } from 'lucide-react';
 import { backendPost } from '@shared/lib/backend';
 import { ReservasHoyView } from '../components/ReservasHoyView';
 import { CheckInDetail } from '../components/CheckInDetail';
@@ -73,8 +74,7 @@ export default function Scanner() {
           background: 'var(--ek-mustard)',
           color: 'var(--ek-bg)',
           border: 'none',
-          boxShadow:
-            '0 8px 32px rgba(229, 184, 41, 0.35), 0 4px 12px rgba(0, 0, 0, 0.4)',
+          boxShadow: 'var(--ek-shadow-cta)',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -84,29 +84,18 @@ export default function Scanner() {
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'scale(1.05)';
-          e.currentTarget.style.boxShadow =
-            '0 12px 40px rgba(229, 184, 41, 0.45), 0 6px 16px rgba(0, 0, 0, 0.5)';
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = 'scale(1)';
-          e.currentTarget.style.boxShadow =
-            '0 8px 32px rgba(229, 184, 41, 0.35), 0 4px 12px rgba(0, 0, 0, 0.4)';
+        }}
+        onMouseDown={(e) => {
+          e.currentTarget.style.transform = 'scale(0.96)';
+        }}
+        onMouseUp={(e) => {
+          e.currentTarget.style.transform = 'scale(1.05)';
         }}
       >
-        <svg
-          width="28"
-          height="28"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-          <circle cx="12" cy="13" r="4" />
-        </svg>
+        <Camera size={28} aria-hidden="true" />
       </button>
 
       {cameraOpen && (

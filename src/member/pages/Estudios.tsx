@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { ArrowRight, ImageIcon } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
+import { TierBadge } from '@shared/components/TierBadge';
 import type { Database } from '@shared/types/database';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
@@ -47,7 +49,7 @@ export default function Estudios() {
   return (
     <div className="ek-container">
       <div style={{ marginBottom: '24px' }}>
-        <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>EXPLORAR</p>
+        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>EXPLORAR</p>
         <h1 className="ek-display-xl">Nuestros estudios</h1>
         <p className="ek-body-muted" style={{ marginTop: '8px' }}>
           Espacios profesionales diseñados para creadores. Cada uno con su personalidad.
@@ -94,20 +96,13 @@ export default function Estudios() {
                     }}
                   />
                 ) : (
-                  <span style={{
-                    fontSize: '10px',
-                    color: 'var(--ek-ink-faint)',
-                    letterSpacing: '0.18em',
-                    fontWeight: 600
-                  }}>FOTO PRÓXIMAMENTE</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: 'var(--ek-ink-faint)' }}>
+                    <ImageIcon size={24} strokeWidth={1.5} aria-hidden="true" />
+                    <span style={{ fontSize: '10px', letterSpacing: '0.18em', fontWeight: 600 }}>FOTO PRÓXIMAMENTE</span>
+                  </div>
                 )}
 
-                <span
-                  className={esPro ? 'ek-badge ek-badge--outline' : 'ek-badge'}
-                  style={{ position: 'absolute', top: '12px', left: '12px' }}
-                >
-                  {esPro ? '★ PRO' : 'BÁSICA'}
-                </span>
+                <TierBadge pro={esPro} style={{ position: 'absolute', top: '12px', left: '12px' }} />
               </div>
 
               <div style={{ padding: '18px' }}>
@@ -152,8 +147,8 @@ export default function Estudios() {
                       ? `Hasta ${r.capacidad_personas} personas`
                       : 'Capacidad por confirmar'}
                   </span>
-                  <span style={{ color: 'var(--ek-mustard)', fontWeight: 600 }}>
-                    Ver detalle →
+                  <span style={{ color: 'var(--ek-mustard)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    Ver detalle <ArrowRight size={13} aria-hidden="true" />
                   </span>
                 </div>
               </div>

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { TierBadge } from '@shared/components/TierBadge';
 import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 
 interface MiembroData {
@@ -65,7 +67,13 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMes
   if (kind === 'error') {
     return (
       <div className="rec-detail rec-detail--error">
-        <p className="rec-detail-eyebrow">⚠ NO PUEDE ENTRAR</p>
+        <p
+          className="rec-detail-eyebrow"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+        >
+          <AlertTriangle size={14} aria-hidden="true" />
+          NO PUEDE ENTRAR
+        </p>
         <p className="rec-detail-error-message">{errorMessage ?? 'QR no válido'}</p>
         <p style={{ color: 'rgba(245,241,232,0.6)', fontSize: '0.875rem', marginTop: '1rem' }}>
           Si necesitas anular o aclarar, avisá a admin.
@@ -88,12 +96,17 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMes
     hour: '2-digit', minute: '2-digit', hour12: false
   });
 
-  const tierLabel = miembro.membresia_tier === 'pro' ? '★ PRO' : miembro.membresia_tier === 'basica' ? 'BÁSICA' : 'SIN PLAN';
-  const tierColor = miembro.membresia_tier === 'pro' ? 'var(--ek-mustard)' : 'rgba(245,241,232,0.7)';
+  const tieneTier = miembro.membresia_tier === 'pro' || miembro.membresia_tier === 'basica';
 
   return (
     <div className="rec-detail rec-detail--success">
-      <p className="rec-detail-eyebrow">✓ CHECK-IN OK</p>
+      <p
+        className="rec-detail-eyebrow"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+      >
+        <CheckCircle2 size={14} aria-hidden="true" />
+        CHECK-IN OK
+      </p>
 
       <div className="rec-detail-header">
         <Avatar nombre={miembro.nombre ?? miembro.email} url={miembro.avatar_url} />
@@ -117,7 +130,21 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMes
       <div className="rec-detail-divider" />
 
       <div className="rec-detail-grid">
-        <Cell label="MEMBRESÍA" value={tierLabel} color={tierColor} />
+        <div>
+          <p className="rec-detail-section-label">MEMBRESÍA</p>
+          <div style={{ marginTop: '2px' }}>
+            {tieneTier ? (
+              <TierBadge pro={miembro.membresia_tier === 'pro'} />
+            ) : (
+              <p
+                className="rec-detail-value"
+                style={{ color: 'rgba(245,241,232,0.7)' }}
+              >
+                SIN PLAN
+              </p>
+            )}
+          </div>
+        </div>
         <Cell label="CHECK-IN HOY" value={`${stats?.check_ins_hoy ?? 1}`} />
         <Cell label="CHECK-IN SEMANA" value={`${stats?.check_ins_semana ?? 1}`} />
       </div>

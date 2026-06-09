@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
+import { X, Menu } from 'lucide-react';
 import { useAdminGuard } from './hooks/useAdminGuard';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { Sidebar } from './components/Sidebar';
@@ -46,7 +47,7 @@ export default function AdminLayout() {
                 zIndex: 2
               }}
             >
-              ✕
+              <X size={20} aria-hidden="true" />
             </button>
             <Sidebar onNavigate={() => setDrawerOpen(false)} />
           </div>
@@ -61,20 +62,7 @@ export default function AdminLayout() {
             className="ek-icon-btn"
             style={{ width: '44px', height: '44px', padding: 0 }}
           >
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
+            <Menu size={20} aria-hidden="true" />
           </button>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
             <span

@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Sun, CloudSun, Moon, Eye, Ban, ArrowRight, ArrowUp, ArrowDown, PartyPopper } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
 import { useDashboardData, type DashboardData } from '../hooks/useAdminData';
@@ -16,11 +18,11 @@ function capitalizar(s: string | null | undefined): string {
     .join(' ');
 }
 
-function saludoTiming(d: Date = new Date()): { texto: string; emoji: string } {
+function saludoTiming(d: Date = new Date()): { texto: string; icon: LucideIcon } {
   const h = d.getHours();
-  if (h >= 5 && h < 12) return { texto: 'Buenos días', emoji: '☀️' };
-  if (h >= 12 && h < 19) return { texto: 'Buenas tardes', emoji: '🌤' };
-  return { texto: 'Buenas noches', emoji: '🌙' };
+  if (h >= 5 && h < 12) return { texto: 'Buenos días', icon: Sun };
+  if (h >= 12 && h < 19) return { texto: 'Buenas tardes', icon: CloudSun };
+  return { texto: 'Buenas noches', icon: Moon };
 }
 
 function nombreMes(d: Date): string {
@@ -38,6 +40,7 @@ export default function AdminDashboard() {
   const [cancelar, setCancelar] = useState<ReservaParaCancelar | null>(null);
 
   const saludo = saludoTiming();
+  const SaludoIcon = saludo.icon;
   const nombre = capitalizar(usuario?.nombre).split(' ')[0] || '';
 
   if (isLoading) {
@@ -84,8 +87,9 @@ export default function AdminDashboard() {
       >
         Hoy en EKKO
       </h1>
-      <p style={{ fontSize: '14px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '36px' }}>
-        {saludo.texto}{nombre ? `, ${nombre}` : ''} {saludo.emoji}
+      <p style={{ fontSize: '14px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '36px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+        {saludo.texto}{nombre ? `, ${nombre}` : ''}
+        <SaludoIcon size={15} aria-hidden="true" />
       </p>
 
       <SeccionHoy data={data} onCancelar={setCancelar} />
@@ -150,7 +154,7 @@ function SeccionHoy({
       ) : (
         <>
           <p
-            className="ek-eyebrow"
+            className="ek-eyebrow ek-eyebrow--mustard"
             style={{ fontSize: '10px', marginTop: '20px', marginBottom: '12px' }}
           >
             PRÓXIMAS
@@ -219,12 +223,12 @@ function SeccionHoy({
                     items={[
                       {
                         label: 'Ver detalle',
-                        icon: '👁',
+                        icon: Eye,
                         onClick: () => toast.info('Detalle de reserva: pendiente Sprint Reservas.')
                       },
                       {
                         label: 'Cancelar reserva',
-                        icon: '🚫',
+                        icon: Ban,
                         onClick: () =>
                           onCancelar({
                             id: r.id,
@@ -254,7 +258,10 @@ function SeccionHoy({
                 fontWeight: 600
               }}
             >
-              Ver todas las {total} reservas →
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                Ver todas las {total} reservas
+                <ArrowRight size={13} aria-hidden="true" />
+              </span>
             </Link>
           )}
         </>
@@ -347,15 +354,17 @@ function MetricaCard({
 }) {
   let tendenciaTexto = '';
   let tendenciaColor = 'var(--ek-ink-faint)';
+  let TendenciaIcon: LucideIcon | null = null;
 
   if (tendencia === null) {
-    tendenciaTexto = 'Primer mes 🎉';
+    tendenciaTexto = 'Primer mes';
+    TendenciaIcon = PartyPopper;
   } else {
     const abs = Math.abs(tendencia).toFixed(0);
-    const flecha = tendencia >= 0 ? '↑' : '↓';
+    TendenciaIcon = tendencia >= 0 ? ArrowUp : ArrowDown;
     const positivo = tendenciaInversa ? tendencia <= 0 : tendencia >= 0;
     tendenciaColor = positivo ? 'var(--ek-success)' : 'var(--ek-danger)';
-    tendenciaTexto = `${flecha} ${abs}% vs ${mesAnteriorNombre}`;
+    tendenciaTexto = `${abs}% vs ${mesAnteriorNombre}`;
   }
 
   return (
@@ -376,7 +385,8 @@ function MetricaCard({
       >
         {valor}
       </p>
-      <p style={{ fontSize: '12px', color: tendenciaColor, margin: 0, fontWeight: 600 }}>
+      <p style={{ fontSize: '12px', color: tendenciaColor, margin: 0, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+        {TendenciaIcon && <TendenciaIcon size={13} aria-hidden="true" />}
         {tendenciaTexto}
       </p>
       {subtexto && (

@@ -43,7 +43,7 @@ export default function ReceptionLayout() {
         >
           <div>
             <p
-              className="ek-eyebrow ek-eyebrow--mustard"
+              className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar"
               style={{ marginBottom: '4px', fontSize: '10px' }}
             >
               RECEPCIÓN

@@ -1,9 +1,10 @@
+import { AlertTriangle, X } from 'lucide-react';
 import { useNotificacionesMiembro } from '@shared/hooks/useNotificacionesMiembro';
 
 /**
  * Banner sticky de notificaciones in-app para miembros. Sprint Final.
  * Render condicional: solo si hay notificaciones no leídas.
- * Cada notificación se cierra individualmente con su botón ✕.
+ * Cada notificación se cierra individualmente con su botón de cierre.
  */
 export default function NotificacionesBanner() {
   const { notificaciones, marcarLeida } = useNotificacionesMiembro();
@@ -37,9 +38,7 @@ export default function NotificacionesBanner() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', minWidth: 0 }}>
-            <span aria-hidden="true" style={{ fontSize: '16px', lineHeight: 1.4 }}>
-              ⚠️
-            </span>
+            <AlertTriangle size={18} aria-hidden="true" style={{ color: 'var(--ek-mustard)', flexShrink: 0, marginTop: '1px' }} />
             <div style={{ minWidth: 0 }}>
               <p
                 style={{
@@ -75,8 +74,6 @@ export default function NotificacionesBanner() {
               border: 'none',
               color: 'var(--ek-mustard)',
               cursor: 'pointer',
-              fontSize: '16px',
-              lineHeight: 1,
               flexShrink: 0,
               minWidth: '44px',
               minHeight: '44px',
@@ -87,7 +84,7 @@ export default function NotificacionesBanner() {
               marginRight: '-10px'
             }}
           >
-            ✕
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
       ))}

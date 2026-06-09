@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { X } from 'lucide-react';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useReglaCancelacion, puedeCancelarReserva } from '@member/hooks/useReglaCancelacion';
 import { CancelarMiReservaModal } from './CancelarMiReservaModal';
@@ -86,11 +87,12 @@ export function BotonCancelarReserva({ reserva, onCancelada }: Props) {
           padding: '4px 8px',
           display: 'inline-flex',
           alignItems: 'center',
+          gap: '5px',
           textDecoration: 'underline',
           textUnderlineOffset: '3px'
         }}
       >
-        Cancelar reserva
+        <X size={13} aria-hidden="true" /> Cancelar reserva
       </button>
 
       {modalOpen && (

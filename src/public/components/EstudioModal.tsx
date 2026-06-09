@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Star, Check, X } from 'lucide-react';
 
 export interface EstudioInfo {
   slug: string;
@@ -47,9 +48,9 @@ export default function EstudioModal({ estudio, onClose }: Props) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'var(--ek-backdrop)',
+        backdropFilter: 'blur(var(--ek-backdrop-blur))',
+        WebkitBackdropFilter: 'blur(var(--ek-backdrop-blur))',
         zIndex: 100,
         display: 'flex',
         alignItems: 'center',
@@ -92,11 +93,10 @@ export default function EstudioModal({ estudio, onClose }: Props) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '18px',
             transition: 'all 0.18s ease'
           }}
         >
-          ×
+          <X size={20} aria-hidden="true" />
         </button>
 
         <div style={{
@@ -139,7 +139,8 @@ export default function EstudioModal({ estudio, onClose }: Props) {
             className={esPro ? 'ek-badge ek-badge--outline' : 'ek-badge'}
             style={{ position: 'absolute', top: '16px', left: '16px' }}
           >
-            {esPro ? '★ PRO' : 'BÁSICA'}
+            {esPro && <Star size={11} fill="currentColor" aria-hidden="true" />}
+            {esPro ? 'PRO' : 'BÁSICA'}
           </span>
         </div>
 
@@ -212,7 +213,7 @@ export default function EstudioModal({ estudio, onClose }: Props) {
                     lineHeight: 1.5
                   }}
                 >
-                  <span style={{ color: 'var(--ek-mustard)', flexShrink: 0 }}>✓</span>
+                  <Check size={16} style={{ color: 'var(--ek-mustard)', flexShrink: 0, marginTop: '1px' }} aria-hidden="true" />
                   {item}
                 </li>
               ))}

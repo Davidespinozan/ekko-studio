@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useToast } from '@shared/hooks/useToast';
+import { useEffect } from 'react';
+import { CheckCircle2, AlertTriangle, Lightbulb } from 'lucide-react';
+import { CopyButton } from '@shared/components/CopyButton';
 
 export interface CredencialesCreadas {
   nombre: string;
@@ -28,12 +29,8 @@ function buildCredencialesText(c: CredencialesCreadas): string {
 }
 
 export default function CredencialesCreadasModal({ isOpen, credenciales, onClose }: Props) {
-  const toast = useToast();
-  const [copiado, setCopiado] = useState(false);
-
   useEffect(() => {
     if (!isOpen) return;
-    setCopiado(false);
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -48,18 +45,6 @@ export default function CredencialesCreadasModal({ isOpen, credenciales, onClose
 
   if (!isOpen) return null;
 
-  async function handleCopy() {
-    const text = buildCredencialesText(credenciales);
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiado(true);
-      toast.success('Credenciales copiadas al portapapeles.');
-      setTimeout(() => setCopiado(false), 2000);
-    } catch {
-      toast.error('No se pudo copiar al portapapeles. Copia manualmente.');
-    }
-  }
-
   return (
     <div
       onClick={onClose}
@@ -69,9 +54,9 @@ export default function CredencialesCreadasModal({ isOpen, credenciales, onClose
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'var(--ek-backdrop)',
+        backdropFilter: 'blur(var(--ek-backdrop-blur))',
+        WebkitBackdropFilter: 'blur(var(--ek-backdrop-blur))',
         zIndex: 110,
         display: 'flex',
         alignItems: 'center',
@@ -94,9 +79,10 @@ export default function CredencialesCreadasModal({ isOpen, credenciales, onClose
       >
         <p
           className="ek-eyebrow ek-eyebrow--mustard"
-          style={{ marginBottom: '6px', color: 'var(--ek-success)' }}
+          style={{ marginBottom: '6px', color: 'var(--ek-success)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          ✓ ACCESO CREADO
+          <CheckCircle2 size={13} aria-hidden="true" />
+          ACCESO CREADO
         </p>
         <h3
           id="cred-creadas-title"
@@ -132,18 +118,12 @@ export default function CredencialesCreadasModal({ isOpen, credenciales, onClose
           <CredField label="Contraseña" value={credenciales.password} mono />
         </div>
 
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="ek-cta ek-cta--full"
-          style={{
-            padding: '12px',
-            fontSize: '14px',
-            marginBottom: '16px'
-          }}
-        >
-          {copiado ? '✓ Copiado' : '📋 Copiar credenciales'}
-        </button>
+        <CopyButton
+          text={buildCredencialesText(credenciales)}
+          label="Copiar credenciales"
+          copiedLabel="Credenciales copiadas"
+          full
+        />
 
         <p
           style={{
@@ -152,13 +132,18 @@ export default function CredencialesCreadasModal({ isOpen, credenciales, onClose
             background: 'var(--ek-mustard-soft)',
             padding: '10px 12px',
             borderRadius: 'var(--ek-r-sm)',
-            margin: 0,
-            marginBottom: '10px',
-            lineHeight: 1.5
+            margin: '16px 0 10px',
+            lineHeight: 1.5,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px'
           }}
         >
-          ⚠️ Por seguridad, no podrás volver a ver esta contraseña. Si la persona la pierde,
-          puede recuperarla desde el login con &quot;Olvidé mi contraseña&quot;.
+          <AlertTriangle size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
+          <span>
+            Por seguridad, no podrás volver a ver esta contraseña. Si la persona la pierde,
+            puede recuperarla desde el login con &quot;Olvidé mi contraseña&quot;.
+          </span>
         </p>
 
         <p
@@ -167,10 +152,14 @@ export default function CredencialesCreadasModal({ isOpen, credenciales, onClose
             color: 'var(--ek-ink-muted)',
             margin: 0,
             marginBottom: '20px',
-            lineHeight: 1.5
+            lineHeight: 1.5,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px'
           }}
         >
-          💡 Sugerencia: comparte por WhatsApp o llamada, no por email.
+          <Lightbulb size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
+          <span>Sugerencia: comparte por WhatsApp o llamada, no por email.</span>
         </p>
 
         <button

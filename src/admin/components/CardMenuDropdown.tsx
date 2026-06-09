@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { MoreHorizontal } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 export interface DropdownItem {
   label: string;
-  icon: string;
+  /** Icono Lucide (preferido) o glifo string (compatibilidad legacy). */
+  icon: LucideIcon | string;
   onClick: () => void;
   danger?: boolean;
   disabled?: boolean;
@@ -33,9 +36,9 @@ export default function CardMenuDropdown({ items }: Props) {
         className="ek-icon-btn"
         aria-label="Acciones"
         aria-expanded={open}
-        style={{ width: '44px', height: '44px', padding: 0, fontSize: '18px', lineHeight: 1 }}
+        style={{ width: '44px', height: '44px', padding: 0, lineHeight: 1 }}
       >
-        ⋯
+        <MoreHorizontal size={18} aria-hidden="true" />
       </button>
       {open && (
         <>
@@ -60,7 +63,9 @@ export default function CardMenuDropdown({ items }: Props) {
             }}
             role="menu"
           >
-            {items.map((item, idx) => (
+            {items.map((item, idx) => {
+              const Icon = typeof item.icon === 'string' ? null : item.icon;
+              return (
               <div key={`${item.label}-${idx}`}>
                 {item.divider && (
                   <div style={{ height: '0.5px', background: 'var(--ek-line)', margin: '4px 0' }} />
@@ -95,11 +100,16 @@ export default function CardMenuDropdown({ items }: Props) {
                   }}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <span aria-hidden="true">{item.icon}</span>
+                  {Icon ? (
+                    <Icon size={16} aria-hidden="true" />
+                  ) : (
+                    <span aria-hidden="true">{item.icon as string}</span>
+                  )}
                   {item.label}
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

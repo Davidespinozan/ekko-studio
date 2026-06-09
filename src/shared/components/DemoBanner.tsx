@@ -1,4 +1,5 @@
 import { useSearchParams } from 'react-router-dom';
+import { Eye } from 'lucide-react';
 
 export type DemoVista = 'Landing' | 'Miembro' | 'Recepción';
 
@@ -51,7 +52,7 @@ export function DemoBanner({ vista }: DemoBannerProps) {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
-        <span aria-hidden="true">🔍</span>
+        <Eye size={15} aria-hidden="true" style={{ flexShrink: 0 }} />
         <span style={{ fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           Vista de demostración · Estás viendo como <strong>{vista}</strong>
         </span>

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
+import { CopyButton } from '@shared/components/CopyButton';
 import { traducirErrorRegistro } from '../lib/traducirErrorRegistro';
 
 interface Props {
@@ -49,7 +51,6 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
   const [password, setPassword] = useState(() => generarPassword());
   const [submitting, setSubmitting] = useState(false);
   const [creado, setCreado] = useState<MiembroCreado | null>(null);
-  const [copiado, setCopiado] = useState(false);
 
   // Escape cierra solo en la fase de formulario: en la fase "creado" el
   // recepcionista debe cerrar de forma explícita para no perder las
@@ -122,28 +123,6 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
     }
   }
 
-  async function handleCopy() {
-    if (!creado) return;
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    const text = [
-      'EKKO Studio — Tu acceso',
-      '',
-      `Nombre: ${creado.nombre}`,
-      `Email: ${creado.email}`,
-      `Contraseña: ${creado.password}`,
-      '',
-      `Iniciá sesión en: ${origin}/login`
-    ].join('\n');
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiado(true);
-      toast.success('Credenciales copiadas.');
-      setTimeout(() => setCopiado(false), 2000);
-    } catch {
-      toast.error('No se pudo copiar. Anotá las credenciales manualmente.');
-    }
-  }
-
   return (
     <div
       onClick={() => !submitting && !creado && onClose()}
@@ -153,9 +132,9 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'var(--ek-backdrop)',
+        backdropFilter: 'blur(var(--ek-backdrop-blur))',
+        WebkitBackdropFilter: 'blur(var(--ek-backdrop-blur))',
         zIndex: 110,
         display: 'flex',
         alignItems: 'center',
@@ -181,8 +160,6 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
         {creado ? (
           <CredencialesView
             creado={creado}
-            copiado={copiado}
-            onCopy={handleCopy}
             onCerrar={() => onRegistrado(creado.email)}
           />
         ) : (
@@ -280,9 +257,16 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
                   disabled={submitting}
                   className="ek-icon-btn"
                   aria-label="Generar otra contraseña"
-                  style={{ width: '44px', minHeight: '44px', padding: 0, fontSize: '16px' }}
+                  style={{
+                    width: '44px',
+                    minHeight: '44px',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
                 >
-                  🔄
+                  <RefreshCw size={16} aria-hidden="true" />
                 </button>
               </div>
               <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
@@ -318,22 +302,36 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
 
 function CredencialesView({
   creado,
-  copiado,
-  onCopy,
   onCerrar
 }: {
   creado: MiembroCreado;
-  copiado: boolean;
-  onCopy: () => void;
   onCerrar: () => void;
 }) {
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const credencialesTexto = [
+    'EKKO Studio — Tu acceso',
+    '',
+    `Nombre: ${creado.nombre}`,
+    `Email: ${creado.email}`,
+    `Contraseña: ${creado.password}`,
+    '',
+    `Iniciá sesión en: ${origin}/login`
+  ].join('\n');
+
   return (
     <>
       <p
         className="ek-eyebrow"
-        style={{ marginBottom: '6px', color: 'var(--ek-success)' }}
+        style={{
+          marginBottom: '6px',
+          color: 'var(--ek-success)',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px'
+        }}
       >
-        ✓ MIEMBRO REGISTRADO
+        <CheckCircle2 size={13} aria-hidden="true" />
+        MIEMBRO REGISTRADO
       </p>
       <h3
         style={{
@@ -368,16 +366,17 @@ function CredencialesView({
         <CredField label="Contraseña" value={creado.password} mono />
       </div>
 
-      <button
-        type="button"
-        onClick={onCopy}
-        className="ek-cta ek-cta--full"
-        style={{ padding: '12px', fontSize: '14px', minHeight: '44px', marginBottom: '14px' }}
-      >
-        {copiado ? '✓ Copiado' : '📋 Copiar credenciales'}
-      </button>
+      <div style={{ marginBottom: '14px' }}>
+        <CopyButton
+          text={credencialesTexto}
+          label="Copiar credenciales"
+          copiedLabel="Copiado"
+          full
+        />
+      </div>
 
-      <p
+      <div
+        role="alert"
         style={{
           fontSize: '12px',
           color: 'var(--ek-mustard)',
@@ -386,12 +385,18 @@ function CredencialesView({
           borderRadius: 'var(--ek-r-sm)',
           margin: 0,
           marginBottom: '20px',
-          lineHeight: 1.55
+          lineHeight: 1.55,
+          display: 'flex',
+          gap: '10px',
+          alignItems: 'flex-start'
         }}
       >
-        ⚠️ La cuenta queda <strong>PENDIENTE DE ACTIVACIÓN</strong> — se activa al confirmar el
-        pago/plan con administración. Mientras tanto el miembro no podrá reservar.
-      </p>
+        <AlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
+        <span>
+          La cuenta queda <strong>PENDIENTE DE ACTIVACIÓN</strong> — se activa al confirmar el
+          pago/plan con administración. Mientras tanto el miembro no podrá reservar.
+        </span>
+      </div>
 
       <button
         type="button"

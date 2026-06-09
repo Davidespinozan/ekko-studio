@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { useReservasRango, useRecursosAdmin } from '../hooks/useAdminData';
 import { formatHora } from '@member/logic/reservaLogic';
+import { Spinner } from '@shared/components/Spinner';
 import DetalleReservaModal from '../components/DetalleReservaModal';
 import CancelarReservaModal, {
   type ReservaParaCancelar
@@ -40,7 +42,7 @@ export default function Calendario() {
         }}
       >
         <div>
-          <p className="ek-eyebrow">RESERVAS</p>
+          <p className="ek-eyebrow ek-eyebrow--mustard">RESERVAS</p>
           <h1 className="ek-h2">Gestiona reservas de tus miembros</h1>
         </div>
         <VistaToggle value={vista} onChange={setVista} />
@@ -189,9 +191,10 @@ function VistaSemana({
           type="button"
           onClick={() => onCambiarVista('dia')}
           className="ek-cta"
-          style={{ minHeight: '44px' }}
+          style={{ minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
         >
-          Cambiar a vista Día →
+          Cambiar a vista Día
+          <ArrowRight size={15} aria-hidden="true" />
         </button>
       </div>
 
@@ -200,8 +203,10 @@ function VistaSemana({
         <button
           onClick={() => setWeekStart(addDays(weekStart, -7))}
           className="adm-link-btn"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
         >
-          ← Semana anterior
+          <ChevronLeft size={14} aria-hidden="true" />
+          Semana anterior
         </button>
         <span className="adm-week-label">
           {weekStart.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} —{' '}
@@ -214,13 +219,15 @@ function VistaSemana({
         <button
           onClick={() => setWeekStart(addDays(weekStart, 7))}
           className="adm-link-btn"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
         >
-          Semana siguiente →
+          Semana siguiente
+          <ChevronRight size={14} aria-hidden="true" />
         </button>
       </div>
 
       {isLoading ? (
-        <p className="adm-body">Cargando…</p>
+        <Spinner label="Cargando…" />
       ) : (
         <div className="adm-cal-grid">
           {days.map((day) => {

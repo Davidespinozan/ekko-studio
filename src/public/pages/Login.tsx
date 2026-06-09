@@ -1,6 +1,8 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { Spinner } from '@shared/components/Spinner';
 import { validarStatusCuenta, traducirErrorAuth } from '@shared/lib/validarStatusCuenta';
 
 export default function Login() {
@@ -8,6 +10,7 @@ export default function Login() {
   const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -111,27 +114,44 @@ export default function Login() {
 
             <div className="ek-form-field">
               <label htmlFor="password" className="ek-label">Contraseña</label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                required
-                minLength={8}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="ek-input"
-                placeholder="••••••••"
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="ek-input"
+                  placeholder="••••••••"
+                  style={{ paddingRight: '48px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="ek-icon-btn ek-icon-btn--ghost ek-icon-btn--sm"
+                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                  style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)' }}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
-            {error && <p className="ek-error-text">{error}</p>}
+            {error && (
+              <p className="ek-error-text" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '1px' }} aria-hidden="true" />
+                <span>{error}</span>
+              </p>
+            )}
 
             <button
               type="submit"
               className="ek-cta ek-cta--full"
               disabled={isSubmitting || !email || !password}
             >
-              {isSubmitting ? 'Iniciando sesión…' : 'Iniciar sesión'}
+              {isSubmitting ? <Spinner size={16} label="Iniciando sesión…" /> : 'Iniciar sesión'}
             </button>
           </form>
         </div>

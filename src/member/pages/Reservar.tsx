@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Star, CalendarX } from 'lucide-react';
+import { EmptyState } from '@shared/components/EmptyState';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
@@ -153,12 +155,12 @@ export default function Reservar() {
   if (recursos.length === 0) {
     return (
       <div className="ek-container">
-        <div className="ek-stack-lg">
-          <p className="ek-eyebrow">SIN ESTUDIOS DISPONIBLES</p>
-          <p className="ek-body">
-            No hay estudios activos en este momento. Contacta al administrador.
-          </p>
-        </div>
+        <EmptyState
+          icon={CalendarX}
+          tone="neutral"
+          title="Sin estudios disponibles"
+          hint="No hay estudios activos en este momento. Contacta al administrador."
+        />
       </div>
     );
   }
@@ -167,7 +169,7 @@ export default function Reservar() {
     <div className="ek-container">
       <div className="ek-stack-xl">
         <div className="ek-stack-md">
-          <p className="ek-eyebrow">RESERVAR</p>
+          <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar">RESERVAR</p>
           <h1 className="ek-h2">Elige tu sesión</h1>
         </div>
 
@@ -214,8 +216,11 @@ export default function Reservar() {
                       fontSize: '9px',
                       color: 'var(--ek-mustard)',
                       fontWeight: 700,
-                      letterSpacing: '0.12em'
-                    }}>★ PRO</span>
+                      letterSpacing: '0.12em',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '3px'
+                    }}><Star size={9} fill="currentColor" aria-hidden="true" /> PRO</span>
                   )}
                 </button>
               );

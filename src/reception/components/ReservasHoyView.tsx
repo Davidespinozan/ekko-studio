@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
+import { X, CheckCircle2, Search } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
+import { StatusBadge } from '@shared/components/StatusBadge';
+import { EmptyState } from '@shared/components/EmptyState';
 import { useReservasHoy, checkInManual, type ReservaConJoin } from '../hooks/useReservasHoy';
 import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 
@@ -26,64 +29,48 @@ function normalizar(s: string): string {
 }
 
 /**
- * statusConfig completo — todos los status posibles de reservas mapeados.
- * NO usar fallback "PENDIENTE" para status desconocidos: un nuevo estado en
- * BD debe ser obvio para forzar el fix del frontend.
- *
- * `cancelada` y `cancelada_admin` comparten visual: recepcionista no necesita
- * diferenciar quién canceló (info irrelevante para operación).
+ * Etiquetas cortas para el badge de estado, en clave operativa de recepción.
+ * `confirmada` se muestra como "PENDIENTE" (aún no llegó / falta check-in),
+ * pill mostaza propia; el resto delega en <StatusBadge/> (icono + tono).
+ * `cancelada` y `cancelada_admin` comparten visual: recepción no necesita
+ * diferenciar quién canceló.
  */
-type StatusInfo = { label: string; bg: string; color: string; bloqueaCheckIn: boolean };
-
-// Badges: bg sólido saturado + texto oscuro (var(--ek-bg)) para garantizar
-// contraste WCAG AA ≥4.5:1. Antes completada/cancelada/no_show usaban
-// bg *-soft (alpha 0.12) + texto del mismo color — chip casi invisible.
-const STATUS_CONFIG: Record<string, StatusInfo> = {
-  confirmada: {
-    label: 'PENDIENTE',
-    bg: 'var(--ek-mustard)',
-    color: 'var(--ek-bg)',
-    bloqueaCheckIn: false
-  },
-  completada: {
-    label: '✓ OK',
-    bg: 'var(--ek-success)',
-    color: 'var(--ek-bg)',
-    bloqueaCheckIn: true
-  },
-  cancelada: {
-    label: '⛔ CANCELADA',
-    bg: 'var(--ek-danger)',
-    color: 'var(--ek-bg)',
-    bloqueaCheckIn: true
-  },
-  cancelada_admin: {
-    label: '⛔ CANCELADA',
-    bg: 'var(--ek-danger)',
-    color: 'var(--ek-bg)',
-    bloqueaCheckIn: true
-  },
-  no_show: {
-    label: 'NO SHOW',
-    bg: 'var(--ek-danger)',
-    color: 'var(--ek-bg)',
-    bloqueaCheckIn: true
-  }
+const STATUS_LABEL_CORTO: Record<string, string> = {
+  completada: 'OK',
+  cancelada: 'CANCELADA',
+  cancelada_admin: 'CANCELADA',
+  no_show: 'NO SHOW'
 };
 
-function getStatusInfo(status: string): StatusInfo {
-  const info = STATUS_CONFIG[status];
-  if (info) return info;
-  // Fallback visible: si aparece un status no mapeado, mejor que falle obvio.
+/**
+ * Badge de estado de reserva. `confirmada` → pill mostaza "PENDIENTE"
+ * (operativo). Estados terminales → <StatusBadge/> unificado. Estado no
+ * mapeado: se loguea para forzar el fix del frontend.
+ */
+function StatusReservaBadge({ status }: { status: string }) {
+  if (status === 'confirmada') {
+    return (
+      <span
+        className="ek-badge"
+        style={{
+          backgroundColor: 'var(--ek-mustard)',
+          color: 'var(--ek-bg)',
+          fontSize: '10px',
+          fontWeight: 700,
+          flexShrink: 0
+        }}
+      >
+        PENDIENTE
+      </span>
+    );
+  }
+  if (status in STATUS_LABEL_CORTO) {
+    return <StatusBadge status={status} label={STATUS_LABEL_CORTO[status]} size={12} />;
+  }
   if (typeof console !== 'undefined') {
     console.error('[ReservasHoyView] Status no mapeado:', status);
   }
-  return {
-    label: `⚠️ ${status.toUpperCase()}`,
-    bg: 'var(--ek-ink)',
-    color: 'var(--ek-bg)',
-    bloqueaCheckIn: true
-  };
+  return <StatusBadge status={status} label={status.toUpperCase()} size={12} />;
 }
 
 function capitalizarNombre(s: string | undefined | null): string {
@@ -341,11 +328,10 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
                 background: 'transparent',
                 color: 'var(--ek-ink-muted)',
                 cursor: 'pointer',
-                fontSize: '16px',
                 lineHeight: 1
               }}
             >
-              ✕
+              <X size={18} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -405,7 +391,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
                 padding: '0 12px'
               }}
             >
-              {recursoFiltradoNombre} <span aria-hidden="true">✕</span>
+              {recursoFiltradoNombre} <X size={13} aria-hidden="true" />
             </button>
           )}
           {busquedaDebounced && (
@@ -426,7 +412,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
                 padding: '0 12px'
               }}
             >
-              &ldquo;{busquedaDebounced}&rdquo; <span aria-hidden="true">✕</span>
+              &ldquo;{busquedaDebounced}&rdquo; <X size={13} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -444,30 +430,26 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
           ))}
         </div>
       ) : sinResultadosTrasFiltro ? (
-        <div
-          style={{
-            marginTop: '32px',
-            padding: '32px 16px',
-            textAlign: 'center',
-            background: 'var(--ek-bg-soft)',
-            border: '0.5px dashed var(--ek-line)',
-            borderRadius: 'var(--ek-r-md)'
-          }}
-        >
-          <p className="ek-body-faint" style={{ marginBottom: '12px' }}>
-            No hay reservas que coincidan con los filtros.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setBusqueda('');
-              setRecursoFiltrado('todos');
-            }}
-            className="ek-icon-btn"
-            style={{ width: 'auto', minHeight: '44px', padding: '10px 16px', fontSize: '12px' }}
-          >
-            Limpiar filtros
-          </button>
+        <div style={{ marginTop: '20px' }}>
+          <EmptyState
+            icon={Search}
+            title="Sin coincidencias"
+            hint="No hay reservas que coincidan con los filtros."
+            tone="neutral"
+            action={
+              <button
+                type="button"
+                onClick={() => {
+                  setBusqueda('');
+                  setRecursoFiltrado('todos');
+                }}
+                className="ek-icon-btn"
+                style={{ width: 'auto', minHeight: '44px', padding: '10px 16px', fontSize: '12px' }}
+              >
+                Limpiar filtros
+              </button>
+            }
+          />
         </div>
       ) : (
         <>
@@ -541,7 +523,6 @@ function ReservaCard({
     capitalizarNombre(reserva.usuario?.nombre) || reserva.usuario?.email || '—';
 
   const tier = reserva.usuario?.membresia_tier;
-  const status = getStatusInfo(reserva.status);
   // Disabled si está cancelada (cualquier tipo) o no-show. completada permite
   // abrir el modal (muestra "ya hizo check-in").
   const disabled =
@@ -609,18 +590,7 @@ function ReservaCard({
         </p>
       </div>
 
-      <span
-        className="ek-badge"
-        style={{
-          backgroundColor: status.bg,
-          color: status.color,
-          fontSize: '10px',
-          fontWeight: 700,
-          flexShrink: 0
-        }}
-      >
-        {status.label}
-      </span>
+      <StatusReservaBadge status={reserva.status} />
     </button>
   );
 }
@@ -687,8 +657,18 @@ function ManualCheckInModal({
 
         {yaCheckIn ? (
           <>
-            <p style={{ color: 'var(--ek-success)', marginTop: '1rem', fontWeight: 600 }}>
-              ✓ Ya hizo check-in
+            <p
+              style={{
+                color: 'var(--ek-success)',
+                marginTop: '1rem',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <CheckCircle2 size={16} aria-hidden="true" />
+              Ya hizo check-in
               {(() => {
                 const m = (reserva as { check_in_method?: string }).check_in_method;
                 return m ? ` (${m})` : null;

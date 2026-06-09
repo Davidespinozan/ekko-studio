@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { CheckCircle2, XCircle, AlertTriangle, Info, X, type LucideIcon } from 'lucide-react';
 
 export type ToastVariant = 'success' | 'error' | 'warning' | 'info';
 
@@ -25,30 +26,30 @@ const DEFAULT_DURATION: Record<ToastVariant, number> = {
   info: 3000
 };
 
-const VARIANT_STYLES: Record<ToastVariant, { bg: string; border: string; color: string; icon: string }> = {
+const VARIANT_STYLES: Record<ToastVariant, { bg: string; border: string; color: string; icon: LucideIcon }> = {
   success: {
     bg: 'rgba(34, 197, 94, 0.15)',
     border: 'rgb(34, 197, 94)',
     color: 'rgb(74, 222, 128)',
-    icon: '✓'
+    icon: CheckCircle2
   },
   error: {
     bg: 'rgba(239, 68, 68, 0.15)',
     border: 'rgb(239, 68, 68)',
     color: 'rgb(248, 113, 113)',
-    icon: '✕'
+    icon: XCircle
   },
   warning: {
     bg: 'var(--ek-mustard-soft)',
     border: 'var(--ek-mustard)',
     color: 'var(--ek-mustard)',
-    icon: '⚠'
+    icon: AlertTriangle
   },
   info: {
     bg: 'rgba(59, 130, 246, 0.15)',
     border: 'rgb(59, 130, 246)',
     color: 'rgb(96, 165, 250)',
-    icon: 'ℹ'
+    icon: Info
   }
 };
 
@@ -137,7 +138,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 animation: 'ek-toast-slide 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
             >
-              <span style={{ fontWeight: 700, lineHeight: 1.4 }}>{style.icon}</span>
+              <style.icon size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
               <span style={{ flex: 1, color: 'var(--ek-ink)' }}>{t.message}</span>
               <button
                 type="button"
@@ -148,12 +149,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   border: 'none',
                   color: 'var(--ek-ink-muted)',
                   cursor: 'pointer',
-                  fontSize: '14px',
                   padding: 0,
-                  lineHeight: 1
+                  lineHeight: 1,
+                  display: 'flex',
+                  alignItems: 'center'
                 }}
               >
-                ✕
+                <X size={15} aria-hidden="true" />
               </button>
             </div>
           );

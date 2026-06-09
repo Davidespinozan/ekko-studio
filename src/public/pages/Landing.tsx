@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Star, ArrowRight, Check } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useLandingConfig } from '@shared/hooks/useLandingConfig';
 import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
@@ -392,7 +393,8 @@ export default function Landing() {
                     className={s.tier === 'pro' ? 'ek-badge ek-badge--outline' : 'ek-badge'}
                     style={{ position: 'absolute', top: '14px', left: '14px' }}
                   >
-                    {s.tier === 'pro' ? '★ PRO' : 'BÁSICA'}
+                    {s.tier === 'pro' && <Star size={11} fill="currentColor" aria-hidden="true" />}
+                    {s.tier === 'pro' ? 'PRO' : 'BÁSICA'}
                   </span>
                 </div>
                 <div style={{ padding: '20px' }}>
@@ -422,9 +424,12 @@ export default function Landing() {
                     margin: 0,
                     letterSpacing: '0.08em',
                     textTransform: 'uppercase',
-                    fontWeight: 600
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px'
                   }}>
-                    Ver detalle →
+                    Ver detalle <ArrowRight size={13} aria-hidden="true" />
                   </p>
                 </div>
               </button>
@@ -485,9 +490,10 @@ export default function Landing() {
                 >
                   <p
                     className={esPro ? 'ek-eyebrow ek-eyebrow--mustard' : 'ek-eyebrow'}
-                    style={{ marginBottom: '12px' }}
+                    style={{ marginBottom: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
-                    {esPro ? '★ PRO · RECOMENDADA' : tier.nombre.toUpperCase()}
+                    {esPro && <Star size={12} fill="currentColor" aria-hidden="true" />}
+                    {esPro ? 'PRO · RECOMENDADA' : tier.nombre.toUpperCase()}
                   </p>
                   <p style={{
                     fontFamily: 'var(--ek-font-display)',
@@ -528,7 +534,7 @@ export default function Landing() {
                           fontSize: '14px'
                         }}
                       >
-                        <span style={{ color: 'var(--ek-mustard)' }}>✓</span>
+                        <Check size={16} style={{ color: 'var(--ek-mustard)', flexShrink: 0, marginTop: '1px' }} aria-hidden="true" />
                         {b}
                       </li>
                     ))}

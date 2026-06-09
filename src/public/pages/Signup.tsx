@@ -1,6 +1,8 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
+import { ArrowLeft, Star, Check, Eye, EyeOff, AlertCircle, CreditCard, Lock, User } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { Spinner } from '@shared/components/Spinner';
 
 type Tier = 'basica' | 'pro';
 
@@ -74,6 +76,7 @@ export default function Signup() {
   const [cardNumber, setCardNumber] = useState('');
   const [cardExp, setCardExp] = useState('');
   const [cardCvv, setCardCvv] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -223,9 +226,11 @@ export default function Signup() {
         color: 'var(--ek-ink-muted)',
         textDecoration: 'none',
         marginBottom: '32px',
-        display: 'inline-block'
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px'
       }}>
-        ← Volver a EKKO
+        <ArrowLeft size={15} aria-hidden="true" /> Volver a EKKO
       </Link>
 
       {/* Plan resumen — sticky para que el usuario siempre vea qué compra,
@@ -239,8 +244,9 @@ export default function Signup() {
         zIndex: 5,
         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
       }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>
-          {plan.tier === 'pro' ? '★ PRO · MEMBRESÍA' : 'MEMBRESÍA BÁSICA'}
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          {plan.tier === 'pro' && <Star size={12} fill="currentColor" aria-hidden="true" />}
+          {plan.tier === 'pro' ? 'PRO · MEMBRESÍA' : 'MEMBRESÍA BÁSICA'}
         </p>
         <p style={{
           fontFamily: 'var(--ek-font-display)',
@@ -255,15 +261,17 @@ export default function Signup() {
         </p>
         <ul style={{ listStyle: 'none', padding: 0, margin: '16px 0 0 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {plan.beneficios.map((b) => (
-            <li key={b} style={{ display: 'flex', gap: '8px', fontSize: '13px' }}>
-              <span style={{ color: 'var(--ek-mustard)' }}>✓</span>{b}
+            <li key={b} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+              <Check size={15} style={{ color: 'var(--ek-mustard)', flexShrink: 0 }} aria-hidden="true" />{b}
             </li>
           ))}
         </ul>
       </div>
 
       <form onSubmit={handleSubmit} onFocus={handleFormFocus} className="ek-stack-md">
-        <p className="ek-eyebrow" style={{ marginBottom: '4px' }}>TUS DATOS</p>
+        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '4px' }}>
+          <User size={13} aria-hidden="true" /> TUS DATOS
+        </p>
 
         <div className="ek-form-field">
           <label className="ek-label" htmlFor="signup-nombre">Nombre completo</label>
@@ -295,17 +303,29 @@ export default function Signup() {
 
         <div className="ek-form-field">
           <label className="ek-label" htmlFor="signup-password">Contraseña</label>
-          <input
-            id="signup-password"
-            type="password"
-            className="ek-input"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            disabled={isProcessing}
-            autoComplete="new-password"
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              id="signup-password"
+              type={showPassword ? 'text' : 'password'}
+              className="ek-input"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              disabled={isProcessing}
+              autoComplete="new-password"
+              style={{ paddingRight: '48px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="ek-icon-btn ek-icon-btn--ghost ek-icon-btn--sm"
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)' }}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
           <p className="ek-helper-text">Mínimo 8 caracteres.</p>
         </div>
 
@@ -313,7 +333,7 @@ export default function Signup() {
           <label className="ek-label" htmlFor="signup-password-confirm">Confirmar contraseña</label>
           <input
             id="signup-password-confirm"
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             className="ek-input"
             value={passwordConfirm}
             onChange={(e) => setPasswordConfirm(e.target.value)}
@@ -323,24 +343,32 @@ export default function Signup() {
           />
         </div>
 
-        <p className="ek-eyebrow" style={{ marginTop: '20px', marginBottom: '4px' }}>
-          PAGO
+        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginTop: '20px', marginBottom: '4px' }}>
+          <Lock size={13} aria-hidden="true" /> PAGO SEGURO
         </p>
 
         <div className="ek-form-field">
           <label className="ek-label" htmlFor="signup-card">Número de tarjeta</label>
-          <input
-            id="signup-card"
-            type="text"
-            className="ek-input"
-            placeholder="0000 0000 0000 0000"
-            value={cardNumber}
-            onChange={(e) => handleCardNumber(e.target.value)}
-            required
-            disabled={isProcessing}
-            inputMode="numeric"
-            autoComplete="cc-number"
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              id="signup-card"
+              type="text"
+              className="ek-input"
+              placeholder="0000 0000 0000 0000"
+              value={cardNumber}
+              onChange={(e) => handleCardNumber(e.target.value)}
+              required
+              disabled={isProcessing}
+              inputMode="numeric"
+              autoComplete="cc-number"
+              style={{ paddingRight: '44px' }}
+            />
+            <CreditCard
+              size={18}
+              aria-hidden="true"
+              style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--ek-ink-faint)', pointerEvents: 'none' }}
+            />
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -378,14 +406,18 @@ export default function Signup() {
 
         {error && (
           <div style={{
-            background: 'rgba(226, 85, 85, 0.1)',
+            background: 'var(--ek-danger-soft)',
             border: '0.5px solid var(--ek-danger)',
             borderRadius: 'var(--ek-r-sm)',
             padding: '12px 16px',
             color: 'var(--ek-danger)',
-            fontSize: '13px'
+            fontSize: '13px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px'
           }}>
-            {error}
+            <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '1px' }} aria-hidden="true" />
+            <span>{error}</span>
           </div>
         )}
 
@@ -396,7 +428,7 @@ export default function Signup() {
           disabled={isProcessing}
         >
           {isProcessing
-            ? 'Procesando pago…'
+            ? <Spinner size={18} label="Procesando pago…" />
             : `Pagar y empezar — $${plan.precio.toLocaleString('es-MX')}/mes`
           }
         </button>

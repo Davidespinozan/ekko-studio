@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Users, ArrowRight } from 'lucide-react';
 import { useMiembros } from '../hooks/useAdminData';
 import { NuevaPersonaModal } from '../components/NuevaPersonaModal';
+import { Spinner } from '@shared/components/Spinner';
+import { EmptyState } from '@shared/components/EmptyState';
 
 export default function Miembros() {
   const [search, setSearch] = useState('');
@@ -24,7 +27,7 @@ export default function Miembros() {
         }}
       >
         <div>
-          <p className="ek-eyebrow">MIEMBROS</p>
+          <p className="ek-eyebrow ek-eyebrow--mustard">MIEMBROS</p>
           <h1 className="ek-h2">Tus clientes en EKKO</h1>
           {!isLoading && (
             <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '4px' }}>
@@ -63,9 +66,14 @@ export default function Miembros() {
       </div>
 
       {isLoading ? (
-        <p className="adm-body">Cargando…</p>
+        <Spinner label="Cargando…" />
       ) : miembros.length === 0 ? (
-        <p className="adm-body">Sin resultados.</p>
+        <EmptyState
+          icon={Users}
+          title="Sin resultados."
+          hint="No hay miembros que coincidan con tu búsqueda."
+          tone="neutral"
+        />
       ) : (
         <div className="adm-table-wrapper">
           <table className="adm-table">
@@ -92,8 +100,13 @@ export default function Miembros() {
                     {new Date(m.created_at).toLocaleDateString('es-MX')}
                   </td>
                   <td>
-                    <Link to={`/admin/miembros/${m.id}`} className="adm-link">
-                      Ver →
+                    <Link
+                      to={`/admin/miembros/${m.id}`}
+                      className="adm-link"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      Ver
+                      <ArrowRight size={13} aria-hidden="true" />
                     </Link>
                   </td>
                 </tr>

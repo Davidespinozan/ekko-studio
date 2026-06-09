@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { X, ImageOff } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 
 interface ImageUploaderProps {
@@ -119,12 +120,11 @@ export default function ImageUploader({
                 width: '32px',
                 height: '32px',
                 padding: 0,
-                background: 'rgba(10, 10, 10, 0.85)',
-                fontSize: '16px'
+                background: 'rgba(10, 10, 10, 0.85)'
               }}
               aria-label="Quitar imagen"
             >
-              ✕
+              <X size={16} aria-hidden="true" />
             </button>
           </div>
         ) : (
@@ -140,20 +140,12 @@ export default function ImageUploader({
               gap: '8px'
             }}
           >
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--ek-ink-faint)"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <polyline points="21 15 16 10 5 21" />
-            </svg>
+            <ImageOff
+              size={32}
+              strokeWidth={1.5}
+              aria-hidden="true"
+              style={{ color: 'var(--ek-ink-faint)' }}
+            />
             <span
               style={{
                 fontSize: '11px',

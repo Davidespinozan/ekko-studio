@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { Lightbulb } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
+import { CopyButton } from '@shared/components/CopyButton';
 import { cancelarReserva } from '../lib/crudHelpers';
 
 export interface ReservaParaCancelar {
@@ -40,7 +42,6 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
   const [typed, setTyped] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -61,17 +62,6 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
   const canSubmit = motivoOk && typedOk && !submitting;
 
   const mensajeWhatsapp = `Hola ${primerNombre(reserva.usuario_nombre)}, te aviso que tuvimos que cancelar tu reserva del ${fechaFmt} en ${reserva.recurso_nombre}. Motivo: ${motivo || '[escribe el motivo arriba]'}. Disculpa las molestias, podés reservar otra fecha desde la app.`;
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(mensajeWhatsapp);
-      setCopiado(true);
-      toast.success('Mensaje copiado.');
-      setTimeout(() => setCopiado(false), 2000);
-    } catch {
-      toast.error('No se pudo copiar.');
-    }
-  }
 
   async function handleSubmit() {
     if (!usuario) return;
@@ -106,9 +96,9 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0, 0, 0, 0.85)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'var(--ek-backdrop)',
+        backdropFilter: 'blur(var(--ek-backdrop-blur))',
+        WebkitBackdropFilter: 'blur(var(--ek-backdrop-blur))',
         zIndex: 110,
         display: 'flex',
         alignItems: 'center',
@@ -225,9 +215,10 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
         >
           <p
             className="ek-eyebrow ek-eyebrow--mustard"
-            style={{ fontSize: '10px', marginBottom: '8px' }}
+            style={{ fontSize: '10px', marginBottom: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           >
-            💡 SUGERENCIA WHATSAPP
+            <Lightbulb size={12} aria-hidden="true" />
+            SUGERENCIA WHATSAPP
           </p>
           <p
             style={{
@@ -244,14 +235,7 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
           >
             {mensajeWhatsapp}
           </p>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="ek-icon-btn"
-            style={{ width: 'auto', padding: '8px 14px', fontSize: '12px' }}
-          >
-            {copiado ? '✓ Copiado' : '📋 Copiar mensaje'}
-          </button>
+          <CopyButton text={mensajeWhatsapp} label="Copiar mensaje" copiedLabel="Mensaje copiado" />
         </div>
 
         <div style={{ marginBottom: '16px' }}>

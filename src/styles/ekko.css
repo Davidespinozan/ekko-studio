@@ -1283,52 +1283,44 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   .rec-status--success { background: var(--ek-success-soft); color: var(--ek-success); }
   .rec-status--error { background: var(--ek-danger-soft); color: var(--ek-danger); }
 
-  /* Camera modal */
+  /* Camera modal — experiencia inmersiva edge-to-edge (móvil/tablet). El
+     video ocupa todo el viewport sobre fondo negro; el chrome (cerrar /
+     hint) flota encima respetando safe-area-inset. */
   .rec-camera-modal {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.95);
+    background: #000;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 150;
-    padding: 20px;
+    padding: 0;
   }
 
   .rec-camera-modal-inner {
     position: relative;
-    max-width: 600px;
     width: 100%;
+    height: 100%;
   }
 
   .rec-camera-close {
     position: absolute;
-    /* Overlay sobre la esquina del feed, respetando notch / Dynamic Island.
-       Antes top:-56px podía quedar bajo el notch o fuera de pantalla. */
+    /* Control claro sobre el video (.ek-media-ctrl), legible sobre cualquier
+       fondo. Respeta notch / Dynamic Island vía safe-area-inset. */
     top: calc(12px + env(safe-area-inset-top, 0px));
     right: calc(12px + env(safe-area-inset-right, 0px));
     z-index: 2;
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    background: rgba(10, 10, 10, 0.7);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    border: 0.5px solid var(--ek-line);
-    color: var(--ek-ink);
-    font-size: 18px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 
   .rec-camera-wrap {
     position: relative;
-    border-radius: var(--ek-r-card);
+    width: 100%;
+    height: 100%;
     overflow: hidden;
-    background: var(--ek-bg);
-    aspect-ratio: 1;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .rec-video {
@@ -1369,6 +1361,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   .rec-camera-error {
     text-align: center;
     padding: 40px;
+    max-width: 420px;
     color: var(--ek-ink-muted);
   }
 
@@ -2224,4 +2217,162 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     z-index: -1;
     pointer-events: none;
   }
+}
+
+/* ============================================================================
+   DESIGN SYSTEM v3 — FUNDACIÓN DE MODERNIZACIÓN
+   ============================================================================
+   Tokens + utilidades compartidas que faltaban para nivelar TODA la UI:
+   backdrop unificado, "live pulse", spinner real, empty-state con icono en
+   círculo tintado, eyebrow con barra de acento, ring de avatar e icon-btn
+   con focus accesible. Consumidas por componentes shared (StatusBadge,
+   EmptyState, CopyButton, Spinner) y por las 4 áreas.
+   ============================================================================ */
+
+:root {
+  /* Backdrop unificado de modales (antes rgba(0,0,0,.85) hardcodeado x11) */
+  --ek-backdrop: rgba(6, 6, 6, 0.78);
+  --ek-backdrop-blur: 10px;
+}
+
+/* --- Backdrop de modal centralizado ------------------------------------- */
+.ek-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: var(--ek-backdrop);
+  backdrop-filter: blur(var(--ek-backdrop-blur));
+  -webkit-backdrop-filter: blur(var(--ek-backdrop-blur));
+  animation: ek-fade-in 0.18s ease;
+}
+
+/* --- Spinner real (reemplaza "..." de carga) ---------------------------- */
+@keyframes ek-spin { to { transform: rotate(360deg); } }
+.ek-spin { animation: ek-spin 0.7s linear infinite; transform-origin: center; }
+
+.ek-loading-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ek-ink-muted);
+  font-size: 14px;
+}
+
+/* --- "En vivo": pulso suave para status dots y badges ------------------- */
+@keyframes ek-pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(93, 202, 138, 0.45); }
+  70%  { box-shadow: 0 0 0 6px rgba(93, 202, 138, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(93, 202, 138, 0); }
+}
+.ek-status-dot--live {
+  animation: ek-pulse-ring 1.8s ease-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ek-status-dot--live, .ek-spin { animation: none; }
+}
+
+/* --- Empty state premium: icono vectorial en círculo tintado ------------ */
+.ek-empty-icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ek-mustard);
+  background: var(--ek-mustard-soft);
+  border: 0.5px solid var(--ek-mustard-dim);
+  box-shadow: inset 0 1px 0 rgba(245, 241, 232, 0.06);
+}
+.ek-empty-icon--neutral {
+  color: var(--ek-ink-muted);
+  background: rgba(245, 241, 232, 0.04);
+  border-color: var(--ek-line);
+}
+.ek-empty-icon--danger {
+  color: var(--ek-danger);
+  background: var(--ek-danger-soft);
+  border-color: rgba(226, 85, 85, 0.3);
+}
+
+/* --- Eyebrow con barra de acento a la izquierda (técnica #5) ------------- */
+.ek-eyebrow--bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.ek-eyebrow--bar::before {
+  content: '';
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ek-mustard);
+}
+
+/* --- Ring de avatar con gradiente de marca (técnica #12) ----------------- */
+.ek-avatar-ring {
+  border-radius: 50%;
+  padding: 2px;
+  background: linear-gradient(135deg, var(--ek-mustard), rgba(229, 184, 41, 0.25));
+  display: inline-flex;
+}
+.ek-avatar-ring > * { border: 2px solid var(--ek-bg); }
+
+/* --- icon-btn: focus accesible + variantes ------------------------------ */
+.ek-icon-btn:focus-visible {
+  border-color: var(--ek-mustard);
+  box-shadow: 0 0 0 3px rgba(229, 184, 41, 0.12);
+  outline: none;
+}
+.ek-icon-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+}
+.ek-icon-btn--ghost:hover { background: rgba(245, 241, 232, 0.06); }
+.ek-icon-btn--sm { width: 32px; height: 32px; border-radius: var(--ek-r-xs); }
+.ek-icon-btn--danger:hover {
+  background: var(--ek-danger-soft);
+  color: var(--ek-danger);
+}
+
+/* --- Controles sobre media: círculo claro, icono oscuro (técnica #9) ----- */
+.ek-media-ctrl {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 241, 232, 0.92);
+  color: var(--ek-bg);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+.ek-media-ctrl:hover { background: #fff; transform: scale(1.05); }
+.ek-media-ctrl:active { transform: scale(0.96); }
+
+/* --- Stagger de entrada para listas (técnica #12) ----------------------- */
+@keyframes ek-stagger-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ek-stagger > * {
+  animation: ek-stagger-in 0.4s ease both;
+}
+.ek-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.ek-stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.ek-stagger > *:nth-child(3) { animation-delay: 0.10s; }
+.ek-stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.ek-stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.ek-stagger > *:nth-child(6) { animation-delay: 0.22s; }
+.ek-stagger > *:nth-child(7) { animation-delay: 0.26s; }
+.ek-stagger > *:nth-child(8) { animation-delay: 0.30s; }
+@media (prefers-reduced-motion: reduce) {
+  .ek-stagger > * { animation: none; }
 }

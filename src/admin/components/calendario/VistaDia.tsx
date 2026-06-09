@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, CalendarOff } from 'lucide-react';
 import { useReservasRango } from '../../hooks/useAdminData';
 import { formatHora } from '@member/logic/reservaLogic';
+import { EmptyState } from '@shared/components/EmptyState';
 
 interface Props {
   refreshTick: number;
@@ -36,7 +38,7 @@ export default function VistaDia({ refreshTick, onVerDetalle }: Props) {
           className="adm-dia-nav-btn"
           aria-label="Día anterior"
         >
-          ←
+          <ChevronLeft size={18} aria-hidden="true" />
         </button>
         <div className="adm-dia-nav-label">
           <span>{formatFechaLarga(fecha)}</span>
@@ -48,7 +50,7 @@ export default function VistaDia({ refreshTick, onVerDetalle }: Props) {
           className="adm-dia-nav-btn"
           aria-label="Día siguiente"
         >
-          →
+          <ChevronRight size={18} aria-hidden="true" />
         </button>
       </div>
 
@@ -63,11 +65,11 @@ export default function VistaDia({ refreshTick, onVerDetalle }: Props) {
           ))}
         </div>
       ) : reservas.length === 0 ? (
-        <div className="ek-empty" style={{ padding: '40px 0', textAlign: 'center' }}>
-          <p className="adm-body" style={{ color: 'var(--ek-ink-muted)' }}>
-            No hay reservas para este día.
-          </p>
-        </div>
+        <EmptyState
+          icon={CalendarOff}
+          title="No hay reservas para este día."
+          tone="neutral"
+        />
       ) : (
         <div className="adm-dia-reservas">
           {reservas.map((r) => {

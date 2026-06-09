@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { Loader2, RefreshCw, ArrowLeft } from 'lucide-react';
 import QRCodeStyling from 'qr-code-styling';
 import { supabase } from '@shared/lib/supabase';
 import { backendPost } from '@shared/lib/backend';
@@ -48,10 +49,13 @@ function QRSkeleton() {
         width: '100%',
         borderRadius: 'var(--ek-r-card)',
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        gap: '14px'
       }}
     >
+      <Loader2 size={28} className="ek-spin" style={{ color: 'var(--ek-mustard)' }} aria-hidden="true" />
       <span
         style={{
           fontSize: '12px',
@@ -104,10 +108,13 @@ function QRError({ mensaje, onReintentar }: { mensaje: string; onReintentar: () 
           fontSize: '13px',
           fontWeight: 600,
           cursor: 'pointer',
-          padding: '6px 10px'
+          padding: '6px 10px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px'
         }}
       >
-        Reintentar →
+        <RefreshCw size={14} aria-hidden="true" /> Reintentar
       </button>
     </div>
   );
@@ -190,7 +197,9 @@ export default function MiQR() {
   return (
     <div className="ek-container">
       <div className="ek-stack-xl" style={{ maxWidth: 'min(24rem, 100%)', margin: '0 auto', width: '100%' }}>
-        <Link to="/app" className="adm-link">← Volver al inicio</Link>
+        <Link to="/app" className="adm-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <ArrowLeft size={14} aria-hidden="true" /> Volver al inicio
+        </Link>
 
         {reserva && (
           <div className="ek-stack-md">
