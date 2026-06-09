@@ -77,6 +77,9 @@ html {
   background: var(--ek-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Evita scroll horizontal en móvil por glows/full-bleed que se salen del
+     viewport. `clip` no crea contexto de scroll → no rompe position:sticky. */
+  overflow-x: clip;
 }
 
 body {
@@ -92,6 +95,7 @@ body {
   line-height: 1.5;
   min-height: 100vh;
   overscroll-behavior-x: none;
+  overflow-x: clip;
 }
 
 @media (max-width: 768px) {
@@ -2482,6 +2486,102 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   letter-spacing: -0.05em;
   color: rgba(245, 241, 232, 0.05);
   pointer-events: none;
+}
+
+/* --- Reservar: chips y slots con vida (más mostaza, menos gris) --- */
+.ek-slot {
+  padding: 14px 8px;
+  min-height: 52px;
+  background: var(--ek-bg-soft);
+  color: var(--ek-ink);
+  border: 0.5px solid var(--ek-line);
+  border-radius: var(--ek-r-sm);
+  font-family: var(--ek-font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.ek-slot:hover:not(:disabled) {
+  border-color: var(--ek-mustard);
+  background: var(--ek-mustard-soft);
+  color: var(--ek-mustard);
+  transform: translateY(-1px);
+}
+.ek-slot:active:not(:disabled) { transform: scale(0.97); }
+.ek-slot:disabled {
+  background: transparent;
+  color: var(--ek-ink-faint);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Chip seleccionable (estudio / fecha) con estado activo mostaza */
+.ek-chip {
+  flex-shrink: 0;
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: var(--ek-r-pill);
+  border: 0.5px solid var(--ek-line);
+  background: var(--ek-bg-soft);
+  color: var(--ek-ink);
+  font-weight: 600;
+  font-size: 14px;
+  font-family: var(--ek-font-body);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.ek-chip:hover:not(:disabled):not(.ek-chip--active) { border-color: var(--ek-mustard-dim); color: var(--ek-mustard); }
+.ek-chip--active {
+  background: var(--ek-mustard-soft);
+  color: var(--ek-mustard);
+  border-color: var(--ek-mustard);
+}
+.ek-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Label de campo con acento (Estudio / Fecha / Horario) */
+.ek-field-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ek-mustard);
+  display: block;
+}
+
+/* --- Accesos rápidos (inicio member) --- */
+.ek-quick-action {
+  display: flex !important;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px !important;
+  text-decoration: none;
+  color: var(--ek-ink);
+  position: relative;
+  border-radius: var(--ek-r-md) !important;
+}
+.ek-quick-action-label {
+  font-family: var(--ek-font-display);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.ek-quick-action-arrow {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  color: var(--ek-ink-faint);
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+.ek-quick-action:hover .ek-quick-action-arrow { color: var(--ek-mustard); transform: translateX(3px); }
+.ek-quick-action--accent {
+  border-color: var(--ek-mustard-dim) !important;
+  background: linear-gradient(160deg, rgba(229, 184, 41, 0.07), var(--ek-bg-soft)) !important;
 }
 
 @media (max-width: 600px) {

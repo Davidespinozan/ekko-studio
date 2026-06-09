@@ -175,7 +175,7 @@ export default function Reservar() {
 
         {/* Selector de recurso */}
         <div className="ek-stack-sm">
-          <label className="ek-label">Estudio</label>
+          <label className="ek-field-label">Estudio</label>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {recursos.map((r) => {
               const activo = recursoSel?.id === r.id;
@@ -184,30 +184,14 @@ export default function Reservar() {
               return (
                 <button
                   key={r.id}
+                  className={`ek-chip ${activo && accesible ? 'ek-chip--active' : ''}`}
+                  style={accesible ? undefined : { opacity: 0.55, cursor: 'not-allowed' }}
                   onClick={() => {
                     if (!accesible) {
                       toast.warning('Tu plan no incluye este estudio. Ve a Estudios para más info.');
                       return;
                     }
                     setRecursoSel(r);
-                  }}
-                  style={{
-                    padding: '10px 18px',
-                    minHeight: '44px',
-                    background: activo && accesible ? 'var(--ek-mustard-soft)' : 'transparent',
-                    color: activo && accesible
-                      ? 'var(--ek-mustard)'
-                      : accesible ? 'var(--ek-ink-muted)' : 'var(--ek-ink-faint)',
-                    border: `0.5px solid ${activo && accesible ? 'var(--ek-mustard)' : 'var(--ek-line)'}`,
-                    borderRadius: 'var(--ek-r-pill)',
-                    fontWeight: 600,
-                    fontSize: '14px',
-                    cursor: accesible ? 'pointer' : 'not-allowed',
-                    opacity: accesible ? 1 : 0.5,
-                    fontFamily: 'var(--ek-font-body)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px'
                   }}
                 >
                   {r.nombre}
@@ -230,7 +214,7 @@ export default function Reservar() {
 
         {/* Selector de fecha */}
         <div className="ek-stack-sm">
-          <label className="ek-label">Fecha</label>
+          <label className="ek-field-label">Fecha</label>
           <div className="ek-hscroll-fade">
             <div
               style={{
@@ -248,21 +232,8 @@ export default function Reservar() {
                   <button
                     key={f.fechaISO}
                     onClick={() => setFechaSel(f.fechaISO)}
-                    style={{
-                      flexShrink: 0,
-                      scrollSnapAlign: 'start',
-                      padding: '10px 14px',
-                      minHeight: '44px',
-                      background: activo ? 'var(--ek-mustard-soft)' : 'var(--ek-bg-soft)',
-                      color: activo ? 'var(--ek-mustard)' : 'var(--ek-ink)',
-                      border: `0.5px solid ${activo ? 'var(--ek-mustard)' : 'var(--ek-line)'}`,
-                      borderRadius: 'var(--ek-r-sm)',
-                      fontWeight: 600,
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                      fontFamily: 'var(--ek-font-body)'
-                    }}
+                    className={`ek-chip ${activo ? 'ek-chip--active' : ''}`}
+                    style={{ scrollSnapAlign: 'start', borderRadius: 'var(--ek-r-sm)', fontSize: '13px' }}
                   >
                     {f.label}
                   </button>
@@ -274,7 +245,7 @@ export default function Reservar() {
 
         {/* Grid de slots */}
         <div className="ek-stack-sm">
-          <label className="ek-label">Horario</label>
+          <label className="ek-field-label">Horario</label>
           {loadingSlots ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               {Array.from({ length: 8 }).map((_, i) => (
@@ -303,22 +274,10 @@ export default function Reservar() {
                 return (
                   <button
                     key={i}
+                    className="ek-slot"
                     disabled={!slot.disponible}
                     onClick={() => setSlotPendiente(slot)}
                     title={tooltip}
-                    style={{
-                      padding: '14px 8px',
-                      minHeight: '52px',
-                      background: slot.disponible ? 'var(--ek-bg-soft)' : 'transparent',
-                      color: slot.disponible ? 'var(--ek-ink)' : 'var(--ek-ink-faint)',
-                      border: '0.5px solid var(--ek-line)',
-                      borderRadius: 'var(--ek-r-sm)',
-                      fontFamily: 'var(--ek-font-mono)',
-                      fontSize: '15px',
-                      fontWeight: 600,
-                      cursor: slot.disponible ? 'pointer' : 'not-allowed',
-                      opacity: slot.disponible ? 1 : 0.4
-                    }}
                   >
                     {formatHora(slot.inicio)}
                   </button>
