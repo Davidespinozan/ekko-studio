@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { X, Search, UserX } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
@@ -25,61 +25,63 @@ function capitalizar(s: string | null | undefined): string {
     .join(' ');
 }
 
+/** Normaliza para comparar: minúsculas + sin acentos. */
+function norm(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 /**
- * Búsqueda del padrón de miembros para recepción (RP-2).
- * Recepción ya lee `usuarios` del tenant vía RLS — sin backend nuevo.
+ * Búsqueda del padrón de miembros para recepción.
+ * Trae los miembros del tenant una vez y filtra en cliente: así la búsqueda
+ * es instantánea e INSENSIBLE a acentos y mayúsculas (José ↔ jose), que con
+ * ilike de Postgres no se lograba.
  */
 export default function BuscarMiembro() {
   const tenant = useTenant();
   const [query, setQuery] = useState('');
-  const [debounced, setDebounced] = useState('');
-  const [resultados, setResultados] = useState<MiembroResultado[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Debounce del input (200ms, mismo criterio que la búsqueda de R1).
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 200);
-    return () => clearTimeout(t);
-  }, [query]);
+  const [todos, setTodos] = useState<MiembroResultado[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(false);
 
   useEffect(() => {
-    // Sanitizar: comas y paréntesis rompen la sintaxis de .or(); % y _ son
-    // wildcards de ilike. Los quitamos — nombres/emails no los usan.
-    const safe = debounced.replace(/[,%()_]/g, '').trim();
-    if (safe.length < 2) {
-      setResultados([]);
-      setIsLoading(false);
-      return;
-    }
-
     let mounted = true;
     setIsLoading(true);
-
+    setErrorCarga(false);
     supabase
       .from('usuarios')
       .select('id, nombre, email, status, membresia_tier')
       .eq('tenant_id', tenant.id)
       .eq('rol', 'miembro')
-      .or(`nombre.ilike.%${safe}%,email.ilike.%${safe}%`)
       .order('nombre', { ascending: true })
-      .limit(30)
+      .limit(1000)
       .then(({ data, error }) => {
         if (!mounted) return;
         if (error) {
           console.error('[BuscarMiembro]', error);
-          setResultados([]);
+          setErrorCarga(true);
+          setTodos([]);
         } else {
-          setResultados((data ?? []) as MiembroResultado[]);
+          setTodos((data ?? []) as MiembroResultado[]);
         }
         setIsLoading(false);
       });
-
     return () => {
       mounted = false;
     };
-  }, [debounced, tenant.id]);
+  }, [tenant.id]);
 
-  const sinBusqueda = debounced.replace(/[,%()_]/g, '').trim().length < 2;
+  const q = norm(query);
+  const sinBusqueda = q.length < 2;
+  const resultados = useMemo(() => {
+    if (q.length < 2) return [];
+    return todos
+      .filter((m) => norm(m.nombre ?? '').includes(q) || norm(m.email).includes(q))
+      .slice(0, 50);
+  }, [q, todos]);
 
   return (
     <div className="rec-main">
@@ -124,7 +126,14 @@ export default function BuscarMiembro() {
         )}
       </div>
 
-      {sinBusqueda ? (
+      {errorCarga ? (
+        <EmptyState
+          icon={UserX}
+          title="No pudimos cargar el padrón"
+          hint="Revisá tu conexión y recargá la página."
+          tone="danger"
+        />
+      ) : sinBusqueda ? (
         <EmptyState
           icon={Search}
           title="Buscá un miembro"

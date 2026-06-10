@@ -1,0 +1,63 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+
+/**
+ * Búsqueda de miembros: debe ser INSENSIBLE a acentos y mayúsculas
+ * (José ↔ jose) — bug reportado: "busco el nombre y no aparece".
+ */
+
+const hoisted = vi.hoisted(() => ({
+  miembros: [] as Record<string, unknown>[]
+}));
+
+vi.mock('@shared/lib/supabase', () => ({
+  supabase: {
+    from: () => {
+      const b: Record<string, unknown> = {};
+      for (const m of ['select', 'eq', 'order']) b[m] = () => b;
+      b.limit = () => Promise.resolve({ data: hoisted.miembros, error: null });
+      return b;
+    }
+  }
+}));
+
+vi.mock('@shared/hooks/useTenant', () => ({ useTenant: () => ({ id: 't-1' }) }));
+
+import BuscarMiembro from '../BuscarMiembro';
+
+function renderBuscar() {
+  return render(
+    <MemoryRouter>
+      <BuscarMiembro />
+    </MemoryRouter>
+  );
+}
+
+beforeEach(() => {
+  hoisted.miembros = [
+    { id: 'm-1', nombre: 'José Pérez', email: 'jose@ekko.mx', status: 'activo', membresia_tier: 'pro' },
+    { id: 'm-2', nombre: 'Ana López', email: 'ana@ekko.mx', status: 'activo', membresia_tier: 'basica' }
+  ];
+});
+
+describe('BuscarMiembro · acentos/mayúsculas', () => {
+  it('encuentra "José Pérez" buscando "jose perez" (sin acentos)', async () => {
+    renderBuscar();
+    fireEvent.change(screen.getByLabelText('Buscar miembro'), { target: { value: 'jose perez' } });
+    expect(await screen.findByText('José Pérez')).toBeInTheDocument();
+    expect(screen.queryByText('Ana López')).not.toBeInTheDocument();
+  });
+
+  it('busca también por email', async () => {
+    renderBuscar();
+    fireEvent.change(screen.getByLabelText('Buscar miembro'), { target: { value: 'ANA@ekko' } });
+    expect(await screen.findByText('Ana López')).toBeInTheDocument();
+  });
+
+  it('sin coincidencias muestra el estado vacío', async () => {
+    renderBuscar();
+    fireEvent.change(screen.getByLabelText('Buscar miembro'), { target: { value: 'zzz' } });
+    expect(await screen.findByText('Sin coincidencias')).toBeInTheDocument();
+  });
+});
