@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, CheckCircle2, Search } from 'lucide-react';
+import { X, CheckCircle2, Search, CalendarDays } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { StatusBadge } from '@shared/components/StatusBadge';
@@ -449,6 +449,15 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
                 Limpiar filtros
               </button>
             }
+          />
+        </div>
+      ) : llegando.length === 0 && resto.length === 0 ? (
+        <div style={{ marginTop: '24px' }}>
+          <EmptyState
+            icon={CalendarDays}
+            tone="neutral"
+            title={esHoy ? 'Sin reservas para hoy' : 'Sin reservas para este día'}
+            hint="Cuando haya reservas aparecerán acá. Escaneá el QR del cliente o registrá un walk-in desde su perfil."
           />
         </div>
       ) : (
