@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, UserX } from 'lucide-react';
+import { ArrowLeft, UserX, Camera, Pencil, KeyRound, Unlock, CalendarPlus } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { useToast } from '@shared/hooks/useToast';
 import { EmptyState } from '@shared/components/EmptyState';
 import { TierBadge } from '@shared/components/TierBadge';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { statusMiembro } from '../lib/miembroStatus';
+import { actualizarMiembro } from '../lib/accionesMiembro';
 import { CrearReservaModal, type ReservaOriginal } from '../components/CrearReservaModal';
 import {
   CancelarReservaRecepcionModal,
   type ReservaParaCancelar
 } from '../components/CancelarReservaRecepcionModal';
+import { EditarMiembroModal } from '../components/EditarMiembroModal';
+import { FotoMiembroModal } from '../components/FotoMiembroModal';
+import { ResetPasswordModal } from '../components/ResetPasswordModal';
 
 /**
  * Perfil de miembro READ-ONLY para recepción (Sprint RP-2).
@@ -29,6 +34,7 @@ interface MiembroPerfil {
   nombre: string | null;
   email: string;
   telefono: string | null;
+  avatar_url: string | null;
   membresia_tier: string | null;
   status: string;
   no_shows_count: number | null;
@@ -76,6 +82,7 @@ function fechaCorta(iso: string): string {
 
 export default function PerfilMiembroRecepcion() {
   const { id } = useParams<{ id: string }>();
+  const toast = useToast();
   const [miembro, setMiembro] = useState<MiembroPerfil | null>(null);
   const [reservas, setReservas] = useState<ReservaPerfil[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,6 +90,10 @@ export default function PerfilMiembroRecepcion() {
   const [crearOpen, setCrearOpen] = useState(false);
   const [cancelarTarget, setCancelarTarget] = useState<ReservaParaCancelar | null>(null);
   const [reprogramarTarget, setReprogramarTarget] = useState<ReservaOriginal | null>(null);
+  const [editarOpen, setEditarOpen] = useState(false);
+  const [fotoOpen, setFotoOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [desbloqueando, setDesbloqueando] = useState(false);
 
   const recargarReservas = useCallback(async () => {
     if (!id) return;
@@ -95,6 +106,21 @@ export default function PerfilMiembroRecepcion() {
     setReservas((data ?? []) as unknown as ReservaPerfil[]);
   }, [id]);
 
+  const recargarMiembro = useCallback(async () => {
+    if (!id) return;
+    // SELECT explícito — NO se piden stripe_customer_id ni ob_data (R6).
+    const { data: m, error } = await supabase
+      .from('usuarios')
+      .select('id, nombre, email, telefono, avatar_url, membresia_tier, status, no_shows_count, bloqueado_hasta, created_at')
+      .eq('id', id!)
+      .maybeSingle();
+    if (error || !m) {
+      setNoEncontrado(true);
+      return;
+    }
+    setMiembro(m as MiembroPerfil);
+  }, [id]);
+
   useEffect(() => {
     if (!id) return;
     let mounted = true;
@@ -102,20 +128,8 @@ export default function PerfilMiembroRecepcion() {
     setNoEncontrado(false);
 
     async function load() {
-      // SELECT explícito — NO se piden stripe_customer_id ni ob_data (R6).
-      const { data: m, error } = await supabase
-        .from('usuarios')
-        .select('id, nombre, email, telefono, membresia_tier, status, no_shows_count, bloqueado_hasta, created_at')
-        .eq('id', id!)
-        .maybeSingle();
-
+      await recargarMiembro();
       if (!mounted) return;
-      if (error || !m) {
-        setNoEncontrado(true);
-        setIsLoading(false);
-        return;
-      }
-      setMiembro(m as MiembroPerfil);
       await recargarReservas();
       if (!mounted) return;
       setIsLoading(false);
@@ -125,7 +139,21 @@ export default function PerfilMiembroRecepcion() {
     return () => {
       mounted = false;
     };
-  }, [id, recargarReservas]);
+  }, [id, recargarMiembro, recargarReservas]);
+
+  async function desbloquear() {
+    if (!miembro) return;
+    setDesbloqueando(true);
+    try {
+      await actualizarMiembro(miembro.id, { unblock: true });
+      toast.success('Miembro desbloqueado.');
+      await recargarMiembro();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'No se pudo desbloquear.');
+    } finally {
+      setDesbloqueando(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -179,22 +207,47 @@ export default function PerfilMiembroRecepcion() {
         Volver a búsqueda
       </Link>
 
-      <div style={{ marginTop: '12px', marginBottom: '20px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '4px' }}>
-          MIEMBRO
-        </p>
-        <h1
+      <div style={{ marginTop: '12px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+        {/* Avatar editable: recepción toma/cambia la foto del cliente */}
+        <button
+          type="button"
+          onClick={() => setFotoOpen(true)}
+          aria-label="Cambiar foto"
           style={{
-            fontFamily: 'var(--ek-font-display)',
-            fontSize: '24px',
-            fontWeight: 700,
-            letterSpacing: '-0.03em',
-            margin: 0,
-            color: 'var(--ek-ink)'
+            position: 'relative', width: '64px', height: '64px', flexShrink: 0,
+            borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: 'none'
           }}
         >
-          {capitalizar(miembro.nombre) || miembro.email}
-        </h1>
+          {miembro.avatar_url ? (
+            <img src={miembro.avatar_url} alt={miembro.nombre ?? 'Miembro'} style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+          ) : (
+            <span style={{
+              width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'var(--ek-bg-elevated)', color: 'var(--ek-mustard)',
+              fontFamily: 'var(--ek-font-display)', fontSize: '22px', fontWeight: 700, border: '0.5px solid var(--ek-line)'
+            }}>{iniciales(miembro.nombre, miembro.email)}</span>
+          )}
+          <span className="ek-media-ctrl" style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '26px', height: '26px', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
+            <Camera size={13} aria-hidden="true" />
+          </span>
+        </button>
+        <div style={{ minWidth: 0 }}>
+          <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '4px' }}>
+            MIEMBRO
+          </p>
+          <h1
+            style={{
+              fontFamily: 'var(--ek-font-display)',
+              fontSize: '24px',
+              fontWeight: 700,
+              letterSpacing: '-0.03em',
+              margin: 0,
+              color: 'var(--ek-ink)'
+            }}
+          >
+            {capitalizar(miembro.nombre) || miembro.email}
+          </h1>
+        </div>
       </div>
 
       {/* Estado de cuenta — recepción debe poder explicárselo al cliente. */}
@@ -214,14 +267,25 @@ export default function PerfilMiembroRecepcion() {
           </p>
           {miembro.status !== 'activo' && (
             <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '4px 0 0' }}>
-              La cuenta no está activa. Derivá al cliente con administración.
+              La cuenta no está activa. Podés activarla en <strong>Editar miembro</strong>.
             </p>
           )}
           {bloqueado && (
-            <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '4px 0 0' }}>
-              Restricción para reservar hasta el{' '}
-              {fechaCorta(miembro.bloqueado_hasta as string)} (penalización por inasistencia).
-            </p>
+            <>
+              <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '4px 0 8px' }}>
+                Restricción para reservar hasta el{' '}
+                {fechaCorta(miembro.bloqueado_hasta as string)} (penalización por inasistencia).
+              </p>
+              <button
+                type="button"
+                onClick={desbloquear}
+                disabled={desbloqueando}
+                className="ek-cta ek-cta--secondary"
+                style={{ minHeight: '40px', padding: '8px 14px', fontSize: '13px' }}
+              >
+                <Unlock size={15} aria-hidden="true" /> {desbloqueando ? 'Desbloqueando…' : 'Desbloquear ahora'}
+              </button>
+            </>
           )}
         </div>
       )}
@@ -259,24 +323,40 @@ export default function PerfilMiembroRecepcion() {
         <Dato label="Miembro desde" valor={fechaCorta(miembro.created_at)} />
       </div>
 
+      {/* Acciones de cuenta (Recepción Plus): foto, datos, credenciales. */}
+      <section style={{ marginBottom: '20px' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>ACCIONES DE CUENTA</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+          <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={() => setEditarOpen(true)}>
+            <Pencil size={15} aria-hidden="true" /> Editar datos
+          </button>
+          <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={() => setFotoOpen(true)}>
+            <Camera size={15} aria-hidden="true" /> {miembro.avatar_url ? 'Cambiar foto' : 'Tomar foto'}
+          </button>
+          <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={() => setResetOpen(true)}>
+            <KeyRound size={15} aria-hidden="true" /> Resetear acceso
+          </button>
+        </div>
+      </section>
+
       {/* Acciones de reserva: crear (RP-3a) + reprogramar/cancelar por fila (RP-3a/3b). */}
       <div style={{ marginBottom: '20px' }}>
         <button
           type="button"
           onClick={() => setCrearOpen(true)}
           disabled={miembro.status !== 'activo'}
-          className="ek-cta"
+          className="ek-cta ek-cta--gold"
           style={{
-            minHeight: '44px',
+            minHeight: '46px',
             opacity: miembro.status !== 'activo' ? 0.5 : 1,
             cursor: miembro.status !== 'activo' ? 'not-allowed' : 'pointer'
           }}
         >
-          + Crear reserva
+          <CalendarPlus size={16} aria-hidden="true" /> Crear reserva
         </button>
         {miembro.status !== 'activo' && (
           <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
-            El miembro no está activo — no se puede reservar. Derivá con administración.
+            El miembro no está activo — activá la cuenta en "Editar datos" para poder reservar.
           </p>
         )}
       </div>
@@ -352,8 +432,47 @@ export default function PerfilMiembroRecepcion() {
           onCreada={recargarReservas}
         />
       )}
+
+      {editarOpen && (
+        <EditarMiembroModal
+          miembro={{
+            id: miembro.id,
+            nombre: miembro.nombre,
+            email: miembro.email,
+            telefono: miembro.telefono,
+            status: miembro.status,
+            membresia_tier: miembro.membresia_tier
+          }}
+          onClose={() => setEditarOpen(false)}
+          onGuardado={recargarMiembro}
+        />
+      )}
+
+      {fotoOpen && (
+        <FotoMiembroModal
+          miembroId={miembro.id}
+          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
+          onClose={() => setFotoOpen(false)}
+          onActualizada={recargarMiembro}
+        />
+      )}
+
+      {resetOpen && (
+        <ResetPasswordModal
+          miembroId={miembro.id}
+          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
+          onClose={() => setResetOpen(false)}
+        />
+      )}
     </div>
   );
+}
+
+function iniciales(nombre: string | null, email: string): string {
+  const base = (nombre ?? email ?? '?').trim();
+  const parts = base.split(/[\s@.]+/).filter(Boolean).slice(0, 2);
+  const ini = parts.map((p) => p[0]?.toUpperCase() ?? '').join('');
+  return ini || '?';
 }
 
 function Dato({ label, valor }: { label: string; valor: React.ReactNode }) {

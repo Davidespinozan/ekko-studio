@@ -1,30 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { ToastProvider } from '@shared/providers/ToastProvider';
 
 /**
- * Test de SEGURIDAD (RP-2): el perfil de recepción es READ-ONLY.
- * Verifica que NO renderiza controles de edición — recepción consulta,
- * no edita (riesgo R3 del RECEPCION_PLUS_PLAN). Si un sprint futuro
- * mete por error un control de edición acá, este test lo atrapa.
+ * Recepción Plus: el perfil de recepción ahora es un panel de GESTIÓN del
+ * front-desk (foto, datos, credenciales, desbloqueo, reservas), no una vista
+ * read-only. Este test cubre que se muestran los datos, las acciones de
+ * cuenta y que "Crear reserva" respeta el status del miembro.
  */
 
 const hoisted = vi.hoisted(() => ({
-  miembro: {
-    id: 'm-1',
-    nombre: 'ana lópez',
-    email: 'ana@cravia.mx',
-    telefono: '6661234567',
-    membresia_tier: 'pro',
-    status: 'activo',
-    no_shows_count: 0,
-    bloqueado_hasta: null as string | null,
-    created_at: '2026-01-10T12:00:00Z'
-  } as Record<string, unknown>,
+  miembro: {} as Record<string, unknown>,
   reservas: [] as Record<string, unknown>[]
 }));
 
-// Reserva próxima (confirmada + futura) — habilita las acciones de la fila.
 const RESERVA_PROXIMA = {
   id: 'res-1',
   slot_inicio: '2030-01-01T10:00:00.000Z',
@@ -47,7 +37,6 @@ vi.mock('@shared/lib/supabase', () => ({
           })
         };
       }
-      // reservas
       return {
         select: () => ({
           eq: () => ({
@@ -65,21 +54,24 @@ import PerfilMiembroRecepcion from '../PerfilMiembroRecepcion';
 
 function renderPerfil() {
   return render(
-    <MemoryRouter initialEntries={['/recepcion/miembros/m-1']}>
-      <Routes>
-        <Route path="/recepcion/miembros/:id" element={<PerfilMiembroRecepcion />} />
-      </Routes>
-    </MemoryRouter>
+    <ToastProvider>
+      <MemoryRouter initialEntries={['/recepcion/miembros/m-1']}>
+        <Routes>
+          <Route path="/recepcion/miembros/:id" element={<PerfilMiembroRecepcion />} />
+        </Routes>
+      </MemoryRouter>
+    </ToastProvider>
   );
 }
 
-describe('PerfilMiembroRecepcion · read-only', () => {
+describe('PerfilMiembroRecepcion · gestión front-desk', () => {
   beforeEach(() => {
     hoisted.miembro = {
       id: 'm-1',
       nombre: 'ana lópez',
       email: 'ana@cravia.mx',
       telefono: '6661234567',
+      avatar_url: null,
       membresia_tier: 'pro',
       status: 'activo',
       no_shows_count: 0,
@@ -95,21 +87,12 @@ describe('PerfilMiembroRecepcion · read-only', () => {
     expect(screen.getByText('ana@cravia.mx')).toBeInTheDocument();
   });
 
-  it('NO renderiza controles de edición (recepción no edita)', async () => {
-    const { container } = renderPerfil();
+  it('ofrece las acciones de cuenta del front-desk', async () => {
+    renderPerfil();
     await screen.findByText('Ana López');
-
-    // Ningún control de edición de los que sí tiene MiembroDetalle (admin).
-    expect(screen.queryByText(/reset/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/cambiar rol/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/eliminar/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/guardar/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/suspender/i)).not.toBeInTheDocument();
-
-    // Sin inputs ni selects editables — es una vista de pura lectura.
-    expect(container.querySelector('select')).toBeNull();
-    expect(container.querySelector('input')).toBeNull();
-    expect(container.querySelector('textarea')).toBeNull();
+    expect(screen.getByRole('button', { name: /editar datos/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /tomar foto/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /resetear acceso/i })).toBeInTheDocument();
   });
 
   it('un miembro suspendido muestra la alerta de estado', async () => {
@@ -117,38 +100,32 @@ describe('PerfilMiembroRecepcion · read-only', () => {
     renderPerfil();
     await screen.findByText('Ana López');
     expect(screen.getAllByText(/suspendido/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/derivá al cliente con administración/i)).toBeInTheDocument();
   });
 
-  it('D2 — miembro activo: botón "Crear reserva" habilitado', async () => {
+  it('miembro bloqueado: ofrece "Desbloquear ahora"', async () => {
+    hoisted.miembro = { ...hoisted.miembro, bloqueado_hasta: '2099-01-01T00:00:00Z' };
     renderPerfil();
     await screen.findByText('Ana López');
-    const btn = screen.getByRole('button', { name: /crear reserva/i });
-    expect(btn).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: /desbloquear/i })).toBeInTheDocument();
   });
 
-  it('D2 — miembro no-activo: botón "Crear reserva" deshabilitado', async () => {
+  it('miembro activo: "Crear reserva" habilitado', async () => {
+    renderPerfil();
+    await screen.findByText('Ana López');
+    expect(screen.getByRole('button', { name: /crear reserva/i })).not.toBeDisabled();
+  });
+
+  it('miembro no-activo: "Crear reserva" deshabilitado', async () => {
     hoisted.miembro = { ...hoisted.miembro, status: 'suspendido' };
     renderPerfil();
     await screen.findByText('Ana López');
-    const btn = screen.getByRole('button', { name: /crear reserva/i });
-    expect(btn).toBeDisabled();
+    expect(screen.getByRole('button', { name: /crear reserva/i })).toBeDisabled();
   });
 
-  it('D2 (RP-3b) — miembro activo: acción "Reprogramar" habilitada', async () => {
+  it('miembro activo: acción "Reprogramar" habilitada', async () => {
     hoisted.reservas = [RESERVA_PROXIMA];
     renderPerfil();
     await screen.findByText('Ana López');
-    const btn = await screen.findByRole('button', { name: /reprogramar/i });
-    expect(btn).not.toBeDisabled();
-  });
-
-  it('D2 (RP-3b) — miembro no-activo: acción "Reprogramar" deshabilitada', async () => {
-    hoisted.miembro = { ...hoisted.miembro, status: 'suspendido' };
-    hoisted.reservas = [RESERVA_PROXIMA];
-    renderPerfil();
-    await screen.findByText('Ana López');
-    const btn = await screen.findByRole('button', { name: /reprogramar/i });
-    expect(btn).toBeDisabled();
+    expect(await screen.findByRole('button', { name: /reprogramar/i })).not.toBeDisabled();
   });
 });
