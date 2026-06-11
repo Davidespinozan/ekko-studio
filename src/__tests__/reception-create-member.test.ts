@@ -10,9 +10,18 @@ const mockGetUser = vi.fn();
 const mockMaybeSingle = vi.fn();
 const mockCreateUser = vi.fn();
 const mockDeleteUser = vi.fn();
-const mockUpdate = vi.fn((_payload: Record<string, unknown>) => ({
-  eq: vi.fn().mockResolvedValue({ error: null })
-}));
+const mockAuditInsert = vi.fn();
+// update().eq().select().maybeSingle() → devuelve el id del miembro creado.
+function updateReturn() {
+  return {
+    eq: vi.fn(() => ({
+      select: vi.fn(() => ({
+        maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'm-new' }, error: null })
+      }))
+    }))
+  };
+}
+const mockUpdate = vi.fn((_payload: Record<string, unknown>) => updateReturn());
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
@@ -20,12 +29,15 @@ vi.mock('@supabase/supabase-js', () => ({
       getUser: mockGetUser,
       admin: { createUser: mockCreateUser, deleteUser: mockDeleteUser }
     },
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: mockMaybeSingle,
-      update: mockUpdate
-    }))
+    from: vi.fn((table: string) => {
+      if (table === 'audit_log') return { insert: mockAuditInsert };
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: mockMaybeSingle,
+        update: mockUpdate
+      };
+    })
   }))
 }));
 
@@ -52,7 +64,8 @@ describe('reception-create-member · seguridad', () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
     mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-caller' } }, error: null });
     mockCreateUser.mockResolvedValue({ data: { user: { id: 'auth-nuevo' } }, error: null });
-    mockUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+    mockUpdate.mockImplementation(() => updateReturn());
+    mockAuditInsert.mockResolvedValue({ error: null });
   });
 
   it('rechaza método que no sea POST', async () => {
@@ -118,5 +131,20 @@ describe('reception-create-member · seguridad', () => {
     const res = await invocar(evento({ ...BODY_OK, password: 'corta' }));
     expect(res.statusCode).toBe(400);
     expect(mockCreateUser).not.toHaveBeenCalled();
+  });
+
+  it('escribe audit_log create_member (Bloque A)', async () => {
+    mockMaybeSingle.mockResolvedValue({
+      data: { id: 'u-recep', tenant_id: 'tenant-1', rol: 'recepcionista' },
+      error: null
+    });
+    const res = await invocar(evento(BODY_OK));
+    expect(res.statusCode).toBe(200);
+    const audit = mockAuditInsert.mock.calls[0][0] as Record<string, unknown>;
+    expect(audit.accion).toBe('create_member');
+    expect(audit.target_id).toBe('m-new');
+    expect(audit.tenant_id).toBe('tenant-1');
+    expect(audit.actor_usuario_id).toBe('u-recep');
+    expect((audit.despues as Record<string, unknown>).rol).toBe('miembro');
   });
 });

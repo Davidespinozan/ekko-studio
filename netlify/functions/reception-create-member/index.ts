@@ -10,6 +10,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
+import { writeAuditLog } from '../_lib/auditLog';
 
 /**
  * POST /reception-create-member
@@ -108,7 +109,7 @@ export const handler: Handler = async (event) => {
     // 2. El trigger on_auth_user_created ya insertó la fila en `usuarios`.
     //    La actualizamos a los valores reales.
     //    rol='miembro' es FIJO — recepción nunca crea staff.
-    const { error: updateErr } = await supabaseAdmin
+    const { data: nuevoMiembro, error: updateErr } = await supabaseAdmin
       .from('usuarios')
       .update({
         rol: 'miembro',
@@ -118,13 +119,31 @@ export const handler: Handler = async (event) => {
         telefono: body.telefono?.trim() || null,
         tenant_id: tenantId
       })
-      .eq('auth_id', newAuthUser.user.id);
+      .eq('auth_id', newAuthUser.user.id)
+      .select('id')
+      .maybeSingle();
 
-    if (updateErr) {
+    if (updateErr || !nuevoMiembro) {
       // Best-effort: limpiar el auth user creado para no dejar huérfano.
       await supabaseAdmin.auth.admin.deleteUser(newAuthUser.user.id);
-      return serverError(`No se pudo registrar el miembro: ${updateErr.message}`);
+      return serverError(`No se pudo registrar el miembro: ${updateErr?.message ?? 'sin datos'}`);
     }
+
+    // Auditoría inmutable: alta de miembro (Bloque A). No rompe la respuesta si falla.
+    await writeAuditLog(supabaseAdmin, {
+      tenant_id: tenantId,
+      actor_usuario_id: callerProfile.id,
+      actor_rol: callerProfile.rol,
+      accion: 'create_member',
+      target_tipo: 'usuario',
+      target_id: nuevoMiembro.id,
+      despues: {
+        nombre: body.nombre.trim(),
+        email: body.email.trim().toLowerCase(),
+        rol: 'miembro',
+        status: 'pendiente_pago'
+      }
+    });
 
     return ok({
       success: true,

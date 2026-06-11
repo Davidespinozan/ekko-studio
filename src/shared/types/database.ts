@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          accion: string
+          actor_rol: string | null
+          actor_usuario_id: string | null
+          antes: Json | null
+          creada_at: string
+          despues: Json | null
+          id: string
+          metadata: Json | null
+          motivo: string | null
+          target_id: string
+          target_tipo: string
+          tenant_id: string
+        }
+        Insert: {
+          accion: string
+          actor_rol?: string | null
+          actor_usuario_id?: string | null
+          antes?: Json | null
+          creada_at?: string
+          despues?: Json | null
+          id?: string
+          metadata?: Json | null
+          motivo?: string | null
+          target_id: string
+          target_tipo: string
+          tenant_id: string
+        }
+        Update: {
+          accion?: string
+          actor_rol?: string | null
+          actor_usuario_id?: string | null
+          antes?: Json | null
+          creada_at?: string
+          despues?: Json | null
+          id?: string
+          metadata?: Json | null
+          motivo?: string | null
+          target_id?: string
+          target_tipo?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_actor_usuario_id_fkey"
+            columns: ["actor_usuario_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membresias: {
         Row: {
           cancelada_at: string | null

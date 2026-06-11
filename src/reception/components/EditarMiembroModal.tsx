@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useToast } from '@shared/hooks/useToast';
 import { Spinner } from '@shared/components/Spinner';
 import { actualizarMiembro } from '../lib/accionesMiembro';
+import { MotivoField } from './MotivoField';
 
 export interface MiembroEditable {
   id: string;
@@ -31,10 +32,23 @@ const TIER_OPCIONES = [
   { value: 'pro', label: 'Pro' }
 ];
 
+// Motivos predefinidos para los cambios sensibles (Bloque A — gobernanza).
+const MOTIVOS_STATUS = [
+  'Cliente activó/pagó plan',
+  'Cliente solicitó suspensión',
+  'No-show acumulado / cuenta de riesgo',
+  'Cuenta dada de baja por el cliente'
+];
+const MOTIVOS_TIER = [
+  'Cliente subió de plan',
+  'Cliente bajó de plan',
+  'Promoción / cortesía'
+];
+
 /**
  * Edición de la cuenta del miembro desde recepción: contacto + status + plan.
- * El email también cambia la cuenta de acceso (auth). Cambios sensibles
- * (status/plan) quedan registrados en notas_admin por el backend.
+ * El email también cambia la cuenta de acceso (auth). Los cambios sensibles
+ * (status/plan) exigen motivo y quedan registrados en audit_log (Bloque A).
  */
 export function EditarMiembroModal({ miembro, onClose, onGuardado }: Props) {
   const toast = useToast();
@@ -43,12 +57,26 @@ export function EditarMiembroModal({ miembro, onClose, onGuardado }: Props) {
   const [telefono, setTelefono] = useState(miembro.telefono ?? '');
   const [status, setStatus] = useState(miembro.status);
   const [tier, setTier] = useState(miembro.membresia_tier ?? '');
+  const [motivo, setMotivo] = useState('');
   const [saving, setSaving] = useState(false);
 
   const emailCambia = email.trim().toLowerCase() !== miembro.email.toLowerCase();
+  const statusCambia = status !== miembro.status;
+  const tierCambia = (tier === '' ? null : tier) !== (miembro.membresia_tier ?? null);
+  const requiereMotivo = statusCambia || tierCambia;
+
+  // Opciones de motivo según lo que cambió (status, tier o ambos).
+  const motivoOpciones = [
+    ...(statusCambia ? MOTIVOS_STATUS : []),
+    ...(tierCambia ? MOTIVOS_TIER : [])
+  ];
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (requiereMotivo && !motivo.trim()) {
+      toast.error('Indicá el motivo del cambio.');
+      return;
+    }
     setSaving(true);
     try {
       const res = await actualizarMiembro(miembro.id, {
@@ -56,7 +84,8 @@ export function EditarMiembroModal({ miembro, onClose, onGuardado }: Props) {
         telefono,
         email,
         status,
-        membresia_tier: tier === '' ? null : tier
+        membresia_tier: tier === '' ? null : tier,
+        motivo: requiereMotivo ? motivo.trim() : undefined
       });
       if (res.sin_cambios) {
         toast.info('No había cambios para guardar.');
@@ -120,6 +149,14 @@ export function EditarMiembroModal({ miembro, onClose, onGuardado }: Props) {
               </select>
             </div>
           </div>
+
+          {requiereMotivo && (
+            <MotivoField
+              opciones={motivoOpciones}
+              onChange={setMotivo}
+              idPrefix="em-motivo"
+            />
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>

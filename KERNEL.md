@@ -1322,6 +1322,41 @@ Migración `20260522100000_logic_fix.sql` — `CREATE OR REPLACE` de 3 RPCs core
 Verificación: `supabase/tests/logic_fix_checks.sql`. Los 13 MEDIUM (−2 resueltos)
 + 5 LOW del audit quedan como hardening post-launch.
 
+## Bloque A — Gobernanza (rediseño de recepción)
+
+Prerrequisito de los Bloques B–F del rediseño de recepción
+(`RECEPCION_REDESIGN_ANALYSIS.md`). Cierra la deuda de traza que dejó el "hub
+de gestión": recepción ya podía cambiar status/tier/desbloqueo sin razón ni
+auditoría confiable.
+
+- **`audit_log` insert-only** (`20260611100000_audit_log.sql`): tenant, actor
+  (usuario + rol), acción, target, `antes`/`despues` (jsonb), `motivo`,
+  `creada_at`. RLS: INSERT solo `service_role` (sin policy para authenticated →
+  bloqueado); SELECT admin = todo el tenant, recepción = solo `target_tipo='usuario'`;
+  **sin policies de UPDATE/DELETE → inmutable por construcción**. Lo escriben las
+  Netlify Functions con `service_role` vía `_lib/auditLog.ts` (`writeAuditLog`).
+  Un fallo de auditoría NO rompe la operación principal (loguea y sigue).
+- **Razón obligatoria** en status / tier / desbloqueo: el backend devuelve 400 si
+  falta `motivo` (≥3 chars). La UI (`MotivoField`) ofrece motivos predefinidos +
+  "Otro" (texto libre): en `EditarMiembroModal` (status/tier) y `DesbloquearModal`.
+- **`notas_admin` separada del log** (cierra B1+B2): `reception-update-member` y
+  `reception-reset-password` dejaron de anexar líneas a `notas_admin` (campo
+  borrable por admin). La auditoría vive ahora en `audit_log`. `notas_admin`
+  vuelve a ser solo notas humanas.
+- **B4 — desbloqueo NO resetea `no_shows_count`**: antes ponía el contador en 0 en
+  silencio. Ahora solo limpia `bloqueado_hasta`; el historial de inasistencias se
+  conserva. El "perdón de historial" será acción aparte (Bloque D).
+- **Acciones trazadas (v1):** `status_change`, `tier_change`, `unblock`,
+  `contact_change`, `avatar_change`, `password_reset`, `create_member`. Las de
+  reserva quedan fuera (ya tienen `cancelada_por` / `check_in_by`).
+- **Historial de cambios** read-only en el perfil de recepción
+  (`useAuditLogDeUsuario` + sección "HISTORIAL DE CAMBIOS").
+- **No incluido (post-launch):** UI de admin del audit log global.
+
+Verificación: `supabase/tests/audit_log_checks.sql` (estructural: RLS on, 0
+policies de escritura, inmutabilidad). Tests de las funciones + modales + hook
+en la suite (vitest).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

@@ -12,7 +12,8 @@ import { ToastProvider } from '@shared/providers/ToastProvider';
 
 const hoisted = vi.hoisted(() => ({
   miembro: {} as Record<string, unknown>,
-  reservas: [] as Record<string, unknown>[]
+  reservas: [] as Record<string, unknown>[],
+  audit: [] as Record<string, unknown>[]
 }));
 
 const RESERVA_PROXIMA = {
@@ -33,6 +34,19 @@ vi.mock('@shared/lib/supabase', () => ({
           select: () => ({
             eq: () => ({
               maybeSingle: () => Promise.resolve({ data: hoisted.miembro, error: null })
+            })
+          })
+        };
+      }
+      if (table === 'audit_log') {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                order: () => ({
+                  limit: () => Promise.resolve({ data: hoisted.audit, error: null })
+                })
+              })
             })
           })
         };
@@ -79,6 +93,7 @@ describe('PerfilMiembroRecepcion · gestión front-desk', () => {
       created_at: '2026-01-10T12:00:00Z'
     };
     hoisted.reservas = [];
+    hoisted.audit = [];
   });
 
   it('muestra los datos del miembro', async () => {

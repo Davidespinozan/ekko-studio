@@ -2,12 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, UserX, Camera, Pencil, KeyRound, Unlock, CalendarPlus } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
-import { useToast } from '@shared/hooks/useToast';
 import { EmptyState } from '@shared/components/EmptyState';
 import { TierBadge } from '@shared/components/TierBadge';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { statusMiembro } from '../lib/miembroStatus';
-import { actualizarMiembro } from '../lib/accionesMiembro';
 import { CrearReservaModal, type ReservaOriginal } from '../components/CrearReservaModal';
 import {
   CancelarReservaRecepcionModal,
@@ -16,6 +14,8 @@ import {
 import { EditarMiembroModal } from '../components/EditarMiembroModal';
 import { FotoMiembroModal } from '../components/FotoMiembroModal';
 import { ResetPasswordModal } from '../components/ResetPasswordModal';
+import { DesbloquearModal } from '../components/DesbloquearModal';
+import { useAuditLogDeUsuario, type AuditEntryUsuario } from '../hooks/useAuditLogDeUsuario';
 
 /**
  * Perfil de miembro READ-ONLY para recepción (Sprint RP-2).
@@ -82,7 +82,6 @@ function fechaCorta(iso: string): string {
 
 export default function PerfilMiembroRecepcion() {
   const { id } = useParams<{ id: string }>();
-  const toast = useToast();
   const [miembro, setMiembro] = useState<MiembroPerfil | null>(null);
   const [reservas, setReservas] = useState<ReservaPerfil[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,7 +92,13 @@ export default function PerfilMiembroRecepcion() {
   const [editarOpen, setEditarOpen] = useState(false);
   const [fotoOpen, setFotoOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
-  const [desbloqueando, setDesbloqueando] = useState(false);
+  const [desbloquearOpen, setDesbloquearOpen] = useState(false);
+  const {
+    entries: auditEntries,
+    isLoading: auditLoading,
+    error: auditError,
+    recargar: recargarAudit
+  } = useAuditLogDeUsuario(id);
 
   const recargarReservas = useCallback(async () => {
     if (!id) return;
@@ -141,19 +146,11 @@ export default function PerfilMiembroRecepcion() {
     };
   }, [id, recargarMiembro, recargarReservas]);
 
-  async function desbloquear() {
-    if (!miembro) return;
-    setDesbloqueando(true);
-    try {
-      await actualizarMiembro(miembro.id, { unblock: true });
-      toast.success('Miembro desbloqueado.');
-      await recargarMiembro();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo desbloquear.');
-    } finally {
-      setDesbloqueando(false);
-    }
-  }
+  // Tras una acción de cuenta: recargar datos del miembro + su historial de cambios.
+  const recargarPerfil = useCallback(async () => {
+    await recargarMiembro();
+    await recargarAudit();
+  }, [recargarMiembro, recargarAudit]);
 
   if (isLoading) {
     return (
@@ -278,12 +275,11 @@ export default function PerfilMiembroRecepcion() {
               </p>
               <button
                 type="button"
-                onClick={desbloquear}
-                disabled={desbloqueando}
+                onClick={() => setDesbloquearOpen(true)}
                 className="ek-cta ek-cta--secondary"
                 style={{ minHeight: '40px', padding: '8px 14px', fontSize: '13px' }}
               >
-                <Unlock size={15} aria-hidden="true" /> {desbloqueando ? 'Desbloqueando…' : 'Desbloquear ahora'}
+                <Unlock size={15} aria-hidden="true" /> Desbloquear ahora
               </button>
             </>
           )}
@@ -399,6 +395,11 @@ export default function PerfilMiembroRecepcion() {
         )}
       </Seccion>
 
+      <section style={{ marginBottom: '20px' }}>
+        <p className="ek-eyebrow" style={{ marginBottom: '10px' }}>HISTORIAL DE CAMBIOS</p>
+        <HistorialCambios entries={auditEntries} isLoading={auditLoading} error={auditError} />
+      </section>
+
       {crearOpen && (
         <CrearReservaModal
           miembro={{
@@ -444,7 +445,7 @@ export default function PerfilMiembroRecepcion() {
             membresia_tier: miembro.membresia_tier
           }}
           onClose={() => setEditarOpen(false)}
-          onGuardado={recargarMiembro}
+          onGuardado={recargarPerfil}
         />
       )}
 
@@ -453,7 +454,7 @@ export default function PerfilMiembroRecepcion() {
           miembroId={miembro.id}
           miembroNombre={capitalizar(miembro.nombre) || miembro.email}
           onClose={() => setFotoOpen(false)}
-          onActualizada={recargarMiembro}
+          onActualizada={recargarPerfil}
         />
       )}
 
@@ -461,7 +462,19 @@ export default function PerfilMiembroRecepcion() {
         <ResetPasswordModal
           miembroId={miembro.id}
           miembroNombre={capitalizar(miembro.nombre) || miembro.email}
-          onClose={() => setResetOpen(false)}
+          onClose={() => {
+            setResetOpen(false);
+            void recargarAudit();
+          }}
+        />
+      )}
+
+      {desbloquearOpen && (
+        <DesbloquearModal
+          miembroId={miembro.id}
+          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
+          onClose={() => setDesbloquearOpen(false)}
+          onDesbloqueado={recargarPerfil}
         />
       )}
     </div>
@@ -484,6 +497,94 @@ function Dato({ label, valor }: { label: string; valor: React.ReactNode }) {
       <span style={{ fontSize: '13px', color: 'var(--ek-ink)', textAlign: 'right' }}>
         {valor}
       </span>
+    </div>
+  );
+}
+
+function actorLabel(rol: string | null): string {
+  if (rol === 'admin') return 'Admin';
+  if (rol === 'recepcionista') return 'Recepción';
+  return rol ?? '—';
+}
+
+function valorTexto(v: unknown): string {
+  if (v == null || v === '') return '—';
+  return String(v);
+}
+
+function planLabel(v: unknown): string {
+  return v == null ? 'sin plan' : String(v);
+}
+
+function describirCambio(e: AuditEntryUsuario): string {
+  switch (e.accion) {
+    case 'status_change':
+      return `Cambió estado: ${valorTexto(e.antes?.status)} → ${valorTexto(e.despues?.status)}`;
+    case 'tier_change':
+      return `Cambió plan: ${planLabel(e.antes?.membresia_tier)} → ${planLabel(e.despues?.membresia_tier)}`;
+    case 'unblock':
+      return 'Levantó el bloqueo por inasistencia';
+    case 'contact_change':
+      return 'Editó datos de contacto';
+    case 'avatar_change':
+      return 'Actualizó la foto';
+    case 'password_reset':
+      return 'Reseteó el acceso';
+    case 'create_member':
+      return 'Registró al miembro';
+    default:
+      return e.accion;
+  }
+}
+
+function HistorialCambios({
+  entries,
+  isLoading,
+  error
+}: {
+  entries: AuditEntryUsuario[];
+  isLoading: boolean;
+  error: boolean;
+}) {
+  if (isLoading) {
+    return <div className="ek-skeleton" style={{ height: '48px', borderRadius: 'var(--ek-r-sm)' }} />;
+  }
+  if (error) {
+    return <p className="ek-body-faint">No se pudo cargar el historial.</p>;
+  }
+  if (entries.length === 0) {
+    return <p className="ek-body-faint">Sin cambios registrados.</p>;
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      {entries.map((e) => (
+        <div
+          key={e.id}
+          style={{
+            padding: '10px 14px',
+            background: 'var(--ek-bg-soft)',
+            border: '0.5px solid var(--ek-line)',
+            borderRadius: 'var(--ek-r-sm)'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
+            <span style={{ fontSize: '13px', color: 'var(--ek-ink)', fontWeight: 600 }}>
+              {describirCambio(e)}
+            </span>
+            <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              {fechaHora(e.creada_at)}
+            </span>
+          </div>
+          <div style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '2px' }}>
+            {actorLabel(e.actor_rol)}
+          </div>
+          {e.motivo && (
+            <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '6px 0 0', fontStyle: 'italic' }}>
+              "{e.motivo}"
+            </p>
+          )}
+        </div>
+      ))}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { backendPost } from '@shared/lib/backend';
 /**
  * Acciones de front-desk sobre la cuenta de un miembro (Recepción Plus).
  * Todas pasan por Netlify functions con service_role que validan rol
- * recepcionista/admin + tenant y registran el cambio en notas_admin.
+ * recepcionista/admin + tenant y registran el cambio en audit_log (Bloque A).
  */
 
 export interface MiembroPatch {
@@ -14,6 +14,8 @@ export interface MiembroPatch {
   membresia_tier?: string | null;
   unblock?: boolean;
   avatar?: { base64: string; contentType: string };
+  /** Obligatorio (lo valida el backend) cuando cambia status/tier/unblock. */
+  motivo?: string;
 }
 
 export interface UpdateResult {
