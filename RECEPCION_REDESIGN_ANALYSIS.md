@@ -287,11 +287,15 @@ Agrupado en bloques lógicos. Dimensión: 🟢 chico · 🟡 mediano · 🔴 gra
   (scanner QR dedicado, sin el panel embebido). `Scanner.tsx` eliminado.
 - Sin migración SQL; sin regresiones de Bloque A.
 
-### Bloque D — No-shows y check-in 🟡
+### Bloque D — No-shows y check-in 🟡 — ✅ HECHO
 **Marcar no-show manual, corregir check-in, levantar penalización con razón, ver penalizados.**
-- Depende de: A (audit + razón).
-- Riesgo: medio (afecta penalizaciones).
-- Prioridad: media.
+- Entregado: `reception-marcar-no-show` (replica el efecto del cron sobre una reserva
+  puntual) y `reception-corregir-checkin` (deshace check-in del mismo día), ambas con
+  motivo obligatorio + `audit_log` (targeteado al usuario → visible en su historial).
+- UI: "Marcar no-show" en Faltantes (Hoy), "Corregir check-in" en el modal de check-in
+  hecho, y toggle **Penalizados** en Miembros. Levantar penalización ya estaba en Bloque A.
+- Sin migración SQL. El cron sigue de noche (complementario). Detalle en `KERNEL.md` → "Bloque D".
+- Deuda chica anotada: el cron `marcar_no_shows` no escribe `audit_log` (anterior a A).
 
 ### Bloque E — Comunicación y notas 🟢
 **Notas operativas (separadas de auditoría) + notificación manual.**

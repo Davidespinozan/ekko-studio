@@ -1393,6 +1393,39 @@ Sin regresiones de Bloque A: ningún flujo de B/C escribe en `notas_admin`; el
 check-in manual sigue trazando con `check_in_by`/`check_in_method` (no requiere
 `audit_log`). Tests: routing de los 4 tabs, toggle de Agenda, detalle read-only.
 
+## Bloque D — No-shows manual + corregir check-in
+
+Sigue a B+C en el rediseño de recepción. Cierra las capacidades #3/#4 del
+análisis. **Sin migración SQL** — Netlify Functions con `service_role` sobre
+tablas existentes, mismo patrón de gobernanza que Bloque A.
+
+- **`reception-marcar-no-show`** (Netlify Function): marca una reserva puntual
+  como `no_show` replicando el efecto del cron `marcar_no_shows`
+  (`no_shows_count + 1`, `bloqueado_hasta = GREATEST(actual, now+7d)`). Motivo
+  obligatorio; `audit_log` con `antes`/`despues`. Elegibilidad: `confirmada`,
+  sin check-in, **`slot_fin < now`** (no exige el +30min del cron — recepción
+  actúa con conocimiento directo; idempotente: el cron salta lo no-confirmada).
+- **`reception-corregir-checkin`** (Netlify Function): deshace un check-in
+  (`status → confirmada`, limpia `check_in_at`/`check_in_by`/`check_in_method`).
+  Limitado al **mismo día** en `America/Mazatlan`; más viejo → escalar a admin.
+  Motivo obligatorio; `audit_log`.
+- **Audit targeteado al `usuario`** (no a `reserva`): la RLS de `audit_log` deja
+  a recepción leer solo `target_tipo='usuario'`, así estas acciones aparecen en
+  el "Historial de cambios" del perfil. El `reserva_id`/`folio` van en
+  `metadata`. (Desviación deliberada del plan, que pedía `target_tipo='reserva'`
+  — habría sido invisible para recepción sin tocar la RLS.)
+- **UI:** en "Hoy", la sección **Faltantes** gana "Marcar no-show" por fila; el
+  modal de check-in ya hecho gana "Corregir check-in" (secundario). Modales
+  `MarcarNoShowModal` / `CorregirCheckinModal` con `MotivoField` (Bloque A).
+- **Penalizados:** toggle **Buscar / Penalizados** en `BuscarMiembro` (Opción A,
+  sin tab nuevo) → lista de `bloqueado_hasta > now`; tap → perfil, donde está el
+  desbloqueo (Bloque A). NO se creó endpoint nuevo para levantar.
+- **El cron `marcar_no_shows` sigue de noche**; el manual es complementario.
+- **Deuda chica reportada:** el cron `marcar_no_shows` NO escribe `audit_log`
+  (es anterior a Bloque A). Fuera de alcance de D.
+- **No incluido:** notas operativas + notificación manual (E), recurso fuera de
+  servicio (F).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

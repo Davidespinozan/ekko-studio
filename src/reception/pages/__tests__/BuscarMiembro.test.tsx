@@ -36,8 +36,8 @@ function renderBuscar() {
 
 beforeEach(() => {
   hoisted.miembros = [
-    { id: 'm-1', nombre: 'José Pérez', email: 'jose@ekko.mx', status: 'activo', membresia_tier: 'pro' },
-    { id: 'm-2', nombre: 'Ana López', email: 'ana@ekko.mx', status: 'activo', membresia_tier: 'basica' }
+    { id: 'm-1', nombre: 'José Pérez', email: 'jose@ekko.mx', status: 'activo', membresia_tier: 'pro', bloqueado_hasta: '2999-01-01T00:00:00Z' },
+    { id: 'm-2', nombre: 'Ana López', email: 'ana@ekko.mx', status: 'activo', membresia_tier: 'basica', bloqueado_hasta: null }
   ];
 });
 
@@ -59,5 +59,12 @@ describe('BuscarMiembro · acentos/mayúsculas', () => {
     renderBuscar();
     fireEvent.change(screen.getByLabelText('Buscar miembro'), { target: { value: 'zzz' } });
     expect(await screen.findByText('Sin coincidencias')).toBeInTheDocument();
+  });
+
+  it('el toggle "Penalizados" lista solo a los bloqueados activos (Bloque D)', async () => {
+    renderBuscar();
+    fireEvent.click(await screen.findByRole('button', { name: /penalizados/i }));
+    expect(await screen.findByText('José Pérez')).toBeInTheDocument();
+    expect(screen.queryByText('Ana López')).not.toBeInTheDocument();
   });
 });

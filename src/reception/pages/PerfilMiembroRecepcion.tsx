@@ -524,6 +524,10 @@ function describirCambio(e: AuditEntryUsuario): string {
       return `Cambió plan: ${planLabel(e.antes?.membresia_tier)} → ${planLabel(e.despues?.membresia_tier)}`;
     case 'unblock':
       return 'Levantó el bloqueo por inasistencia';
+    case 'no_show_manual':
+      return 'Marcó inasistencia (no-show)';
+    case 'checkin_correction':
+      return 'Corrigió un check-in';
     case 'contact_change':
       return 'Editó datos de contacto';
     case 'avatar_change':

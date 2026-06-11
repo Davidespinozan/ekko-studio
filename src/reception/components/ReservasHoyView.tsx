@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, CheckCircle2, Search, CalendarDays } from 'lucide-react';
+import { X, CheckCircle2, Search, CalendarDays, UserX, RotateCcw } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { EmptyState } from '@shared/components/EmptyState';
 import { useReservasHoy, checkInManual, type ReservaConJoin } from '../hooks/useReservasHoy';
 import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
+import { MarcarNoShowModal, type ReservaInfo } from './MarcarNoShowModal';
+import { CorregirCheckinModal } from './CorregirCheckinModal';
 
 interface Props {
   onManualCheckInSuccess?: (data: any) => void;
@@ -110,11 +112,13 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
     return d;
   });
   const [selected, setSelected] = useState<ReservaConJoin | null>(null);
+  const [noShowTarget, setNoShowTarget] = useState<ReservaConJoin | null>(null);
+  const [corregirTarget, setCorregirTarget] = useState<ReservaConJoin | null>(null);
   // Polling pausa si hay un modal de check-in abierto (manual local o
   // CheckInDetail a nivel Scanner) — evita reordenar la lista debajo.
   const { reservas, isLoading, refetch } = useReservasHoy(
     fechaSeleccionada,
-    !selected && !pausarPolling
+    !selected && !noShowTarget && !corregirTarget && !pausarPolling
   );
 
   // Búsqueda + debounce
@@ -530,9 +534,19 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
                 Reservas cuyo horario ya pasó sin check-in. El sistema las marca como
                 inasistencia automáticamente.
               </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {faltantes.map((r) => (
-                  <ReservaCard key={r.id} reserva={r} onSelect={setSelected} />
+                  <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <ReservaCard reserva={r} onSelect={setSelected} />
+                    <button
+                      type="button"
+                      onClick={() => setNoShowTarget(r)}
+                      className="ek-cta ek-cta--secondary"
+                      style={{ minHeight: '40px', fontSize: '13px', color: 'var(--ek-danger)' }}
+                    >
+                      <UserX size={14} aria-hidden="true" /> Marcar no-show
+                    </button>
+                  </div>
                 ))}
               </div>
             </section>
@@ -549,10 +563,40 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
             setSelected(null);
             onManualCheckInSuccess?.(data);
           }}
+          onCorregir={() => {
+            setCorregirTarget(selected);
+            setSelected(null);
+          }}
+        />
+      )}
+
+      {noShowTarget && (
+        <MarcarNoShowModal
+          reserva={toReservaInfo(noShowTarget)}
+          onClose={() => setNoShowTarget(null)}
+          onDone={() => void refetch()}
+        />
+      )}
+
+      {corregirTarget && (
+        <CorregirCheckinModal
+          reserva={toReservaInfo(corregirTarget)}
+          onClose={() => setCorregirTarget(null)}
+          onDone={() => void refetch()}
         />
       )}
     </div>
   );
+}
+
+function toReservaInfo(r: ReservaConJoin): ReservaInfo {
+  return {
+    id: r.id,
+    folio: r.folio ?? '—',
+    slot_inicio: r.slot_inicio,
+    recurso_nombre: r.recurso?.nombre ?? 'Estudio',
+    miembro_nombre: capitalizarNombre(r.usuario?.nombre) || r.usuario?.email || 'Miembro'
+  };
 }
 
 function ReservaCard({
@@ -649,11 +693,13 @@ function ReservaCard({
 function ManualCheckInModal({
   reserva,
   onClose,
-  onDone
+  onDone,
+  onCorregir
 }: {
   reserva: ReservaConJoin;
   onClose: () => void;
   onDone: (data: any) => Promise<void>;
+  onCorregir?: () => void;
 }) {
   const [motivo, setMotivo] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -725,9 +771,21 @@ function ManualCheckInModal({
                 return m ? ` (${m})` : null;
               })()}
             </p>
-            <button onClick={onClose} className="ek-cta ek-cta--full" style={{ marginTop: '1rem' }}>
-              Cerrar
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '1rem' }}>
+              <button onClick={onClose} className="ek-cta ek-cta--full">
+                Cerrar
+              </button>
+              {onCorregir && (
+                <button
+                  type="button"
+                  onClick={onCorregir}
+                  className="ek-cta ek-cta--secondary ek-cta--full"
+                  style={{ fontSize: '13px', color: 'var(--ek-ink-muted)' }}
+                >
+                  <RotateCcw size={14} aria-hidden="true" /> Corregir check-in
+                </button>
+              )}
+            </div>
           </>
         ) : (
           <>
