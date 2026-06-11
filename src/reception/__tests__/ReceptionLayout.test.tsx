@@ -17,6 +17,7 @@ vi.mock('@shared/hooks/useAuth', () => ({
   })
 }));
 vi.mock('@shared/components/DemoBanner', () => ({ DemoBanner: () => null }));
+vi.mock('@shared/components/BrandLogo', () => ({ BrandLogo: () => null }));
 
 // Stubs de las páginas lazy — el test solo cubre routing + nav.
 vi.mock('../pages/Hoy', () => ({ default: () => <div>HOY_STUB</div> }));

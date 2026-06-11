@@ -4,6 +4,7 @@ import { useAuth } from '@shared/hooks/useAuth';
 import { validarStatusCuenta } from '@shared/lib/validarStatusCuenta';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { DemoBanner } from '@shared/components/DemoBanner';
+import { BrandLogo } from '@shared/components/BrandLogo';
 import NotificacionesBanner from './components/NotificacionesBanner';
 import { BottomNav } from './components/BottomNav';
 
@@ -49,20 +50,12 @@ export default function MemberLayout() {
           <Link
             to="/app"
             style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: '10px',
+              display: 'inline-flex',
+              alignItems: 'center',
               textDecoration: 'none'
             }}
           >
-            <span style={{
-              fontFamily: 'var(--ek-font-display)',
-              fontSize: '22px',
-              fontWeight: 700,
-              letterSpacing: '-0.04em',
-              color: 'var(--ek-mustard)'
-            }}>EKKO</span>
-            <span className="ek-eyebrow" style={{ paddingTop: '4px' }}>STUDIO</span>
+            <BrandLogo height={40} />
           </Link>
         </div>
       </header>

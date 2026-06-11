@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { DemoBanner } from '@shared/components/DemoBanner';
+import { BrandLogo } from '@shared/components/BrandLogo';
 import { ReceptionBottomNav } from './components/ReceptionBottomNav';
 
 const Hoy = lazy(() => import('./pages/Hoy'));
@@ -47,22 +48,11 @@ export default function ReceptionLayout() {
           <div>
             <p
               className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar"
-              style={{ marginBottom: '4px', fontSize: '10px' }}
+              style={{ marginBottom: '6px', fontSize: '10px' }}
             >
               RECEPCIÓN
             </p>
-            <p
-              style={{
-                fontFamily: 'var(--ek-font-display)',
-                fontSize: '18px',
-                fontWeight: 700,
-                letterSpacing: '-0.03em',
-                margin: 0,
-                color: 'var(--ek-mustard)'
-              }}
-            >
-              EKKO Studio
-            </p>
+            <BrandLogo height={30} maxWidth={130} />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
