@@ -4,6 +4,7 @@ import { lazy, Suspense } from 'react';
 import { X, Menu } from 'lucide-react';
 import { useAdminGuard } from './hooks/useAdminGuard';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
+import { BrandLogo } from '@shared/components/BrandLogo';
 import { Sidebar } from './components/Sidebar';
 
 const Dashboard = lazy(() => import('./pages/AdminDashboard'));
@@ -64,20 +65,7 @@ export default function AdminLayout() {
           >
             <Menu size={20} aria-hidden="true" />
           </button>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-            <span
-              style={{
-                fontFamily: 'var(--ek-font-display)',
-                fontSize: '17px',
-                fontWeight: 700,
-                letterSpacing: '-0.03em',
-                color: 'var(--ek-mustard)'
-              }}
-            >
-              EKKO
-            </span>
-            <span className="ek-eyebrow" style={{ fontSize: '9px' }}>ADMIN</span>
-          </div>
+          <BrandLogo height={88} maxWidth={220} />
           <div style={{ width: '44px' }} />
         </header>
 

@@ -55,7 +55,7 @@ export default function MemberLayout() {
               textDecoration: 'none'
             }}
           >
-            <BrandLogo height={110} maxWidth={280} />
+            <BrandLogo height={88} maxWidth={280} />
           </Link>
         </div>
       </header>

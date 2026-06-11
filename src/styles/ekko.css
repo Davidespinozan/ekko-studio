@@ -1597,7 +1597,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     position: sticky;
     top: 0;
     z-index: 10;
-    height: 56px;
+    min-height: 56px;
   }
 
   @media (min-width: 1024px) {

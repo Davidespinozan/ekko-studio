@@ -262,7 +262,7 @@ export function Sidebar({ onNavigate }: Props = {}) {
           <img
             src={logoUrl}
             alt={tenant.nombre}
-            style={{ maxHeight: '40px', maxWidth: '160px', objectFit: 'contain', display: 'block' }}
+            style={{ maxHeight: '88px', maxWidth: '200px', objectFit: 'contain', display: 'block' }}
           />
         ) : (
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
