@@ -1,10 +1,16 @@
 import { useCallback, useState } from 'react';
-import { Camera } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Camera, ScanLine } from 'lucide-react';
 import { backendPost } from '@shared/lib/backend';
-import { ReservasHoyView } from '../components/ReservasHoyView';
 import { CheckInDetail } from '../components/CheckInDetail';
 import { CameraModal } from '../components/CameraModal';
 import { useScannerHID } from '../hooks/useScannerHID';
+
+/**
+ * "Check-in" — scanner QR dedicado (Bloque B/C). Es lo que antes vivía en
+ * Scanner.tsx, SIN el panel del día embebido (eso se movió a "Hoy"). Pantalla
+ * limpia, foco en el escaneo. El check-in manual vive en "Hoy".
+ */
 
 interface VerifyResponse {
   success: boolean;
@@ -23,10 +29,9 @@ type DetailState =
   | { kind: 'success'; data: VerifyResponse['data'] }
   | { kind: 'error'; message: string };
 
-export default function Scanner() {
+export default function Checkin() {
   const [detail, setDetail] = useState<DetailState>({ kind: 'none' });
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [refreshTick, setRefreshTick] = useState(0);
 
   const handleQRPayload = useCallback(async (qrPayload: string) => {
     try {
@@ -36,7 +41,6 @@ export default function Scanner() {
       } else {
         setDetail({ kind: 'error', message: res.message ?? 'QR no válido' });
       }
-      setRefreshTick((t) => t + 1);
     } catch (e) {
       setDetail({ kind: 'error', message: e instanceof Error ? e.message : 'Error verificando QR' });
     }
@@ -46,57 +50,68 @@ export default function Scanner() {
   useScannerHID(handleQRPayload, detail.kind === 'none' && !cameraOpen);
 
   const closeDetail = () => setDetail({ kind: 'none' });
-  const handleManualCheckIn = (data: VerifyResponse['data']) => {
-    setDetail({ kind: 'success', data });
-    setRefreshTick((t) => t + 1);
-  };
 
   return (
     <>
-      <div className="rec-main">
-        <ReservasHoyView
-          key={refreshTick}
-          onManualCheckInSuccess={handleManualCheckIn}
-          pausarPolling={detail.kind !== 'none' || cameraOpen}
-        />
-      </div>
-
-      <button
-        onClick={() => setCameraOpen(true)}
-        aria-label="Abrir cámara para escanear QR"
+      <div
+        className="rec-main"
         style={{
-          position: 'fixed',
-          bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
-          right: 'calc(24px + env(safe-area-inset-right, 0px))',
-          width: '64px',
-          height: '64px',
-          borderRadius: '50%',
-          background: 'var(--ek-mustard)',
-          color: 'var(--ek-bg)',
-          border: 'none',
-          boxShadow: 'var(--ek-shadow-cta)',
-          cursor: 'pointer',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 50,
-          transition: 'transform 0.2s ease, box-shadow 0.2s ease'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = 'scale(1.05)';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = 'scale(1)';
-        }}
-        onMouseDown={(e) => {
-          e.currentTarget.style.transform = 'scale(0.96)';
-        }}
-        onMouseUp={(e) => {
-          e.currentTarget.style.transform = 'scale(1.05)';
+          textAlign: 'center',
+          minHeight: '60vh',
+          gap: '20px'
         }}
       >
-        <Camera size={28} aria-hidden="true" />
-      </button>
+        <div
+          style={{
+            width: '88px',
+            height: '88px',
+            borderRadius: '50%',
+            background: 'var(--ek-mustard-soft)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          <ScanLine size={40} style={{ color: 'var(--ek-mustard)' }} aria-hidden="true" />
+        </div>
+
+        <div>
+          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '6px' }}>
+            CHECK-IN
+          </p>
+          <h1
+            style={{
+              fontFamily: 'var(--ek-font-display)',
+              fontSize: '22px',
+              fontWeight: 700,
+              letterSpacing: '-0.03em',
+              margin: 0,
+              color: 'var(--ek-ink)'
+            }}
+          >
+            Escaneá el QR del cliente
+          </h1>
+          <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: '8px auto 0', maxWidth: '320px' }}>
+            Usá el lector o abrí la cámara. El check-in se confirma al leer un QR válido.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setCameraOpen(true)}
+          className="ek-cta ek-cta--gold"
+          style={{ minHeight: '52px', padding: '0 28px' }}
+        >
+          <Camera size={18} aria-hidden="true" /> Abrir cámara
+        </button>
+
+        <Link to="/recepcion" className="adm-link" style={{ fontSize: '13px' }}>
+          No tengo el QR — buscar en "Hoy"
+        </Link>
+      </div>
 
       {cameraOpen && (
         <CameraModal

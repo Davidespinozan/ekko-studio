@@ -23,7 +23,8 @@ interface ReservaDetalle {
 interface Props {
   reservaId: string | null;
   onClose: () => void;
-  onCancelar: (info: {
+  /** Omitir → modo read-only (recepción): no se muestra "Cancelar reserva". */
+  onCancelar?: (info: {
     id: string;
     slot_inicio: string;
     recurso_nombre: string;
@@ -149,7 +150,7 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
 
   const esFutura = data ? new Date(data.slot_inicio).getTime() > Date.now() : false;
   const esConfirmada = data ? data.status === 'confirmada' : false;
-  const puedeCancelar = esFutura && esConfirmada;
+  const puedeCancelar = esFutura && esConfirmada && !!onCancelar;
   const yaCancelada = data?.status === 'cancelada' || data?.status === 'cancelada_admin';
 
   return (
@@ -271,7 +272,7 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
                 <button
                   type="button"
                   onClick={() =>
-                    onCancelar({
+                    onCancelar?.({
                       id: data.id,
                       slot_inicio: data.slot_inicio,
                       recurso_nombre: data.recurso_nombre,
@@ -291,12 +292,12 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
                 </button>
               )}
             </div>
-            {esFutura && !esConfirmada && !yaCancelada && (
+            {onCancelar && esFutura && !esConfirmada && !yaCancelada && (
               <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '10px', textAlign: 'center' }}>
                 Solo se pueden cancelar reservas confirmadas.
               </p>
             )}
-            {!esFutura && !yaCancelada && (
+            {onCancelar && !esFutura && !yaCancelada && (
               <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '10px', textAlign: 'center' }}>
                 Esta reserva ya pasó. No se puede cancelar.
               </p>

@@ -1,12 +1,15 @@
-import { Routes, Route, Navigate, NavLink, useLocation } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { lazy, Suspense } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { DemoBanner } from '@shared/components/DemoBanner';
+import { ReceptionBottomNav } from './components/ReceptionBottomNav';
 
-const Scanner = lazy(() => import('./pages/Scanner'));
+const Hoy = lazy(() => import('./pages/Hoy'));
+const Agenda = lazy(() => import('./pages/Agenda'));
 const BuscarMiembro = lazy(() => import('./pages/BuscarMiembro'));
 const PerfilMiembroRecepcion = lazy(() => import('./pages/PerfilMiembroRecepcion'));
+const Checkin = lazy(() => import('./pages/Checkin'));
 
 function capitalizar(s: string | null | undefined): string {
   if (!s) return '';
@@ -75,29 +78,17 @@ export default function ReceptionLayout() {
         </div>
       </header>
 
-      <nav className="rec-tabs" aria-label="Navegación de recepción">
-        <NavLink
-          to="/recepcion"
-          end
-          className={({ isActive }) => `rec-tab ${isActive ? 'rec-tab--active' : ''}`}
-        >
-          Check-in
-        </NavLink>
-        <NavLink
-          to="/recepcion/miembros"
-          className={({ isActive }) => `rec-tab ${isActive ? 'rec-tab--active' : ''}`}
-        >
-          Miembros
-        </NavLink>
-      </nav>
-
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
-          <Route path="/" element={<Scanner />} />
+          <Route path="/" element={<Hoy />} />
+          <Route path="/agenda" element={<Agenda />} />
           <Route path="/miembros" element={<BuscarMiembro />} />
           <Route path="/miembros/:id" element={<PerfilMiembroRecepcion />} />
+          <Route path="/checkin" element={<Checkin />} />
         </Routes>
       </Suspense>
+
+      <ReceptionBottomNav />
     </div>
   );
 }

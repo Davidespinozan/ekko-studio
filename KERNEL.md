@@ -1357,6 +1357,42 @@ Verificación: `supabase/tests/audit_log_checks.sql` (estructural: RLS on, 0
 policies de escritura, inmutabilidad). Tests de las funciones + modales + hook
 en la suite (vitest).
 
+## Bloque B + C — Agenda de recepción + Panel Hoy + nueva IA
+
+Sigue al Bloque A en el rediseño de recepción para operar sin admin presente.
+Solo UI + reuso — **sin migración SQL**.
+
+- **Bottom-nav de 4 ítems** (`ReceptionBottomNav`, reusa `ek-bottom-nav`):
+  **Hoy · Agenda · Miembros · Check-in**. Reemplaza los 2 tabs superiores.
+  Rutas: `/recepcion` (Hoy), `/recepcion/agenda`, `/recepcion/miembros[/:id]`,
+  `/recepcion/checkin`. El deep-link al perfil del miembro no cambió.
+- **Hoy** (`pages/Hoy.tsx` → `ReservasHoyView`): panel del día con **ocupación**
+  (sesiones activas + check-ins), llegadas, resto del día, **faltantes**
+  (confirmadas cuyo horario ya pasó sin check-in — informativo; el cron las
+  resuelve, recepción NO las marca acá → Bloque D) y check-in manual. Estados
+  reales (skeleton/empty/filtros).
+- **Agenda** (`pages/Agenda.tsx`): VER reservas read-only. Vista **Semana**
+  (compartida) + **Lista** filtrable; default Semana en desktop / Lista en
+  mobile (persistido). Tap → detalle read-only. NO se cancela/reprograma desde
+  Agenda en v1: eso vive en el perfil del miembro (con contexto).
+- **Check-in** (`pages/Checkin.tsx`): scanner QR dedicado (lo que era
+  `Scanner.tsx`, sin el panel del día embebido). Lector HID + cámara +
+  `qr-verify` + `CheckInDetail`. Scanner.tsx eliminado.
+- **Reuso (estrategia híbrida):** `useReservasRango` movido a
+  `@shared/hooks/` (admin lo re-exporta). `VistaSemana` extraído de
+  `Calendario.tsx` a `@shared/components/calendario/` con prop
+  `vistaCompactaCta` (Día en admin, Lista en recepción). `ReservasVistaLista` y
+  `DetalleReservaModal` ganaron `onCancelar` **opcional** → sin ella = modo
+  read-only (recepción los importa de admin sin duplicar). VistaSemana perdió
+  su dependencia de `useRecursosAdmin` (la leyenda ya no muestra "Total
+  recursos").
+- **No incluido en B+C:** marcar no-show / corregir check-in (Bloque D), notas
+  operativas + notificación manual (E), recurso fuera de servicio (F).
+
+Sin regresiones de Bloque A: ningún flujo de B/C escribe en `notas_admin`; el
+check-in manual sigue trazando con `check_in_by`/`check_in_method` (no requiere
+`audit_log`). Tests: routing de los 4 tabs, toggle de Agenda, detalle read-only.
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

@@ -273,16 +273,19 @@ Agrupado en bloques lógicos. Dimensión: 🟢 chico · 🟡 mediano · 🔴 gra
 - Cierra **B1, B2 y B4** (ver abajo). Detalle en `KERNEL.md` → "Bloque A — Gobernanza".
 - Pendiente fuera de alcance: UI de admin del audit log global (post-launch si hace falta).
 
-### Bloque B — Agenda de recepción 🟡
+### Bloque B — Agenda de recepción 🟡 — ✅ HECHO
 **Calendario semana + lista filtrable + detalle de reserva (read-only), reutilizando admin.**
-- Depende de: nada (RLS ya cubre).
-- Riesgo: bajo.
-- Prioridad: media-alta. Gran valor, bajo costo.
+- Entregado: `pages/Agenda.tsx` (Semana compartida + Lista filtrable + detalle read-only).
+  Estrategia híbrida: `useReservasRango` y `VistaSemana` movidos a `@shared/`;
+  `ReservasVistaLista` y `DetalleReservaModal` con `onCancelar` opcional (sin ella = read-only).
+- Decidido: **no** se cancela/reprograma desde Agenda en v1 (eso vive en el perfil del miembro).
+- Detalle en `KERNEL.md` → "Bloque B + C".
 
-### Bloque C — Panel "Hoy" + IA nueva (bottom-nav 4) 🟡
-- Depende de: B (comparte componentes).
-- Riesgo: bajo-medio (reorganiza navegación existente).
-- Prioridad: media.
+### Bloque C — Panel "Hoy" + IA nueva (bottom-nav 4) 🟡 — ✅ HECHO
+- Entregado: bottom-nav 4 ítems (Hoy · Agenda · Miembros · Check-in), `pages/Hoy.tsx`
+  (ocupación + llegadas + resto + faltantes + check-in manual) y `pages/Checkin.tsx`
+  (scanner QR dedicado, sin el panel embebido). `Scanner.tsx` eliminado.
+- Sin migración SQL; sin regresiones de Bloque A.
 
 ### Bloque D — No-shows y check-in 🟡
 **Marcar no-show manual, corregir check-in, levantar penalización con razón, ver penalizados.**

@@ -48,7 +48,8 @@ function parseInputDate(value: string): Date {
 interface Props {
   refreshTick: number;
   onVerDetalle: (reservaId: string) => void;
-  onCancelar: (info: {
+  /** Omitir → modo read-only (recepción): la fila no ofrece "Cancelar". */
+  onCancelar?: (info: {
     id: string;
     slot_inicio: string;
     recurso_nombre: string;
@@ -381,14 +382,17 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
                 key={r.id}
                 reserva={r}
                 onVerDetalle={() => onVerDetalle(r.id)}
-                onCancelar={() =>
-                  onCancelar({
-                    id: r.id,
-                    slot_inicio: r.slot_inicio,
-                    recurso_nombre: r.recurso_nombre,
-                    usuario_nombre: r.usuario_nombre,
-                    tier: r.tier
-                  })
+                onCancelar={
+                  onCancelar
+                    ? () =>
+                        onCancelar({
+                          id: r.id,
+                          slot_inicio: r.slot_inicio,
+                          recurso_nombre: r.recurso_nombre,
+                          usuario_nombre: r.usuario_nombre,
+                          tier: r.tier
+                        })
+                    : undefined
                 }
               />
             ))}
@@ -442,12 +446,12 @@ function ReservaRow({
 }: {
   reserva: ReservaListada;
   onVerDetalle: () => void;
-  onCancelar: () => void;
+  onCancelar?: () => void;
 }) {
   const fecha = new Date(reserva.slot_inicio);
   const esFutura = fecha.getTime() > Date.now();
   const esConfirmada = reserva.status === 'confirmada';
-  const puedeCancelar = esFutura && esConfirmada;
+  const puedeCancelar = esFutura && esConfirmada && !!onCancelar;
 
   return (
     <div
@@ -518,7 +522,7 @@ function ReservaRow({
       <CardMenuDropdown
         items={[
           { label: 'Ver detalle', icon: Eye, onClick: onVerDetalle },
-          ...(puedeCancelar
+          ...(puedeCancelar && onCancelar
             ? [
                 {
                   label: 'Cancelar reserva',

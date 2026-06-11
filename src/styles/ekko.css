@@ -2814,3 +2814,12 @@ select.ek-input option {
   background: var(--ek-bg-elevated);
   color: var(--ek-ink);
 }
+
+/* ============================================================================
+   RECEPCIÓN — bottom-nav fijo (Bloque B/C)
+   ============================================================================
+   La nav de recepción pasó de tabs superiores a bottom-nav fijo (ek-bottom-nav,
+   ~64px + safe-area). El contenido (.rec-main) debe despejarlo abajo. */
+.rec-shell .rec-main {
+  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}

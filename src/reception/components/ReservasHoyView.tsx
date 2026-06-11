@@ -192,26 +192,38 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
     return result;
   }, [reservas, recursoFiltrado, busquedaDebounced]);
 
-  const { llegando, resto } = useMemo(() => {
+  const { llegando, resto, faltantes } = useMemo(() => {
     const now = Date.now();
     const llegando: ReservaConJoin[] = [];
     const resto: ReservaConJoin[] = [];
+    const faltantes: ReservaConJoin[] = [];
     reservasFiltradas.forEach((r) => {
       const inicio = new Date(r.slot_inicio).getTime();
       const fin = new Date(r.slot_fin).getTime();
-      // "Llegando ahora" solo aplica si la fecha vista es hoy
-      if (
-        esHoy &&
-        ((now >= inicio - 15 * 60_000 && now <= fin) ||
-          (now >= inicio - 15 * 60_000 && now <= inicio + 15 * 60_000))
-      ) {
+      const enVentana =
+        now >= inicio - 15 * 60_000 && (now <= fin || now <= inicio + 15 * 60_000);
+      // "Llegando ahora" solo aplica si la fecha vista es hoy.
+      if (esHoy && enVentana) {
         llegando.push(r);
+      } else if (esHoy && r.status === 'confirmada' && fin < now) {
+        // Confirmada cuyo horario ya pasó sin check-in → faltante (candidata
+        // a no-show; el cron la resuelve, recepción NO la marca acá — Bloque D).
+        faltantes.push(r);
       } else {
         resto.push(r);
       }
     });
-    return { llegando, resto };
+    return { llegando, resto, faltantes };
   }, [reservasFiltradas, esHoy]);
+
+  // Ocupación del día (sobre la lista sin filtrar): sesiones activas + check-ins.
+  const ocupacion = useMemo(() => {
+    const activas = reservas.filter(
+      (r) => r.status !== 'cancelada' && r.status !== 'cancelada_admin'
+    );
+    const conCheckIn = reservas.filter((r) => r.status === 'completada').length;
+    return { total: activas.length, conCheckIn };
+  }, [reservas]);
 
   const filtrosActivos = recursoFiltrado !== 'todos' || busquedaDebounced.length > 0;
   const sinResultadosTrasFiltro =
@@ -222,10 +234,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
   const cargandoInicial = isLoading && reservas.length === 0;
 
   return (
-    <div
-      className="rec-hoy"
-      style={{ paddingBottom: 'calc(110px + env(safe-area-inset-bottom, 0px))' }}
-    >
+    <div className="rec-hoy">
       <div
         style={{
           display: 'flex',
@@ -296,6 +305,22 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
           </svg>
         </button>
       </div>
+
+      {/* Ocupación del día */}
+      {!cargandoInicial && (
+        <p
+          style={{
+            fontSize: '12px',
+            color: 'var(--ek-ink-muted)',
+            margin: '0 0 4px',
+            textAlign: 'center'
+          }}
+        >
+          {ocupacion.total === 0
+            ? 'Sin reservas para este día'
+            : `${ocupacion.total} ${ocupacion.total === 1 ? 'sesión' : 'sesiones'} · ${ocupacion.conCheckIn} con check-in`}
+        </p>
+      )}
 
       {/* Búsqueda + filtro recurso */}
       <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -451,7 +476,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
             }
           />
         </div>
-      ) : llegando.length === 0 && resto.length === 0 ? (
+      ) : llegando.length === 0 && resto.length === 0 && faltantes.length === 0 ? (
         <div style={{ marginTop: '24px' }}>
           <EmptyState
             icon={CalendarDays}
@@ -495,6 +520,23 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
               </div>
             )}
           </section>
+
+          {esHoy && faltantes.length > 0 && (
+            <section style={{ marginTop: '32px' }}>
+              <p className="ek-eyebrow" style={{ marginBottom: '8px', color: 'var(--ek-danger)' }}>
+                FALTANTES
+              </p>
+              <p className="ek-body-faint" style={{ margin: '0 0 12px', fontSize: '12px' }}>
+                Reservas cuyo horario ya pasó sin check-in. El sistema las marca como
+                inasistencia automáticamente.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {faltantes.map((r) => (
+                  <ReservaCard key={r.id} reserva={r} onSelect={setSelected} />
+                ))}
+              </div>
+            </section>
+          )}
         </>
       )}
 

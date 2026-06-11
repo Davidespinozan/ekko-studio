@@ -484,39 +484,10 @@ export function useDashboardData() {
 
 /**
  * Reservas en un rango de fechas para vista calendario.
+ * Movido a `@shared/hooks/useReservasRango` (lo comparten admin y recepción —
+ * Bloque B/C). Se re-exporta acá por compatibilidad de imports.
  */
-export function useReservasRango(fechaInicio: Date, fechaFin: Date) {
-  const tenant = useTenant();
-  const [reservas, setReservas] = useState<ReservaConJoin[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Primitivos estables: los callers pasan objetos Date nuevos cada render,
-  // depender del objeto causaría refetch en loop.
-  const inicioMs = fechaInicio.getTime();
-  const finMs = fechaFin.getTime();
-
-  const refetch = useCallback(async () => {
-    setIsLoading(true);
-    const { data, error } = await supabase
-      .from('reservas')
-      .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)')
-      .eq('tenant_id', tenant.id)
-      .gte('slot_inicio', new Date(inicioMs).toISOString())
-      .lt('slot_inicio', new Date(finMs).toISOString())
-      .order('slot_inicio', { ascending: true });
-
-    if (error) {
-      console.error('[useReservasRango]', error);
-      setIsLoading(false);
-      return;
-    }
-    setReservas((data ?? []) as unknown as ReservaConJoin[]);
-    setIsLoading(false);
-  }, [tenant.id, inicioMs, finMs]);
-
-  useEffect(() => { refetch(); }, [refetch]);
-  return { reservas, isLoading, refetch };
-}
+export { useReservasRango } from '@shared/hooks/useReservasRango';
 
 // ============================================================================
 // Mutations de gestión de usuarios (vía Netlify Functions con service_role)
