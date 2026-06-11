@@ -297,11 +297,13 @@ Agrupado en bloques lógicos. Dimensión: 🟢 chico · 🟡 mediano · 🔴 gra
 - Sin migración SQL. El cron sigue de noche (complementario). Detalle en `KERNEL.md` → "Bloque D".
 - Deuda chica anotada: el cron `marcar_no_shows` no escribe `audit_log` (anterior a A).
 
-### Bloque E — Comunicación y notas 🟢
+### Bloque E — Comunicación y notas 🟢 — ✅ HECHO
 **Notas operativas (separadas de auditoría) + notificación manual.**
-- Depende de: A (separar notas_admin).
-- Riesgo: bajo.
-- Prioridad: media (clave si hay multi-recepcionista).
+- Entregado: tabla `notas_miembro` (bitácora compartida admin+recepción, PostgREST + RLS),
+  componente `NotasMiembro` en ambos perfiles, `reception-notificar-miembro` (aviso in-app +
+  audit_log) con `EnviarAvisoModal`.
+- Cerrada la deuda de D: el cron `marcar_no_shows` ahora escribe `audit_log` por miembro afectado.
+- Detalle en `KERNEL.md` → "Bloque E".
 
 ### Bloque F — Recurso fuera de servicio temporal 🟢
 - Depende de: nada.

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, UserX, Camera, Pencil, KeyRound, Unlock, CalendarPlus } from 'lucide-react';
+import { ArrowLeft, UserX, Camera, Pencil, KeyRound, Unlock, CalendarPlus, Send } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { EmptyState } from '@shared/components/EmptyState';
 import { TierBadge } from '@shared/components/TierBadge';
 import { StatusBadge } from '@shared/components/StatusBadge';
+import { NotasMiembro } from '@shared/components/NotasMiembro';
+import { EnviarAvisoModal } from '@shared/components/EnviarAvisoModal';
 import { statusMiembro } from '../lib/miembroStatus';
 import { CrearReservaModal, type ReservaOriginal } from '../components/CrearReservaModal';
 import {
@@ -93,6 +95,7 @@ export default function PerfilMiembroRecepcion() {
   const [fotoOpen, setFotoOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [desbloquearOpen, setDesbloquearOpen] = useState(false);
+  const [avisoOpen, setAvisoOpen] = useState(false);
   const {
     entries: auditEntries,
     isLoading: auditLoading,
@@ -332,6 +335,9 @@ export default function PerfilMiembroRecepcion() {
           <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={() => setResetOpen(true)}>
             <KeyRound size={15} aria-hidden="true" /> Resetear acceso
           </button>
+          <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={() => setAvisoOpen(true)}>
+            <Send size={15} aria-hidden="true" /> Enviar aviso
+          </button>
         </div>
       </section>
 
@@ -394,6 +400,11 @@ export default function PerfilMiembroRecepcion() {
           historial.slice(0, 15).map((r) => <FilaReserva key={r.id} reserva={r} historico />)
         )}
       </Seccion>
+
+      <section style={{ marginBottom: '20px' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>NOTAS OPERATIVAS</p>
+        <NotasMiembro miembroId={miembro.id} />
+      </section>
 
       <section style={{ marginBottom: '20px' }}>
         <p className="ek-eyebrow" style={{ marginBottom: '10px' }}>HISTORIAL DE CAMBIOS</p>
@@ -475,6 +486,14 @@ export default function PerfilMiembroRecepcion() {
           miembroNombre={capitalizar(miembro.nombre) || miembro.email}
           onClose={() => setDesbloquearOpen(false)}
           onDesbloqueado={recargarPerfil}
+        />
+      )}
+
+      {avisoOpen && (
+        <EnviarAvisoModal
+          miembroId={miembro.id}
+          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
+          onClose={() => setAvisoOpen(false)}
         />
       )}
     </div>

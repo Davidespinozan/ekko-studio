@@ -1426,6 +1426,30 @@ tablas existentes, mismo patrón de gobernanza que Bloque A.
 - **No incluido:** notas operativas + notificación manual (E), recurso fuera de
   servicio (F).
 
+## Bloque E — Notas operativas + notificación manual
+
+Sigue a D en el rediseño de recepción. Cierra capacidades #5/#6 del análisis y
+la deuda del cron reportada en D.
+
+- **`notas_miembro`** (`20260611200000_notas_miembro.sql`): bitácora operativa
+  compartida (admin + recepción del tenant). RLS: SELECT recepción/admin del
+  tenant; INSERT con `autor_id = get_my_user_id()`; UPDATE/DELETE solo el autor
+  **o** admin (recepción no reescribe la nota de otro). **PostgREST directo**, sin
+  función. Separada de `usuarios.notas_admin` (privada de admin, intacta) y de
+  `audit_log` (las notas son editables → NO van al log).
+- **UI:** `NotasMiembro` (shared) en el perfil de recepción ("Notas operativas")
+  y en `MiembroDetalle` de admin ("Notas del equipo"); lista + alta + editar/
+  borrar (con confirmación), estados reales. Hook `useNotasMiembro`.
+- **Notificación manual** (`reception-notificar-miembro`, service_role): inserta
+  en `notificaciones` (`tipo='aviso_manual'`, in-app) + `audit_log`
+  (`accion='notification_sent'`, sin motivo — el contenido del aviso ES la
+  traza). UI `EnviarAvisoModal` (shared) en ambos perfiles.
+- **Deuda de D cerrada** (`20260611210000_cron_no_show_audit.sql`): el cron
+  `marcar_no_shows` ahora inserta `audit_log` (`accion='no_show_cron'`,
+  `actor_rol='service_role'`) **una entrada por miembro afectado**, con el delta
+  de `no_shows_count`/`bloqueado_hasta` y `metadata` reserva/folio.
+- **No incluido:** recurso fuera de servicio (Bloque F).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

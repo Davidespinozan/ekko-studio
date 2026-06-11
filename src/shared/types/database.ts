@@ -153,6 +153,61 @@ export type Database = {
           },
         ]
       }
+      notas_miembro: {
+        Row: {
+          actualizada_at: string | null
+          autor_id: string
+          autor_rol: string
+          contenido: string
+          creada_at: string
+          id: string
+          miembro_id: string
+          tenant_id: string
+        }
+        Insert: {
+          actualizada_at?: string | null
+          autor_id: string
+          autor_rol: string
+          contenido: string
+          creada_at?: string
+          id?: string
+          miembro_id: string
+          tenant_id: string
+        }
+        Update: {
+          actualizada_at?: string | null
+          autor_id?: string
+          autor_rol?: string
+          contenido?: string
+          creada_at?: string
+          id?: string
+          miembro_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notas_miembro_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_miembro_miembro_id_fkey"
+            columns: ["miembro_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notas_miembro_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notificaciones: {
         Row: {
           creada_at: string

@@ -1,11 +1,13 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, AlertTriangle, Check } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Check, Send } from 'lucide-react';
 import { useMiembroDetalle, updateMiembro, adminUpdateRole, adminDeleteUser } from '../hooks/useAdminData';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { formatHora } from '@member/logic/reservaLogic';
 import { Spinner } from '@shared/components/Spinner';
+import { NotasMiembro } from '@shared/components/NotasMiembro';
+import { EnviarAvisoModal } from '@shared/components/EnviarAvisoModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type { Database } from '@shared/types/database';
 
@@ -22,6 +24,7 @@ export default function MiembroDetalle() {
   });
   const [eliminarOpen, setEliminarOpen] = useState(false);
   const [eliminando, setEliminando] = useState(false);
+  const [avisoOpen, setAvisoOpen] = useState(false);
 
   const totalReservas = reservas.length;
 
@@ -174,6 +177,25 @@ export default function MiembroDetalle() {
         />
       </section>
 
+      <section className="adm-section">
+        <h2 className="ek-h3">Notas del equipo</h2>
+        <p className="adm-body" style={{ marginBottom: '0.5rem' }}>
+          Bitácora compartida entre admin y recepción. Cada autor edita o borra
+          lo suyo; vos podés editar todo.
+        </p>
+        <NotasMiembro miembroId={miembro.id} />
+      </section>
+
+      <section className="adm-section">
+        <h2 className="ek-h3">Avisar al miembro</h2>
+        <p className="adm-body" style={{ marginBottom: '0.75rem' }}>
+          Manda un aviso in-app puntual. El miembro lo verá en sus notificaciones.
+        </p>
+        <button onClick={() => setAvisoOpen(true)} className="ek-cta ek-cta--secondary" style={{ minHeight: '44px' }}>
+          <Send size={15} aria-hidden="true" /> Enviar aviso
+        </button>
+      </section>
+
       <section
         className="adm-section"
         style={{ borderTop: '0.5px solid var(--ek-danger)', paddingTop: '20px', marginTop: '32px' }}
@@ -209,6 +231,14 @@ export default function MiembroDetalle() {
           Eliminar definitivamente
         </button>
       </section>
+
+      {avisoOpen && (
+        <EnviarAvisoModal
+          miembroId={miembro.id}
+          miembroNombre={miembro.nombre ?? miembro.email}
+          onClose={() => setAvisoOpen(false)}
+        />
+      )}
 
       <ConfirmDialog
         isOpen={eliminarOpen}
