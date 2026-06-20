@@ -4,6 +4,7 @@ import { Star, ArrowRight, Check, CalendarCheck, Clapperboard, FolderDown, Image
 import { supabase } from '@shared/lib/supabase';
 import { useLandingConfig } from '@shared/hooks/useLandingConfig';
 import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
+import AppShowcase from '../components/AppShowcase';
 import Footer from '../components/Footer';
 
 interface EstudioPublico {
@@ -214,6 +215,11 @@ export default function Landing() {
           {hero.cta_texto}
         </a>
       </section>
+
+      {/* ============================================================
+          TU ESTUDIO EN EL BOLSILLO (sección 2 — showcase de la app)
+          ============================================================ */}
+      <AppShowcase />
 
       {/* ============================================================
           CÓMO FUNCIONA

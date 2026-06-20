@@ -2852,3 +2852,268 @@ select.ek-input option {
 .rec-shell .rec-main {
   padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
 }
+
+/* ============================================================================
+   LANDING — sección 2 "Tu estudio en el bolsillo" (AppShowcase)
+   ============================================================================
+   Showcase de la app del miembro con mockups de teléfono en CSS (sin imágenes).
+   Layout en 2 columnas (copy + teléfonos) que colapsa a 1 en móvil. */
+.ek-showcase {
+  padding: clamp(48px, 8vw, 88px) 0;
+  position: relative;
+}
+.ek-showcase-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: clamp(40px, 6vw, 56px);
+  align-items: center;
+}
+@media (min-width: 900px) {
+  .ek-showcase-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+}
+
+.ek-showcase-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+}
+.ek-showcase-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--ek-ink-faint);
+  line-height: 1.4;
+}
+.ek-showcase-install svg { color: var(--ek-mustard); flex-shrink: 0; }
+
+/* --- Contenedor de teléfonos --- */
+.ek-showcase-phones {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 480px;
+}
+@media (min-width: 900px) {
+  .ek-showcase-phones { justify-content: flex-end; padding-right: 8px; }
+}
+.ek-showcase-glow {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, rgba(229, 184, 41, 0.14), transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* --- Marco del dispositivo --- */
+.ek-phone {
+  position: relative;
+  width: 232px;
+  height: 472px;
+  background: #050505;
+  border: 1px solid var(--ek-line-strong);
+  border-radius: 38px;
+  padding: 9px;
+  box-shadow:
+    0 2px 0 rgba(245, 241, 232, 0.04) inset,
+    0 40px 80px rgba(0, 0, 0, 0.55),
+    0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1;
+}
+.ek-phone-notch {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 92px;
+  height: 19px;
+  background: #050505;
+  border-radius: 0 0 13px 13px;
+  z-index: 3;
+}
+.ek-phone-screen {
+  width: 100%;
+  height: 100%;
+  background: var(--ek-bg);
+  border-radius: 30px;
+  overflow: hidden;
+}
+.ek-phone--front {
+  transform: translateY(14px);
+}
+.ek-phone--back {
+  position: absolute;
+  transform: translate(-58px, -34px) scale(0.9) rotate(-4deg);
+  filter: brightness(0.8);
+  z-index: 0;
+}
+@media (min-width: 900px) {
+  .ek-phone--back { transform: translate(-118px, -34px) scale(0.9) rotate(-5deg); }
+}
+/* En pantallas chicas el teléfono de atrás estorba: lo ocultamos. */
+@media (max-width: 380px) {
+  .ek-showcase-phones { transform: scale(0.92); }
+  .ek-phone--back { display: none; }
+}
+
+/* --- Mini app (pantalla interna) --- */
+.ek-mini-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-family: var(--ek-font-body);
+  color: var(--ek-ink);
+}
+.ek-mini-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 13px 18px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.ek-mini-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--ek-ink); display: inline-block;
+}
+.ek-mini-body {
+  flex: 1;
+  overflow: hidden;
+  padding: 4px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ek-mini-brand {
+  font-family: var(--ek-font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--ek-mustard);
+  margin: 0;
+}
+.ek-mini-greeting {
+  font-family: var(--ek-font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  margin: 0 0 2px;
+}
+.ek-mini-eyebrow {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--ek-ink-faint);
+  margin: 4px 0 0;
+}
+.ek-mini-card {
+  background: var(--ek-bg-elevated);
+  border: 0.5px solid var(--ek-line);
+  border-radius: 14px;
+  padding: 11px 12px;
+}
+.ek-mini-card--hero {
+  background:
+    radial-gradient(120% 100% at 100% 0%, var(--ek-mustard-soft), transparent 60%),
+    var(--ek-bg-elevated);
+  border-color: var(--ek-mustard-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ek-mini-row { display: flex; align-items: center; }
+.ek-mini-card-title {
+  font-family: var(--ek-font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.ek-mini-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 8px; font-weight: 800; letter-spacing: 0.08em;
+  color: var(--ek-mustard);
+  border: 0.5px solid var(--ek-mustard-dim);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+.ek-mini-when {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; color: var(--ek-ink-muted);
+}
+.ek-mini-when svg, .ek-mini-badge svg { flex-shrink: 0; }
+.ek-mini-progress {
+  height: 4px; border-radius: 999px;
+  background: rgba(245, 241, 232, 0.08);
+  overflow: hidden;
+}
+.ek-mini-progress i {
+  display: block; height: 100%;
+  background: var(--ek-mustard); border-radius: 999px;
+}
+.ek-mini-foot { font-size: 9.5px; color: var(--ek-ink-faint); }
+.ek-mini-line {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11.5px; color: var(--ek-ink-muted);
+  padding: 9px 12px;
+}
+.ek-mini-day {
+  font-weight: 700; color: var(--ek-ink);
+  font-size: 10px; min-width: 24px;
+}
+.ek-mini-hour {
+  font-family: var(--ek-font-mono);
+  font-size: 10.5px; color: var(--ek-mustard); font-weight: 600;
+}
+.ek-mini-card--media { display: flex; flex-direction: column; gap: 6px; }
+.ek-mini-thumb {
+  height: 64px; border-radius: 10px;
+  background:
+    linear-gradient(135deg, rgba(229, 184, 41, 0.12), transparent 60%),
+    var(--ek-bg-soft);
+  border: 0.5px solid var(--ek-line);
+  margin-bottom: 2px;
+}
+.ek-mini-chips { display: flex; gap: 6px; margin-top: 4px; }
+.ek-mini-chip {
+  font-family: var(--ek-font-mono);
+  font-size: 10px; font-weight: 600;
+  color: var(--ek-ink-muted);
+  border: 0.5px solid var(--ek-line-strong);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.ek-mini-chip.is-active {
+  color: var(--ek-bg);
+  background: var(--ek-mustard);
+  border-color: var(--ek-mustard);
+}
+
+/* --- Bottom nav del mockup --- */
+.ek-mini-nav {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 9px 8px calc(11px + 4px);
+  border-top: 0.5px solid var(--ek-line);
+  background: var(--ek-bg-soft);
+}
+.ek-mini-nav-item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  color: var(--ek-ink-faint);
+}
+.ek-mini-nav-item i {
+  font-style: normal; font-size: 8px; font-weight: 600; letter-spacing: 0.02em;
+}
+.ek-mini-nav-item.is-active { color: var(--ek-mustard); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ek-phone { transition: transform 0.5s var(--ek-ease-premium); }
+}
