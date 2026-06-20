@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { ToastProvider } from '@shared/providers/ToastProvider';
 
 /**
  * Búsqueda de miembros: debe ser INSENSIBLE a acentos y mayúsculas
@@ -28,9 +29,11 @@ import BuscarMiembro from '../BuscarMiembro';
 
 function renderBuscar() {
   return render(
-    <MemoryRouter>
-      <BuscarMiembro />
-    </MemoryRouter>
+    <ToastProvider>
+      <MemoryRouter>
+        <BuscarMiembro />
+      </MemoryRouter>
+    </ToastProvider>
   );
 }
 
@@ -66,5 +69,11 @@ describe('BuscarMiembro · acentos/mayúsculas', () => {
     fireEvent.click(await screen.findByRole('button', { name: /penalizados/i }));
     expect(await screen.findByText('José Pérez')).toBeInTheDocument();
     expect(screen.queryByText('Ana López')).not.toBeInTheDocument();
+  });
+
+  it('el botón "Registrar" abre el alta de miembro', async () => {
+    renderBuscar();
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
+    expect(await screen.findByText('Nuevo miembro')).toBeInTheDocument();
   });
 });

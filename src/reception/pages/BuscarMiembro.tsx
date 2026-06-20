@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { X, Search, UserX, ShieldAlert } from 'lucide-react';
+import { X, Search, UserX, ShieldAlert, UserPlus } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { EmptyState } from '@shared/components/EmptyState';
 import { TierBadge } from '@shared/components/TierBadge';
 import { statusMiembro } from '../lib/miembroStatus';
+import { RegistrarMiembroModal } from '../components/RegistrarMiembroModal';
 
 interface MiembroResultado {
   id: string;
@@ -57,33 +58,40 @@ export default function BuscarMiembro() {
   const [todos, setTodos] = useState<MiembroResultado[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorCarga, setErrorCarga] = useState(false);
+  const [registrarOpen, setRegistrarOpen] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
+  const cargarPadron = useCallback(async () => {
     setIsLoading(true);
     setErrorCarga(false);
-    supabase
+    const { data, error } = await supabase
       .from('usuarios')
       .select('id, nombre, email, status, membresia_tier, bloqueado_hasta')
       .eq('tenant_id', tenant.id)
       .eq('rol', 'miembro')
       .order('nombre', { ascending: true })
-      .limit(1000)
-      .then(({ data, error }) => {
-        if (!mounted) return;
-        if (error) {
-          console.error('[BuscarMiembro]', error);
-          setErrorCarga(true);
-          setTodos([]);
-        } else {
-          setTodos((data ?? []) as MiembroResultado[]);
-        }
-        setIsLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
+      .limit(1000);
+    if (error) {
+      console.error('[BuscarMiembro]', error);
+      setErrorCarga(true);
+      setTodos([]);
+    } else {
+      setTodos((data ?? []) as MiembroResultado[]);
+    }
+    setIsLoading(false);
   }, [tenant.id]);
+
+  useEffect(() => {
+    void cargarPadron();
+  }, [cargarPadron]);
+
+  // Tras registrar: recargar el padrón y pre-cargar el email en la búsqueda
+  // para ubicar al miembro nuevo (que nace pendiente_pago).
+  async function handleRegistrado(email: string) {
+    setRegistrarOpen(false);
+    setModo('buscar');
+    setQuery(email);
+    await cargarPadron();
+  }
 
   const q = norm(query);
   const sinBusqueda = q.length < 2;
@@ -103,9 +111,19 @@ export default function BuscarMiembro() {
 
   return (
     <div className="rec-main">
-      <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ margin: '0 0 12px' }}>
-        MIEMBROS
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ margin: 0 }}>
+          MIEMBROS
+        </p>
+        <button
+          type="button"
+          onClick={() => setRegistrarOpen(true)}
+          className="ek-cta ek-cta--gold"
+          style={{ minHeight: '44px', padding: '0 16px', fontSize: '13px', flexShrink: 0 }}
+        >
+          <UserPlus size={16} aria-hidden="true" /> Registrar
+        </button>
+      </div>
 
       {/* Toggle Buscar / Penalizados (Bloque D) */}
       <div
@@ -237,6 +255,13 @@ export default function BuscarMiembro() {
             <MiembroCard key={m.id} miembro={m} mostrarBloqueo />
           ))}
         </div>
+      )}
+
+      {registrarOpen && (
+        <RegistrarMiembroModal
+          onClose={() => setRegistrarOpen(false)}
+          onRegistrado={handleRegistrado}
+        />
       )}
     </div>
   );
