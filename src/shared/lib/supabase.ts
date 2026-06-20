@@ -26,7 +26,7 @@ if (!url || !anonKey) {
  * IMPORTANTE: para evitar el deadlock de Supabase JS v2 dentro de
  * onAuthStateChange, NUNCA hagas `await supabase.from(...)` dentro del
  * callback. Difiérelo con setTimeout(() => { ... }, 0).
- * Ver docs/DECISIONS.md D-006.
+ * Ver DECISIONS.md (D-006).
  */
 export const supabase = createClient<Database>(url ?? '', anonKey ?? '', {
   auth: {
