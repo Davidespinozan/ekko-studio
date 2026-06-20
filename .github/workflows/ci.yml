@@ -1,0 +1,71 @@
+name: CI
+
+# Corre en cada push a main y en cada PR a main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Si llega un push nuevo al mismo ref, cancela la corrida vieja.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Chequeos rápidos: no dependen de secrets, siempre deben quedar verdes. ──
+  #    Es el mismo gate que corremos a mano en cada bloque (lint, tsc, tests,
+  #    build); acá queda automatizado: un PR rojo no mergea.
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint (eslint, max-warnings 0)
+        run: npm run lint
+      - name: Typecheck (tsc)
+        run: npx tsc --noEmit
+      - name: Unit tests (vitest)
+        run: npm test
+      # vite build compila aunque falten las VITE_SUPABASE_* (las bakea vacías);
+      # acá solo validamos que el bundle compila.
+      - name: Build
+        run: npm run build
+
+  # ── Smoke e2e (read-only) — habilitado solo si el repo tiene los secrets de
+  #    Supabase (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY). Sin secrets, no
+  #    corre (el CI no se pone rojo por falta de config). Para activarlo: cargar
+  #    esos 2 secrets en Settings → Secrets and variables → Actions. ──
+  e2e:
+    runs-on: ubuntu-latest
+    needs: checks
+    timeout-minutes: 15
+    if: ${{ vars.RUN_E2E == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Instalar navegador (chromium)
+        run: npx playwright install --with-deps chromium
+      - name: Build (con Supabase real → el smoke lee datos públicos del tenant)
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      - name: Smoke e2e (playwright sirve el build con vite preview)
+        run: npx playwright test e2e/tests --project=chromium
+      - name: Subir reporte de Playwright
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
