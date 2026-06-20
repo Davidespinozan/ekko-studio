@@ -98,10 +98,17 @@ completo en `KERNEL.md`.
 
 ---
 
-## Decisiones PENDIENTES (necesitan input del dueño)
+## Pagos / membresías (D4)
 
-- **D4 — Modelo de cobro (SIN decidir).** Bloquea pagos/Stripe. Define:
-  suscripción mensual por tier vs pago único; trial sí/no; self-serve vs cobro
-  en mostrador. Hoy: signup simulado, "cambiar plan" por WhatsApp.
-- **B3 — Cambiar tier no activa la cuenta** (queda inconsistente). Se resolverá
-  al cablear la activación en un solo RPC (ver `BACKLOG.md` → Pagos).
+- **D4 — Modelo de cobro (DECIDIDO · 2026-06-12):** **suscripción mensual por
+  tier · sin trial · self-serve + recepción.** Ver `STRIPE.md`.
+- **Activación en un solo lugar:** RPC keystone `activar_membresia` (escribe
+  `membresias` + pone `usuarios.status='activo'`), llamado por
+  `reception-activar-membresia` (mostrador, hoy), `stripe-webhook` (futuro) y
+  `suscribir-membresia` (atajo simulado). `membresias` deja de estar muerto.
+- **B3 — CERRADO:** activar pasa por ese RPC → la cuenta queda consistente
+  (cambiar tier + activar ya no deja la cuenta inerte). Antes: cambiar tier no
+  tocaba `status`.
+- **Plug-and-play Stripe:** todo cableado; conectar Stripe = 3 pasos (env +
+  Checkout Session en `suscribir-membresia` + activar en `stripe-webhook`). Ver
+  `STRIPE.md` y los marcadores `TODO STRIPE`.

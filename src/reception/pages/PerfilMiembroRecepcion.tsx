@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, UserX, Camera, Pencil, KeyRound, Unlock, CalendarPlus, Send } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { useToast } from '@shared/hooks/useToast';
+import { activarMembresiaMostrador } from '@shared/lib/checkout';
 import { EmptyState } from '@shared/components/EmptyState';
 import { TierBadge } from '@shared/components/TierBadge';
 import { StatusBadge } from '@shared/components/StatusBadge';
@@ -84,6 +86,8 @@ function fechaCorta(iso: string): string {
 
 export default function PerfilMiembroRecepcion() {
   const { id } = useParams<{ id: string }>();
+  const toast = useToast();
+  const [activando, setActivando] = useState(false);
   const [miembro, setMiembro] = useState<MiembroPerfil | null>(null);
   const [reservas, setReservas] = useState<ReservaPerfil[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -154,6 +158,26 @@ export default function PerfilMiembroRecepcion() {
     await recargarMiembro();
     await recargarAudit();
   }, [recargarMiembro, recargarAudit]);
+
+  // Activación en mostrador (D4: recepción confirma el pago y activa). Pasa por
+  // el RPC keystone `activar_membresia` — cierra B3.
+  async function activarMembresia() {
+    if (!miembro) return;
+    if (!miembro.membresia_tier) {
+      toast.error('Asigná un plan primero en "Editar datos".');
+      return;
+    }
+    setActivando(true);
+    try {
+      await activarMembresiaMostrador(miembro.id, miembro.membresia_tier);
+      toast.success('Membresía activada.');
+      await recargarPerfil();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo activar la membresía.');
+    } finally {
+      setActivando(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -266,9 +290,27 @@ export default function PerfilMiembroRecepcion() {
             {st.label}
           </p>
           {miembro.status !== 'activo' && (
-            <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '4px 0 0' }}>
-              La cuenta no está activa. Podés activarla en <strong>Editar miembro</strong>.
-            </p>
+            <>
+              <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '4px 0 8px' }}>
+                La cuenta no está activa. Confirmá el pago y activá la membresía
+                {miembro.membresia_tier ? '' : ' (asigná un plan primero en "Editar datos")'}.
+              </p>
+              <button
+                type="button"
+                onClick={activarMembresia}
+                disabled={activando || !miembro.membresia_tier}
+                className="ek-cta ek-cta--gold"
+                style={{
+                  minHeight: '40px',
+                  padding: '8px 14px',
+                  fontSize: '13px',
+                  opacity: !miembro.membresia_tier ? 0.5 : 1,
+                  cursor: !miembro.membresia_tier ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {activando ? 'Activando…' : 'Activar membresía'}
+              </button>
+            </>
           )}
           {bloqueado && (
             <>

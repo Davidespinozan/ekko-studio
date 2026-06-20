@@ -5,22 +5,24 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
 
 ---
 
-## 1. Lo grande — Pagos / Stripe (bloqueante de lanzamiento)
+## 1. Pagos / Stripe — andamiaje HECHO, falta conectar la llave
 
-> Hoy: signup simulado, "cambiar plan" por WhatsApp. Sin pasarela.
-> Requiere primero la decisión **D4** (modelo de cobro).
+> D4 decidido (suscripción mensual por tier · sin trial · self-serve +
+> recepción). El andamiaje plug-and-play ya está; ver `STRIPE.md`.
 
-- [ ] **Definir D4** (David): suscripción mensual por tier vs pago único; trial
-      sí/no; self-serve (checkout) vs cobro en mostrador.
-- [ ] **Andamiaje plug-and-play** (patrón de SALA, ver `docs/audit/ekko-vs-sala-madurez.md`):
-  - [ ] RPC **único de activación** `activar_membresia(usuario_id, tier_id, ...)`
-        que escriba la tabla `membresias` (hoy muerta) y ponga `status='activo'`.
-        **Cierra B3 de paso.**
-  - [ ] `suscribir-membresia` (Netlify): demo activa simulado / real
-        `stripe_pendiente` / con Stripe → Checkout Session.
-  - [ ] `stripe-webhook` esqueleto (no-op sin `STRIPE_WEBHOOK_SECRET`).
-  - [ ] Cargar `tiers.stripe_price_id` por plan + `STRIPE.md` + marcadores
-        `TODO STRIPE`.
+- [x] **D4 definido.**
+- [x] RPC keystone `activar_membresia` (escribe `membresias` + `status='activo'`).
+      **B3 cerrado.**
+- [x] `reception-activar-membresia` + botón "Activar membresía" en el perfil
+      (cobro en mostrador — funciona HOY).
+- [x] `suscribir-membresia` (self-serve → `stripe_pendiente` sin Stripe).
+- [x] `stripe-webhook` esqueleto + `checkout.ts` + `STRIPE.md` + `TODO STRIPE`.
+- [ ] **Conectar Stripe** (cuando David quiera cobrar online): env vars +
+      Checkout Session + activar en el webhook. Son los 3 pasos de `STRIPE.md`.
+- [ ] Cargar `tiers.stripe_price_id` por plan.
+- [ ] Migrar la UI del miembro (`MiSuscripcion`) de `change-plan` a
+      `iniciarCheckout` cuando se conecte Stripe.
+- [ ] Touchpoints que se "encienden": Método de pago, Historial de pagos.
 
 ## 2. Deudas técnicas conocidas
 
