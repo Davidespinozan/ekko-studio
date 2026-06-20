@@ -9,7 +9,15 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/__tests__/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    css: true
+    css: true,
+    // Env placeholder para tests: algunos módulos importan el cliente real de
+    // Supabase (createClient) al cargar; sin estas vars tira "supabaseUrl is
+    // required" en CI (que no tiene .env.local). Valores dummy con formato
+    // válido — los tests que tocan datos mockean supabase igual.
+    env: {
+      VITE_SUPABASE_URL: 'https://placeholder.supabase.co',
+      VITE_SUPABASE_ANON_KEY: 'placeholder-anon-key'
+    }
   },
   resolve: {
     alias: {
