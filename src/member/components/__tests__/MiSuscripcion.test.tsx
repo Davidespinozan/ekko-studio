@@ -3,20 +3,23 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 /**
  * MiSuscripcion: muestra el plan actual con datos reales del tier, estado
- * vacío de pagos, y permite cambiar de plan IN-APP (vía backend change-plan,
- * no WhatsApp).
+ * vacío de pagos, y permite cambiar de plan IN-APP. El cambio ahora va por
+ * Stripe Checkout (función `suscribir-membresia`); sin Stripe responde
+ * stripe_pendiente y la UI avisa "acercate a recepción".
  */
 
 const h = vi.hoisted(() => ({
   tiers: [] as unknown[],
   pagos: [] as unknown[],
-  changePlan: vi.fn()
+  membresias: [] as unknown[],
+  backend: vi.fn()
 }));
 
 vi.mock('@shared/lib/supabase', () => {
   function builderFor(table: string) {
-    const result = table === 'tiers'
-      ? { data: h.tiers, error: null }
+    const result =
+      table === 'tiers' ? { data: h.tiers, error: null }
+      : table === 'membresias' ? { data: h.membresias, error: null }
       : { data: h.pagos, error: null };
     const b: Record<string, unknown> = {};
     for (const m of ['select', 'eq', 'order', 'limit']) b[m] = () => b;
@@ -27,7 +30,7 @@ vi.mock('@shared/lib/supabase', () => {
 });
 
 vi.mock('@shared/lib/backend', () => ({
-  backendPost: (path: string, body: unknown) => h.changePlan(path, body)
+  backendPost: (path: string, body: unknown) => h.backend(path, body)
 }));
 
 vi.mock('@shared/hooks/useTenant', () => ({ useTenant: () => ({ id: 't-1', config: {} }) }));
@@ -43,7 +46,9 @@ beforeEach(() => {
     { slug: 'pro', nombre: 'Pro', precio_centavos: 120000, beneficios: ['Todo Básica', 'Estudios pro'], descripcion: null }
   ];
   h.pagos = [];
-  h.changePlan = vi.fn().mockResolvedValue({ success: true });
+  h.membresias = [];
+  // Sin Stripe configurado: el cambio de plan responde stripe_pendiente.
+  h.backend = vi.fn().mockResolvedValue({ activated: false, reason: 'stripe_pendiente' });
 });
 
 function renderComp(tierSlug: string | null = 'pro') {
@@ -64,13 +69,20 @@ describe('MiSuscripcion', () => {
     await waitFor(() => expect(screen.getByText('Sin pagos registrados')).toBeInTheDocument());
   });
 
-  it('cambia de plan in-app (llama a change-plan) y refleja el nuevo plan', async () => {
+  it('cambiar de plan abre el checkout de Stripe (suscribir-membresia)', async () => {
     renderComp('pro');
     await waitFor(() => expect(screen.getByText('Cambiar de plan')).toBeInTheDocument());
     fireEvent.click(screen.getByText('Cambiar de plan'));
     await waitFor(() => expect(screen.getByText('CAMBIAR DE PLAN')).toBeInTheDocument());
-    // El plan no-actual (Básica) ofrece cambiar
-    fireEvent.click(screen.getByText('Cambiar a este'));
-    await waitFor(() => expect(h.changePlan).toHaveBeenCalledWith('change-plan', { tier: 'basica' }));
+    // El plan no-actual (Básica) ofrece elegir
+    fireEvent.click(screen.getByText('Elegir este'));
+    await waitFor(() => expect(h.backend).toHaveBeenCalledWith('suscribir-membresia', { tier: 'basica' }));
+  });
+
+  it('muestra el banner de pago vencido cuando la membresía está past_due', async () => {
+    h.membresias = [{ status: 'past_due', stripe_subscription_id: 'sub_1', cancel_at_period_end: false, periodo_actual_fin: null }];
+    renderComp('pro');
+    await waitFor(() => expect(screen.getByText('Tu último pago no se procesó')).toBeInTheDocument());
+    expect(screen.getByText('Gestionar suscripción')).toBeInTheDocument();
   });
 });

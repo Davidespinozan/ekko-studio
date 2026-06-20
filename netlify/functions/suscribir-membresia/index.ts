@@ -7,7 +7,8 @@ if (!globalThis.WebSocket) {
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, serverError } from '../_lib/http';
-import { requireEnv } from '../_lib/env';
+import { requireEnv, optionalEnv } from '../_lib/env';
+import { getStripe, getOrCreateCustomer } from '../_lib/stripe';
 
 /**
  * POST /suscribir-membresia
@@ -15,21 +16,13 @@ import { requireEnv } from '../_lib/env';
  * Body: { tier: <slug de un tier activo del tenant> }
  *
  * Punto ÚNICO de enchufe de Stripe para la compra self-serve (D4: suscripción
- * mensual por tier, sin trial). La activación real vive en el RPC keystone
- * `activar_membresia` — NO se activa acá salvo el atajo simulado.
+ * mensual por tier, sin trial). Crea una Checkout Session hosted y devuelve
+ * { url } para redirigir. La activación REAL la dispara el webhook
+ * (checkout.session.completed → activar_membresia). NO se activa acá.
  *
- * HOY (sin Stripe → falta STRIPE_SECRET_KEY):
- *   - { activated: false, reason: 'stripe_pendiente' }. La UI muestra "pago en
- *     camino — acercate a recepción". NO se cobra ni se activa (no fingimos un
- *     pago). Mientras tanto, recepción activa en mostrador
- *     (reception-activar-membresia).
- *
- * CONECTAR STRIPE — reemplazar el bloque [TODO STRIPE]:
- *   1. Crear stripe.checkout.sessions.create({ mode: 'subscription',
- *      line_items: [{ price: tier.stripe_price_id, quantity: 1 }],
- *      customer?: ..., metadata: { usuario_id, tier_id } }) y devolver { url }.
- *   2. iniciarCheckout (front) ya redirige si viene { url }.
- *   3. La activación la dispara el webhook → activar_membresia. NO activar acá.
+ * Sin STRIPE_SECRET_KEY (Stripe aún no conectado): responde
+ * { activated: false, reason: 'stripe_pendiente' } y recepción activa en
+ * mostrador. No fingimos pago.
  */
 
 interface Body {
@@ -61,7 +54,7 @@ export const handler: Handler = async (event) => {
 
     const { data: socio } = await asUser
       .from('usuarios')
-      .select('id, tenant_id, rol')
+      .select('id, tenant_id, rol, nombre, email')
       .eq('auth_id', authUser.id)
       .maybeSingle();
     if (!socio) return unauthorized('Sin perfil');
@@ -69,7 +62,7 @@ export const handler: Handler = async (event) => {
 
     const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
-    // Validar que el tier es del tenant y está activo.
+    // Validar que el tier es del tenant, está activo y tiene precio en Stripe.
     const { data: tier } = await admin
       .from('tiers')
       .select('id, slug, stripe_price_id, activo, tenant_id')
@@ -80,24 +73,43 @@ export const handler: Handler = async (event) => {
       return badRequest('Plan inválido');
     }
 
-    // ── [TODO STRIPE] ────────────────────────────────────────────────────────
-    // Con STRIPE_SECRET_KEY: crear Checkout Session y devolver { url }.
-    //   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-    //   const session = await stripe.checkout.sessions.create({
-    //     mode: 'subscription',
-    //     line_items: [{ price: tier.stripe_price_id, quantity: 1 }],
-    //     metadata: { usuario_id: socio.id, tier_id: tier.id },
-    //     success_url: ..., cancel_url: ...
-    //   });
-    //   return ok({ url: session.url });
+    // Sin Stripe configurado: no se cobra ni se activa. Recepción activa en mostrador.
     if (!process.env.STRIPE_SECRET_KEY) {
-      // Sin Stripe: no se cobra ni se activa. Recepción activa en mostrador.
       return ok({ activated: false, reason: 'stripe_pendiente' });
     }
-    // ──────────────────────────────────────────────────────────────────────────
+    if (!tier.stripe_price_id) {
+      return badRequest('Este plan aún no tiene precio configurado en Stripe');
+    }
 
-    // (Inalcanzable hasta completar el bloque de arriba; placeholder explícito.)
-    return ok({ activated: false, reason: 'stripe_pendiente' });
+    const stripe = getStripe();
+    const customerId = await getOrCreateCustomer(stripe, admin, {
+      id: socio.id,
+      email: socio.email ?? null,
+      nombre: socio.nombre ?? null
+    });
+
+    // Base de URLs: Netlify expone URL del sitio; fallback al origin del request.
+    const base =
+      optionalEnv('URL') ||
+      optionalEnv('DEPLOY_PRIME_URL') ||
+      event.headers.origin ||
+      '';
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: customerId,
+      line_items: [{ price: tier.stripe_price_id, quantity: 1 }],
+      // metadata en la session (checkout.session.completed) y en la suscripción
+      // (red de seguridad para el webhook). EKKO no tiene trial → sin trial_*.
+      metadata: { usuario_id: socio.id, tier_id: tier.id },
+      subscription_data: { metadata: { usuario_id: socio.id, tier_id: tier.id } },
+      payment_method_collection: 'always',
+      allow_promotion_codes: true,
+      success_url: `${base}/app/perfil?suscripcion=ok`,
+      cancel_url: `${base}/app/perfil?suscripcion=cancelado`
+    });
+
+    return ok({ url: session.url });
   } catch (err) {
     console.error('[suscribir-membresia]', err);
     return serverError(err instanceof Error ? err.message : 'Error inesperado');

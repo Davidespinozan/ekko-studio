@@ -37,3 +37,21 @@ export interface ActivarResult {
 export function activarMembresiaMostrador(usuario_id: string, tier: string): Promise<ActivarResult> {
   return backendPost<ActivarResult>('reception-activar-membresia', { usuario_id, tier });
 }
+
+/**
+ * Abre el Customer Portal de Stripe (cancelar, cambiar tarjeta, ver facturas).
+ * Redirige si la respuesta trae `{ url }`; si Stripe aún no está conectado
+ * devuelve `{ reason: 'stripe_pendiente' }` y el caller decide qué mostrar.
+ */
+export interface PortalResult {
+  url?: string;
+  reason?: string;
+}
+
+export async function abrirPortal(): Promise<PortalResult> {
+  const res = await backendPost<PortalResult>('stripe-portal', {});
+  if (res.url) {
+    window.location.href = res.url;
+  }
+  return res;
+}

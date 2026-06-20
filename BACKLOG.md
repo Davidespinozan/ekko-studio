@@ -17,12 +17,20 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
       (cobro en mostrador — funciona HOY).
 - [x] `suscribir-membresia` (self-serve → `stripe_pendiente` sin Stripe).
 - [x] `stripe-webhook` esqueleto + `checkout.ts` + `STRIPE.md` + `TODO STRIPE`.
-- [ ] **Conectar Stripe** (cuando David quiera cobrar online): env vars +
-      Checkout Session + activar en el webhook. Son los 3 pasos de `STRIPE.md`.
-- [ ] Cargar `tiers.stripe_price_id` por plan.
-- [ ] Migrar la UI del miembro (`MiSuscripcion`) de `change-plan` a
-      `iniciarCheckout` cuando se conecte Stripe.
-- [ ] Touchpoints que se "encienden": Método de pago, Historial de pagos.
+- [x] **Código de Stripe implementado** (Checkout Session + webhook idempotente
+      con guardia de orden + Customer Portal + `getOrCreateCustomer`). Patrones
+      de HSC. Migración `stripe_billing` (tabla de eventos + `cancel_at_period_end`
+      + `last_sub_event_at` + RPC `sync_membresia_stripe`). Dep `stripe` instalada.
+- [x] UI del miembro (`MiSuscripcion`) → `iniciarCheckout` + "Gestionar
+      suscripción" (portal) + banner de pago vencido (`past_due`).
+- [ ] **Conectar Stripe — pasos de David** (cuando quiera cobrar online): crear
+      cuenta + productos/precios, cargar `tiers.stripe_price_id`, env vars
+      `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` en Netlify, registrar el webhook
+      + habilitar el Customer Portal. Ver `STRIPE.md`.
+- [ ] Aplicar la migración `20260620120000_stripe_billing.sql` al Supabase de
+      EKKO (+ regenerar tipos, opcional).
+- [ ] (con pagos vivos) Registrar cada cobro en `payment_events` desde el
+      webhook para el "Historial de pagos" del miembro.
 
 ## 2. Deudas técnicas conocidas
 

@@ -76,11 +76,13 @@ export type Database = {
       }
       membresias: {
         Row: {
+          cancel_at_period_end: boolean
           cancelada_at: string | null
           cancelada_efectiva_at: string | null
           commitment_ends_at: string | null
           created_at: string
           id: string
+          last_sub_event_at: string | null
           periodo_actual_fin: string | null
           periodo_actual_inicio: string | null
           status: string
@@ -94,11 +96,13 @@ export type Database = {
           usuario_id: string
         }
         Insert: {
+          cancel_at_period_end?: boolean
           cancelada_at?: string | null
           cancelada_efectiva_at?: string | null
           commitment_ends_at?: string | null
           created_at?: string
           id?: string
+          last_sub_event_at?: string | null
           periodo_actual_fin?: string | null
           periodo_actual_inicio?: string | null
           status?: string
@@ -112,11 +116,13 @@ export type Database = {
           usuario_id: string
         }
         Update: {
+          cancel_at_period_end?: boolean
           cancelada_at?: string | null
           cancelada_efectiva_at?: string | null
           commitment_ends_at?: string | null
           created_at?: string
           id?: string
+          last_sub_event_at?: string | null
           periodo_actual_fin?: string | null
           periodo_actual_inicio?: string | null
           status?: string

@@ -1,12 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Sparkles, Check, CreditCard, ArrowRight, X } from 'lucide-react';
+import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Settings } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
-import { backendPost } from '@shared/lib/backend';
+import { iniciarCheckout, abrirPortal } from '@shared/lib/checkout';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
 import { TierBadge } from '@shared/components/TierBadge';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Spinner } from '@shared/components/Spinner';
+
+interface MembresiaInfo {
+  status: string | null;
+  stripe_subscription_id: string | null;
+  cancel_at_period_end: boolean | null;
+  periodo_actual_fin: string | null;
+}
 
 interface TierInfo {
   slug: string;
@@ -60,15 +67,17 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const toast = useToast();
   const [tiers, setTiers] = useState<TierInfo[]>([]);
   const [pagos, setPagos] = useState<PagoInfo[]>([]);
+  const [membresia, setMembresia] = useState<MembresiaInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [cambiarOpen, setCambiarOpen] = useState(false);
   const [currentSlug, setCurrentSlug] = useState<string | null>(tierSlug);
   const [cambiando, setCambiando] = useState<string | null>(null);
+  const [gestionando, setGestionando] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const [tiersRes, pagosRes] = await Promise.all([
+      const [tiersRes, pagosRes, memRes] = await Promise.all([
         supabase
           .from('tiers')
           .select('slug, nombre, precio_centavos, beneficios, descripcion')
@@ -80,7 +89,13 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           .select('id, monto_centavos, moneda, status, created_at')
           .eq('usuario_id', usuarioId)
           .order('created_at', { ascending: false })
-          .limit(12)
+          .limit(12),
+        supabase
+          .from('membresias')
+          .select('status, stripe_subscription_id, cancel_at_period_end, periodo_actual_fin')
+          .eq('usuario_id', usuarioId)
+          .order('created_at', { ascending: false })
+          .limit(1)
       ]);
       if (!mounted) return;
       setTiers(
@@ -93,26 +108,65 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
         }))
       );
       setPagos((pagosRes.data ?? []) as PagoInfo[]);
+      setMembresia(((memRes.data ?? [])[0] as MembresiaInfo | undefined) ?? null);
       setLoading(false);
     }
     load();
     return () => { mounted = false; };
   }, [tenant.id, usuarioId]);
 
+  // Retorno desde el Checkout de Stripe (?suscripcion=ok|cancelado).
+  useEffect(() => {
+    const estado = new URLSearchParams(window.location.search).get('suscripcion');
+    if (estado === 'ok') {
+      toast.success('¡Listo! Tu suscripción se está activando, puede tardar unos segundos.');
+    } else if (estado === 'cancelado') {
+      toast.info('Cancelaste el checkout. Tu plan no cambió.');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const planActual = tiers.find((t) => t.slug === currentSlug) ?? null;
   const statusMeta = STATUS_META[status ?? ''] ?? { texto: status ?? '—', clase: 'ek-badge--neutral' };
+  const tieneSuscripcion = !!membresia?.stripe_subscription_id;
+  const pagoVencido = membresia?.status === 'past_due';
+  const cancelaAlFin = membresia?.cancel_at_period_end === true;
+  const finPeriodo = membresia?.periodo_actual_fin
+    ? new Date(membresia.periodo_actual_fin).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
 
   async function cambiarPlan(destino: TierInfo) {
     setCambiando(destino.slug);
     try {
-      await backendPost('change-plan', { tier: destino.slug });
-      setCurrentSlug(destino.slug);
-      setCambiarOpen(false);
-      toast.success(`Tu plan ahora es ${destino.nombre}.`);
+      const res = await iniciarCheckout(destino.slug);
+      if (res.url) return; // iniciarCheckout ya redirige al Checkout de Stripe
+      if (res.reason === 'stripe_pendiente') {
+        setCambiarOpen(false);
+        toast.info('Acercate a recepción para activar tu nuevo plan, o escribinos por WhatsApp.');
+      } else if (res.activated) {
+        setCurrentSlug(destino.slug);
+        setCambiarOpen(false);
+        toast.success(`Tu plan ahora es ${destino.nombre}.`);
+      }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No pudimos cambiar tu plan. Intentá de nuevo.');
+      toast.error(e instanceof Error ? e.message : 'No pudimos iniciar el cambio. Intentá de nuevo.');
     } finally {
       setCambiando(null);
+    }
+  }
+
+  async function gestionarSuscripcion() {
+    setGestionando(true);
+    try {
+      const res = await abrirPortal();
+      if (res.url) return; // abrirPortal ya redirige al Customer Portal
+      if (res.reason === 'stripe_pendiente') {
+        toast.info('La gestión en línea estará disponible cuando el estudio active los pagos.');
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No pudimos abrir la gestión. Intentá de nuevo.');
+    } finally {
+      setGestionando(false);
     }
   }
 
@@ -126,6 +180,39 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
         <div className="ek-card"><Spinner size={18} label="Cargando tu plan…" /></div>
       ) : (
         <>
+          {/* Aviso de pago vencido (past_due): mantiene acceso, pide actualizar tarjeta */}
+          {pagoVencido && (
+            <div
+              role="alert"
+              className="ek-card"
+              style={{
+                marginBottom: '16px',
+                borderColor: 'var(--ek-warning)',
+                background: 'var(--ek-warning-soft)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '10px'
+              }}
+            >
+              <AlertTriangle size={18} style={{ color: 'var(--ek-warning)', flexShrink: 0, marginTop: '1px' }} aria-hidden="true" />
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>Tu último pago no se procesó</p>
+                <p className="ek-body-muted" style={{ margin: '4px 0 10px' }}>
+                  Actualizá tu método de pago para no perder el acceso al estudio.
+                </p>
+                <button
+                  type="button"
+                  className="ek-cta"
+                  style={{ padding: '9px 16px', fontSize: '13px' }}
+                  onClick={gestionarSuscripcion}
+                  disabled={gestionando}
+                >
+                  {gestionando ? <Spinner size={15} /> : 'Actualizar pago'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Plan actual */}
           <div className="ek-card--hero" style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
@@ -167,9 +254,27 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               </ul>
             )}
 
+            {cancelaAlFin && (
+              <p className="ek-helper-text" style={{ marginTop: 0, marginBottom: '12px', color: 'var(--ek-warning)' }}>
+                Tu plan se cancela{finPeriodo ? ` el ${finPeriodo}` : ' al terminar el período'}. Podés reactivarlo desde “Gestionar suscripción”.
+              </p>
+            )}
+
             <button type="button" className="ek-cta ek-cta--full" onClick={() => setCambiarOpen(true)}>
               Cambiar de plan <ArrowRight size={16} aria-hidden="true" />
             </button>
+
+            {tieneSuscripcion && (
+              <button
+                type="button"
+                className="ek-cta ek-cta--secondary ek-cta--full"
+                style={{ marginTop: '10px' }}
+                onClick={gestionarSuscripcion}
+                disabled={gestionando}
+              >
+                {gestionando ? <Spinner size={15} /> : <>Gestionar suscripción <Settings size={15} aria-hidden="true" /></>}
+              </button>
+            )}
           </div>
 
           {/* Método de pago e historial */}
@@ -224,7 +329,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               </button>
             </div>
             <p className="ek-body-muted" style={{ marginTop: 0, marginBottom: '18px' }}>
-              Elegí tu nuevo plan y coordinamos el cambio por WhatsApp.
+              Elegí tu nuevo plan. Te llevamos al pago seguro de Stripe.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -251,7 +356,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                       >
                         {cambiando === t.slug
                           ? <Spinner size={15} />
-                          : <>Cambiar a este <ArrowRight size={15} aria-hidden="true" /></>}
+                          : <>Elegir este <ArrowRight size={15} aria-hidden="true" /></>}
                       </button>
                     )}
                   </div>
@@ -260,7 +365,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             </div>
 
             <p className="ek-helper-text" style={{ marginTop: '14px' }}>
-              El cambio se aplica al instante. El cobro proporcional se gestiona en tu próximo período.
+              El cobro lo procesa Stripe de forma segura. El cobro proporcional se ajusta en tu próximo período.
             </p>
           </div>
         </div>

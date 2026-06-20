@@ -112,3 +112,13 @@ completo en `KERNEL.md`.
 - **Plug-and-play Stripe:** todo cableado; conectar Stripe = 3 pasos (env +
   Checkout Session en `suscribir-membresia` + activar en `stripe-webhook`). Ver
   `STRIPE.md` y los marcadores `TODO STRIPE`.
+- **EKKO-007 — Billing de Stripe implementado (2026-06-20):** Checkout hosted
+  (redirect, sin trial), webhook con **idempotencia** (`stripe_webhook_events`,
+  dedupe por `event.id` + borrado-en-error para reintento) y **guardia de orden**
+  (`membresias.last_sub_event_at`), Customer Portal (`stripe-portal`), y
+  `getOrCreateCustomer` (match por `metadata.usuario_id`, no email). Activación
+  por el RPC keystone `activar_membresia`; cambios de estado por
+  `sync_membresia_stripe`. **Precios desde `tiers.stripe_price_id` en DB** (NO
+  lookup_keys — EKKO es single-tenant, una moneda). **Stripe estándar, cuenta
+  del cliente** (NO Connect — no es plataforma multi-negocio). Patrones tomados
+  de HSC. Faltan solo los pasos de cuenta/precios/env (ver `STRIPE.md`).
