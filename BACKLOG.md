@@ -49,7 +49,7 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
 ## 4. Madurez visual (aprendido de SALA — ver `docs/audit/ekko-vs-sala-madurez.md`)
 
 - [ ] **PageHeader compartido** — reemplazar los headers hand-rolled de recepción.
-- [ ] **ConexionBanner** — banner global offline (acciones que fallan sin red).
+- [x] **ConexionBanner** — banner global offline (montado en App.tsx).
 - [ ] **PwaInstallBanner** — invitar a instalar la PWA (iPad recepción + móvil).
 - [ ] (cosmético) `MagneticButton` / `HeroCarousel` en el landing.
 - [ ] (opcional) Hero mobile dedicado en la landing.
