@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Wrench } from 'lucide-react';
 import VistaSemana from '@shared/components/calendario/VistaSemana';
 import ReservasVistaLista from '@admin/components/ReservasVistaLista';
 import DetalleReservaModal from '@admin/components/DetalleReservaModal';
+import { EstudiosServicioModal } from '@shared/components/EstudiosServicioModal';
 
 /**
  * "Agenda" de recepción (Bloque B/C) — VER reservas del estudio, read-only.
@@ -26,6 +28,7 @@ function vistaInicial(): Vista {
 export default function Agenda() {
   const [vista, setVista] = useState<Vista>(vistaInicial);
   const [detalleId, setDetalleId] = useState<string | null>(null);
+  const [estudiosOpen, setEstudiosOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -64,7 +67,18 @@ export default function Agenda() {
             Reservas del estudio
           </h1>
         </div>
-        <VistaToggle value={vista} onChange={setVista} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => setEstudiosOpen(true)}
+            className="ek-cta ek-cta--secondary"
+            style={{ minHeight: '44px', padding: '0 14px', fontSize: '13px' }}
+            title="Marcar estudios fuera de servicio"
+          >
+            <Wrench size={15} aria-hidden="true" /> Estudios
+          </button>
+          <VistaToggle value={vista} onChange={setVista} />
+        </div>
       </div>
 
       {vista === 'semana' ? (
@@ -78,6 +92,8 @@ export default function Agenda() {
       )}
 
       <DetalleReservaModal reservaId={detalleId} onClose={() => setDetalleId(null)} />
+
+      {estudiosOpen && <EstudiosServicioModal onClose={() => setEstudiosOpen(false)} />}
     </div>
   );
 }

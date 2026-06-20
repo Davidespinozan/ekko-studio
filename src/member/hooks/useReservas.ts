@@ -117,6 +117,7 @@ export function useRecursosDelTenant() {
         .select('*')
         .eq('tenant_id', tenant.id)
         .eq('activo', true)
+        .eq('fuera_de_servicio', false) // Bloque F: no ofrecer estudios fuera de servicio
         .order('orden', { ascending: true });
 
       if (!isMounted) return;

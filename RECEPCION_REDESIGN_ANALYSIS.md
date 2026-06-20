@@ -305,10 +305,14 @@ Agrupado en bloques lógicos. Dimensión: 🟢 chico · 🟡 mediano · 🔴 gra
 - Cerrada la deuda de D: el cron `marcar_no_shows` ahora escribe `audit_log` por miembro afectado.
 - Detalle en `KERNEL.md` → "Bloque E".
 
-### Bloque F — Recurso fuera de servicio temporal 🟢
-- Depende de: nada.
-- Riesgo: medio (afecta reservas existentes — definir qué pasa con reservas ya hechas).
-- Prioridad: baja.
+### Bloque F — Recurso fuera de servicio temporal 🟢 — ✅ HECHO
+- Entregado: `recursos.fuera_de_servicio` + trigger que bloquea reservas nuevas;
+  `reception-recurso-servicio` (toggle + auto-cancela futuras + notifica + audit);
+  `EstudiosServicioModal` compartido en Agenda (recepción) y Recursos (admin); oculto
+  en los flujos de reserva (member + recepción).
+- Decisiones de David: lo marcan **admin + recepción**; las reservas afectadas se
+  **auto-cancelan + notifican**. Detalle en `KERNEL.md` → "Bloque F".
+- **Con esto el rediseño de recepción (A–F) queda completo.**
 
 ### POST-LAUNCH (no bloqueante para abrir Cravia)
 - **Pagos en mostrador (#9)** — bloqueado por D4 + Stripe. Post-launch obligado.

@@ -225,6 +225,7 @@ export function traducirErrorRPC(message: string): string {
   if (message.includes('EKKO_USUARIO_BLOQUEADO')) return 'Tu cuenta tiene una restricción activa.';
   if (message.includes('EKKO_RECURSO_NO_EXISTE')) return 'El estudio no está disponible.';
   if (message.includes('EKKO_RECURSO_INACTIVO')) return 'Este estudio no está disponible.';
+  if (message.includes('EKKO_RECURSO_FUERA_SERVICIO')) return 'Este estudio está temporalmente fuera de servicio.';
   if (message.includes('EKKO_TIER_NO_PERMITIDO')) return 'Tu plan no tiene acceso a este estudio.';
   if (message.includes('EKKO_TIER_NO_PERMITE')) return 'Tu plan no incluye acceso a este estudio.';
   if (message.includes('EKKO_INVITADOS_EXCEDEN')) return 'Tu plan no permite tantos invitados.';

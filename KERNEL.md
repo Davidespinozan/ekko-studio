@@ -1450,6 +1450,33 @@ la deuda del cron reportada en D.
   de `no_shows_count`/`bloqueado_hasta` y `metadata` reserva/folio.
 - **No incluido:** recurso fuera de servicio (Bloque F).
 
+## Bloque F — Recurso fuera de servicio (temporal)
+
+Cierra el rediseño de recepción. "Fuera de servicio" = el estudio sigue
+visible/activo pero **no se puede reservar por un rato** (mantenimiento),
+distinto de archivar (`activo=false`, permanente).
+
+- **`recursos.fuera_de_servicio` (boolean) + `fuera_de_servicio_motivo`**
+  (`20260612100000_recurso_fuera_servicio.sql`).
+- **Enforcement por trigger** `BEFORE INSERT ON reservas`: rechaza cualquier
+  reserva nueva en un estudio fuera de servicio (`EKKO_RECURSO_FUERA_SERVICIO`).
+  Se hizo por trigger y **NO** reescribiendo `reservar_recurso_atomic` /
+  `reservar_para_miembro_atomic` (ruta crítica) — una pieza chica cubre todo
+  path. El traductor compartido mapea el código nuevo.
+- **`reception-recurso-servicio`** (Netlify Function, service_role): togglea el
+  flag. Al marcar fuera de servicio **auto-cancela las reservas futuras
+  confirmadas** del estudio (`cancelada_admin`) y **notifica** a cada miembro
+  (mismo formato que `cancelar_reserva_atomic`); audit_log
+  (`recurso_fuera_servicio` / `recurso_reactivado`, target_tipo='recurso', con
+  `reservas_canceladas`). Reactivar no restaura reservas.
+- **UI compartida** `EstudiosServicioModal` (lista de estudios + toggle con
+  confirmación), montada desde **Agenda** (recepción) y **Recursos** (admin) —
+  ambos roles pueden marcarlo (decisión de David).
+- **Oculto en los flujos de reserva**: `useRecursosDelTenant` agrega
+  `.eq('fuera_de_servicio', false)` → member y recepción no lo ofrecen (defensa
+  en profundidad junto al trigger).
+- Verificación: `supabase/tests/recurso_fuera_servicio_checks.sql` (estructural).
+
 ## Onboarding de un tenant nuevo
 
 Ver [TENANT_SETUP.md](TENANT_SETUP.md) en este mismo directorio.

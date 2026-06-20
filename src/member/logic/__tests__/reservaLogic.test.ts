@@ -38,6 +38,8 @@ function makeRecurso(overrides: Partial<Recurso> = {}): Recurso {
     fotos_urls: [],
     video_url: null,
     activo: true,
+    fuera_de_servicio: false,
+    fuera_de_servicio_motivo: null,
     orden: 1,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',

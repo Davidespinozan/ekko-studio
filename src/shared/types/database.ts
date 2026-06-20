@@ -355,6 +355,8 @@ export type Database = {
           estilo_visual: string | null
           foto_url: string | null
           fotos_urls: string[]
+          fuera_de_servicio: boolean
+          fuera_de_servicio_motivo: string | null
           horarios: Json
           id: string
           nombre: string
@@ -377,6 +379,8 @@ export type Database = {
           estilo_visual?: string | null
           foto_url?: string | null
           fotos_urls?: string[]
+          fuera_de_servicio?: boolean
+          fuera_de_servicio_motivo?: string | null
           horarios?: Json
           id?: string
           nombre: string
@@ -399,6 +403,8 @@ export type Database = {
           estilo_visual?: string | null
           foto_url?: string | null
           fotos_urls?: string[]
+          fuera_de_servicio?: boolean
+          fuera_de_servicio_motivo?: string | null
           horarios?: Json
           id?: string
           nombre?: string

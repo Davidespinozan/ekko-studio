@@ -10,9 +10,11 @@ import {
   Check,
   Circle,
   X,
-  Clapperboard
+  Clapperboard,
+  Wrench
 } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { EstudiosServicioModal } from '@shared/components/EstudiosServicioModal';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
 import { useRecursosAdmin, updateRecurso, insertRecurso } from '../hooks/useAdminData';
@@ -115,6 +117,7 @@ export default function Recursos() {
   const [mostrarArchivados, setMostrarArchivados] = useState(false);
   const [duplicandoId, setDuplicandoId] = useState<string | null>(null);
   const [restaurandoId, setRestaurandoId] = useState<string | null>(null);
+  const [servicioOpen, setServicioOpen] = useState(false);
 
   const { activos, archivados } = useMemo(() => {
     return {
@@ -219,10 +222,17 @@ export default function Recursos() {
             </p>
           )}
         </div>
-        <button onClick={() => setModal({ mode: 'create' })} className="ek-cta">
-          + Nuevo estudio
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <button onClick={() => setServicioOpen(true)} className="ek-cta ek-cta--secondary" style={{ minHeight: '44px' }}>
+            <Wrench size={15} aria-hidden="true" /> Fuera de servicio
+          </button>
+          <button onClick={() => setModal({ mode: 'create' })} className="ek-cta">
+            + Nuevo estudio
+          </button>
+        </div>
       </div>
+
+      {servicioOpen && <EstudiosServicioModal onClose={() => setServicioOpen(false)} />}
 
       {isLoading ? (
         <Spinner label="Cargando…" />
