@@ -14,9 +14,15 @@
   --ek-ink-faint:    #555555;
 
   /* Brand */
-  --ek-mustard:      #e5b829;
-  --ek-mustard-dim:  rgba(229, 184, 41, 0.18);
-  --ek-mustard-soft: rgba(229, 184, 41, 0.08);
+  --ek-mustard:        #e5b829;
+  --ek-mustard-hover:  #efc23f;  /* +luz para hover */
+  --ek-mustard-active: #c9a01f;  /* -luz para pressed */
+  --ek-mustard-dim:    rgba(229, 184, 41, 0.18);
+  --ek-mustard-soft:   rgba(229, 184, 41, 0.08);
+  --ek-mustard-tint:   rgba(229, 184, 41, 0.04);  /* wash apenas perceptible */
+  --ek-mustard-glow:        rgba(229, 184, 41, 0.30);
+  --ek-mustard-glow-strong: rgba(229, 184, 41, 0.45);
+  --ek-mustard-ring:   rgba(229, 184, 41, 0.55);   /* focus ring */
 
   /* Lines */
   --ek-line:         rgba(245, 241, 232, 0.08);
@@ -28,7 +34,13 @@
   --ek-danger:       #e25555;
   --ek-danger-soft:  rgba(226, 85, 85, 0.12);
   --ek-warning:      #e5b829;
+  --ek-warning-soft: rgba(229, 184, 41, 0.12);
   --ek-info:         #6aa3d4;
+  --ek-info-soft:    rgba(106, 163, 212, 0.12);
+
+  /* Easing — curva "premium" (la misma de las animaciones de modal) */
+  --ek-ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+  --ek-ease-out:     cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Shadows */
   --ek-shadow-card:    0 12px 24px rgba(0, 0, 0, 0.3);
@@ -113,7 +125,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
 /* Custom focus visible (technique #12) */
 *:focus-visible {
-  outline: 2px solid rgba(229, 184, 41, 0.55);
+  outline: 2px solid var(--ek-mustard-ring);
   outline-offset: 2px;
   border-radius: 8px;
 }
@@ -334,10 +346,16 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-card--elevated { box-shadow: var(--ek-shadow-hero); }
 
-  .ek-card-interactive { cursor: pointer; }
+  .ek-card-interactive {
+    cursor: pointer;
+    transition: border-color 0.2s var(--ek-ease-out),
+                transform 0.2s var(--ek-ease-out),
+                box-shadow 0.2s var(--ek-ease-out);
+  }
   .ek-card-interactive:hover {
-    border-color: var(--ek-line-strong);
+    border-color: var(--ek-mustard-dim);
     transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
   }
 
   .ek-stat-card {
@@ -372,6 +390,11 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     justify-content: center;
     gap: 6px;
     text-decoration: none;
+    transition: border-color 0.22s var(--ek-ease-out),
+                transform 0.22s var(--ek-ease-out),
+                box-shadow 0.22s var(--ek-ease-out),
+                background 0.22s var(--ek-ease-out),
+                filter 0.22s var(--ek-ease-out);
   }
 
   .ek-cta:hover,
@@ -452,6 +475,9 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     font-size: 15px;
     min-height: 44px;
     line-height: 1.4;
+    transition: border-color 0.18s var(--ek-ease-out),
+                box-shadow 0.18s var(--ek-ease-out),
+                background 0.18s var(--ek-ease-out);
   }
 
   .ek-input::placeholder { color: var(--ek-ink-faint); }
@@ -2559,13 +2585,16 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
 /* --- CTA gold: relleno mostaza + texto negro (botón principal con vida) -- */
 .ek-cta--gold {
-  background: linear-gradient(150deg, var(--ek-mustard) 0%, #d8a91f 100%) !important;
+  background: linear-gradient(150deg, var(--ek-mustard) 0%, var(--ek-mustard-active) 100%) !important;
   color: var(--ek-bg) !important;
   border-color: transparent !important;
-  box-shadow: 0 8px 24px rgba(229, 184, 41, 0.3) !important;
+  box-shadow: 0 8px 24px var(--ek-mustard-glow) !important;
+  transition: box-shadow 0.28s var(--ek-ease-premium),
+              transform 0.28s var(--ek-ease-premium),
+              filter 0.28s var(--ek-ease-premium);
 }
 .ek-cta--gold:hover {
-  box-shadow: 0 12px 32px rgba(229, 184, 41, 0.45) !important;
+  box-shadow: 0 12px 32px var(--ek-mustard-glow-strong) !important;
   transform: translateY(-1px);
   filter: brightness(1.04);
 }
