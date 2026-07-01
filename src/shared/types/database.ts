@@ -634,6 +634,8 @@ export type Database = {
           slug: string
           status: string
           stripe_account_id: string | null
+          stripe_charges_enabled: boolean
+          stripe_details_submitted: boolean
           stripe_subscription_product_id: string | null
           updated_at: string
           vertical: string
@@ -649,6 +651,8 @@ export type Database = {
           slug: string
           status?: string
           stripe_account_id?: string | null
+          stripe_charges_enabled?: boolean
+          stripe_details_submitted?: boolean
           stripe_subscription_product_id?: string | null
           updated_at?: string
           vertical?: string
@@ -664,6 +668,8 @@ export type Database = {
           slug?: string
           status?: string
           stripe_account_id?: string | null
+          stripe_charges_enabled?: boolean
+          stripe_details_submitted?: boolean
           stripe_subscription_product_id?: string | null
           updated_at?: string
           vertical?: string
