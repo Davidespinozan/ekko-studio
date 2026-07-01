@@ -69,14 +69,16 @@ describe('MiSuscripcion', () => {
     await waitFor(() => expect(screen.getByText('Sin pagos registrados')).toBeInTheDocument());
   });
 
-  it('cambiar de plan abre el checkout de Stripe (suscribir-membresia)', async () => {
+  it('cambiar de plan abre el modal de pago propio (Elements)', async () => {
     renderComp('pro');
     await waitFor(() => expect(screen.getByText('Cambiar de plan')).toBeInTheDocument());
     fireEvent.click(screen.getByText('Cambiar de plan'));
     await waitFor(() => expect(screen.getByText('CAMBIAR DE PLAN')).toBeInTheDocument());
-    // El plan no-actual (Básica) ofrece elegir
+    // Elegir el plan no-actual (Básica) abre el PaymentModal de EKKO.
     fireEvent.click(screen.getByText('Elegir este'));
-    await waitFor(() => expect(h.backend).toHaveBeenCalledWith('suscribir-membresia', { tier: 'basica' }));
+    // Sin VITE_STRIPE_PUBLISHABLE_KEY en test, el modal muestra el estado pendiente.
+    await waitFor(() => expect(screen.getByText('PAGO SEGURO')).toBeInTheDocument());
+    expect(screen.getByText(/no está disponible/i)).toBeInTheDocument();
   });
 
   it('muestra el banner de pago vencido cuando la membresía está past_due', async () => {

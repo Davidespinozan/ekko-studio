@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Settings, Ticket } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
-import { iniciarCheckout, abrirPortal } from '@shared/lib/checkout';
+import { abrirPortal } from '@shared/lib/checkout';
+import { PaymentModal } from '@shared/components/PaymentModal';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
 import { TierBadge } from '@shared/components/TierBadge';
@@ -23,6 +24,7 @@ interface TierInfo {
   precio_centavos: number;
   beneficios: Beneficio[];
   descripcion: string | null;
+  tipo: string;
 }
 
 interface PagoInfo {
@@ -59,9 +61,9 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const [membresia, setMembresia] = useState<MembresiaInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [cambiarOpen, setCambiarOpen] = useState(false);
-  const [currentSlug, setCurrentSlug] = useState<string | null>(tierSlug);
-  const [cambiando, setCambiando] = useState<string | null>(null);
+  const currentSlug = tierSlug;
   const [gestionando, setGestionando] = useState(false);
+  const [pagarTier, setPagarTier] = useState<TierInfo | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -69,7 +71,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
       const [tiersRes, pagosRes, memRes] = await Promise.all([
         supabase
           .from('tiers')
-          .select('slug, nombre, precio_centavos, beneficios, descripcion')
+          .select('slug, nombre, precio_centavos, beneficios, descripcion, tipo')
           .eq('tenant_id', tenant.id)
           .eq('activo', true)
           .order('precio_centavos', { ascending: true }),
@@ -93,7 +95,8 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           nombre: t.nombre,
           precio_centavos: t.precio_centavos,
           beneficios: parseBeneficios(t.beneficios),
-          descripcion: t.descripcion
+          descripcion: t.descripcion,
+          tipo: t.tipo
         }))
       );
       setPagos((pagosRes.data ?? []) as PagoInfo[]);
@@ -125,24 +128,10 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
     ? new Date(membresia.periodo_actual_fin).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
     : null;
 
-  async function cambiarPlan(destino: TierInfo) {
-    setCambiando(destino.slug);
-    try {
-      const res = await iniciarCheckout(destino.slug);
-      if (res.url) return; // iniciarCheckout ya redirige al Checkout de Stripe
-      if (res.reason === 'stripe_pendiente') {
-        setCambiarOpen(false);
-        toast.info('Acercate a recepción para activar tu nuevo plan, o escribinos por WhatsApp.');
-      } else if (res.activated) {
-        setCurrentSlug(destino.slug);
-        setCambiarOpen(false);
-        toast.success(`Tu plan ahora es ${destino.nombre}.`);
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No pudimos iniciar el cambio. Intentá de nuevo.');
-    } finally {
-      setCambiando(null);
-    }
+  // Abre el modal de pago propio (Elements) para el plan elegido.
+  function cambiarPlan(destino: TierInfo) {
+    setCambiarOpen(false);
+    setPagarTier(destino);
   }
 
   async function gestionarSuscripcion() {
@@ -345,7 +334,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               </button>
             </div>
             <p className="ek-body-muted" style={{ marginTop: 0, marginBottom: '18px' }}>
-              Elegí tu nuevo plan. Te llevamos al pago seguro de Stripe.
+              Elegí tu nuevo plan. Pagás de forma segura sin salir de la app.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -368,11 +357,8 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                         className="ek-cta"
                         style={{ padding: '10px 16px', fontSize: '13px' }}
                         onClick={() => cambiarPlan(t)}
-                        disabled={cambiando !== null}
                       >
-                        {cambiando === t.slug
-                          ? <Spinner size={15} />
-                          : <>Elegir este <ArrowRight size={15} aria-hidden="true" /></>}
+                        Elegir este <ArrowRight size={15} aria-hidden="true" />
                       </button>
                     )}
                   </div>
@@ -385,6 +371,21 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Pago in-app (modal propio de EKKO con Stripe Elements) */}
+      {pagarTier && (
+        <PaymentModal
+          tierSlug={pagarTier.slug}
+          tierNombre={pagarTier.nombre}
+          precio={Math.round(pagarTier.precio_centavos / 100)}
+          esPaquete={pagarTier.tipo === 'creditos' || pagarTier.tipo === 'hibrido'}
+          onClose={() => setPagarTier(null)}
+          onPagado={() => {
+            setPagarTier(null);
+            toast.success('¡Pago recibido! Tu plan se está activando, puede tardar unos segundos.');
+          }}
+        />
       )}
     </section>
   );

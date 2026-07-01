@@ -103,6 +103,24 @@ describe('stripe-webhook', () => {
     }));
   });
 
+  it('invoice.paid 1ª factura → activar_membresia leyendo metadata de la suscripción', async () => {
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_1', type: 'invoice.paid', created: 1700000000,
+      data: { object: { subscription: 'sub_1', billing_reason: 'subscription_create' } }
+    });
+    mockSubRetrieve.mockResolvedValue({
+      current_period_end: 1700000000,
+      customer: 'cus_1',
+      metadata: { usuario_id: 'u1', tier_id: 't1' }
+    });
+    const res = await invocar();
+    expect(res.statusCode).toBe(200);
+    expect(mockSubRetrieve).toHaveBeenCalledWith('sub_1');
+    expect(mockRpc).toHaveBeenCalledWith('activar_membresia', expect.objectContaining({
+      p_usuario_id: 'u1', p_tier_id: 't1', p_stripe_subscription_id: 'sub_1'
+    }));
+  });
+
   it('customer.subscription.updated → sync_membresia_stripe', async () => {
     mockConstructEvent.mockReturnValue({
       id: 'evt_1', type: 'customer.subscription.updated', created: 1700000000,

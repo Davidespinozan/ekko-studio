@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { ArrowLeft, Star, Check, Eye, EyeOff, AlertCircle, User, ShieldCheck } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios } from '@shared/lib/beneficios';
-import { iniciarCheckout } from '@shared/lib/checkout';
+import { PaymentModal } from '@shared/components/PaymentModal';
 import { Spinner } from '@shared/components/Spinner';
 
 type Tier = 'basica' | 'pro';
@@ -13,6 +13,7 @@ interface PlanInfo {
   precio: number;
   tier: Tier;
   beneficios: string[];
+  esPaquete: boolean;
 }
 
 interface TierRow {
@@ -20,6 +21,7 @@ interface TierRow {
   nombre: string;
   precio_centavos: number;
   beneficios: unknown;
+  tipo: string;
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -33,7 +35,7 @@ function useTierPorSlug(slug: string) {
     async function load() {
       const { data, error } = await supabase
         .from('tiers')
-        .select('slug, nombre, precio_centavos, beneficios')
+        .select('slug, nombre, precio_centavos, beneficios, tipo')
         .eq('slug', slug)
         .eq('activo', true)
         .maybeSingle();
@@ -64,7 +66,8 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [listo, setListo] = useState(false); // cuenta creada → pantalla de bienvenida
+  const [pagarOpen, setPagarOpen] = useState(false); // cuenta creada → modal de pago
+  const [listo, setListo] = useState(false); // pago/registro concluido → bienvenida
 
   const plan: PlanInfo | null = tierRow
     ? {
@@ -74,7 +77,8 @@ export default function Signup() {
         beneficios: parseBeneficios(tierRow.beneficios)
           .filter((b) => b.incluido)
           .map((b) => b.label)
-          .slice(0, 4)
+          .slice(0, 4),
+        esPaquete: tierRow.tipo === 'creditos' || tierRow.tipo === 'hibrido'
       }
     : null;
 
@@ -155,11 +159,9 @@ export default function Signup() {
         throw new Error('Cuenta creada pero no pudimos iniciar sesión. Iniciá sesión manualmente.');
       }
 
-      // Pago: si Stripe está conectado, iniciarCheckout redirige a la pasarela.
-      // Si no, cae a la pantalla de bienvenida (el pago se coordina en recepción).
-      const checkout = await iniciarCheckout(plan!.tier);
-      if (checkout.url) return; // redirigiendo a Stripe
-      setListo(true);
+      // Cuenta creada + sesión activa → abrir el modal de pago propio (Elements).
+      // Si Stripe no está conectado, el modal muestra "activá en recepción".
+      setPagarOpen(true);
     } catch (err) {
       console.error('[Signup]', err);
       setError(err instanceof Error ? err.message : 'Error inesperado. Intentá de nuevo.');
@@ -401,6 +403,17 @@ export default function Signup() {
           ¿Ya tienes cuenta? <Link to="/login" style={{ color: 'var(--ek-mustard)' }}>Iniciar sesión</Link>
         </p>
       </form>
+
+      {pagarOpen && (
+        <PaymentModal
+          tierSlug={plan.tier}
+          tierNombre={plan.nombre}
+          precio={plan.precio}
+          esPaquete={plan.esPaquete}
+          onClose={() => { setPagarOpen(false); setListo(true); }}
+          onPagado={() => { setPagarOpen(false); setListo(true); }}
+        />
+      )}
     </div>
   );
 }

@@ -57,13 +57,20 @@ responde `400` "plan sin precio configurado".
 ```
 STRIPE_SECRET_KEY=sk_test_...        # luego sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...   # front (pago in-app con Elements)
 ```
 (Ya existen `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.)
 
 Y en el dashboard de Stripe: apuntar el **webhook endpoint** a
 `/.netlify/functions/stripe-webhook` con los eventos:
-`checkout.session.completed`, `customer.subscription.updated`,
-`customer.subscription.deleted`, `invoice.payment_failed`, `invoice.paid`.
+`payment_intent.succeeded`, `invoice.paid`, `invoice.payment_failed`,
+`customer.subscription.updated`, `customer.subscription.deleted`
+(+ `checkout.session.completed` si se usa el Checkout hosted como fallback).
+
+> **Pago in-app (Elements):** el cobro ocurre en el modal propio de EKKO
+> (`PaymentModal` + `crear-pago-intent`), sin redirigir. Con Elements la
+> activación llega por `invoice.paid`(subscription_create) / `payment_intent.succeeded`,
+> NO por `checkout.session.completed`.
 
 > El **Customer Portal** se habilita una vez en el dashboard de Stripe
 > (Settings → Billing → Customer portal): activar cancelar, cambiar método de

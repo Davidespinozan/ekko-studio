@@ -154,6 +154,22 @@ completo en `KERNEL.md`.
   idea de pedir estos datos en el signup (fricción + PCI: el signup NO debe
   capturar tarjeta cruda, va por Stripe).
 
+## Pago in-app (Stripe Elements)
+
+- **EKKO-011 — Modal de pago propio con Stripe Elements (2026-06-20):** el pago se
+  hace DENTRO de la app (modal EKKO con `<PaymentElement>` + `appearance` de la
+  marca), NO se redirige a la página hosted de Stripe. El campo de tarjeta es un
+  iframe seguro de Stripe → cero PCI en EKKO. Backend `crear-pago-intent`:
+  mensual = subscription `default_incomplete` (client_secret de la 1ª factura,
+  cobro inmediato + 3DS en el modal, sin trial); paquete = PaymentIntent (pago
+  único). El front confirma con `confirmPayment` (`redirect:'if_required'`).
+  Activación por webhook: `invoice.paid` con `billing_reason='subscription_create'`
+  (crea la membresía) y `payment_intent.succeeded` con metadata (paquete);
+  renovación/past_due/cancelación siguen por `sync_membresia_stripe`. Reemplaza el
+  redirect de `iniciarCheckout` en Signup y MiSuscripción (el Checkout hosted queda
+  como fallback). Env nueva: `VITE_STRIPE_PUBLISHABLE_KEY`. Patrón de HSC (Elements)
+  adaptado a suscripción sin trial. **Requiere validación en modo test.**
+
 ## Notificaciones
 
 - **EKKO-008 — Web Push implementado (2026-06-20):** entrega fuera de la app
