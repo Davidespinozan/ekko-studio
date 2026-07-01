@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { ToastProvider } from '@shared/providers/ToastProvider';
 import ConexionBanner from '@shared/components/ConexionBanner';
+import PwaInstallBanner from '@shared/components/PwaInstallBanner';
 
 const PublicLayout = lazy(() => import('@public/PublicLayout'));
 const MemberLayout = lazy(() => import('@member/MemberLayout'));
@@ -13,6 +14,7 @@ export default function App() {
   return (
     <ToastProvider>
       <ConexionBanner />
+      <PwaInstallBanner />
       <Suspense fallback={<LoadingScreen />}>
         <Routes>
           <Route path="/app/*" element={<MemberLayout />} />

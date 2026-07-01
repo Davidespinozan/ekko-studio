@@ -58,7 +58,8 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
 
 - [ ] **PageHeader compartido** — reemplazar los headers hand-rolled de recepción.
 - [x] **ConexionBanner** — banner global offline (montado en App.tsx).
-- [ ] **PwaInstallBanner** — invitar a instalar la PWA (iPad recepción + móvil).
+- [x] **PwaInstallBanner** — invita a instalar la PWA (Android/Chrome vía
+      beforeinstallprompt, iOS con instrucciones; dismissible, montado en App.tsx).
 - [ ] (cosmético) `MagneticButton` / `HeroCarousel` en el landing.
 - [ ] (opcional) Hero mobile dedicado en la landing.
 
