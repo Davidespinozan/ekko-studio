@@ -58,6 +58,11 @@ export default function Login() {
       }
 
       // 3. Validar status ANTES del redirect (evita el flash de /app).
+      // Excepción: `pendiente_pago` entra a /app para pagar su membresía (self-serve).
+      if (perfil.status === 'pendiente_pago') {
+        navigate('/app', { replace: true });
+        return;
+      }
       const validacion = validarStatusCuenta(perfil);
       if (!validacion.permitido) {
         await supabase.auth.signOut();

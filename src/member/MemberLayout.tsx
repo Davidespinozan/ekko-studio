@@ -9,6 +9,7 @@ import NotificacionesBanner from './components/NotificacionesBanner';
 import { BottomNav } from './components/BottomNav';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
+const PagarMembresia = lazy(() => import('./pages/PagarMembresia'));
 const Reservar = lazy(() => import('./pages/Reservar'));
 const Perfil = lazy(() => import('./pages/Perfil'));
 const MiQR = lazy(() => import('./pages/MiQR'));
@@ -24,19 +25,30 @@ export default function MemberLayout() {
   // Acá cubrimos la sesión vieja cuyo status cambió mientras estaba dentro.
   const validacion = usuario ? validarStatusCuenta(usuario) : null;
 
+  // `pendiente_pago` NO se echa: puede pagar su membresía self-serve (abajo).
+  const pendientePago = usuario?.status === 'pendiente_pago';
+
   useEffect(() => {
     if (isLoading) return;
     if (!authUser || !usuario) return;
     if (validarStatusCuenta(usuario).permitido) return;
+    if (pendientePago) return; // se queda para pagar
     if (yaCerrado.current) return;
     yaCerrado.current = true;
     // signOut limpia la sesión; el Navigate de abajo redirige a /login
     // con el mensaje claro (no flash, no deslogueo silencioso).
     void signOut();
-  }, [authUser, usuario, isLoading, signOut]);
+  }, [authUser, usuario, isLoading, signOut, pendientePago]);
 
   if (isLoading) return <LoadingScreen />;
   if (!authUser) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (pendientePago) {
+    return (
+      <Suspense fallback={<LoadingScreen />}>
+        <PagarMembresia />
+      </Suspense>
+    );
+  }
   if (usuario && validacion && !validacion.permitido) {
     return <Navigate to="/login" state={{ mensaje: validacion.mensaje }} replace />;
   }

@@ -1,9 +1,8 @@
 import { useEffect, useState, FormEvent } from 'react';
-import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, Star, Check, Eye, EyeOff, AlertCircle, User, ShieldCheck } from 'lucide-react';
+import { useSearchParams, Link, Navigate } from 'react-router-dom';
+import { ArrowLeft, Star, Check, Eye, EyeOff, AlertCircle, User } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios } from '@shared/lib/beneficios';
-import { PaymentModal } from '@shared/components/PaymentModal';
 import { Spinner } from '@shared/components/Spinner';
 
 type Tier = 'basica' | 'pro';
@@ -53,7 +52,6 @@ function useTierPorSlug(slug: string) {
 }
 
 export default function Signup() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tierParam = (searchParams.get('tier') as Tier) || 'basica';
   const { tier: tierRow, isLoading: tierLoading } = useTierPorSlug(tierParam);
@@ -66,8 +64,6 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pagarOpen, setPagarOpen] = useState(false); // cuenta creada → modal de pago
-  const [listo, setListo] = useState(false); // pago/registro concluido → bienvenida
 
   const plan: PlanInfo | null = tierRow
     ? {
@@ -159,9 +155,9 @@ export default function Signup() {
         throw new Error('Cuenta creada pero no pudimos iniciar sesión. Iniciá sesión manualmente.');
       }
 
-      // Cuenta creada + sesión activa → abrir el modal de pago propio (Elements).
-      // Si Stripe no está conectado, el modal muestra "activá en recepción".
-      setPagarOpen(true);
+      // Cuenta creada + sesión activa. El login dispara el redirect a /app
+      // (useRoleRedirect), donde el miembro pendiente_pago paga su membresía.
+      // No hace falta hacer nada más acá; se desmonta al redirigir.
     } catch (err) {
       console.error('[Signup]', err);
       setError(err instanceof Error ? err.message : 'Error inesperado. Intentá de nuevo.');
@@ -179,41 +175,6 @@ export default function Signup() {
 
   if (!plan) {
     return <Navigate to="/" replace />;
-  }
-
-  // Pantalla de bienvenida (qué recibe el suscriptor al concluir el registro).
-  if (listo) {
-    return (
-      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '48px 24px', minHeight: '100dvh' }}>
-        <div className="ek-card" style={{ padding: '32px', textAlign: 'center' }}>
-          <span className="ek-empty-icon" style={{ width: 64, height: 64, marginBottom: '18px' }}>
-            <ShieldCheck size={30} aria-hidden="true" />
-          </span>
-          <h1 style={{ fontFamily: 'var(--ek-font-display)', fontSize: '26px', fontWeight: 700, margin: '0 0 8px', letterSpacing: '-0.02em' }}>
-            ¡Bienvenido/a a EKKO!
-          </h1>
-          <p className="ek-body-muted" style={{ margin: '0 0 24px' }}>
-            Tu cuenta quedó creada con el plan <strong style={{ color: 'var(--ek-mustard)' }}>{plan.nombre}</strong>.
-          </p>
-
-          <div className="ek-card ek-card--md" style={{ textAlign: 'left', marginBottom: '24px' }}>
-            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '12px' }}>PRÓXIMOS PASOS</p>
-            <ol style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', lineHeight: 1.5 }}>
-              <li>En tu <strong>primera visita</strong>, recepción toma tu foto y tus datos (INE).</li>
-              <li>Firmás el <strong>contrato de uso</strong> del estudio.</li>
-              <li>Activamos tu membresía y <strong>¡a grabar!</strong></li>
-            </ol>
-          </div>
-
-          <button type="button" className="ek-cta ek-cta--gold ek-cta--full" onClick={() => navigate('/app')}>
-            Ir a mi cuenta
-          </button>
-          <p className="ek-helper-text" style={{ marginTop: '12px' }}>
-            El pago de tu membresía se coordina en recepción.
-          </p>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -403,17 +364,6 @@ export default function Signup() {
           ¿Ya tienes cuenta? <Link to="/login" style={{ color: 'var(--ek-mustard)' }}>Iniciar sesión</Link>
         </p>
       </form>
-
-      {pagarOpen && (
-        <PaymentModal
-          tierSlug={plan.tier}
-          tierNombre={plan.nombre}
-          precio={plan.precio}
-          esPaquete={plan.esPaquete}
-          onClose={() => { setPagarOpen(false); setListo(true); }}
-          onPagado={() => { setPagarOpen(false); setListo(true); }}
-        />
-      )}
     </div>
   );
 }
