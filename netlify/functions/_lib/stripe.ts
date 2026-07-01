@@ -81,6 +81,13 @@ export type EventoClasificado =
       cancel_at_period_end: boolean | null;
       event_at: string;
     }
+  | {
+      // Activación de una suscripción in-app (Elements): la 1ª factura se pagó
+      // → crear la membresía. El webhook lee el metadata + periodo de la sub.
+      kind: 'activar-sub';
+      subscription_id: string;
+      event_at: string;
+    }
   | { kind: 'ignore'; reason: string };
 
 /**
@@ -134,8 +141,11 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
       const subscription_id =
         typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id;
       if (!subscription_id) return { kind: 'ignore', reason: 'invoice_sin_suscripcion' };
-      // La ACTIVACIÓN la dispara checkout.session.completed. invoice.paid
-      // (renovación) sincroniza estado/periodo; payment_failed → past_due.
+      // 1ª factura de la suscripción (Elements) → ACTIVAR (crea la membresía).
+      // Renovación → sync; payment_failed → past_due.
+      if (event.type === 'invoice.paid' && inv.billing_reason === 'subscription_create') {
+        return { kind: 'activar-sub', subscription_id, event_at };
+      }
       return {
         kind: 'sync',
         subscription_id,
@@ -144,6 +154,19 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
         cancel_at_period_end: null,
         event_at
       };
+    }
+
+    case 'payment_intent.succeeded': {
+      // Paquete pagado in-app (pago único con Elements). El metadata lo pusimos
+      // en crear-pago-intent. (Los PI de suscripción no llevan este metadata.)
+      const pi = event.data.object as Stripe.PaymentIntent;
+      const usuario_id = pi.metadata?.usuario_id;
+      const tier_id = pi.metadata?.tier_id;
+      const customer_id = typeof pi.customer === 'string' ? pi.customer : pi.customer?.id;
+      if (!usuario_id || !tier_id || !customer_id) {
+        return { kind: 'ignore', reason: 'payment_intent_sin_metadata' };
+      }
+      return { kind: 'activar', usuario_id, tier_id, subscription_id: null, customer_id, event_at };
     }
 
     default:

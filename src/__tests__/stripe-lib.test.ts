@@ -128,6 +128,25 @@ describe('clasificarEvento', () => {
     if (r.kind === 'sync') expect(r.estado).toBe('activa');
   });
 
+  it('invoice.paid 1ª factura (subscription_create) → activar-sub', () => {
+    const r = clasificarEvento(ev('invoice.paid', { subscription: 'sub_1', billing_reason: 'subscription_create' }));
+    expect(r.kind).toBe('activar-sub');
+    if (r.kind === 'activar-sub') expect(r.subscription_id).toBe('sub_1');
+  });
+
+  it('payment_intent.succeeded con metadata (paquete) → activar sin suscripción', () => {
+    const r = clasificarEvento(ev('payment_intent.succeeded', {
+      customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' }
+    }));
+    expect(r.kind).toBe('activar');
+    if (r.kind === 'activar') expect(r.subscription_id).toBeNull();
+  });
+
+  it('payment_intent.succeeded sin metadata → ignore', () => {
+    const r = clasificarEvento(ev('payment_intent.succeeded', { customer: 'cus_1', metadata: {} }));
+    expect(r.kind).toBe('ignore');
+  });
+
   it('evento no manejado → ignore', () => {
     const r = clasificarEvento(ev('customer.created', { id: 'cus_1' }));
     expect(r.kind).toBe('ignore');

@@ -55,3 +55,19 @@ export async function abrirPortal(): Promise<PortalResult> {
   }
   return res;
 }
+
+/**
+ * Pago IN-APP con Elements sobre la cuenta conectada del estudio. Devuelve el
+ * `clientSecret` + `account` (cuenta conectada) que consume <PaymentModal>.
+ * `reason` = 'stripe_pendiente' | 'cobros_no_activos' si no se puede cobrar.
+ */
+export interface PagoIntentResult {
+  clientSecret?: string;
+  account?: string;
+  modo?: 'suscripcion' | 'pago';
+  reason?: string;
+}
+
+export function crearPagoIntent(tierSlug: string): Promise<PagoIntentResult> {
+  return backendPost<PagoIntentResult>('crear-pago-intent', { tier: tierSlug });
+}
