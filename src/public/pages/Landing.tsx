@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ArrowRight, Check, CalendarCheck, Clapperboard, FolderDown, ImageIcon, Sparkles } from 'lucide-react';
+import { Star, ArrowRight, Check, X, CalendarCheck, Clapperboard, FolderDown, ImageIcon, Sparkles } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { parseBeneficios } from '@shared/lib/beneficios';
 import { useLandingConfig } from '@shared/hooks/useLandingConfig';
 import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
 import AppShowcase from '../components/AppShowcase';
@@ -80,21 +81,6 @@ function useTiersPublicos() {
   }, []);
 
   return { tiers, isLoading };
-}
-
-function parseBeneficios(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.filter((b): b is string => typeof b === 'string');
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed)
-        ? parsed.filter((b): b is string => typeof b === 'string')
-        : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
 }
 
 function formatearPesos(centavos: number): string {
@@ -469,19 +455,24 @@ export default function Landing() {
                       flex: 1
                     }}
                   >
-                    {beneficios.map((b) => (
+                    {beneficios.map((b, i) => (
                       <li
-                        key={b}
+                        key={i}
                         className="ek-pricing-benefit"
                         style={{
                           display: 'flex',
                           alignItems: 'flex-start',
                           gap: '8px',
-                          fontSize: '14px'
+                          fontSize: '14px',
+                          color: b.incluido ? undefined : 'var(--ek-ink-faint)'
                         }}
                       >
-                        <Check size={15} style={{ color: 'var(--ek-mustard)', flexShrink: 0, marginTop: '2px' }} aria-hidden="true" />
-                        {b}
+                        {b.incluido ? (
+                          <Check size={15} style={{ color: 'var(--ek-mustard)', flexShrink: 0, marginTop: '2px' }} aria-hidden="true" />
+                        ) : (
+                          <X size={15} style={{ color: 'var(--ek-ink-faint)', flexShrink: 0, marginTop: '2px' }} aria-hidden="true" />
+                        )}
+                        <span style={{ textDecoration: b.incluido ? 'none' : 'line-through' }}>{b.label}</span>
                       </li>
                     ))}
                   </ul>
@@ -525,8 +516,12 @@ export default function Landing() {
               a: 'Acceso a los estudios según tu plan, todo el equipo profesional ya montado (cámaras, micrófonos, iluminación), espacio para invitados y reservas vía app.'
             },
             {
-              q: '¿Puedo cancelar cuándo quiera?',
-              a: 'El compromiso mínimo es de 6 meses. Después puedes cancelar con 30 días de anticipación. Sin penalidades por cancelación pasado el commitment.'
+              q: '¿Puedo cancelar una grabación programada?',
+              a: 'Sí. Puedes cancelarla con anticipación a través de WhatsApp, para evitar una posible amonestación por inasistencia.'
+            },
+            {
+              q: '¿Puedo cancelar mi membresía?',
+              a: 'El cobro de la membresía está sujeto al contrato, que contempla un mínimo de 6 meses. Pasado ese periodo, podrás cancelarla cuando gustes.'
             },
             {
               q: '¿Qué pasa si no llego a mi reserva?',

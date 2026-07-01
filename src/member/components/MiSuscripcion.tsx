@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Settings } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
 import { iniciarCheckout, abrirPortal } from '@shared/lib/checkout';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
@@ -19,7 +20,7 @@ interface TierInfo {
   slug: string;
   nombre: string;
   precio_centavos: number;
-  beneficios: string[];
+  beneficios: Beneficio[];
   descripcion: string | null;
 }
 
@@ -29,19 +30,6 @@ interface PagoInfo {
   moneda: string | null;
   status: string | null;
   created_at: string;
-}
-
-function parseBeneficios(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.filter((b): b is string => typeof b === 'string');
-  if (typeof raw === 'string') {
-    try {
-      const p = JSON.parse(raw);
-      return Array.isArray(p) ? p.filter((b): b is string => typeof b === 'string') : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
 }
 
 function formatearPesos(centavos: number): string {
@@ -243,12 +231,12 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               <span className={`ek-badge ${statusMeta.clase}`}>{statusMeta.texto}</span>
             </div>
 
-            {planActual && planActual.beneficios.length > 0 && (
+            {planActual && planActual.beneficios.filter((b) => b.incluido).length > 0 && (
               <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {planActual.beneficios.map((b) => (
-                  <li key={b} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px' }}>
+                {planActual.beneficios.filter((b) => b.incluido).map((b, i) => (
+                  <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', fontSize: '14px' }}>
                     <Check size={15} style={{ color: 'var(--ek-mustard)', flexShrink: 0, marginTop: '2px' }} aria-hidden="true" />
-                    {b}
+                    {b.label}
                   </li>
                 ))}
               </ul>

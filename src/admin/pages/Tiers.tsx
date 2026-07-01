@@ -31,6 +31,7 @@ import Toggle from '../components/Toggle';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CardMenuDropdown from '../components/CardMenuDropdown';
 import type { Database } from '@shared/types/database';
+import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
 
 type Tier = Database['public']['Tables']['tiers']['Row'];
 
@@ -429,19 +430,21 @@ function TierRow({
               gap: '2px'
             }}
           >
-            {beneficios.slice(0, 3).map((b) => (
+            {beneficios.slice(0, 3).map((b, i) => (
               <li
-                key={b}
+                key={i}
                 style={{
                   fontSize: '13px',
-                  color: 'var(--ek-ink-muted)',
+                  color: b.incluido ? 'var(--ek-ink-muted)' : 'var(--ek-ink-faint)',
                   display: 'flex',
                   alignItems: 'flex-start',
                   gap: '6px'
                 }}
               >
-                <span style={{ color: 'var(--ek-mustard)' }}>•</span>
-                <span style={{ flex: 1 }}>{b}</span>
+                {b.incluido
+                  ? <Check size={13} style={{ color: 'var(--ek-mustard)', flexShrink: 0, marginTop: '2px' }} aria-hidden="true" />
+                  : <X size={13} style={{ color: 'var(--ek-ink-faint)', flexShrink: 0, marginTop: '2px' }} aria-hidden="true" />}
+                <span style={{ flex: 1, textDecoration: b.incluido ? 'none' : 'line-through' }}>{b.label}</span>
               </li>
             ))}
             {beneficios.length > 3 && (
@@ -521,21 +524,6 @@ function TierArchivedRow({
   );
 }
 
-function parseBeneficios(raw: unknown): string[] {
-  try {
-    if (Array.isArray(raw)) return raw.filter((b): b is string => typeof b === 'string');
-    if (typeof raw === 'string') {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed)
-        ? parsed.filter((b): b is string => typeof b === 'string')
-        : [];
-    }
-    return [];
-  } catch {
-    return [];
-  }
-}
-
 function EditarTierModal({
   tier,
   existingSlugs,
@@ -557,7 +545,7 @@ function EditarTierModal({
   );
   const [descripcion, setDescripcion] = useState(tier?.descripcion ?? '');
   const [activo, setActivo] = useState(tier?.activo ?? true);
-  const [beneficios, setBeneficios] = useState<string[]>(() =>
+  const [beneficios, setBeneficios] = useState<Beneficio[]>(() =>
     tier ? parseBeneficios(tier.beneficios) : []
   );
   const [maxInvitados, setMaxInvitados] = useState<number>(() => {
@@ -639,7 +627,7 @@ function EditarTierModal({
       nombre,
       descripcion: descripcion || null,
       precio_centavos: precioCentavos,
-      beneficios,
+      beneficios: beneficios as never,
       reglas: reglasNuevas as never,
       activo
     });
@@ -772,15 +760,15 @@ function BeneficiosEditor({
   value,
   onChange
 }: {
-  value: string[];
-  onChange: (v: string[]) => void;
+  value: Beneficio[];
+  onChange: (v: Beneficio[]) => void;
 }) {
   const [nuevo, setNuevo] = useState('');
 
   const agregar = () => {
     const trim = nuevo.trim();
     if (!trim) return;
-    onChange([...value, trim]);
+    onChange([...value, { label: trim, incluido: true }]);
     setNuevo('');
   };
 
@@ -788,8 +776,12 @@ function BeneficiosEditor({
     onChange(value.filter((_, i) => i !== idx));
   };
 
-  const editar = (idx: number, nuevoTexto: string) => {
-    onChange(value.map((b, i) => (i === idx ? nuevoTexto : b)));
+  const editarLabel = (idx: number, label: string) => {
+    onChange(value.map((b, i) => (i === idx ? { ...b, label } : b)));
+  };
+
+  const toggleIncluido = (idx: number) => {
+    onChange(value.map((b, i) => (i === idx ? { ...b, incluido: !b.incluido } : b)));
   };
 
   const mover = (idx: number, dir: 'up' | 'down') => {
@@ -823,7 +815,7 @@ function BeneficiosEditor({
           key={idx}
           style={{
             display: 'grid',
-            gridTemplateColumns: '24px 1fr auto auto auto',
+            gridTemplateColumns: 'auto 1fr auto auto auto',
             gap: '8px',
             alignItems: 'center',
             padding: '8px',
@@ -831,16 +823,29 @@ function BeneficiosEditor({
             borderRadius: 'var(--ek-r-sm)'
           }}
         >
-          <span style={{ color: 'var(--ek-mustard)', display: 'inline-flex', justifyContent: 'center' }}>
-            <Check size={14} aria-hidden="true" />
-          </span>
+          {/* Toggle incluido (✓) / no incluido (✗) */}
+          <button
+            type="button"
+            onClick={() => toggleIncluido(idx)}
+            className="ek-icon-btn"
+            style={{ padding: '4px 8px', color: beneficio.incluido ? 'var(--ek-mustard)' : 'var(--ek-ink-faint)' }}
+            aria-label={beneficio.incluido ? 'Incluido — tocar para excluir' : 'No incluido — tocar para incluir'}
+            aria-pressed={beneficio.incluido}
+          >
+            {beneficio.incluido ? <Check size={15} aria-hidden="true" /> : <X size={15} aria-hidden="true" />}
+          </button>
 
           <input
             type="text"
-            value={beneficio}
-            onChange={(e) => editar(idx, e.target.value)}
+            value={beneficio.label}
+            onChange={(e) => editarLabel(idx, e.target.value)}
             className="ek-input"
-            style={{ fontSize: '13px', padding: '6px 10px' }}
+            style={{
+              fontSize: '13px',
+              padding: '6px 10px',
+              textDecoration: beneficio.incluido ? 'none' : 'line-through',
+              opacity: beneficio.incluido ? 1 : 0.6
+            }}
           />
 
           <button
@@ -888,7 +893,7 @@ function BeneficiosEditor({
       >
         <input
           type="text"
-          placeholder="Ej: Acceso a TODOS los estudios"
+          placeholder="Ej: Hasta 4 invitados por sesión"
           value={nuevo}
           onChange={(e) => setNuevo(e.target.value)}
           onKeyDown={(e) => {
@@ -909,6 +914,9 @@ function BeneficiosEditor({
           + Agregar
         </button>
       </div>
+      <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', margin: 0 }}>
+        Tocá el ✓/✗ para marcar si el plan lo incluye o no. Se muestra como tabla en la landing.
+      </p>
     </div>
   );
 }
