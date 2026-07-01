@@ -747,9 +747,12 @@ export type Database = {
           avatar_url: string | null
           bloqueado_hasta: string | null
           commitment_ends_at: string | null
+          contrato_firmado: boolean
+          contrato_firmado_at: string | null
           created_at: string
           email: string
           id: string
+          identidad_completa: boolean
           invitado: boolean
           membresia_activa_id: string | null
           membresia_tier: string | null
@@ -768,9 +771,12 @@ export type Database = {
           avatar_url?: string | null
           bloqueado_hasta?: string | null
           commitment_ends_at?: string | null
+          contrato_firmado?: boolean
+          contrato_firmado_at?: string | null
           created_at?: string
           email: string
           id?: string
+          identidad_completa?: boolean
           invitado?: boolean
           membresia_activa_id?: string | null
           membresia_tier?: string | null
@@ -789,9 +795,12 @@ export type Database = {
           avatar_url?: string | null
           bloqueado_hasta?: string | null
           commitment_ends_at?: string | null
+          contrato_firmado?: boolean
+          contrato_firmado_at?: string | null
           created_at?: string
           email?: string
           id?: string
+          identidad_completa?: boolean
           invitado?: boolean
           membresia_activa_id?: string | null
           membresia_tier?: string | null
@@ -825,6 +834,10 @@ export type Database = {
       usuarios_datos_privados: {
         Row: {
           created_at: string
+          domicilio: string | null
+          fecha_nacimiento: string | null
+          ine_folio: string | null
+          ine_foto_path: string | null
           ob_data: Json | null
           stripe_customer_id: string | null
           tenant_id: string
@@ -833,6 +846,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          domicilio?: string | null
+          fecha_nacimiento?: string | null
+          ine_folio?: string | null
+          ine_foto_path?: string | null
           ob_data?: Json | null
           stripe_customer_id?: string | null
           tenant_id: string
@@ -841,6 +858,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          domicilio?: string | null
+          fecha_nacimiento?: string | null
+          ine_folio?: string | null
+          ine_foto_path?: string | null
           ob_data?: Json | null
           stripe_customer_id?: string | null
           tenant_id?: string

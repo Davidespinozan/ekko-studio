@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, UserX, Camera, Pencil, KeyRound, Unlock, CalendarPlus, Send } from 'lucide-react';
+import { ArrowLeft, UserX, Camera, Pencil, KeyRound, Unlock, CalendarPlus, Send, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { activarMembresiaMostrador } from '@shared/lib/checkout';
@@ -17,6 +17,7 @@ import {
 } from '../components/CancelarReservaRecepcionModal';
 import { EditarMiembroModal } from '../components/EditarMiembroModal';
 import { FotoMiembroModal } from '../components/FotoMiembroModal';
+import { FichaIdentidadModal } from '../components/FichaIdentidadModal';
 import { ResetPasswordModal } from '../components/ResetPasswordModal';
 import { DesbloquearModal } from '../components/DesbloquearModal';
 import { useAuditLogDeUsuario, type AuditEntryUsuario } from '../hooks/useAuditLogDeUsuario';
@@ -41,6 +42,8 @@ interface MiembroPerfil {
   status: string;
   no_shows_count: number | null;
   bloqueado_hasta: string | null;
+  identidad_completa: boolean;
+  contrato_firmado: boolean;
   created_at: string;
 }
 
@@ -98,6 +101,7 @@ export default function PerfilMiembroRecepcion() {
   const [resetOpen, setResetOpen] = useState(false);
   const [desbloquearOpen, setDesbloquearOpen] = useState(false);
   const [avisoOpen, setAvisoOpen] = useState(false);
+  const [fichaOpen, setFichaOpen] = useState(false);
   const {
     entries: auditEntries,
     isLoading: auditLoading,
@@ -121,7 +125,7 @@ export default function PerfilMiembroRecepcion() {
     // SELECT explícito — NO se piden stripe_customer_id ni ob_data (R6).
     const { data: m, error } = await supabase
       .from('usuarios')
-      .select('id, nombre, email, telefono, avatar_url, membresia_tier, status, no_shows_count, bloqueado_hasta, created_at')
+      .select('id, nombre, email, telefono, avatar_url, membresia_tier, status, no_shows_count, bloqueado_hasta, identidad_completa, contrato_firmado, created_at')
       .eq('id', id!)
       .maybeSingle();
     if (error || !m) {
@@ -442,6 +446,47 @@ export default function PerfilMiembroRecepcion() {
       </Seccion>
 
       <section style={{ marginBottom: '20px' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>FICHA DE IDENTIDAD</p>
+        {(() => {
+          const habilitado = miembro.identidad_completa && miembro.contrato_firmado;
+          return (
+            <div
+              className="ek-card"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                borderColor: habilitado ? undefined : 'var(--ek-warning)',
+                background: habilitado ? undefined : 'var(--ek-warning-soft)'
+              }}
+            >
+              {habilitado
+                ? <ShieldCheck size={22} style={{ color: 'var(--ek-success)', flexShrink: 0 }} aria-hidden="true" />
+                : <ShieldAlert size={22} style={{ color: 'var(--ek-warning)', flexShrink: 0 }} aria-hidden="true" />}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>
+                  {habilitado ? 'Ingreso habilitado' : 'Ingreso bloqueado'}
+                </p>
+                <p className="ek-body-muted" style={{ margin: '2px 0 0', fontSize: '12.5px' }}>
+                  {habilitado
+                    ? 'Ficha completa y contrato firmado.'
+                    : `Falta: ${[!miembro.identidad_completa && 'datos/foto/INE', !miembro.contrato_firmado && 'contrato firmado'].filter(Boolean).join(' y ')}.`}
+                </p>
+              </div>
+              <button
+                type="button"
+                className={habilitado ? 'ek-cta ek-cta--secondary' : 'ek-cta ek-cta--gold'}
+                style={{ padding: '9px 16px', fontSize: '13px', flexShrink: 0 }}
+                onClick={() => setFichaOpen(true)}
+              >
+                {habilitado ? 'Ver ficha' : 'Completar ficha'}
+              </button>
+            </div>
+          );
+        })()}
+      </section>
+
+      <section style={{ marginBottom: '20px' }}>
         <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>NOTAS OPERATIVAS</p>
         <NotasMiembro miembroId={miembro.id} />
       </section>
@@ -506,6 +551,16 @@ export default function PerfilMiembroRecepcion() {
           miembroNombre={capitalizar(miembro.nombre) || miembro.email}
           onClose={() => setFotoOpen(false)}
           onActualizada={recargarPerfil}
+        />
+      )}
+
+      {fichaOpen && (
+        <FichaIdentidadModal
+          miembroId={miembro.id}
+          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
+          tieneFoto={!!miembro.avatar_url}
+          onClose={() => setFichaOpen(false)}
+          onGuardada={recargarPerfil}
         />
       )}
 

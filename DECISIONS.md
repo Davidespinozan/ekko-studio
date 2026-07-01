@@ -138,6 +138,22 @@ completo en `KERNEL.md`.
   Pago: paquetes usan Stripe `mode:'payment'` (pago único); mensual `subscription`.
   Mismo webhook y `activar_membresia`. Patrón tomado de SALA.
 
+## Identidad / gate de ingreso
+
+- **EKKO-010 — Ficha de identidad obligatoria + gate de check-in (2026-06-20):**
+  el estudio renta espacios con equipo caro → hay que identificar y responsabilizar
+  a quien entra. En la 1ª sesión recepción captura **foto (avatar) + fecha de
+  nacimiento + domicilio + INE (foto)** y marca **contrato firmado**. Datos
+  sensibles en `usuarios_datos_privados` (RLS admin-only), escritos por
+  `reception-datos-identidad` (service_role + audit sin valores sensibles); foto
+  de INE en bucket **privado** `identidad` (signed URLs). Flags de gate en
+  `usuarios` (`identidad_completa`, `contrato_firmado`), protegidos por el trigger
+  C2. **Gate**: un trigger BEFORE UPDATE en `reservas` bloquea el check-in
+  (`confirmada`→`completada`) con `EKKO_IDENTIDAD_INCOMPLETA` / `EKKO_CONTRATO_PENDIENTE`
+  hasta que ambos flags sean true — cubre check-in por QR y manual. Reemplaza la
+  idea de pedir estos datos en el signup (fricción + PCI: el signup NO debe
+  capturar tarjeta cruda, va por Stripe).
+
 ## Notificaciones
 
 - **EKKO-008 — Web Push implementado (2026-06-20):** entrega fuera de la app

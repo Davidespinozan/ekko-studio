@@ -62,6 +62,19 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
 - [ ] **#5 Directorio de invitados** (nombre+correo para marketing) — feature
       nueva; definir consentimiento/aviso de privacidad primero.
 
+## 1d. Identidad / prevención (renta de espacios)
+
+- [x] **Ficha de identidad + gate de ingreso**: recepción captura foto + fecha
+      nac + domicilio + INE (foto, bucket privado) + contrato firmado; el check-in
+      se bloquea hasta que esté completa (trigger, cubre QR y manual). Ver EKKO-010.
+- [ ] **Aplicar** `20260620170000_ficha_identidad.sql` al Supabase de EKKO.
+- [ ] Signup: **quitar los campos de tarjeta** (número/exp/cvv) — va por Stripe
+      Checkout (PCI). Agregar aviso de privacidad + aceptar contrato + confirmación.
+- [ ] Ojo migración: miembros existentes quedan con `identidad_completa=false`
+      (no podrán check-in hasta completar ficha). Para un estudio nuevo está bien.
+- [ ] (prevención, futuro) check-out con estado del equipo; tarjeta en archivo
+      para cobrar daños (cuando haya Stripe).
+
 ## 2. Deudas técnicas conocidas
 
 - [ ] **B3 — cambiar tier no activa la cuenta** (se cierra con el RPC de
