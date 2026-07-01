@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
+import { enviarPushAUsuario } from '../_lib/push';
 
 /**
  * POST /reception-notificar-miembro
@@ -88,6 +89,14 @@ export const handler: Handler = async (event) => {
       mensaje
     });
     if (insErr) return serverError(insErr.message);
+
+    // Entrega push (además del aviso in-app). No-op si no hay VAPID configurado.
+    await enviarPushAUsuario(supabaseAdmin, target.id, {
+      titulo: 'Aviso del estudio',
+      mensaje,
+      url: '/app',
+      tag: 'aviso_manual'
+    });
 
     await writeAuditLog(supabaseAdmin, {
       tenant_id: target.tenant_id,

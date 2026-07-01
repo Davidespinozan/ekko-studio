@@ -350,6 +350,39 @@ export type Database = {
           },
         ]
       }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          tenant_id: string
+          user_agent: string | null
+          usuario_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          tenant_id: string
+          user_agent?: string | null
+          usuario_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          tenant_id?: string
+          user_agent?: string | null
+          usuario_id?: string
+        }
+        Relationships: []
+      }
       recursos: {
         Row: {
           activo: boolean
@@ -449,6 +482,7 @@ export type Database = {
           invitados_count: number
           notas: string | null
           qr_token_hash: string | null
+          recordatorio_enviado_at: string | null
           recurso_id: string
           slot_fin: string
           slot_inicio: string
@@ -472,6 +506,7 @@ export type Database = {
           invitados_count?: number
           notas?: string | null
           qr_token_hash?: string | null
+          recordatorio_enviado_at?: string | null
           recurso_id: string
           slot_fin: string
           slot_inicio: string
@@ -495,6 +530,7 @@ export type Database = {
           invitados_count?: number
           notas?: string | null
           qr_token_hash?: string | null
+          recordatorio_enviado_at?: string | null
           recurso_id?: string
           slot_fin?: string
           slot_inicio?: string

@@ -60,6 +60,17 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
 - [x] **ConexionBanner** — banner global offline (montado en App.tsx).
 - [x] **PwaInstallBanner** — invita a instalar la PWA (Android/Chrome vía
       beforeinstallprompt, iOS con instrucciones; dismissible, montado en App.tsx).
+- [x] **Notificaciones push (Web Push)** — infra completa: tabla
+      `push_subscriptions`, SW `public/push-sw.js`, cliente + toggle en Perfil,
+      helper `_lib/push.ts` (web-push), enganche a aviso manual + recurso fuera
+      de servicio, y **cron de recordatorio de reserva ~1h antes**. Patrón de HSC.
+      Falta: VAPID keys + env vars + aplicar migraciones (ver `PUSH.md`).
+- [ ] **Push — pasos de David**: `npx web-push generate-vapid-keys`, cargar
+      `VAPID_*` + `VITE_VAPID_PUBLIC_KEY` en Netlify, aplicar migraciones
+      `20260620130000_push_subscriptions` + `20260620140000_recordatorios_reservas`.
+- [ ] Push del caso "cancelación por miembro/modal recepción" (hoy pasa por RPC
+      client-side): cubrir con trigger `AFTER INSERT ON notificaciones` + pg_net,
+      o moviendo ese cancel a una función Node.
 - [ ] (cosmético) `MagneticButton` / `HeroCarousel` en el landing.
 - [ ] (opcional) Hero mobile dedicado en la landing.
 

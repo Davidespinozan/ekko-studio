@@ -43,6 +43,9 @@ export default defineConfig(({ mode }) => {
           ]
         },
         workbox: {
+          // Inyecta los handlers de Web Push en el SW de Workbox (push-sw.js
+          // vive en /public). Así el push convive con el caché sin un 2º SW.
+          importScripts: ['push-sw.js'],
           navigateFallbackDenylist: [/^\/api/, /^\/.netlify/],
           runtimeCaching: [
             {

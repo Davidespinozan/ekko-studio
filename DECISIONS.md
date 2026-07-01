@@ -122,3 +122,17 @@ completo en `KERNEL.md`.
   lookup_keys — EKKO es single-tenant, una moneda). **Stripe estándar, cuenta
   del cliente** (NO Connect — no es plataforma multi-negocio). Patrones tomados
   de HSC. Faltan solo los pasos de cuenta/precios/env (ver `STRIPE.md`).
+
+## Notificaciones
+
+- **EKKO-008 — Web Push implementado (2026-06-20):** entrega fuera de la app
+  sobre las notificaciones IN-APP existentes. Tabla `push_subscriptions` (una por
+  dispositivo, RLS por dueño), SW `public/push-sw.js` inyectado en Workbox vía
+  `importScripts`, cliente en `shared/lib/push.ts` + toggle en Perfil, envío con
+  el paquete `web-push` (`_lib/push.ts`, borra suscripciones muertas 404/410).
+  **Disparo desde Node** (no trigger de DB): el helper se llama tras cada insert
+  en `notificaciones` (aviso manual, recurso fuera de servicio) + cron
+  `cron-recordatorios` (RPC `generar_recordatorios_reservas`, recordatorio de
+  reserva ~1h antes con dedupe por `reservas.recordatorio_enviado_at`). Patrones
+  de HSC. Faltan VAPID keys + env + migraciones (ver `PUSH.md`). Pendiente: el
+  cancel client-side no dispara push (ver `BACKLOG.md`).

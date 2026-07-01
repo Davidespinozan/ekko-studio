@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
+import { enviarPushAUsuario } from '../_lib/push';
 
 /**
  * POST /reception-recurso-servicio
@@ -155,6 +156,18 @@ export const handler: Handler = async (event) => {
       }));
       const { error: notifErr } = await supabaseAdmin.from('notificaciones').insert(notifs);
       if (notifErr) console.error('[reception-recurso-servicio] notif', notifErr.message);
+
+      // Entrega push a cada afectado (además del aviso in-app). No-op sin VAPID.
+      await Promise.all(
+        notifs.map((n) =>
+          enviarPushAUsuario(supabaseAdmin, n.usuario_id, {
+            titulo: n.titulo,
+            mensaje: n.mensaje,
+            url: '/app',
+            tag: 'reserva_cancelada'
+          })
+        )
+      );
     }
 
     await writeAuditLog(supabaseAdmin, {

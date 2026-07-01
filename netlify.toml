@@ -40,3 +40,7 @@
 [[scheduled_functions]]
   name = "cron-no-shows"
   cron = "0 * * * *"
+
+[[scheduled_functions]]
+  name = "cron-recordatorios"
+  cron = "*/15 * * * *"

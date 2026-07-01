@@ -5,6 +5,7 @@ import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
 import { EmptyState } from '@shared/components/EmptyState';
 import { MiSuscripcion } from '@member/components/MiSuscripcion';
+import { ActivarAvisosPush } from '@member/components/ActivarAvisosPush';
 import { ESTADOS_RESERVA_HISTORICOS } from '@shared/constants/reservaStatus';
 import type { Database } from '@shared/types/database';
 
@@ -175,6 +176,11 @@ export default function Perfil() {
             tierSlug={usuario.membresia_tier ?? null}
             status={usuario.status}
           />
+        )}
+
+        {/* Avisos push */}
+        {usuario?.id && (
+          <ActivarAvisosPush usuarioId={usuario.id} tenantId={tenant.id} />
         )}
 
         {/* Stat del mes */}
