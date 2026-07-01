@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
+import { backendPost } from '@shared/lib/backend';
 import { useToast } from '@shared/hooks/useToast';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { Spinner } from '@shared/components/Spinner';
@@ -18,6 +19,8 @@ interface ReservaDetalle {
   usuario_nombre: string;
   usuario_email: string;
   tier: string | null;
+  invitados_count: number;
+  observaciones: string | null;
 }
 
 interface Props {
@@ -73,6 +76,25 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
   const toast = useToast();
   const [data, setData] = useState<ReservaDetalle | null>(null);
   const [loading, setLoading] = useState(false);
+  const [obs, setObs] = useState('');
+  const [savingObs, setSavingObs] = useState(false);
+
+  async function guardarObservacion() {
+    if (!data) return;
+    setSavingObs(true);
+    try {
+      await backendPost('reception-observar-reserva', {
+        reserva_id: data.id,
+        observaciones: obs
+      });
+      setData({ ...data, observaciones: obs.trim() || null });
+      toast.success('Observación guardada.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo guardar la observación.');
+    } finally {
+      setSavingObs(false);
+    }
+  }
 
   useEffect(() => {
     if (!reservaId) {
@@ -85,7 +107,7 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
     supabase
       .from('reservas')
       .select(
-        'id, slot_inicio, slot_fin, status, folio, created_at, cancelada_at, cancelada_motivo, cancelada_por, recurso:recursos(nombre), usuario:usuarios!reservas_usuario_id_fkey(nombre, email, membresia_tier)'
+        'id, slot_inicio, slot_fin, status, folio, created_at, cancelada_at, cancelada_motivo, cancelada_por, invitados_count, observaciones, recurso:recursos(nombre), usuario:usuarios!reservas_usuario_id_fkey(nombre, email, membresia_tier)'
       )
       .eq('id', reservaId)
       .single()
@@ -106,6 +128,8 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
           cancelada_at: string | null;
           cancelada_motivo: string | null;
           cancelada_por: string | null;
+          invitados_count?: number | null;
+          observaciones?: string | null;
           recurso?: { nombre?: string } | null;
           usuario?: { nombre?: string | null; email?: string; membresia_tier?: string | null } | null;
         };
@@ -119,11 +143,14 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
           cancelada_at: r.cancelada_at,
           cancelada_motivo: r.cancelada_motivo,
           cancelada_por: r.cancelada_por,
+          invitados_count: r.invitados_count ?? 0,
+          observaciones: r.observaciones ?? null,
           recurso_nombre: r.recurso?.nombre ?? '—',
           usuario_nombre: capitalizar(r.usuario?.nombre) || r.usuario?.email || '—',
           usuario_email: r.usuario?.email ?? '—',
           tier: r.usuario?.membresia_tier ?? null
         });
+        setObs(r.observaciones ?? '');
         setLoading(false);
       });
 
@@ -228,8 +255,12 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
               <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '4px' }}>
                 {formatearFecha(data.slot_inicio).replace(/^./, (c) => c.toUpperCase())}
               </p>
-              <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0 }}>
+              <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '4px' }}>
                 {formatearHora(data.slot_inicio)} — {formatearHora(data.slot_fin)}
+              </p>
+              <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0 }}>
+                Personas: <span style={{ color: 'var(--ek-ink)', fontWeight: 600 }}>{1 + data.invitados_count}</span>
+                {data.invitados_count > 0 && ` (titular + ${data.invitados_count} invitado${data.invitados_count === 1 ? '' : 's'})`}
               </p>
             </Block>
 
@@ -254,6 +285,30 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
                   Reservada el {formatearCreatedAt(data.created_at)}
                 </p>
               )}
+            </Block>
+
+            <Block label="OBSERVACIONES DEL ESTUDIO">
+              <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', margin: '0 0 8px' }}>
+                Notas internas para el expediente (mal uso de equipo, compras extra, etc.). El miembro no las ve.
+              </p>
+              <textarea
+                value={obs}
+                onChange={(e) => setObs(e.target.value)}
+                rows={3}
+                maxLength={2000}
+                placeholder="Ej: Compró 30 min extra. Dejó el set desordenado."
+                className="ek-input"
+                style={{ width: '100%', resize: 'vertical', fontSize: '13px' }}
+              />
+              <button
+                type="button"
+                onClick={guardarObservacion}
+                disabled={savingObs || obs.trim() === (data.observaciones ?? '')}
+                className="ek-cta ek-cta--secondary"
+                style={{ marginTop: '8px', padding: '8px 16px', fontSize: '13px' }}
+              >
+                {savingObs ? <Spinner size={14} /> : 'Guardar observación'}
+              </button>
             </Block>
 
             <div

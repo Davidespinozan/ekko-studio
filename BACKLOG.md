@@ -47,6 +47,21 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
 - [ ] (abierto, feedback cliente #4) "Compras extra" (horas/invitados/servicios)
       podrían modelarse como consumibles/paquetes sobre este mismo motor.
 
+## 1c. Feedback del cliente (web)
+
+- [x] **#1 FAQ cancelación** dividida en dos (grabación vs membresía).
+- [x] **#2 Tabla "qué incluye / qué no"** por tier (beneficios ✓/✗ configurables).
+- [x] **#3 Expediente en el detalle de reserva** (v1): observaciones del estudio
+      por reserva (`reservas.observaciones` + `reception-observar-reserva` + audit)
+      y "Personas" (titular + invitados). Falta aplicar migración
+      `20260620160000_reserva_observaciones.sql`.
+- [ ] #3 (fase 2) vista de expediente agregada en el perfil del miembro
+      (historial de observaciones de sus reservas).
+- [ ] **#4 Compras extra** (horas/invitados/servicios) — modelar sobre el motor
+      de créditos/paquetes (pago único). Requiere Stripe conectado.
+- [ ] **#5 Directorio de invitados** (nombre+correo para marketing) — feature
+      nueva; definir consentimiento/aviso de privacidad primero.
+
 ## 2. Deudas técnicas conocidas
 
 - [ ] **B3 — cambiar tier no activa la cuenta** (se cierra con el RPC de

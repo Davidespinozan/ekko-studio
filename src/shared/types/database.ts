@@ -523,6 +523,7 @@ export type Database = {
           id: string
           invitados_count: number
           notas: string | null
+          observaciones: string | null
           qr_token_hash: string | null
           recordatorio_enviado_at: string | null
           recurso_id: string
@@ -547,6 +548,7 @@ export type Database = {
           id?: string
           invitados_count?: number
           notas?: string | null
+          observaciones?: string | null
           qr_token_hash?: string | null
           recordatorio_enviado_at?: string | null
           recurso_id: string
@@ -571,6 +573,7 @@ export type Database = {
           id?: string
           invitados_count?: number
           notas?: string | null
+          observaciones?: string | null
           qr_token_hash?: string | null
           recordatorio_enviado_at?: string | null
           recurso_id?: string
