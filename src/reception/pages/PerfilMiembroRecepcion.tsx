@@ -22,15 +22,13 @@ import { DesbloquearModal } from '../components/DesbloquearModal';
 import { useAuditLogDeUsuario, type AuditEntryUsuario } from '../hooks/useAuditLogDeUsuario';
 
 /**
- * Perfil de miembro READ-ONLY para recepción (Sprint RP-2).
+ * Perfil de miembro para recepción — hub de gestión (agenda, no-show, notas,
+ * activar membresía, reprogramar). Empezó READ-ONLY (Sprint RP-2) y creció.
  *
  * Vista NUEVA — NO reusa `MiembroDetalle` de admin (riesgo R3: ese
- * componente edita status/rol/tier, resetea password y borra). Acá
- * recepción solo CONSULTA. Tampoco se leen campos sensibles
- * (stripe_customer_id, ob_data — riesgo R6): el SELECT ni los pide.
- *
- * Las acciones de reserva (crear/cancelar/reprogramar) son RP-3 y
- * van a colgar de esta vista — ver el marcador más abajo.
+ * componente edita rol, resetea password y borra — acciones peligrosas que
+ * recepción no debe tener). Tampoco lee campos sensibles (stripe_customer_id,
+ * ob_data — riesgo R6): el SELECT ni los pide.
  */
 
 interface MiembroPerfil {

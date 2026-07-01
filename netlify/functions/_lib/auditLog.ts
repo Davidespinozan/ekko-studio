@@ -25,7 +25,7 @@ export interface AuditEntry {
 /**
  * Inserta una entrada de auditoría. NO lanza: un fallo de auditoría no debe
  * romper la operación principal (recepción ya hizo el cambio). El fallo se
- * loguea ruidosamente para detectarlo (Sentry está pendiente — ver _lib/sentry).
+ * loguea ruidosamente para detectarlo (falta un sink tipo Sentry).
  */
 export async function writeAuditLog(
   supabaseAdmin: SupabaseClient,
