@@ -559,6 +559,7 @@ function EditarTierModal({
   const [vence, setVence] = useState(tier?.tipo === 'hibrido');
   const [clasesIncluidas, setClasesIncluidas] = useState<number>(tier?.clases_incluidas ?? 10);
   const [duracionDias, setDuracionDias] = useState<number>(tier?.duracion_dias ?? 30);
+  const [stripePriceId, setStripePriceId] = useState(tier?.stripe_price_id ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -622,6 +623,7 @@ function EditarTierModal({
         tipo,
         clases_incluidas: clasesVal,
         duracion_dias: duracionVal,
+        stripe_price_id: stripePriceId.trim() || null,
         beneficios: beneficios as never,
         reglas: reglas as never,
         activo,
@@ -648,6 +650,7 @@ function EditarTierModal({
       tipo,
       clases_incluidas: clasesVal,
       duracion_dias: duracionVal,
+      stripe_price_id: stripePriceId.trim() || null,
       beneficios: beneficios as never,
       reglas: reglasNuevas as never,
       activo
@@ -777,6 +780,28 @@ function EditarTierModal({
             </p>
           </div>
         )}
+
+        <div className="ek-form-field" style={{ marginTop: '16px' }}>
+          <label className="ek-label" htmlFor="tier-stripe-price">
+            {esPaquete ? 'Stripe Price ID (opcional)' : 'Stripe Price ID (mensual)'}
+          </label>
+          <input
+            id="tier-stripe-price"
+            type="text"
+            className="ek-input"
+            placeholder="price_..."
+            value={stripePriceId}
+            onChange={(e) => setStripePriceId(e.target.value)}
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
+            {esPaquete
+              ? 'Los paquetes se cobran por monto (pago único), no necesitan price. Dejalo vacío salvo que uses un precio fijo de Stripe.'
+              : 'El precio recurrente mensual de Stripe para este plan (Dashboard → Productos). Necesario para el cobro online.'}
+          </p>
+        </div>
 
         <div className="ek-form-field" style={{ marginTop: '12px' }}>
           <Toggle
