@@ -90,6 +90,19 @@ describe('stripe-webhook', () => {
     }));
   });
 
+  it('checkout mode payment (paquete) → activar sin retrieve de suscripción', async () => {
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_1', type: 'checkout.session.completed', created: 1700000000,
+      data: { object: { mode: 'payment', subscription: null, customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' } } }
+    });
+    const res = await invocar();
+    expect(res.statusCode).toBe(200);
+    expect(mockSubRetrieve).not.toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledWith('activar_membresia', expect.objectContaining({
+      p_usuario_id: 'u1', p_tier_id: 't1', p_stripe_subscription_id: null, p_periodo_fin: null
+    }));
+  });
+
   it('customer.subscription.updated → sync_membresia_stripe', async () => {
     mockConstructEvent.mockReturnValue({
       id: 'evt_1', type: 'customer.subscription.updated', created: 1700000000,

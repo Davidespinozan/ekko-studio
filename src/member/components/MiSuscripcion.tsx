@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Settings } from 'lucide-react';
+import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Settings, Ticket } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
 import { iniciarCheckout, abrirPortal } from '@shared/lib/checkout';
@@ -14,6 +14,7 @@ interface MembresiaInfo {
   stripe_subscription_id: string | null;
   cancel_at_period_end: boolean | null;
   periodo_actual_fin: string | null;
+  creditos_restantes: number | null;
 }
 
 interface TierInfo {
@@ -80,7 +81,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           .limit(12),
         supabase
           .from('membresias')
-          .select('status, stripe_subscription_id, cancel_at_period_end, periodo_actual_fin')
+          .select('status, stripe_subscription_id, cancel_at_period_end, periodo_actual_fin, creditos_restantes')
           .eq('usuario_id', usuarioId)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -117,6 +118,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const planActual = tiers.find((t) => t.slug === currentSlug) ?? null;
   const statusMeta = STATUS_META[status ?? ''] ?? { texto: status ?? '—', clase: 'ek-badge--neutral' };
   const tieneSuscripcion = !!membresia?.stripe_subscription_id;
+  const creditos = membresia?.creditos_restantes ?? null; // null = plan mensual (ilimitado)
   const pagoVencido = membresia?.status === 'past_due';
   const cancelaAlFin = membresia?.cancel_at_period_end === true;
   const finPeriodo = membresia?.periodo_actual_fin
@@ -230,6 +232,32 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               )}
               <span className={`ek-badge ${statusMeta.clase}`}>{statusMeta.texto}</span>
             </div>
+
+            {/* Saldo de créditos (solo planes por paquete) */}
+            {creditos !== null && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '12px 14px',
+                  marginBottom: '16px',
+                  borderRadius: 'var(--ek-r-md)',
+                  background: creditos > 0 ? 'var(--ek-mustard-soft)' : 'var(--ek-warning-soft)',
+                  border: `0.5px solid ${creditos > 0 ? 'var(--ek-mustard-dim)' : 'var(--ek-warning)'}`
+                }}
+              >
+                <Ticket size={20} style={{ color: 'var(--ek-mustard)', flexShrink: 0 }} aria-hidden="true" />
+                <div>
+                  <p style={{ margin: 0, fontWeight: 700, fontSize: '18px', fontFamily: 'var(--ek-font-display)', letterSpacing: '-0.02em' }}>
+                    {creditos} {creditos === 1 ? 'sesión' : 'sesiones'} disponibles
+                  </p>
+                  <p className="ek-body-muted" style={{ margin: 0, fontSize: '12px' }}>
+                    {creditos > 0 ? 'Se descuenta 1 por reserva.' : 'Comprá un paquete para seguir reservando.'}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {planActual && planActual.beneficios.filter((b) => b.incluido).length > 0 && (
               <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>

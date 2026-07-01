@@ -69,7 +69,7 @@ export type EventoClasificado =
       kind: 'activar';
       usuario_id: string;
       tier_id: string;
-      subscription_id: string;
+      subscription_id: string | null; // null en paquetes (pago único, sin suscripción)
       customer_id: string;
       event_at: string;
     }
@@ -96,10 +96,14 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
       const s = event.data.object as Stripe.Checkout.Session;
       const usuario_id = s.metadata?.usuario_id;
       const tier_id = s.metadata?.tier_id;
-      const subscription_id = typeof s.subscription === 'string' ? s.subscription : s.subscription?.id;
+      const subscription_id =
+        typeof s.subscription === 'string' ? s.subscription : s.subscription?.id ?? null;
       const customer_id = typeof s.customer === 'string' ? s.customer : s.customer?.id;
-      if (s.mode !== 'subscription') return { kind: 'ignore', reason: 'no_es_suscripcion' };
-      if (!usuario_id || !tier_id || !subscription_id || !customer_id) {
+      // 'subscription' = mensual; 'payment' = paquete de créditos (pago único).
+      if (s.mode !== 'subscription' && s.mode !== 'payment') {
+        return { kind: 'ignore', reason: 'no_es_suscripcion_ni_pago' };
+      }
+      if (!usuario_id || !tier_id || !customer_id) {
         return { kind: 'ignore', reason: 'faltan_datos_en_session' };
       }
       return { kind: 'activar', usuario_id, tier_id, subscription_id, customer_id, event_at };

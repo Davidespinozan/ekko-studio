@@ -123,6 +123,21 @@ completo en `KERNEL.md`.
   del cliente** (NO Connect — no es plataforma multi-negocio). Patrones tomados
   de HSC. Faltan solo los pasos de cuenta/precios/env (ver `STRIPE.md`).
 
+## Planes por créditos
+
+- **EKKO-009 — Planes por créditos/paquetes (2026-06-20):** además del mensual,
+  un tier puede ser `tipo='creditos'` (N sesiones sin vencer) o `'hibrido'` (N
+  sesiones que vencen en `duracion_dias`); `'tiempo'` = el mensual de siempre
+  (default, aditivo). El saldo vive en `membresias.creditos_restantes`; el
+  historial en `membresia_movimientos` (ledger append-only). El **descuento y la
+  devolución se hacen por TRIGGER sobre `reservas`** (cubre reserva del miembro Y
+  de recepción sin tocar los RPCs atómicos; `FOR UPDATE` serializa). Decisiones
+  (David): **una membresía vigente por miembro** · **no-show quema el crédito** ·
+  **paquetes se suman**. La devolución ocurre si el estudio cancela
+  (`cancelada_admin`) o el miembro cancela a tiempo (`anticipacion_min_horas`).
+  Pago: paquetes usan Stripe `mode:'payment'` (pago único); mensual `subscription`.
+  Mismo webhook y `activar_membresia`. Patrón tomado de SALA.
+
 ## Notificaciones
 
 - **EKKO-008 — Web Push implementado (2026-06-20):** entrega fuera de la app

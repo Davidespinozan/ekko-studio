@@ -28,6 +28,8 @@ interface TierPublico {
   descripcion: string | null;
   beneficios: unknown;
   reglas: Record<string, unknown> | null;
+  tipo: string;
+  clases_incluidas: number | null;
   orden: number;
 }
 
@@ -67,7 +69,7 @@ function useTiersPublicos() {
     async function load() {
       const { data, error } = await supabase
         .from('tiers')
-        .select('slug, nombre, precio_centavos, descripcion, beneficios, reglas, orden')
+        .select('slug, nombre, precio_centavos, descripcion, beneficios, reglas, tipo, clases_incluidas, orden')
         .eq('activo', true)
         .order('orden', { ascending: true });
 
@@ -435,7 +437,11 @@ export default function Landing() {
                   }}>
                     {formatearPesos(tier.precio_centavos)}
                     <span style={{ fontSize: '15px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>
-                      /mes
+                      {tier.tipo === 'creditos' || tier.tipo === 'hibrido'
+                        ? tier.clases_incluidas
+                          ? ` · ${tier.clases_incluidas} sesiones`
+                          : ' · paquete'
+                        : '/mes'}
                     </span>
                   </p>
                   <p className="ek-body-muted ek-pricing-benefit" style={{ marginTop: '8px', marginBottom: '20px' }}>

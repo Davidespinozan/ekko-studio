@@ -74,14 +74,19 @@ export const handler: Handler = async (event) => {
     const accion = clasificarEvento(stripeEvent);
 
     if (accion.kind === 'activar') {
-      // Leer la suscripción para el periodo_fin real.
-      const sub = await stripe.subscriptions.retrieve(accion.subscription_id);
+      // Mensual: leer la suscripción para el periodo_fin. Paquete (pago único):
+      // no hay suscripción → periodo_fin lo decide activar_membresia por tipo.
+      let periodoFin: string | null = null;
+      if (accion.subscription_id) {
+        const sub = await stripe.subscriptions.retrieve(accion.subscription_id);
+        periodoFin = periodoFinFromSubscription(sub);
+      }
       const { error } = await admin.rpc('activar_membresia', {
         p_usuario_id: accion.usuario_id,
         p_tier_id: accion.tier_id,
         p_stripe_subscription_id: accion.subscription_id,
         p_stripe_customer_id: accion.customer_id,
-        p_periodo_fin: periodoFinFromSubscription(sub)
+        p_periodo_fin: periodoFin
       });
       if (error) throw new Error(`activar_membresia: ${error.message}`);
     } else if (accion.kind === 'sync') {

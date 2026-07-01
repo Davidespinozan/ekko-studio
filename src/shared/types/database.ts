@@ -81,6 +81,7 @@ export type Database = {
           cancelada_efectiva_at: string | null
           commitment_ends_at: string | null
           created_at: string
+          creditos_restantes: number | null
           id: string
           last_sub_event_at: string | null
           periodo_actual_fin: string | null
@@ -101,6 +102,7 @@ export type Database = {
           cancelada_efectiva_at?: string | null
           commitment_ends_at?: string | null
           created_at?: string
+          creditos_restantes?: number | null
           id?: string
           last_sub_event_at?: string | null
           periodo_actual_fin?: string | null
@@ -121,6 +123,7 @@ export type Database = {
           cancelada_efectiva_at?: string | null
           commitment_ends_at?: string | null
           created_at?: string
+          creditos_restantes?: number | null
           id?: string
           last_sub_event_at?: string | null
           periodo_actual_fin?: string | null
@@ -213,6 +216,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      membresia_movimientos: {
+        Row: {
+          created_at: string
+          delta: number
+          id: string
+          membresia_id: string
+          motivo: string | null
+          reserva_id: string | null
+          saldo_after: number | null
+          tenant_id: string
+          tipo: string
+          usuario_id: string
+        }
+        Insert: {
+          created_at?: string
+          delta?: number
+          id?: string
+          membresia_id: string
+          motivo?: string | null
+          reserva_id?: string | null
+          saldo_after?: number | null
+          tenant_id: string
+          tipo: string
+          usuario_id: string
+        }
+        Update: {
+          created_at?: string
+          delta?: number
+          id?: string
+          membresia_id?: string
+          motivo?: string | null
+          reserva_id?: string | null
+          saldo_after?: number | null
+          tenant_id?: string
+          tipo?: string
+          usuario_id?: string
+        }
+        Relationships: []
       }
       notificaciones: {
         Row: {
@@ -629,8 +671,10 @@ export type Database = {
         Row: {
           activo: boolean
           beneficios: Json
+          clases_incluidas: number | null
           created_at: string
           descripcion: string | null
+          duracion_dias: number | null
           id: string
           moneda: string
           nombre: string
@@ -641,13 +685,16 @@ export type Database = {
           slug: string
           stripe_price_id: string | null
           tenant_id: string
+          tipo: string
           updated_at: string
         }
         Insert: {
           activo?: boolean
           beneficios?: Json
+          clases_incluidas?: number | null
           created_at?: string
           descripcion?: string | null
+          duracion_dias?: number | null
           id?: string
           moneda?: string
           nombre: string
@@ -658,13 +705,16 @@ export type Database = {
           slug: string
           stripe_price_id?: string | null
           tenant_id: string
+          tipo?: string
           updated_at?: string
         }
         Update: {
           activo?: boolean
           beneficios?: Json
+          clases_incluidas?: number | null
           created_at?: string
           descripcion?: string | null
+          duracion_dias?: number | null
           id?: string
           moneda?: string
           nombre?: string
@@ -675,6 +725,7 @@ export type Database = {
           slug?: string
           stripe_price_id?: string | null
           tenant_id?: string
+          tipo?: string
           updated_at?: string
         }
         Relationships: [

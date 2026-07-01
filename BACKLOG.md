@@ -32,6 +32,21 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
 - [ ] (con pagos vivos) Registrar cada cobro en `payment_events` desde el
       webhook para el "Historial de pagos" del miembro.
 
+## 1b. Planes por créditos / paquetes (HECHO — falta aplicar migración)
+
+- [x] **Planes por créditos/clases** (además del mensual): `tiers.tipo` +
+      `clases_incluidas`/`duracion_dias`, `membresias.creditos_restantes`, ledger
+      `membresia_movimientos`, triggers de descuento/devolución en `reservas`,
+      `activar_membresia` con créditos, Stripe `mode:'payment'` para paquetes,
+      editor admin con toggle de tipo, banner de saldo del miembro, pricing.
+      Decisiones: una membresía a la vez · no-show quema · paquetes suman. SALA.
+- [ ] **Aplicar** `20260620150000_planes_creditos.sql` al Supabase de EKKO.
+- [ ] Cargar `stripe_price_id` de **pago único** para los tiers de paquete.
+- [ ] (abierto) ¿Cron que marque `status='expirada'` para dashboards? Hoy el
+      vencimiento es lazy (se chequea al reservar).
+- [ ] (abierto, feedback cliente #4) "Compras extra" (horas/invitados/servicios)
+      podrían modelarse como consumibles/paquetes sobre este mismo motor.
+
 ## 2. Deudas técnicas conocidas
 
 - [ ] **B3 — cambiar tier no activa la cuenta** (se cierra con el RPC de

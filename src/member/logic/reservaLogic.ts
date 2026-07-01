@@ -234,6 +234,8 @@ export function traducirErrorRPC(message: string): string {
   if (message.includes('EKKO_ANTICIPACION_EXCESIVA')) return 'No puedes reservar tan lejos en el futuro.';
   if (message.includes('EKKO_CONTINUAS_NO_PERMITIDAS')) return 'No puedes reservar horas consecutivas.';
   if (message.includes('EKKO_CONTINUA')) return 'No puedes reservar horas consecutivas.';
+  if (message.includes('EKKO_SIN_CREDITOS')) return 'No te quedan créditos. Comprá un paquete para reservar.';
+  if (message.includes('EKKO_MEMBRESIA_VENCIDA')) return 'Tu paquete venció. Renová para seguir reservando.';
   if (message.includes('EKKO_SLOT_OCUPADO')) return 'Este horario acaba de ser tomado por otro miembro. Elige otro.';
   if (message.includes('EKKO_RESERVA_NO_EXISTE')) return 'La reserva no existe.';
   if (message.includes('EKKO_NO_AUTORIZADO')) return 'No puedes hacer esta acción.';

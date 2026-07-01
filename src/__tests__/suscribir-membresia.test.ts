@@ -101,6 +101,17 @@ describe('suscribir-membresia (Pagos · self-serve)', () => {
     }));
   });
 
+  it('paquete de créditos → Checkout mode payment (pago único)', async () => {
+    process.env.STRIPE_SECRET_KEY = 'sk_test';
+    mockSocioMaybe.mockResolvedValue({ data: SOCIO, error: null });
+    mockTierMaybe.mockResolvedValue({ data: { ...TIER, stripe_price_id: 'price_pack', tipo: 'creditos' }, error: null });
+    mockCheckoutCreate.mockResolvedValue({ url: 'https://checkout.stripe/pack' });
+
+    const res = await invocar(evento({ tier: 'pro' }));
+    expect(res.statusCode).toBe(200);
+    expect(mockCheckoutCreate).toHaveBeenCalledWith(expect.objectContaining({ mode: 'payment' }));
+  });
+
   it('con Stripe pero tier sin precio → 400', async () => {
     process.env.STRIPE_SECRET_KEY = 'sk_test';
     mockSocioMaybe.mockResolvedValue({ data: SOCIO, error: null });

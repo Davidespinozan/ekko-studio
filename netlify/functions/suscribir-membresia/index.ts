@@ -65,7 +65,7 @@ export const handler: Handler = async (event) => {
     // Validar que el tier es del tenant, está activo y tiene precio en Stripe.
     const { data: tier } = await admin
       .from('tiers')
-      .select('id, slug, stripe_price_id, activo, tenant_id')
+      .select('id, slug, stripe_price_id, activo, tenant_id, tipo')
       .eq('tenant_id', socio.tenant_id)
       .eq('slug', body.tier)
       .maybeSingle();
@@ -95,19 +95,36 @@ export const handler: Handler = async (event) => {
       event.headers.origin ||
       '';
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      customer: customerId,
-      line_items: [{ price: tier.stripe_price_id, quantity: 1 }],
-      // metadata en la session (checkout.session.completed) y en la suscripción
-      // (red de seguridad para el webhook). EKKO no tiene trial → sin trial_*.
-      metadata: { usuario_id: socio.id, tier_id: tier.id },
-      subscription_data: { metadata: { usuario_id: socio.id, tier_id: tier.id } },
-      payment_method_collection: 'always',
-      allow_promotion_codes: true,
-      success_url: `${base}/app/perfil?suscripcion=ok`,
-      cancel_url: `${base}/app/perfil?suscripcion=cancelado`
-    });
+    // Paquete de créditos → pago ÚNICO (mode:'payment'). Mensual → suscripción.
+    const esPaquete = tier.tipo === 'creditos' || tier.tipo === 'hibrido';
+    const metadata = { usuario_id: socio.id, tier_id: tier.id };
+
+    const session = await stripe.checkout.sessions.create(
+      esPaquete
+        ? {
+            mode: 'payment',
+            customer: customerId,
+            line_items: [{ price: tier.stripe_price_id, quantity: 1 }],
+            metadata,
+            payment_intent_data: { metadata },
+            allow_promotion_codes: true,
+            success_url: `${base}/app/perfil?suscripcion=ok`,
+            cancel_url: `${base}/app/perfil?suscripcion=cancelado`
+          }
+        : {
+            mode: 'subscription',
+            customer: customerId,
+            line_items: [{ price: tier.stripe_price_id, quantity: 1 }],
+            // metadata en la session y en la suscripción (red de seguridad para
+            // el webhook). EKKO no tiene trial → sin trial_*.
+            metadata,
+            subscription_data: { metadata },
+            payment_method_collection: 'always',
+            allow_promotion_codes: true,
+            success_url: `${base}/app/perfil?suscripcion=ok`,
+            cancel_url: `${base}/app/perfil?suscripcion=cancelado`
+          }
+    );
 
     return ok({ url: session.url });
   } catch (err) {

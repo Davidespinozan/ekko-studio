@@ -554,6 +554,11 @@ function EditarTierModal({
     if (typeof raw === 'number') return raw;
     return tier?.slug === 'pro' ? 4 : 2;
   });
+  // Tipo de plan: mensual (tiempo) vs paquete de sesiones (creditos/hibrido).
+  const [esPaquete, setEsPaquete] = useState(tier?.tipo === 'creditos' || tier?.tipo === 'hibrido');
+  const [vence, setVence] = useState(tier?.tipo === 'hibrido');
+  const [clasesIncluidas, setClasesIncluidas] = useState<number>(tier?.clases_incluidas ?? 10);
+  const [duracionDias, setDuracionDias] = useState<number>(tier?.duracion_dias ?? 30);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -568,6 +573,16 @@ function EditarTierModal({
     const precioCentavos = Math.round(parseFloat(precio) * 100);
     if (!Number.isFinite(precioCentavos) || precioCentavos < 0) {
       setError('Precio inválido.');
+      setSaving(false);
+      return;
+    }
+
+    // Tipo de plan derivado del toggle. Paquete que vence = híbrido.
+    const tipo = !esPaquete ? 'tiempo' : vence ? 'hibrido' : 'creditos';
+    const clasesVal = esPaquete ? clasesIncluidas : null;
+    const duracionVal = esPaquete ? (vence ? duracionDias : null) : null;
+    if (esPaquete && (!Number.isFinite(clasesIncluidas) || clasesIncluidas < 1)) {
+      setError('El paquete debe incluir al menos 1 sesión.');
       setSaving(false);
       return;
     }
@@ -604,6 +619,9 @@ function EditarTierModal({
         precio_centavos: precioCentavos,
         moneda: 'MXN',
         periodo: 'mensual',
+        tipo,
+        clases_incluidas: clasesVal,
+        duracion_dias: duracionVal,
         beneficios: beneficios as never,
         reglas: reglas as never,
         activo,
@@ -627,6 +645,9 @@ function EditarTierModal({
       nombre,
       descripcion: descripcion || null,
       precio_centavos: precioCentavos,
+      tipo,
+      clases_incluidas: clasesVal,
+      duracion_dias: duracionVal,
       beneficios: beneficios as never,
       reglas: reglasNuevas as never,
       activo
@@ -702,6 +723,60 @@ function EditarTierModal({
             className="ek-input"
           />
         </label>
+
+        {/* Tipo de plan: mensual (tiempo) vs paquete de sesiones (créditos) */}
+        <div className="ek-form-field" style={{ marginTop: '16px' }}>
+          <Toggle
+            checked={esPaquete}
+            onChange={setEsPaquete}
+            label="Paquete de sesiones (créditos)"
+            description="Apagado = mensual (acceso ilimitado). Encendido = N sesiones que se descuentan al reservar."
+          />
+        </div>
+
+        {esPaquete && (
+          <div
+            className="ek-form-field"
+            style={{ marginTop: '12px', padding: '14px', background: 'var(--ek-bg-soft)', borderRadius: 'var(--ek-r-md)', border: '0.5px solid var(--ek-line)' }}
+          >
+            <label className="ek-label">
+              Sesiones incluidas
+              <input
+                type="number"
+                min={1}
+                value={clasesIncluidas}
+                onChange={(e) => setClasesIncluidas(parseInt(e.target.value) || 0)}
+                className="ek-input"
+              />
+            </label>
+
+            <div style={{ marginTop: '12px' }}>
+              <Toggle
+                checked={vence}
+                onChange={setVence}
+                label="Las sesiones vencen"
+                description="Apagado = no vencen. Encendido = vencen en X días desde la compra."
+              />
+            </div>
+
+            {vence && (
+              <label className="ek-label" style={{ marginTop: '12px', display: 'block' }}>
+                Vigencia (días)
+                <input
+                  type="number"
+                  min={1}
+                  value={duracionDias}
+                  onChange={(e) => setDuracionDias(parseInt(e.target.value) || 0)}
+                  className="ek-input"
+                />
+              </label>
+            )}
+            <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '10px' }}>
+              El precio de arriba es el cobro ÚNICO del paquete (no mensual). En Stripe usá un
+              precio de pago único para este plan.
+            </p>
+          </div>
+        )}
 
         <div className="ek-form-field" style={{ marginTop: '12px' }}>
           <Toggle

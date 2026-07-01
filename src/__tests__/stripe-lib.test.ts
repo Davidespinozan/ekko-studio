@@ -64,6 +64,20 @@ describe('clasificarEvento', () => {
     }
   });
 
+  it('checkout.session.completed mode payment (paquete) → activar con subscription_id null', () => {
+    const r = clasificarEvento(ev('checkout.session.completed', {
+      mode: 'payment',
+      subscription: null,
+      customer: 'cus_1',
+      metadata: { usuario_id: 'u1', tier_id: 't1' }
+    }));
+    expect(r.kind).toBe('activar');
+    if (r.kind === 'activar') {
+      expect(r.subscription_id).toBeNull();
+      expect(r.customer_id).toBe('cus_1');
+    }
+  });
+
   it('checkout.session.completed sin metadata → ignore', () => {
     const r = clasificarEvento(ev('checkout.session.completed', {
       mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', metadata: {}
@@ -71,9 +85,9 @@ describe('clasificarEvento', () => {
     expect(r.kind).toBe('ignore');
   });
 
-  it('checkout en modo payment (no suscripción) → ignore', () => {
+  it('checkout en modo setup (ni pago ni suscripción) → ignore', () => {
     const r = clasificarEvento(ev('checkout.session.completed', {
-      mode: 'payment', subscription: null, customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' }
+      mode: 'setup', subscription: null, customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' }
     }));
     expect(r.kind).toBe('ignore');
   });
