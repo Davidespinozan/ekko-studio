@@ -29,7 +29,9 @@ import { getStripe, clasificarEvento, periodoFinFromSubscription } from '../_lib
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') return badRequest('Method not allowed');
 
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  // Webhook de Connect: el signing secret es el del endpoint de Connect
+  // (STRIPE_CONNECT_WEBHOOK_SECRET); cae al genérico por compatibilidad.
+  const webhookSecret = process.env.STRIPE_CONNECT_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret || !process.env.STRIPE_SECRET_KEY) {
     return ok({ skipped: 'stripe_no_configurado' });
   }
@@ -70,6 +72,11 @@ export const handler: Handler = async (event) => {
     return ok({ received: true, duplicate: true });
   }
 
+  // Connect: los eventos de la cuenta conectada traen event.account. Las
+  // lecturas a Stripe (retrieve de la suscripción) deben ir sobre esa cuenta.
+  const connectedAccount = (stripeEvent as unknown as { account?: string }).account;
+  const acctOpt = connectedAccount ? { stripeAccount: connectedAccount } : undefined;
+
   try {
     const accion = clasificarEvento(stripeEvent);
 
@@ -78,7 +85,7 @@ export const handler: Handler = async (event) => {
       // no hay suscripción → periodo_fin lo decide activar_membresia por tipo.
       let periodoFin: string | null = null;
       if (accion.subscription_id) {
-        const sub = await stripe.subscriptions.retrieve(accion.subscription_id);
+        const sub = await stripe.subscriptions.retrieve(accion.subscription_id, acctOpt);
         periodoFin = periodoFinFromSubscription(sub);
       }
       const { error } = await admin.rpc('activar_membresia', {
@@ -89,22 +96,6 @@ export const handler: Handler = async (event) => {
         p_periodo_fin: periodoFin
       });
       if (error) throw new Error(`activar_membresia: ${error.message}`);
-    } else if (accion.kind === 'activar-sub') {
-      // Suscripción in-app (Elements): leer metadata + periodo de la suscripción.
-      const sub = await stripe.subscriptions.retrieve(accion.subscription_id);
-      const usuarioId = sub.metadata?.usuario_id;
-      const tierId = sub.metadata?.tier_id;
-      const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
-      if (usuarioId && tierId && customerId) {
-        const { error } = await admin.rpc('activar_membresia', {
-          p_usuario_id: usuarioId,
-          p_tier_id: tierId,
-          p_stripe_subscription_id: accion.subscription_id,
-          p_stripe_customer_id: customerId,
-          p_periodo_fin: periodoFinFromSubscription(sub)
-        });
-        if (error) throw new Error(`activar_membresia (sub): ${error.message}`);
-      }
     } else if (accion.kind === 'sync') {
       const { error } = await admin.rpc('sync_membresia_stripe', {
         p_stripe_subscription_id: accion.subscription_id,

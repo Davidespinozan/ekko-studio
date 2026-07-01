@@ -8,25 +8,26 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, serverError } from '../_lib/http';
 import { requireEnv, optionalEnv } from '../_lib/env';
-import { getStripe, getOrCreateCustomer } from '../_lib/stripe';
+import { getStripe } from '../_lib/stripe';
+import { resolverCuentaConectada, getOrCreateSocioCustomer } from '../_lib/connectBilling';
 
 /**
  * POST /suscribir-membresia
- * Auth: Bearer JWT del miembro (compra/cambia SU propio plan).
- * Body: { tier: <slug de un tier activo del tenant> }
+ * Auth: Bearer JWT del miembro. Body: { tier: <slug>, embedded?: boolean }
  *
- * Punto ÚNICO de enchufe de Stripe para la compra self-serve (D4: suscripción
- * mensual por tier, sin trial). Crea una Checkout Session hosted y devuelve
- * { url } para redirigir. La activación REAL la dispara el webhook
- * (checkout.session.completed → activar_membresia). NO se activa acá.
+ * Pago IN-APP vía Stripe Connect (direct charge): crea una Checkout Session
+ * EMBEBIDA sobre la CUENTA CONECTADA del estudio (precio inline del tier) y
+ * devuelve { client_secret, account } para montar el Embedded Checkout en el
+ * modal de EKKO. La activación la dispara el webhook de Connect (no acá).
  *
- * Sin STRIPE_SECRET_KEY (Stripe aún no conectado): responde
- * { activated: false, reason: 'stripe_pendiente' } y recepción activa en
- * mostrador. No fingimos pago.
+ *   - Sin STRIPE_SECRET_KEY        → { reason: 'stripe_pendiente' }.
+ *   - Estudio sin cobros activados → { reason: 'cobros_no_activos' }.
+ * STRYV es la plataforma; el dinero cae directo al banco del estudio.
  */
 
 interface Body {
   tier?: string;
+  embedded?: boolean;
 }
 
 export const handler: Handler = async (event) => {
@@ -44,7 +45,6 @@ export const handler: Handler = async (event) => {
     const anonKey = requireEnv('VITE_SUPABASE_ANON_KEY');
     const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
-    // Resolver al miembro por SU token (nunca usuario_id del body).
     const asUser = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${userToken}` } },
       auth: { persistSession: false }
@@ -54,7 +54,7 @@ export const handler: Handler = async (event) => {
 
     const { data: socio } = await asUser
       .from('usuarios')
-      .select('id, tenant_id, rol, nombre, email')
+      .select('id, tenant_id, rol, email')
       .eq('auth_id', authUser.id)
       .maybeSingle();
     if (!socio) return unauthorized('Sin perfil');
@@ -62,10 +62,9 @@ export const handler: Handler = async (event) => {
 
     const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
-    // Validar que el tier es del tenant, está activo y tiene precio en Stripe.
     const { data: tier } = await admin
       .from('tiers')
-      .select('id, slug, stripe_price_id, activo, tenant_id, tipo')
+      .select('id, slug, activo, tenant_id, nombre, precio_centavos, moneda, tipo')
       .eq('tenant_id', socio.tenant_id)
       .eq('slug', body.tier)
       .maybeSingle();
@@ -73,60 +72,93 @@ export const handler: Handler = async (event) => {
       return badRequest('Plan inválido');
     }
 
-    // Sin Stripe configurado: no se cobra ni se activa. Recepción activa en mostrador.
     if (!process.env.STRIPE_SECRET_KEY) {
       return ok({ activated: false, reason: 'stripe_pendiente' });
     }
-    if (!tier.stripe_price_id) {
-      return badRequest('Este plan aún no tiene precio configurado en Stripe');
+
+    // Cuenta conectada del estudio (direct charges).
+    const { accountId, chargesEnabled } = await resolverCuentaConectada(admin, socio.tenant_id);
+    if (!accountId || !chargesEnabled) {
+      return ok({ activated: false, reason: 'cobros_no_activos' });
+    }
+
+    if (!Number.isInteger(tier.precio_centavos) || tier.precio_centavos <= 0) {
+      return badRequest('Este plan no tiene un precio válido');
     }
 
     const stripe = getStripe();
-    const customerId = await getOrCreateCustomer(stripe, admin, {
-      id: socio.id,
-      email: socio.email ?? null,
-      nombre: socio.nombre ?? null
-    });
-
-    // Base de URLs: Netlify expone URL del sitio; fallback al origin del request.
-    const base =
-      optionalEnv('URL') ||
-      optionalEnv('DEPLOY_PRIME_URL') ||
-      event.headers.origin ||
-      '';
-
-    // Paquete de créditos → pago ÚNICO (mode:'payment'). Mensual → suscripción.
-    const esPaquete = tier.tipo === 'creditos' || tier.tipo === 'hibrido';
-    const metadata = { usuario_id: socio.id, tier_id: tier.id };
-
-    const session = await stripe.checkout.sessions.create(
-      esPaquete
-        ? {
-            mode: 'payment',
-            customer: customerId,
-            line_items: [{ price: tier.stripe_price_id, quantity: 1 }],
-            metadata,
-            payment_intent_data: { metadata },
-            allow_promotion_codes: true,
-            success_url: `${base}/app/perfil?suscripcion=ok`,
-            cancel_url: `${base}/app/perfil?suscripcion=cancelado`
-          }
-        : {
-            mode: 'subscription',
-            customer: customerId,
-            line_items: [{ price: tier.stripe_price_id, quantity: 1 }],
-            // metadata en la session y en la suscripción (red de seguridad para
-            // el webhook). EKKO no tiene trial → sin trial_*.
-            metadata,
-            subscription_data: { metadata },
-            payment_method_collection: 'always',
-            allow_promotion_codes: true,
-            success_url: `${base}/app/perfil?suscripcion=ok`,
-            cancel_url: `${base}/app/perfil?suscripcion=cancelado`
-          }
+    const customerId = await getOrCreateSocioCustomer(
+      stripe,
+      admin,
+      { id: socio.id, tenant_id: socio.tenant_id, email: socio.email ?? null },
+      accountId
     );
 
-    return ok({ url: session.url });
+    const feePct = Number(optionalEnv('EKKO_FEE_PERCENT', '0')) || 0;
+    const meta = { app: 'ekko', usuario_id: socio.id, tier_id: tier.id };
+    const currency = (tier.moneda || 'mxn').toLowerCase();
+    const esPaquete = tier.tipo === 'creditos' || tier.tipo === 'hibrido';
+
+    const baseParams = esPaquete
+      ? {
+          mode: 'payment' as const,
+          customer: customerId,
+          line_items: [
+            {
+              price_data: { currency, product_data: { name: tier.nombre }, unit_amount: tier.precio_centavos },
+              quantity: 1
+            }
+          ],
+          payment_intent_data: {
+            metadata: meta,
+            ...(feePct > 0 ? { application_fee_amount: Math.round((tier.precio_centavos * feePct) / 100) } : {})
+          },
+          metadata: meta
+        }
+      : {
+          mode: 'subscription' as const,
+          customer: customerId,
+          line_items: [
+            {
+              price_data: {
+                currency,
+                product_data: { name: tier.nombre },
+                unit_amount: tier.precio_centavos,
+                recurring: { interval: 'month' as const }
+              },
+              quantity: 1
+            }
+          ],
+          subscription_data: {
+            metadata: meta,
+            ...(feePct > 0 ? { application_fee_percent: feePct } : {})
+          },
+          metadata: meta
+        };
+
+    const origin =
+      event.headers.origin || event.headers.referer?.replace(/\/+$/, '') || optionalEnv('URL', '');
+
+    // Embedded → modal de EKKO (client_secret + la cuenta conectada, que el front
+    // necesita para inicializar Stripe.js sobre esa cuenta).
+    if (body.embedded !== false) {
+      const session = await stripe.checkout.sessions.create(
+        { ...baseParams, ui_mode: 'embedded', redirect_on_completion: 'never' },
+        { stripeAccount: accountId }
+      );
+      return ok({ activated: false, client_secret: session.client_secret, account: accountId });
+    }
+
+    // Hosted (redirect) — fallback.
+    const session = await stripe.checkout.sessions.create(
+      {
+        ...baseParams,
+        success_url: `${origin}/app/perfil?suscripcion=ok`,
+        cancel_url: `${origin}/app/perfil?suscripcion=cancelado`
+      },
+      { stripeAccount: accountId }
+    );
+    return ok({ activated: false, url: session.url });
   } catch (err) {
     console.error('[suscribir-membresia]', err);
     return serverError(err instanceof Error ? err.message : 'Error inesperado');

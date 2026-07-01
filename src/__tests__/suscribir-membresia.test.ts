@@ -1,14 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Pagos — `suscribir-membresia` (self-serve). Sin Stripe configurado responde
- * stripe_pendiente (no cobra ni activa). Rechaza tier faltante y no-miembros.
+ * suscribir-membresia (Connect): crea un Embedded Checkout sobre la CUENTA
+ * CONECTADA del estudio (direct charge). Sin Stripe → stripe_pendiente; sin
+ * cobros activados → cobros_no_activos; mensual → mode subscription; paquete →
+ * mode payment. Devuelve { client_secret, account }.
  */
 
 const mockGetUser = vi.fn();
 const mockSocioMaybe = vi.fn();
 const mockTierMaybe = vi.fn();
-const mockCheckoutCreate = vi.fn();
+const mockSessionCreate = vi.fn();
+const mockResolver = vi.fn();
 const mockGetOrCreate = vi.fn();
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -24,99 +27,87 @@ vi.mock('@supabase/supabase-js', () => ({
 }));
 
 vi.mock('../../netlify/functions/_lib/stripe', () => ({
-  getStripe: () => ({ checkout: { sessions: { create: mockCheckoutCreate } } }),
-  getOrCreateCustomer: (...args: unknown[]) => mockGetOrCreate(...args)
+  getStripe: () => ({ checkout: { sessions: { create: mockSessionCreate } } })
+}));
+
+vi.mock('../../netlify/functions/_lib/connectBilling', () => ({
+  resolverCuentaConectada: (...args: unknown[]) => mockResolver(...args),
+  getOrCreateSocioCustomer: (...args: unknown[]) => mockGetOrCreate(...args)
 }));
 
 import { handler } from '../../netlify/functions/suscribir-membresia/index';
 
 type AnyEvent = Parameters<typeof handler>[0];
-function evento(body: unknown): AnyEvent {
-  return { httpMethod: 'POST', headers: { authorization: 'Bearer tok' }, body: JSON.stringify(body) } as unknown as AnyEvent;
-}
-async function invocar(event: AnyEvent) {
-  return (await handler(event, {} as never, () => {})) as { statusCode: number; body: string };
-}
+const evento = (body: unknown): AnyEvent =>
+  ({ httpMethod: 'POST', headers: { authorization: 'Bearer tok' }, body: JSON.stringify(body) } as unknown as AnyEvent);
+const invocar = async (b: unknown) => (await handler(evento(b), {} as never, () => {})) as { statusCode: number; body: string };
 
-const SOCIO = { id: 'm1', tenant_id: 't1', rol: 'miembro' };
-const TIER = { id: 'tier1', slug: 'pro', stripe_price_id: null, activo: true, tenant_id: 't1' };
+const SOCIO = { id: 'm1', tenant_id: 't1', rol: 'miembro', email: 'm@e.test' };
+const TIER = { id: 'tier1', slug: 'pro', activo: true, tenant_id: 't1', nombre: 'Pro', precio_centavos: 120000, moneda: 'MXN', tipo: 'tiempo' };
 
-describe('suscribir-membresia (Pagos · self-serve)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockSocioMaybe.mockReset();
-    mockTierMaybe.mockReset();
-    process.env.VITE_SUPABASE_URL = 'http://supabase.test';
-    process.env.VITE_SUPABASE_ANON_KEY = 'anon';
-    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
-    delete process.env.STRIPE_SECRET_KEY; // sin Stripe
-    mockCheckoutCreate.mockReset();
-    mockGetOrCreate.mockReset().mockResolvedValue('cus_1');
-    mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-m1' } }, error: null });
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  process.env.VITE_SUPABASE_URL = 'http://supabase.test';
+  process.env.VITE_SUPABASE_ANON_KEY = 'anon';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
+  process.env.STRIPE_SECRET_KEY = 'sk_test';
+  mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-m1', email: 'm@e.test' } }, error: null });
+  mockGetOrCreate.mockResolvedValue('cus_1');
+  mockResolver.mockResolvedValue({ accountId: 'acct_1', chargesEnabled: true });
+});
 
-  it('sin Stripe → stripe_pendiente (no activa)', async () => {
-    mockSocioMaybe.mockResolvedValue({ data: SOCIO, error: null });
-    mockTierMaybe.mockResolvedValue({ data: TIER, error: null });
-    const res = await invocar(evento({ tier: 'pro' }));
-    expect(res.statusCode).toBe(200);
-    const body = JSON.parse(res.body) as { activated: boolean; reason: string };
-    expect(body.activated).toBe(false);
-    expect(body.reason).toBe('stripe_pendiente');
-  });
-
+describe('suscribir-membresia (Connect)', () => {
   it('sin tier → 400', async () => {
-    const res = await invocar(evento({}));
+    const res = await invocar({});
     expect(res.statusCode).toBe(400);
   });
 
   it('no-miembro → 400', async () => {
     mockSocioMaybe.mockResolvedValue({ data: { ...SOCIO, rol: 'recepcionista' }, error: null });
-    const res = await invocar(evento({ tier: 'pro' }));
+    const res = await invocar({ tier: 'pro' });
     expect(res.statusCode).toBe(400);
   });
 
-  it('tier inválido → 400', async () => {
+  it('sin Stripe → stripe_pendiente', async () => {
+    delete process.env.STRIPE_SECRET_KEY;
     mockSocioMaybe.mockResolvedValue({ data: SOCIO, error: null });
-    mockTierMaybe.mockResolvedValue({ data: null, error: null });
-    const res = await invocar(evento({ tier: 'fantasma' }));
-    expect(res.statusCode).toBe(400);
+    mockTierMaybe.mockResolvedValue({ data: TIER, error: null });
+    const res = await invocar({ tier: 'pro' });
+    expect(JSON.parse(res.body).reason).toBe('stripe_pendiente');
   });
 
-  it('con Stripe → crea Checkout Session y devuelve { url }', async () => {
-    process.env.STRIPE_SECRET_KEY = 'sk_test';
+  it('estudio sin cobros activados → cobros_no_activos', async () => {
     mockSocioMaybe.mockResolvedValue({ data: SOCIO, error: null });
-    mockTierMaybe.mockResolvedValue({ data: { ...TIER, stripe_price_id: 'price_123' }, error: null });
-    mockCheckoutCreate.mockResolvedValue({ url: 'https://checkout.stripe/x' });
+    mockTierMaybe.mockResolvedValue({ data: TIER, error: null });
+    mockResolver.mockResolvedValue({ accountId: null, chargesEnabled: false });
+    const res = await invocar({ tier: 'pro' });
+    expect(JSON.parse(res.body).reason).toBe('cobros_no_activos');
+  });
 
-    const res = await invocar(evento({ tier: 'pro' }));
+  it('mensual → Embedded Checkout mode subscription sobre la cuenta conectada', async () => {
+    mockSocioMaybe.mockResolvedValue({ data: SOCIO, error: null });
+    mockTierMaybe.mockResolvedValue({ data: TIER, error: null });
+    mockSessionCreate.mockResolvedValue({ client_secret: 'cs_test' });
+    const res = await invocar({ tier: 'pro', embedded: true });
     expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body).url).toBe('https://checkout.stripe/x');
-    expect(mockGetOrCreate).toHaveBeenCalled();
-    expect(mockCheckoutCreate).toHaveBeenCalledWith(expect.objectContaining({
-      mode: 'subscription',
-      customer: 'cus_1',
-      line_items: [{ price: 'price_123', quantity: 1 }],
-      metadata: { usuario_id: 'm1', tier_id: 'tier1' }
-    }));
+    const body = JSON.parse(res.body);
+    expect(body.client_secret).toBe('cs_test');
+    expect(body.account).toBe('acct_1');
+    expect(mockSessionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'subscription', ui_mode: 'embedded' }),
+      { stripeAccount: 'acct_1' }
+    );
   });
 
-  it('paquete de créditos → Checkout mode payment (pago único)', async () => {
-    process.env.STRIPE_SECRET_KEY = 'sk_test';
+  it('paquete → mode payment', async () => {
     mockSocioMaybe.mockResolvedValue({ data: SOCIO, error: null });
-    mockTierMaybe.mockResolvedValue({ data: { ...TIER, stripe_price_id: 'price_pack', tipo: 'creditos' }, error: null });
-    mockCheckoutCreate.mockResolvedValue({ url: 'https://checkout.stripe/pack' });
-
-    const res = await invocar(evento({ tier: 'pro' }));
+    mockTierMaybe.mockResolvedValue({ data: { ...TIER, tipo: 'creditos' }, error: null });
+    mockSessionCreate.mockResolvedValue({ client_secret: 'cs_pack' });
+    const res = await invocar({ tier: 'pro', embedded: true });
     expect(res.statusCode).toBe(200);
-    expect(mockCheckoutCreate).toHaveBeenCalledWith(expect.objectContaining({ mode: 'payment' }));
-  });
-
-  it('con Stripe pero tier sin precio → 400', async () => {
-    process.env.STRIPE_SECRET_KEY = 'sk_test';
-    mockSocioMaybe.mockResolvedValue({ data: SOCIO, error: null });
-    mockTierMaybe.mockResolvedValue({ data: { ...TIER, stripe_price_id: null }, error: null });
-    const res = await invocar(evento({ tier: 'pro' }));
-    expect(res.statusCode).toBe(400);
+    expect(mockSessionCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'payment' }),
+      { stripeAccount: 'acct_1' }
+    );
   });
 });

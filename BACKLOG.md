@@ -23,12 +23,16 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
       + `last_sub_event_at` + RPC `sync_membresia_stripe`). Dep `stripe` instalada.
 - [x] UI del miembro (`MiSuscripcion`) → `iniciarCheckout` + "Gestionar
       suscripción" (portal) + banner de pago vencido (`past_due`).
-- [x] **Pago IN-APP con Stripe Elements** (modal propio de EKKO, sin redirigir a
-      Stripe): `crear-pago-intent` (suscripción default_incomplete / PaymentIntent
-      paquete) + `PaymentModal` con `<PaymentElement>` + appearance EKKO; webhook
-      activa por `invoice.paid`(subscription_create) y `payment_intent.succeeded`.
-      Enganchado en Signup y MiSuscripción. **Requiere probar en modo test.**
-- [ ] **Env nueva**: `VITE_STRIPE_PUBLISHABLE_KEY` (pk_..., front) en Netlify.
+- [x] **Stripe Connect (STRYV plataforma)** — pago in-app con Embedded Checkout
+      sobre la cuenta conectada del estudio (direct charges, plata directa al
+      estudio). Fundación (`connect-onboarding`/`connect-status` + admin "Cobros")
+      + ruteo (`suscribir-membresia` embebido con `{stripeAccount}` + precio inline)
+      + webhook de Connect (`event.account` → `activar_membresia`). Cuentas Express.
+      Reemplazó el intento de Elements/`crear-pago-intent`. **Requiere probar en test.**
+- [ ] **Env nuevas**: `VITE_STRIPE_PUBLISHABLE_KEY` (pk de la plataforma),
+      `STRIPE_CONNECT_WEBHOOK_SECRET` (webhook de Connect), opcional `EKKO_FEE_PERCENT`.
+- [ ] Stripe dashboard: habilitar **Connect** (plataforma) + webhook de Connect
+      apuntando a `/.netlify/functions/stripe-webhook` con `event.account`.
 - [ ] **Conectar Stripe — pasos de David** (cuando quiera cobrar online): crear
       cuenta + productos/precios, cargar `tiers.stripe_price_id`, env vars
       `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` en Netlify, registrar el webhook

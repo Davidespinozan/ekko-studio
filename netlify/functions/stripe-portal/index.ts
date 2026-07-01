@@ -34,6 +34,7 @@ export const handler: Handler = async (event) => {
 
     const supabaseUrl = requireEnv('VITE_SUPABASE_URL');
     const anonKey = requireEnv('VITE_SUPABASE_ANON_KEY');
+    const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
     const asUser = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${userToken}` } },
@@ -44,35 +45,40 @@ export const handler: Handler = async (event) => {
 
     const { data: socio } = await asUser
       .from('usuarios')
-      .select('id')
+      .select('id, tenant_id')
       .eq('auth_id', authUser.id)
       .maybeSingle();
     if (!socio) return unauthorized('Sin perfil');
 
-    // El customer sale de SU membresía (el miembro puede leer la suya por RLS).
-    const { data: mem } = await asUser
-      .from('membresias')
+    // Connect: el customer del miembro vive en la cuenta conectada; el portal
+    // se crea SOBRE esa cuenta. Datos sensibles → service_role.
+    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+    const { data: dp } = await admin
+      .from('usuarios_datos_privados')
       .select('stripe_customer_id')
       .eq('usuario_id', socio.id)
-      .not('stripe_customer_id', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
       .maybeSingle();
-    if (!mem?.stripe_customer_id) {
+    if (!dp?.stripe_customer_id) {
       return badRequest('No tenés una suscripción activa para gestionar');
     }
 
-    const base =
-      optionalEnv('URL') ||
-      optionalEnv('DEPLOY_PRIME_URL') ||
-      event.headers.origin ||
-      '';
+    const { data: tenant } = await admin
+      .from('tenants')
+      .select('stripe_account_id')
+      .eq('id', socio.tenant_id)
+      .maybeSingle();
+    if (!tenant?.stripe_account_id) {
+      return badRequest('El estudio no tiene cobros activados');
+    }
+
+    const base = optionalEnv('URL') || optionalEnv('DEPLOY_PRIME_URL') || event.headers.origin || '';
 
     const stripe = getStripe();
-    const session = await stripe.billingPortal.sessions.create({
-      customer: mem.stripe_customer_id,
-      return_url: `${base}/app/perfil`
-    });
+    const session = await stripe.billingPortal.sessions.create(
+      { customer: dp.stripe_customer_id, return_url: `${base}/app/perfil` },
+      { stripeAccount: tenant.stripe_account_id }
+    );
 
     return ok({ url: session.url });
   } catch (err) {

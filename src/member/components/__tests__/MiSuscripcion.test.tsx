@@ -69,7 +69,7 @@ describe('MiSuscripcion', () => {
     await waitFor(() => expect(screen.getByText('Sin pagos registrados')).toBeInTheDocument());
   });
 
-  it('cambiar de plan abre el modal de pago propio (Elements)', async () => {
+  it('cambiar de plan abre el modal de pago propio', async () => {
     renderComp('pro');
     await waitFor(() => expect(screen.getByText('Cambiar de plan')).toBeInTheDocument());
     fireEvent.click(screen.getByText('Cambiar de plan'));
@@ -78,7 +78,7 @@ describe('MiSuscripcion', () => {
     fireEvent.click(screen.getByText('Elegir este'));
     // Sin VITE_STRIPE_PUBLISHABLE_KEY en test, el modal muestra el estado pendiente.
     await waitFor(() => expect(screen.getByText('PAGO SEGURO')).toBeInTheDocument());
-    expect(screen.getByText(/no está disponible/i)).toBeInTheDocument();
+    expect(screen.getByText(/no están configurados/i)).toBeInTheDocument();
   });
 
   it('muestra el banner de pago vencido cuando la membresía está past_due', async () => {

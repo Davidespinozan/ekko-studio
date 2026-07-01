@@ -156,19 +156,22 @@ completo en `KERNEL.md`.
 
 ## Pago in-app (Stripe Elements)
 
-- **EKKO-011 — Modal de pago propio con Stripe Elements (2026-06-20):** el pago se
-  hace DENTRO de la app (modal EKKO con `<PaymentElement>` + `appearance` de la
-  marca), NO se redirige a la página hosted de Stripe. El campo de tarjeta es un
-  iframe seguro de Stripe → cero PCI en EKKO. Backend `crear-pago-intent`:
-  mensual = subscription `default_incomplete` (client_secret de la 1ª factura,
-  cobro inmediato + 3DS en el modal, sin trial); paquete = PaymentIntent (pago
-  único). El front confirma con `confirmPayment` (`redirect:'if_required'`).
-  Activación por webhook: `invoice.paid` con `billing_reason='subscription_create'`
-  (crea la membresía) y `payment_intent.succeeded` con metadata (paquete);
-  renovación/past_due/cancelación siguen por `sync_membresia_stripe`. Reemplaza el
-  redirect de `iniciarCheckout` en Signup y MiSuscripción (el Checkout hosted queda
-  como fallback). Env nueva: `VITE_STRIPE_PUBLISHABLE_KEY`. Patrón de HSC (Elements)
-  adaptado a suscripción sin trial. **Requiere validación en modo test.**
+- **EKKO-011 — Pago in-app con Stripe Connect + Embedded Checkout (2026-06-20):**
+  el pago se hace DENTRO de la app (modal EKKO con `<EmbeddedCheckout>`), sin
+  redirigir. **STRYV es la plataforma de Connect; cada estudio (tenant) es una
+  cuenta conectada Express que cobra directo a sus miembros (direct charges)** —
+  la plataforma nunca toca los fondos. `suscribir-membresia` crea una Checkout
+  Session **embebida sobre la cuenta conectada** (`{ stripeAccount }`, precio
+  `price_data` inline del tier; mensual=subscription, paquete=payment) y devuelve
+  `{ client_secret, account }`; el front hace `loadStripe(pk, { stripeAccount })`.
+  Activación por **webhook de Connect** (`checkout.session.completed` con
+  `event.account`) vía `activar_membresia`; renovación/past_due/cancelación por
+  `sync_membresia_stripe`. Fundación en `connect-onboarding`/`connect-status` +
+  `tenants.stripe_account_id`/`stripe_charges_enabled`. Gate `cobros_no_activos`
+  si el estudio no completó el onboarding. Portado de SALA. Reemplazó el intento
+  previo de Elements/`crear-pago-intent` (borrado). Env: `VITE_STRIPE_PUBLISHABLE_KEY`,
+  `STRIPE_CONNECT_WEBHOOK_SECRET`, opcional `EKKO_FEE_PERCENT`. **Requiere validación
+  en modo test.**
 
 ## Notificaciones
 

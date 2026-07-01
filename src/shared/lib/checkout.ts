@@ -55,19 +55,3 @@ export async function abrirPortal(): Promise<PortalResult> {
   }
   return res;
 }
-
-/**
- * Pago IN-APP (modal propio de EKKO con Stripe Elements). Crea el intent y
- * devuelve el `client_secret` que consume <PaymentModal>. `modo` = 'suscripcion'
- * (mensual) | 'pago' (paquete). `reason='stripe_pendiente'` si no hay pasarela.
- */
-export interface PagoIntentResult {
-  clientSecret?: string;
-  modo?: 'suscripcion' | 'pago';
-  subscriptionId?: string;
-  reason?: string;
-}
-
-export function crearPagoIntent(tierSlug: string): Promise<PagoIntentResult> {
-  return backendPost<PagoIntentResult>('crear-pago-intent', { tier: tierSlug });
-}
