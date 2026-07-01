@@ -68,8 +68,13 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
       nac + domicilio + INE (foto, bucket privado) + contrato firmado; el check-in
       se bloquea hasta que esté completa (trigger, cubre QR y manual). Ver EKKO-010.
 - [ ] **Aplicar** `20260620170000_ficha_identidad.sql` al Supabase de EKKO.
-- [ ] Signup: **quitar los campos de tarjeta** (número/exp/cvv) — va por Stripe
-      Checkout (PCI). Agregar aviso de privacidad + aceptar contrato + confirmación.
+- [x] Signup: **sacados los campos de tarjeta** (PCI). Ahora crea la cuenta →
+      `iniciarCheckout` (redirige a Stripe si está conectado; si no, pantalla de
+      bienvenida + "activá en recepción"). Consentimiento (términos + aviso de
+      privacidad) obligatorio + pantalla de bienvenida con próximos pasos.
+- [ ] Crear las **páginas reales** de `términos y condiciones` y `aviso de
+      privacidad` (hoy el consentimiento las nombra como texto). Necesita el
+      contenido legal del cliente.
 - [ ] Ojo migración: miembros existentes quedan con `identidad_completa=false`
       (no podrán check-in hasta completar ficha). Para un estudio nuevo está bien.
 - [ ] (prevención, futuro) check-out con estado del equipo; tarjeta en archivo

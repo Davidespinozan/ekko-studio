@@ -1,7 +1,9 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, Star, Check, Eye, EyeOff, AlertCircle, CreditCard, Lock, User } from 'lucide-react';
+import { ArrowLeft, Star, Check, Eye, EyeOff, AlertCircle, User, ShieldCheck } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { parseBeneficios } from '@shared/lib/beneficios';
+import { iniciarCheckout } from '@shared/lib/checkout';
 import { Spinner } from '@shared/components/Spinner';
 
 type Tier = 'basica' | 'pro';
@@ -21,21 +23,6 @@ interface TierRow {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function parseBeneficios(raw: unknown): string[] {
-  if (Array.isArray(raw)) return raw.filter((b): b is string => typeof b === 'string');
-  if (typeof raw === 'string') {
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed)
-        ? parsed.filter((b): b is string => typeof b === 'string')
-        : [];
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
 
 function useTierPorSlug(slug: string) {
   const [tier, setTier] = useState<TierRow | null>(null);
@@ -73,39 +60,26 @@ export default function Signup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExp, setCardExp] = useState('');
-  const [cardCvv, setCardCvv] = useState('');
+  const [acepto, setAcepto] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [listo, setListo] = useState(false); // cuenta creada → pantalla de bienvenida
 
   const plan: PlanInfo | null = tierRow
     ? {
         nombre: tierRow.nombre,
         precio: Math.round(tierRow.precio_centavos / 100),
         tier: tierRow.slug as Tier,
-        beneficios: parseBeneficios(tierRow.beneficios).slice(0, 4)
+        beneficios: parseBeneficios(tierRow.beneficios)
+          .filter((b) => b.incluido)
+          .map((b) => b.label)
+          .slice(0, 4)
       }
     : null;
 
-  const handleCardNumber = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 16);
-    const formatted = digits.replace(/(.{4})/g, '$1 ').trim();
-    setCardNumber(formatted);
-  };
-
-  const handleCardExp = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 4);
-    if (digits.length >= 3) {
-      setCardExp(`${digits.slice(0, 2)}/${digits.slice(2)}`);
-    } else {
-      setCardExp(digits);
-    }
-  };
-
   // Mobile: al enfocar un input, scrollearlo al centro para que el teclado
-  // iOS no lo tape. focus burbujea en React, así lo capturamos en el <form>.
+  // iOS no lo tape.
   const handleFormFocus = (e: React.FocusEvent<HTMLFormElement>) => {
     const target = e.target;
     if (target instanceof HTMLInputElement) {
@@ -138,25 +112,14 @@ export default function Signup() {
       setError('Las contraseñas no coinciden.');
       return;
     }
-    if (cardNumber.replace(/\s/g, '').length !== 16) {
-      setError('El número de tarjeta debe tener 16 dígitos.');
-      return;
-    }
-    if (cardExp.length !== 5) {
-      setError('Fecha de vencimiento inválida.');
-      return;
-    }
-    if (cardCvv.length !== 3) {
-      setError('CVV inválido.');
+    if (!acepto) {
+      setError('Debés aceptar los términos y el aviso de privacidad para continuar.');
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      // Simular procesamiento de pago (2 segundos)
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
       const response = await fetch('/.netlify/functions/fake-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -180,23 +143,26 @@ export default function Signup() {
         ) {
           throw new Error('Ya existe una cuenta con este email. Iniciá sesión.');
         }
-        throw new Error(result.error || 'Error al procesar pago');
+        throw new Error(result.error || 'No se pudo crear la cuenta.');
       }
 
-      // Auto-login
+      // Auto-login para dejar sesión activa (necesaria para el pago).
       const { error: loginError } = await supabase.auth.signInWithPassword({
         email: emailNorm,
         password
       });
-
       if (loginError) {
-        throw new Error('Cuenta creada pero error al iniciar sesión. Inicia sesión manualmente.');
+        throw new Error('Cuenta creada pero no pudimos iniciar sesión. Iniciá sesión manualmente.');
       }
 
-      navigate('/app');
+      // Pago: si Stripe está conectado, iniciarCheckout redirige a la pasarela.
+      // Si no, cae a la pantalla de bienvenida (el pago se coordina en recepción).
+      const checkout = await iniciarCheckout(plan!.tier);
+      if (checkout.url) return; // redirigiendo a Stripe
+      setListo(true);
     } catch (err) {
       console.error('[Signup]', err);
-      setError(err instanceof Error ? err.message : 'Error inesperado. Intenta de nuevo.');
+      setError(err instanceof Error ? err.message : 'Error inesperado. Intentá de nuevo.');
       setIsProcessing(false);
     }
   }
@@ -211,6 +177,41 @@ export default function Signup() {
 
   if (!plan) {
     return <Navigate to="/" replace />;
+  }
+
+  // Pantalla de bienvenida (qué recibe el suscriptor al concluir el registro).
+  if (listo) {
+    return (
+      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '48px 24px', minHeight: '100dvh' }}>
+        <div className="ek-card" style={{ padding: '32px', textAlign: 'center' }}>
+          <span className="ek-empty-icon" style={{ width: 64, height: 64, marginBottom: '18px' }}>
+            <ShieldCheck size={30} aria-hidden="true" />
+          </span>
+          <h1 style={{ fontFamily: 'var(--ek-font-display)', fontSize: '26px', fontWeight: 700, margin: '0 0 8px', letterSpacing: '-0.02em' }}>
+            ¡Bienvenido/a a EKKO!
+          </h1>
+          <p className="ek-body-muted" style={{ margin: '0 0 24px' }}>
+            Tu cuenta quedó creada con el plan <strong style={{ color: 'var(--ek-mustard)' }}>{plan.nombre}</strong>.
+          </p>
+
+          <div className="ek-card ek-card--md" style={{ textAlign: 'left', marginBottom: '24px' }}>
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '12px' }}>PRÓXIMOS PASOS</p>
+            <ol style={{ margin: 0, paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', lineHeight: 1.5 }}>
+              <li>En tu <strong>primera visita</strong>, recepción toma tu foto y tus datos (INE).</li>
+              <li>Firmás el <strong>contrato de uso</strong> del estudio.</li>
+              <li>Activamos tu membresía y <strong>¡a grabar!</strong></li>
+            </ol>
+          </div>
+
+          <button type="button" className="ek-cta ek-cta--gold ek-cta--full" onClick={() => navigate('/app')}>
+            Ir a mi cuenta
+          </button>
+          <p className="ek-helper-text" style={{ marginTop: '12px' }}>
+            El pago de tu membresía se coordina en recepción.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -233,8 +234,6 @@ export default function Signup() {
         <ArrowLeft size={15} aria-hidden="true" /> Volver a EKKO
       </Link>
 
-      {/* Plan resumen — sticky para que el usuario siempre vea qué compra,
-          aunque scrollee el form con el teclado abierto. */}
       <div className="ek-card" style={{
         padding: '24px',
         marginBottom: '32px',
@@ -343,66 +342,19 @@ export default function Signup() {
           />
         </div>
 
-        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginTop: '20px', marginBottom: '4px' }}>
-          <Lock size={13} aria-hidden="true" /> PAGO SEGURO
-        </p>
-
-        <div className="ek-form-field">
-          <label className="ek-label" htmlFor="signup-card">Número de tarjeta</label>
-          <div style={{ position: 'relative' }}>
-            <input
-              id="signup-card"
-              type="text"
-              className="ek-input"
-              placeholder="0000 0000 0000 0000"
-              value={cardNumber}
-              onChange={(e) => handleCardNumber(e.target.value)}
-              required
-              disabled={isProcessing}
-              inputMode="numeric"
-              autoComplete="cc-number"
-              style={{ paddingRight: '44px' }}
-            />
-            <CreditCard
-              size={18}
-              aria-hidden="true"
-              style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--ek-ink-faint)', pointerEvents: 'none' }}
-            />
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          <div className="ek-form-field">
-            <label className="ek-label" htmlFor="signup-exp">Vencimiento</label>
-            <input
-              id="signup-exp"
-              type="text"
-              className="ek-input"
-              placeholder="MM/AA"
-              value={cardExp}
-              onChange={(e) => handleCardExp(e.target.value)}
-              required
-              disabled={isProcessing}
-              inputMode="numeric"
-              autoComplete="cc-exp"
-            />
-          </div>
-          <div className="ek-form-field">
-            <label className="ek-label" htmlFor="signup-cvv">CVV</label>
-            <input
-              id="signup-cvv"
-              type="text"
-              className="ek-input"
-              placeholder="000"
-              value={cardCvv}
-              onChange={(e) => setCardCvv(e.target.value.replace(/\D/g, '').slice(0, 3))}
-              required
-              disabled={isProcessing}
-              inputMode="numeric"
-              autoComplete="cc-csc"
-            />
-          </div>
-        </div>
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginTop: '8px', fontSize: '13px', lineHeight: 1.5, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={acepto}
+            onChange={(e) => setAcepto(e.target.checked)}
+            disabled={isProcessing}
+            style={{ marginTop: '3px', flexShrink: 0 }}
+          />
+          <span>
+            Acepto los <strong style={{ color: 'var(--ek-ink)' }}>términos y condiciones</strong> y el{' '}
+            <strong style={{ color: 'var(--ek-ink)' }}>aviso de privacidad</strong>. Compromiso mínimo de 6 meses.
+          </span>
+        </label>
 
         {error && (
           <div style={{
@@ -427,10 +379,7 @@ export default function Signup() {
           style={{ marginTop: '12px', padding: '16px', fontSize: '15px' }}
           disabled={isProcessing}
         >
-          {isProcessing
-            ? <Spinner size={18} label="Procesando pago…" />
-            : `Pagar y empezar — $${plan.precio.toLocaleString('es-MX')}/mes`
-          }
+          {isProcessing ? <Spinner size={18} label="Creando tu cuenta…" /> : 'Crear mi cuenta'}
         </button>
 
         <p style={{
@@ -440,8 +389,7 @@ export default function Signup() {
           marginTop: '4px',
           lineHeight: 1.5
         }}>
-          Al continuar aceptas los términos. Compromiso mínimo de 6 meses.<br />
-          Pago mensual recurrente, cancelas en cualquier momento.
+          El pago es seguro vía Stripe. En tu primera visita en recepción tomamos tus datos y activamos tu membresía.
         </p>
 
         <p style={{
