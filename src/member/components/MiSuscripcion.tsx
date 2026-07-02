@@ -105,6 +105,8 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
       try {
         const info = await obtenerBillingInfo();
         if (!mounted) return;
+        // Diagnóstico temporal: ver por qué no aparece tarjeta/historial.
+        console.log('[MiSuscripcion] billing debug', info.debug);
         setPaymentMethod(info.paymentMethod);
         setPagos(info.pagos ?? []);
       } catch (e) {

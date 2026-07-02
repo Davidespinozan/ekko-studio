@@ -90,8 +90,18 @@ export const handler: Handler = async (event) => {
       customerId = mem?.stripe_customer_id ?? null;
     }
     const stripeAccount = tenant?.stripe_account_id ?? null;
+
+    // Diagnóstico temporal (no sensible): de dónde salió el customer, si hay
+    // cuenta conectada, y errores de Stripe. Se loguea en el cliente.
+    const debug: Record<string, unknown> = {
+      customerSource: dp?.stripe_customer_id ? 'datos_privados' : customerId ? 'membresias' : 'none',
+      hasCustomer: !!customerId,
+      hasAccount: !!stripeAccount,
+      errors: [] as string[]
+    };
+
     if (!customerId || !stripeAccount) {
-      return ok({ paymentMethod: null, pagos: [] });
+      return ok({ paymentMethod: null, pagos: [], debug });
     }
 
     const stripe = getStripe();
@@ -118,7 +128,9 @@ export const handler: Handler = async (event) => {
         paymentMethod = { brand: card.brand, last4: card.last4, expMonth: card.exp_month, expYear: card.exp_year };
       }
     } catch (e) {
-      console.error('[stripe-billing-info] payment method', e instanceof Error ? e.message : e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[stripe-billing-info] payment method', msg);
+      (debug.errors as string[]).push(`pm: ${msg}`);
     }
 
     // ── Historial: charges (cubre suscripción Y paquetes de una sola vez) ─────
@@ -138,10 +150,14 @@ export const handler: Handler = async (event) => {
         });
       }
     } catch (e) {
-      console.error('[stripe-billing-info] charges', e instanceof Error ? e.message : e);
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('[stripe-billing-info] charges', msg);
+      (debug.errors as string[]).push(`charges: ${msg}`);
     }
 
-    return ok({ paymentMethod, pagos });
+    debug.cardFound = !!paymentMethod;
+    debug.chargesCount = pagos.length;
+    return ok({ paymentMethod, pagos, debug });
   } catch (err) {
     console.error('[stripe-billing-info]', err);
     return serverError(err instanceof Error ? err.message : 'Error inesperado');
