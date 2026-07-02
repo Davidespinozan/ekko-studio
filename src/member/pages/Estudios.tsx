@@ -121,7 +121,7 @@ export default function Estudios() {
                 )}
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '4px' }}>
-                  <ArrowRight size={18} className="ek-quick-action-arrow" aria-hidden="true" />
+                  <ArrowRight size={18} style={{ color: 'var(--ek-mustard)' }} aria-hidden="true" />
                 </div>
               </div>
             </Link>
