@@ -27,6 +27,7 @@ import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
 import { Spinner } from '@shared/components/Spinner';
 import { EmptyState } from '@shared/components/EmptyState';
+import { SegmentedToggle } from '@shared/components/SegmentedToggle';
 import Toggle from '../components/Toggle';
 import ConfirmDialog from '../components/ConfirmDialog';
 import CardMenuDropdown from '../components/CardMenuDropdown';
@@ -727,14 +728,24 @@ function EditarTierModal({
           />
         </label>
 
-        {/* Tipo de plan: mensual (tiempo) vs paquete de sesiones (créditos) */}
+        {/* Tipo de plan: elección explícita mensual vs paquete de créditos */}
         <div className="ek-form-field" style={{ marginTop: '16px' }}>
-          <Toggle
-            checked={esPaquete}
-            onChange={setEsPaquete}
-            label="Paquete de sesiones (créditos)"
-            description="Apagado = mensual (acceso ilimitado). Encendido = N sesiones que se descuentan al reservar."
+          <label className="ek-label" style={{ display: 'block', marginBottom: '8px' }}>Tipo de plan</label>
+          <SegmentedToggle
+            block
+            ariaLabel="Tipo de plan"
+            value={esPaquete ? 'creditos' : 'mensual'}
+            onChange={(v) => setEsPaquete(v === 'creditos')}
+            options={[
+              { value: 'mensual', label: 'Mensual' },
+              { value: 'creditos', label: 'Paquete de créditos' }
+            ]}
           />
+          <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '8px' }}>
+            {esPaquete
+              ? 'N sesiones que se descuentan al reservar (cobro único).'
+              : 'Acceso ilimitado mientras la membresía esté vigente (cobro mensual).'}
+          </p>
         </div>
 
         {esPaquete && (
