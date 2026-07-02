@@ -120,22 +120,8 @@ export default function Estudios() {
                   }}>{r.descripcion}</p>
                 )}
 
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: '10px',
-                  fontSize: '12px',
-                  color: 'var(--ek-ink-muted)'
-                }}>
-                  <span>
-                    {(r.capacidad_personas ?? 0) > 0
-                      ? `Hasta ${r.capacidad_personas} personas`
-                      : 'Capacidad por confirmar'}
-                  </span>
-                  <span style={{ color: 'var(--ek-mustard)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                    Ver detalle <ArrowRight size={13} aria-hidden="true" />
-                  </span>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '4px' }}>
+                  <ArrowRight size={18} className="ek-quick-action-arrow" aria-hidden="true" />
                 </div>
               </div>
             </Link>
