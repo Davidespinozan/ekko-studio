@@ -297,6 +297,21 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     color: var(--ek-ink);
   }
 
+  /* Inicio: logo centrado con la campana anclada a la derecha. */
+  .ek-header-inner--centered {
+    position: relative;
+    justify-content: center;
+  }
+  .ek-header-bell-abs {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  @media (min-width: 768px) {
+    .ek-header-bell-abs { right: 32px; }
+  }
+
   @media (min-width: 768px) {
     .ek-header-glass {
       padding: calc(10px + env(safe-area-inset-top, 0px)) 0 10px;

@@ -73,19 +73,22 @@ export default function MemberLayout() {
     <div className="ek-page" style={{ paddingBottom: '88px' /* espacio para bottom nav */ }}>
       <DemoBanner vista="Miembro" />
       <header className="ek-header-glass">
-        <div className="ek-header-inner">
-          {tituloDeSeccion(location.pathname) ? (
+        {tituloDeSeccion(location.pathname) ? (
+          <div className="ek-header-inner">
             <h1 className="ek-header-title">{tituloDeSeccion(location.pathname)}</h1>
-          ) : (
-            <Link
-              to="/app"
-              style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}
-            >
+            <NotificacionesBell />
+          </div>
+        ) : (
+          /* Inicio: logo centrado, campana anclada a la derecha */
+          <div className="ek-header-inner ek-header-inner--centered">
+            <Link to="/app" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
               <BrandLogo height={52} maxWidth={180} />
             </Link>
-          )}
-          <NotificacionesBell />
-        </div>
+            <div className="ek-header-bell-abs">
+              <NotificacionesBell />
+            </div>
+          </div>
+        )}
       </header>
 
       <Suspense fallback={<LoadingScreen />}>
