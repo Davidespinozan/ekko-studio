@@ -42,9 +42,15 @@
   --ek-ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
   --ek-ease-out:     cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Shadows */
-  --ek-shadow-card:    0 12px 24px rgba(0, 0, 0, 0.3);
-  --ek-shadow-hero:    0 24px 56px rgba(229, 184, 41, 0.04), 0 4px 12px rgba(0, 0, 0, 0.4);
+  /* Highlight superior: borde de luz "iluminado desde arriba" que da
+     profundidad premium a cualquier superficie (se combina con las sombras). */
+  --ek-highlight-top:  inset 0 1px 0 rgba(245, 241, 232, 0.055);
+  --ek-highlight-strong: inset 0 1px 0 rgba(245, 241, 232, 0.08);
+
+  /* Shadows — capas (contacto + ambiente + proyectada) para dar volumen real,
+     no una sola sombra plana. */
+  --ek-shadow-card:    0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.28), 0 24px 48px -16px rgba(0, 0, 0, 0.45);
+  --ek-shadow-hero:    0 24px 56px rgba(229, 184, 41, 0.05), 0 2px 4px rgba(0, 0, 0, 0.4), 0 18px 40px -12px rgba(0, 0, 0, 0.5);
   --ek-shadow-cta:     0 8px 20px rgba(229, 184, 41, 0.12);
   --ek-shadow-modal:   0 32px 80px rgba(0, 0, 0, 0.6);
   --ek-shadow:         var(--ek-shadow-card);
@@ -114,6 +120,20 @@ body {
   input, select, textarea {
     font-size: 16px !important;
   }
+}
+
+/* Grano fílmico global: textura sutilísima que quita la sensación "plana
+   digital" y da acabado premium. Overlay no interactivo, no afecta legibilidad. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
 }
 
 /* Global transition (technique #8) */
@@ -308,11 +328,11 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
      ============================================================================ */
 
   .ek-card {
-    background: linear-gradient(180deg, var(--ek-bg-soft) 0%, var(--ek-bg) 100%);
-    border: 0.5px solid var(--ek-line);
+    background: linear-gradient(180deg, #1c1c1c 0%, #131313 62%, #0f0f0f 100%);
+    border: 1px solid var(--ek-line);
     border-radius: var(--ek-r-card);
     padding: 24px;
-    box-shadow: var(--ek-shadow-card);
+    box-shadow: var(--ek-highlight-top), var(--ek-shadow-card);
     color: var(--ek-ink);
   }
 
@@ -322,11 +342,13 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   }
 
   .ek-card--hero {
-    background: linear-gradient(180deg, var(--ek-bg-soft) 0%, var(--ek-bg) 100%);
-    border: 0.5px solid var(--ek-line);
+    background:
+      radial-gradient(120% 100% at 0% 0%, rgba(229, 184, 41, 0.05), transparent 55%),
+      linear-gradient(180deg, #1e1e1e 0%, #141414 60%, #0f0f0f 100%);
+    border: 1px solid var(--ek-line-strong);
     border-radius: var(--ek-r-card);
     padding: 26px;
-    box-shadow: var(--ek-shadow-hero);
+    box-shadow: var(--ek-highlight-strong), var(--ek-shadow-hero);
     position: relative;
     overflow: hidden;
     color: var(--ek-ink);
@@ -372,10 +394,11 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   }
 
   .ek-stat-card {
-    background: linear-gradient(180deg, rgba(245, 241, 232, 0.02) 0%, transparent 100%);
-    border: 0.5px solid var(--ek-line);
+    background: linear-gradient(180deg, #191919 0%, #121212 100%);
+    border: 1px solid var(--ek-line);
     border-radius: var(--ek-r-md);
     padding: 16px;
+    box-shadow: var(--ek-highlight-top), 0 4px 14px rgba(0, 0, 0, 0.28);
   }
 
   .ek-stat-card--accent { border-color: var(--ek-mustard-dim); }
@@ -386,9 +409,9 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-cta,
   .ek-btn-primary {
-    background: var(--ek-bg);
+    background: linear-gradient(180deg, #1c1c1c 0%, #131313 100%);
     color: var(--ek-ink);
-    border: 0.5px solid rgba(229, 184, 41, 0.4);
+    border: 1px solid rgba(229, 184, 41, 0.4);
     border-radius: var(--ek-r-sm);
     padding: 12px 22px;
     font-family: var(--ek-font-body);
@@ -396,7 +419,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     font-weight: 600;
     letter-spacing: -0.01em;
     min-height: 44px;
-    box-shadow: var(--ek-shadow-cta);
+    box-shadow: var(--ek-highlight-top), 0 4px 14px rgba(0, 0, 0, 0.3);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -2182,8 +2205,10 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   .ek-card:hover {
     border-color: rgba(229, 184, 41, 0.3);
     box-shadow:
-      0 4px 12px rgba(0, 0, 0, 0.4),
-      0 0 24px rgba(229, 184, 41, 0.08);
+      var(--ek-highlight-strong),
+      0 1px 2px rgba(0, 0, 0, 0.35),
+      0 10px 30px rgba(0, 0, 0, 0.4),
+      0 0 32px rgba(229, 184, 41, 0.10);
   }
 
   /* 4. Item activo del sidebar con glow lateral */
