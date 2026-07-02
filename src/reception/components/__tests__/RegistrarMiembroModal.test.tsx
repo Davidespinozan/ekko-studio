@@ -15,6 +15,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 const h = vi.hoisted(() => ({
   getSession: vi.fn(),
   fetchMock: vi.fn(),
+  activarMock: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }
 }));
 
@@ -22,12 +23,17 @@ vi.mock('@shared/lib/supabase', () => ({
   supabase: { auth: { getSession: () => h.getSession() } }
 }));
 vi.mock('@shared/hooks/useToast', () => ({ useToast: () => h.toast }));
+vi.mock('@shared/lib/checkout', () => ({
+  activarMembresiaMostrador: (...args: unknown[]) => h.activarMock(...args)
+}));
 
 import { RegistrarMiembroModal } from '../RegistrarMiembroModal';
 
 beforeEach(() => {
   h.getSession.mockReset();
   h.fetchMock.mockReset();
+  h.activarMock.mockReset();
+  h.activarMock.mockResolvedValue({ success: true });
   h.toast.success.mockReset();
   h.toast.error.mockReset();
   vi.stubGlobal('fetch', h.fetchMock);
@@ -73,6 +79,31 @@ describe('RegistrarMiembroModal · wiring', () => {
     // Fase de credenciales + aviso explícito de pendiente de activación (D2).
     expect(await screen.findByText(/MIEMBRO REGISTRADO/i)).toBeInTheDocument();
     expect(screen.getByText(/PENDIENTE DE ACTIVACIÓN/i)).toBeInTheDocument();
+  });
+
+  it('con plan → manda membresia_tier, activa en el mismo paso y muestra "activa"', async () => {
+    h.fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        user: { id: 'u-nuevo', email: 'ana@correo.com', nombre: 'Ana López', rol: 'miembro', password: 'x' }
+      })
+    });
+
+    render(<RegistrarMiembroModal onClose={vi.fn()} onRegistrado={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Nombre completo'), { target: { value: 'Ana López' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ana@correo.com' } });
+    fireEvent.change(screen.getByLabelText(/Plan inicial/i), { target: { value: 'pro' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar y activar' }));
+
+    await waitFor(() => expect(h.fetchMock).toHaveBeenCalledTimes(1));
+    const body = JSON.parse((h.fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(body.membresia_tier).toBe('pro');
+
+    await waitFor(() => expect(h.activarMock).toHaveBeenCalledWith('u-nuevo', 'pro'));
+    expect(await screen.findByText(/Membresía/i)).toBeInTheDocument();
+    expect(screen.getByText(/activa/i)).toBeInTheDocument();
+    expect(screen.queryByText(/PENDIENTE DE ACTIVACIÓN/i)).not.toBeInTheDocument();
   });
 
   it('submit deshabilitado hasta que nombre, email y password sean válidos', () => {

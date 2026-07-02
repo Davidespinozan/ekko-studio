@@ -148,6 +148,7 @@ export const handler: Handler = async (event) => {
     return ok({
       success: true,
       user: {
+        id: nuevoMiembro.id,
         email: body.email.trim().toLowerCase(),
         nombre: body.nombre.trim(),
         rol: 'miembro',

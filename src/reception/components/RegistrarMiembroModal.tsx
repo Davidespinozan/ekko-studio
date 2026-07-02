@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react';
 import { RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
+import { activarMembresiaMostrador } from '@shared/lib/checkout';
 import { CopyButton } from '@shared/components/CopyButton';
 import { traducirErrorRegistro } from '../lib/traducirErrorRegistro';
+
+type Tier = '' | 'basica' | 'pro';
 
 interface Props {
   onClose: () => void;
@@ -29,17 +32,23 @@ interface MiembroCreado {
   nombre: string;
   email: string;
   password: string;
+  plan: Tier;
+  /** true si se activó la membresía en el mismo registro (cobro en caja). */
+  activada: boolean;
 }
 
 /**
  * Registrar un miembro nuevo desde el mostrador (Sprint RP-4).
  *
- * Consume la Netlify Function `reception-create-member` (RP-1). El modal
- * tiene dos fases: (1) formulario de datos básicos, (2) credenciales para
- * entregar al cliente. NO hay campo de rol — la función lo fija a
- * 'miembro' (defensa en profundidad: la UI tampoco lo expone). NO se
- * asigna tier ni cobro: el miembro nace `pendiente_pago` y la activación
- * es responsabilidad de administración/Stripe (fuera de scope).
+ * Consume la Netlify Function `reception-create-member` (RP-1). Dos fases:
+ * (1) formulario, (2) credenciales para el cliente. El rol lo fija la función
+ * a 'miembro' (defensa en profundidad).
+ *
+ * Flujo híbrido: si se elige un PLAN INICIAL, tras crear la cuenta se activa la
+ * membresía en el mismo paso (cobro en caja, RPC `activar_membresia`) → walk-in
+ * en un solo paso. Sin plan, el miembro nace `pendiente_pago` y se activa luego
+ * desde su perfil. Si la creación funciona pero la activación falla, la cuenta
+ * queda creada (pendiente) y se avisa: nunca se pierde nada.
  */
 export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
   const toast = useToast();
@@ -47,6 +56,7 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
+  const [tier, setTier] = useState<Tier>('');
   // Contraseña temporal autogenerada al montar (lazy init → estable).
   const [password, setPassword] = useState(() => generarPassword());
   const [submitting, setSubmitting] = useState(false);
@@ -104,7 +114,8 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
           nombre: nombreNorm,
           email: emailNorm,
           password,
-          telefono: telNorm || undefined
+          telefono: telNorm || undefined,
+          membresia_tier: tier || undefined
         })
       });
 
@@ -116,7 +127,25 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
         return;
       }
 
-      setCreado({ nombre: nombreNorm, email: emailNorm, password });
+      // Flujo híbrido: si se eligió plan, activar la membresía en el mismo paso
+      // (cobro en caja). Si la activación falla, la cuenta ya quedó creada
+      // (pendiente) → se avisa en la vista de credenciales; nada se pierde.
+      let activada = false;
+      const nuevoId = (result?.user as { id?: string } | undefined)?.id;
+      if (tier && nuevoId) {
+        try {
+          await activarMembresiaMostrador(nuevoId, tier);
+          activada = true;
+        } catch (actErr) {
+          toast.error(
+            actErr instanceof Error
+              ? `Cuenta creada, pero no se pudo activar: ${actErr.message}. Activala desde su perfil.`
+              : 'Cuenta creada, pero no se pudo activar. Activala desde su perfil.'
+          );
+        }
+      }
+
+      setCreado({ nombre: nombreNorm, email: emailNorm, password, plan: tier, activada });
     } catch (err) {
       toast.error(traducirErrorRegistro(err instanceof Error ? err.message : ''));
       setSubmitting(false);
@@ -233,6 +262,28 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
               />
             </div>
 
+            <div className="ek-form-field" style={{ marginBottom: '14px' }}>
+              <label className="ek-label" htmlFor="rm-plan">
+                Plan inicial <span style={{ color: 'var(--ek-ink-faint)' }}>(opcional)</span>
+              </label>
+              <select
+                id="rm-plan"
+                value={tier}
+                onChange={(e) => setTier(e.target.value as Tier)}
+                className="ek-input"
+                disabled={submitting}
+              >
+                <option value="">— Sin plan (activar después) —</option>
+                <option value="basica">Básica</option>
+                <option value="pro">Pro</option>
+              </select>
+              <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
+                {tier
+                  ? 'Se activa la membresía al registrar (confirmás el cobro en caja).'
+                  : 'Sin plan queda pendiente de pago; lo activás luego desde su perfil.'}
+              </p>
+            </div>
+
             <div className="ek-form-field" style={{ marginBottom: '8px' }}>
               <label className="ek-label" htmlFor="rm-password">
                 Contraseña temporal
@@ -287,10 +338,10 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
               <button
                 type="submit"
                 disabled={!canSubmit}
-                className="ek-cta"
+                className={tier ? 'ek-cta ek-cta--gold' : 'ek-cta'}
                 style={{ flex: 1, minHeight: '44px', opacity: canSubmit ? 1 : 0.5 }}
               >
-                {submitting ? 'Registrando…' : 'Registrar miembro'}
+                {submitting ? 'Registrando…' : tier ? 'Registrar y activar' : 'Registrar miembro'}
               </button>
             </div>
           </form>
@@ -375,28 +426,50 @@ function CredencialesView({
         />
       </div>
 
-      <div
-        role="alert"
-        style={{
-          fontSize: '12px',
-          color: 'var(--ek-mustard)',
-          background: 'var(--ek-mustard-soft)',
-          padding: '12px 14px',
-          borderRadius: 'var(--ek-r-sm)',
-          margin: 0,
-          marginBottom: '20px',
-          lineHeight: 1.55,
-          display: 'flex',
-          gap: '10px',
-          alignItems: 'flex-start'
-        }}
-      >
-        <AlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
-        <span>
-          La cuenta queda <strong>PENDIENTE DE ACTIVACIÓN</strong> — se activa al confirmar el
-          pago/plan con administración. Mientras tanto el miembro no podrá reservar.
-        </span>
-      </div>
+      {creado.activada ? (
+        <div
+          role="status"
+          style={{
+            fontSize: '12px',
+            color: 'var(--ek-success)',
+            background: 'var(--ek-success-soft)',
+            padding: '12px 14px',
+            borderRadius: 'var(--ek-r-sm)',
+            margin: '0 0 20px',
+            lineHeight: 1.55,
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'flex-start'
+          }}
+        >
+          <CheckCircle2 size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
+          <span>
+            Membresía <strong>{creado.plan === 'pro' ? 'Pro' : 'Básica'}</strong> activa — ya puede reservar.
+          </span>
+        </div>
+      ) : (
+        <div
+          role="alert"
+          style={{
+            fontSize: '12px',
+            color: 'var(--ek-mustard)',
+            background: 'var(--ek-mustard-soft)',
+            padding: '12px 14px',
+            borderRadius: 'var(--ek-r-sm)',
+            margin: '0 0 20px',
+            lineHeight: 1.55,
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'flex-start'
+          }}
+        >
+          <AlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
+          <span>
+            La cuenta queda <strong>PENDIENTE DE ACTIVACIÓN</strong> — asignás plan y activás desde su
+            perfil (cobro en caja). Mientras tanto el miembro no podrá reservar.
+          </span>
+        </div>
+      )}
 
       <button
         type="button"
