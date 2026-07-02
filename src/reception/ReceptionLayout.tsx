@@ -52,7 +52,7 @@ export default function ReceptionLayout() {
             >
               RECEPCIÓN
             </p>
-            <BrandLogo height={88} maxWidth={240} />
+            <BrandLogo height={52} maxWidth={180} />
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>

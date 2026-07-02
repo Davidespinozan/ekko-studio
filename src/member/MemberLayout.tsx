@@ -68,7 +68,7 @@ export default function MemberLayout() {
               textDecoration: 'none'
             }}
           >
-            <BrandLogo height={88} maxWidth={280} />
+            <BrandLogo height={52} maxWidth={180} />
           </Link>
           <NotificacionesBell />
         </div>
