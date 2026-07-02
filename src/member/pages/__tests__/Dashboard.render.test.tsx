@@ -19,6 +19,10 @@ vi.mock('@shared/hooks/useAuth', () => ({
   useAuth: () => ({ usuario: { id: 'u-1', nombre: 'Ana', bloqueado_hasta: null } })
 }));
 
+vi.mock('@shared/hooks/useTenant', () => ({
+  useTenant: () => ({ id: 't-1', nombre: 'EKKO' })
+}));
+
 import Dashboard from '../Dashboard';
 
 function renderDashboard() {

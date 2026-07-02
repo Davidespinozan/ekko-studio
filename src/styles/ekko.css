@@ -346,6 +346,19 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-card--elevated { box-shadow: var(--ek-shadow-hero); }
 
+  /* Utilidad de "levantar" al hover/press: micro-interacción premium
+     reutilizable (carnet, cards destacadas). Respeta reduced-motion. */
+  .ek-lift {
+    transition: transform 0.28s var(--ek-ease-premium),
+                filter 0.28s var(--ek-ease-premium);
+  }
+  .ek-lift:hover { transform: translateY(-2px); filter: brightness(1.02); }
+  .ek-lift:active { transform: translateY(0) scale(0.995); }
+  @media (prefers-reduced-motion: reduce) {
+    .ek-lift { transition: none; }
+    .ek-lift:hover, .ek-lift:active { transform: none; filter: none; }
+  }
+
   .ek-card-interactive {
     cursor: pointer;
     transition: border-color 0.2s var(--ek-ease-out),

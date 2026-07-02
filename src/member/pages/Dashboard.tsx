@@ -2,10 +2,15 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, AlertTriangle, CalendarPlus, LayoutGrid } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
+import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
 import { BotonCancelarReserva } from '@member/components/BotonCancelarReserva';
 import { EmptyState } from '@shared/components/EmptyState';
+import { CarnetMembresia } from '@member/components/CarnetMembresia';
+import { ResumenChips } from '@member/components/ResumenChips';
+import { useResumenMiembro } from '@member/hooks/useResumenMiembro';
+import { resumenCarnet } from '@member/logic/carnetMembresia';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 type Reserva = Database['public']['Tables']['reservas']['Row'];
@@ -92,17 +97,38 @@ function capitalizarNombre(nombre: string | null | undefined): string {
 
 export default function Dashboard() {
   const { usuario } = useAuth();
+  const tenant = useTenant();
   const {
     reservas: proximasReservas,
     isLoading: loadingReservas,
     error: errorReservas,
     refetch: refetchReservas
   } = useProximasReservas(usuario?.id);
+  const { resumen, isLoading: loadingResumen } = useResumenMiembro(
+    usuario?.id,
+    tenant?.id,
+    usuario?.membresia_tier
+  );
 
   const ahora = new Date();
   const bloqueado = usuario?.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > ahora;
   const nombreFormat = capitalizarNombre(usuario?.nombre) || 'creador';
   const proximaReserva = proximasReservas[0];
+
+  // Carnet: status de la membresía es autoritativo; cae al del usuario.
+  const carnetStatus = resumen.membresia?.status ?? usuario?.status ?? null;
+  const carnet = resumenCarnet({
+    tipo: resumen.tier?.tipo ?? 'tiempo',
+    status: carnetStatus,
+    creditosRestantes: resumen.membresia?.creditosRestantes ?? null,
+    periodoActualFin: resumen.membresia?.periodoActualFin ?? null
+  });
+  const tierNombre = resumen.tier?.nombre ?? usuario?.membresia_tier ?? 'EKKO';
+  // Solo mostramos el chip de créditos en planes por créditos/híbrido.
+  const creditosChip =
+    resumen.tier?.tipo === 'creditos' || resumen.tier?.tipo === 'hibrido'
+      ? resumen.membresia?.creditosRestantes ?? 0
+      : null;
 
   return (
     <div className="ek-container">
@@ -130,14 +156,32 @@ export default function Dashboard() {
       )}
 
       {/* Greeting */}
-      <div style={{ marginBottom: '28px' }}>
+      <div style={{ marginBottom: '24px' }}>
         <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>BIENVENIDA</p>
         <h1 className="ek-display-xl">
           Hola, {nombreFormat}.
         </h1>
       </div>
 
+      {/* Carnet de membresía + chips de resumen (panel de "tu actividad") */}
+      {loadingResumen ? (
+        <>
+          <div className="ek-skeleton" style={{ height: '150px', borderRadius: 'var(--ek-r-card)', marginBottom: '24px' }} />
+          <div className="ek-skeleton" style={{ height: '90px', borderRadius: 'var(--ek-r-md)', marginBottom: '24px' }} />
+        </>
+      ) : (
+        <>
+          <CarnetMembresia tierNombre={tierNombre} resumen={carnet} />
+          <ResumenChips
+            proximasCount={resumen.proximasCount}
+            sesionesEsteMes={resumen.sesionesEsteMes}
+            creditosRestantes={creditosChip}
+          />
+        </>
+      )}
+
       {/* Próxima sesión: cargando / error / hero / empty (ERROR-UI-FIX E-02) */}
+      <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>TU PRÓXIMA SESIÓN</p>
       {loadingReservas ? (
         <div
           className="ek-skeleton"
@@ -156,10 +200,7 @@ export default function Dashboard() {
           </button>
         </div>
       ) : proximaReserva ? (
-        <div className="ek-card--hero ek-card--gold" style={{ marginBottom: '24px' }}>
-          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>
-            PRÓXIMA SESIÓN
-          </p>
+        <div className="ek-card--hero ek-lift" style={{ marginBottom: '24px' }}>
           <h2 className="ek-display-lg" style={{ marginBottom: '6px' }}>
             {proximaReserva.recurso?.nombre ?? 'Estudio'}
           </h2>
