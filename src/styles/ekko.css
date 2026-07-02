@@ -3,10 +3,16 @@
    ============================================================================ */
 
 :root {
-  /* Base */
-  --ek-bg:           #0a0a0a;
-  --ek-bg-soft:      #131313;
-  --ek-bg-elevated:  #1a1a1a;
+  /* Base — negro profundo (fondo) vs gris metálico frío (superficies). El salto
+     de luminancia entre --ek-bg y las cards es lo que da el contraste premium. */
+  --ek-bg:           #070708;
+  --ek-bg-soft:      #101013;
+  --ek-bg-elevated:  #191a1e;
+
+  /* Gris metálico de las tarjetas (frío, con "chapa" iluminada arriba). */
+  --ek-metal-top:    #26272c;
+  --ek-metal-mid:    #1c1d21;
+  --ek-metal-bottom: #16171a;
 
   /* Ink */
   --ek-ink:          #f5f1e8;
@@ -24,9 +30,10 @@
   --ek-mustard-glow-strong: rgba(229, 184, 41, 0.45);
   --ek-mustard-ring:   rgba(229, 184, 41, 0.55);   /* focus ring */
 
-  /* Lines */
-  --ek-line:         rgba(245, 241, 232, 0.08);
-  --ek-line-strong:  rgba(245, 241, 232, 0.14);
+  /* Lines — casi invisibles: el canto de las cards lo define la luz/sombra,
+     no un borde marcado (pedido: "los recuadros tienen muy marcados sus márgenes"). */
+  --ek-line:         rgba(255, 255, 255, 0.045);
+  --ek-line-strong:  rgba(255, 255, 255, 0.09);
 
   /* Semantic */
   --ek-success:      #5dca8a;
@@ -44,8 +51,8 @@
 
   /* Highlight superior: borde de luz "iluminado desde arriba" que da
      profundidad premium a cualquier superficie (se combina con las sombras). */
-  --ek-highlight-top:  inset 0 1px 0 rgba(245, 241, 232, 0.055);
-  --ek-highlight-strong: inset 0 1px 0 rgba(245, 241, 232, 0.08);
+  --ek-highlight-top:    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --ek-highlight-strong: inset 0 1px 0 rgba(255, 255, 255, 0.11);
 
   /* Shadows — capas (contacto + ambiente + proyectada) para dar volumen real,
      no una sola sombra plana. */
@@ -103,9 +110,9 @@ html {
 body {
   margin: 0;
   background:
-    radial-gradient(ellipse 800px 500px at top right, rgba(229, 184, 41, 0.06), transparent 50%),
-    radial-gradient(ellipse 600px 400px at bottom left, rgba(229, 184, 41, 0.03), transparent 50%),
-    linear-gradient(180deg, #0a0a0a 0%, #0c0a08 100%);
+    radial-gradient(ellipse 800px 500px at top right, rgba(229, 184, 41, 0.05), transparent 50%),
+    radial-gradient(ellipse 600px 400px at bottom left, rgba(120, 130, 150, 0.03), transparent 50%),
+    linear-gradient(180deg, #070708 0%, #050506 100%);
   background-attachment: fixed;
   color: var(--ek-ink);
   font-family: var(--ek-font-body);
@@ -328,11 +335,12 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
      ============================================================================ */
 
   .ek-card {
-    background: linear-gradient(180deg, #1c1c1c 0%, #131313 62%, #0f0f0f 100%);
+    background:
+      linear-gradient(180deg, var(--ek-metal-top) 0%, var(--ek-metal-mid) 52%, var(--ek-metal-bottom) 100%);
     border: 1px solid var(--ek-line);
     border-radius: var(--ek-r-card);
     padding: 24px;
-    box-shadow: var(--ek-highlight-top), var(--ek-shadow-card);
+    box-shadow: var(--ek-highlight-strong), var(--ek-shadow-card);
     color: var(--ek-ink);
   }
 
@@ -343,9 +351,9 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-card--hero {
     background:
-      radial-gradient(120% 100% at 0% 0%, rgba(229, 184, 41, 0.05), transparent 55%),
-      linear-gradient(180deg, #1e1e1e 0%, #141414 60%, #0f0f0f 100%);
-    border: 1px solid var(--ek-line-strong);
+      radial-gradient(120% 100% at 0% 0%, rgba(229, 184, 41, 0.06), transparent 55%),
+      linear-gradient(180deg, #2a2b30 0%, #1c1d21 55%, #161719 100%);
+    border: 1px solid var(--ek-line);
     border-radius: var(--ek-r-card);
     padding: 26px;
     box-shadow: var(--ek-highlight-strong), var(--ek-shadow-hero);
@@ -394,11 +402,11 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   }
 
   .ek-stat-card {
-    background: linear-gradient(180deg, #191919 0%, #121212 100%);
+    background: linear-gradient(180deg, #212226 0%, #17181b 100%);
     border: 1px solid var(--ek-line);
     border-radius: var(--ek-r-md);
     padding: 16px;
-    box-shadow: var(--ek-highlight-top), 0 4px 14px rgba(0, 0, 0, 0.28);
+    box-shadow: var(--ek-highlight-top), 0 4px 14px rgba(0, 0, 0, 0.3);
   }
 
   .ek-stat-card--accent { border-color: var(--ek-mustard-dim); }
@@ -409,9 +417,9 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-cta,
   .ek-btn-primary {
-    background: linear-gradient(180deg, #1c1c1c 0%, #131313 100%);
+    background: linear-gradient(180deg, #26272c 0%, #16171a 100%);
     color: var(--ek-ink);
-    border: 1px solid rgba(229, 184, 41, 0.4);
+    border: 1px solid rgba(229, 184, 41, 0.38);
     border-radius: var(--ek-r-sm);
     padding: 12px 22px;
     font-family: var(--ek-font-body);
