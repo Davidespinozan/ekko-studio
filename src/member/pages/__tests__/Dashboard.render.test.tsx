@@ -3,9 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 /**
- * Inicio del member: ya NO duplica el grid de estudios (eso vive en la
- * sección Estudios). En su lugar muestra accesos rápidos. Este test fija
- * ese contrato: hay accesos rápidos y no hay grid de estudios.
+ * Inicio del member: muestra el carnet de membresía compacto (plan + estado +
+ * actividad) y NO duplica el grid de estudios ni los accesos rápidos (esos ya
+ * están en el menú inferior). Este test fija ese contrato.
  */
 
 vi.mock('@shared/lib/supabase', () => {
@@ -34,19 +34,16 @@ function renderDashboard() {
 }
 
 describe('Dashboard · inicio del member', () => {
-  it('muestra accesos rápidos (Reservar / Ver estudios)', async () => {
+  it('muestra el carnet de membresía y NO los accesos rápidos (viven en el menú)', async () => {
     renderDashboard();
-    const reservar = await screen.findByText('Reservar sesión');
-    expect(reservar).toBeInTheDocument();
-    expect(screen.getByText('Ver estudios')).toBeInTheDocument();
-    // links correctos
-    expect(reservar.closest('a')?.getAttribute('href')).toBe('/app/reservar');
-    expect(screen.getByText('Ver estudios').closest('a')?.getAttribute('href')).toBe('/app/estudios');
+    expect(await screen.findByText('MEMBRESÍA')).toBeInTheDocument();
+    expect(screen.queryByText('Reservar sesión')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ver estudios')).not.toBeInTheDocument();
   });
 
   it('ya no renderiza el grid de estudios en el inicio', async () => {
     renderDashboard();
-    await waitFor(() => expect(screen.getByText('Reservar sesión')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('MEMBRESÍA')).toBeInTheDocument());
     expect(screen.queryByText('FOTO PRÓXIMAMENTE')).not.toBeInTheDocument();
     expect(screen.queryByText('DISPONIBLE')).not.toBeInTheDocument();
   });

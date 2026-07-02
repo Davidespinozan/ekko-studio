@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, AlertTriangle, CalendarPlus, LayoutGrid } from 'lucide-react';
+import { ArrowRight, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
 import { ProximaSesionHero } from '@member/components/ProximaSesionHero';
 import { CarnetMembresia } from '@member/components/CarnetMembresia';
-import { ResumenChips } from '@member/components/ResumenChips';
 import { useResumenMiembro } from '@member/hooks/useResumenMiembro';
 import { resumenCarnet } from '@member/logic/carnetMembresia';
 
@@ -195,34 +194,14 @@ export default function Dashboard() {
           <div className="ek-skeleton" style={{ height: '90px', borderRadius: 'var(--ek-r-md)', marginBottom: '24px' }} />
         </>
       ) : (
-        <>
-          <CarnetMembresia tierNombre={tierNombre} resumen={carnet} />
-          <ResumenChips
-            proximasCount={resumen.proximasCount}
-            sesionesEsteMes={resumen.sesionesEsteMes}
-            creditosRestantes={creditosChip}
-          />
-        </>
+        <CarnetMembresia
+          tierNombre={tierNombre}
+          resumen={carnet}
+          proximasCount={resumen.proximasCount}
+          sesionesEsteMes={resumen.sesionesEsteMes}
+          creditosRestantes={creditosChip}
+        />
       )}
-
-      {/* Accesos rápidos */}
-      <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>ACCESOS RÁPIDOS</p>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <Link to="/app/reservar" className="ek-card ek-card-interactive ek-quick-action">
-          <span className="ek-empty-icon" style={{ width: 44, height: 44, margin: 0 }}>
-            <CalendarPlus size={20} aria-hidden="true" />
-          </span>
-          <span className="ek-quick-action-label">Reservar sesión</span>
-          <ArrowRight size={16} className="ek-quick-action-arrow" aria-hidden="true" />
-        </Link>
-        <Link to="/app/estudios" className="ek-card ek-card-interactive ek-quick-action">
-          <span className="ek-empty-icon ek-empty-icon--neutral" style={{ width: 44, height: 44, margin: 0 }}>
-            <LayoutGrid size={20} aria-hidden="true" />
-          </span>
-          <span className="ek-quick-action-label">Ver estudios</span>
-          <ArrowRight size={16} className="ek-quick-action-arrow" aria-hidden="true" />
-        </Link>
-      </div>
     </div>
   );
 }
