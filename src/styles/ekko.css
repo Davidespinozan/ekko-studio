@@ -297,8 +297,9 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     color: var(--ek-ink);
   }
 
-  /* Inicio: logo centrado con la campana anclada a la derecha. */
-  .ek-header-inner--centered {
+  /* Inicio: logo centrado con la campana anclada a la derecha. Doble clase para
+     ganarle en especificidad a la base .ek-header-inner (que va después). */
+  .ek-header-inner.ek-header-inner--centered {
     position: relative;
     justify-content: center;
   }
@@ -1517,8 +1518,8 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-page {
     min-height: 100dvh;
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* El safe-area SUPERIOR lo maneja SOLO el header (fijo). Acá se quitó para
+       no duplicarlo y para que ese espacio no scrollee (se veía "moverse"). */
     color: var(--ek-ink);
   }
 
