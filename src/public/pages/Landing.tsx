@@ -7,6 +7,7 @@ import { useLandingConfig } from '@shared/hooks/useLandingConfig';
 import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
 import AppShowcase from '../components/AppShowcase';
 import { Reveal } from '../components/Reveal';
+import { MagneticButton } from '@shared/components/MagneticButton';
 import Footer from '../components/Footer';
 
 interface EstudioPublico {
@@ -190,7 +191,7 @@ export default function Landing() {
           </p>
         )}
 
-        <a
+        <MagneticButton
           href={hero.cta_link || '#membresias'}
           className="ek-cta ek-cta--gold ek-hero-cta"
           style={{
@@ -206,7 +207,7 @@ export default function Landing() {
           }}
         >
           {hero.cta_texto}
-        </a>
+        </MagneticButton>
       </section>
 
       {/* ============================================================
@@ -643,16 +644,16 @@ export default function Landing() {
               </p>
             )}
             {ctaWhatsappUrl ? (
-              <a
+              <MagneticButton
                 href={ctaWhatsappUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ek-cta"
+                className="ek-cta ek-cta--gold"
                 style={{ padding: '16px 34px', fontSize: '15px', minHeight: '54px', gap: '8px' }}
               >
                 {cta_final.cta_texto}
                 <ArrowRight size={18} aria-hidden="true" />
-              </a>
+              </MagneticButton>
             ) : (
               <span
                 style={{
