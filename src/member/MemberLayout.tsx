@@ -5,7 +5,7 @@ import { validarStatusCuenta } from '@shared/lib/validarStatusCuenta';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { DemoBanner } from '@shared/components/DemoBanner';
 import { BrandLogo } from '@shared/components/BrandLogo';
-import NotificacionesBanner from './components/NotificacionesBanner';
+import { NotificacionesBell } from './components/NotificacionesBell';
 import { BottomNav } from './components/BottomNav';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -57,7 +57,6 @@ export default function MemberLayout() {
   return (
     <div className="ek-page" style={{ paddingBottom: '88px' /* espacio para bottom nav */ }}>
       <DemoBanner vista="Miembro" />
-      <NotificacionesBanner />
       <header className="ek-header-glass">
         <div className="ek-header-inner">
           <Link
@@ -70,6 +69,7 @@ export default function MemberLayout() {
           >
             <BrandLogo height={88} maxWidth={280} />
           </Link>
+          <NotificacionesBell />
         </div>
       </header>
 
