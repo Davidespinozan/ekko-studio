@@ -2803,25 +2803,25 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 }
 
 /* ============================================================================
-   MENÚS OSCUROS DIFERENCIADOS (admin sidebar + member bottom-nav)
+   CHROME DE MENÚS (admin sidebar + member bottom-nav)
    ============================================================================
-   Vuelven a oscuro (nada de blanco), pero MÁS oscuros que el contenido —
-   ahora que las cards usan un gris cálido más claro, el menú se lee como un
-   "marco" oscuro distinto, con borde y sombra marcados para separarlo.
+   Los menús son metal MÁS CLARO que el canvas casi-negro (no más oscuros: el
+   canvas ya es casi negro y se fundían). Gradiente direccional + filo especular
+   + borde → se leen como un marco aparte del contenido.
    ============================================================================ */
 .adm-sidebar-desktop {
-  background: #070707 !important;
-  border-right: 1px solid var(--ek-line-strong) !important;
-  box-shadow: 1px 0 16px rgba(0, 0, 0, 0.55);
+  background: var(--ek-chrome-grad) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: inset 0 1px 0 var(--ek-chrome-edge), inset -1px 0 0 rgba(0, 0, 0, 0.4);
 }
 .adm-sidebar {
-  background: linear-gradient(180deg, #0a0a09 0%, #070706 100%) !important;
+  background: var(--ek-chrome-grad) !important;
 }
 
 .ek-bottom-nav {
-  background: rgba(7, 7, 7, 0.94) !important;
-  border-top: 1px solid var(--ek-line-strong) !important;
-  box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.55);
+  background: var(--ek-chrome-grad-h) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: inset 0 1px 0 var(--ek-chrome-edge), 0 -10px 28px rgba(0, 0, 0, 0.5);
 }
 
 /* ============================================================================
