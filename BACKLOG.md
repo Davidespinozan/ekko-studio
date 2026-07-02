@@ -124,7 +124,10 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
 
 ## 4. Madurez visual (aprendido de SALA — ver `docs/audit/ekko-vs-sala-madurez.md`)
 
-- [ ] **PageHeader compartido** — reemplazar los headers hand-rolled de recepción.
+- [x] **Recepción a la altura de miembros** — header unificado (título de sección
+      dinámico), ReservaCard usa las clases `.rec-card*`, ocupación → stat-cards,
+      `SegmentedToggle` compartido, y `PerfilMiembroRecepcion` componentizado
+      (828 → 353 líneas, cajas grises → `ek-card`). Ver commits jul-2026.
 - [x] **ConexionBanner** — banner global offline (montado en App.tsx).
 - [x] **PwaInstallBanner** — invita a instalar la PWA (Android/Chrome vía
       beforeinstallprompt, iOS con instrucciones; dismissible, montado en App.tsx).
