@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { adminCreateUser } from '../hooks/useAdminData';
 
-type Rol = 'miembro' | 'recepcionista' | 'staff' | 'admin';
 type Tier = 'basica' | 'pro' | '';
 
 interface Props {
@@ -9,17 +8,20 @@ interface Props {
   onCreated: () => Promise<void>;
 }
 
+/**
+ * Alta de MIEMBRO (cliente que paga membresía). Este modal vive en la página
+ * Miembros y crea SOLO miembros. Los roles de equipo (admin/recepcionista) se
+ * crean desde Equipo con `CrearAccesoModal` — por eso acá no hay selector de rol.
+ */
 export function NuevaPersonaModal({ onClose, onCreated }: Props) {
   const [email, setEmail] = useState('');
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [password, setPassword] = useState('');
-  const [rol, setRol] = useState<Rol>('miembro');
   const [tier, setTier] = useState<Tier>('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<{ email: string; password: string; rol: string } | null>(null);
-  const [needsAdminConfirm, setNeedsAdminConfirm] = useState(false);
+  const [success, setSuccess] = useState<{ email: string; password: string } | null>(null);
 
   function generarPassword() {
     const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -30,11 +32,6 @@ export function NuevaPersonaModal({ onClose, onCreated }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (rol === 'admin' && !needsAdminConfirm) {
-      setNeedsAdminConfirm(true);
-      return;
-    }
-
     setSubmitting(true);
     setError(null);
 
@@ -44,20 +41,15 @@ export function NuevaPersonaModal({ onClose, onCreated }: Props) {
         password,
         nombre: nombre.trim(),
         telefono: telefono.trim() || undefined,
-        rol,
-        membresia_tier: rol === 'miembro' ? (tier || null) : null
+        rol: 'miembro',
+        membresia_tier: tier || null
       });
 
-      setSuccess({
-        email: res.user.email,
-        password: res.user.password,
-        rol: res.user.rol
-      });
+      setSuccess({ email: res.user.email, password: res.user.password });
       setSubmitting(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error creando usuario');
       setSubmitting(false);
-      setNeedsAdminConfirm(false);
     }
   }
 
@@ -70,7 +62,7 @@ export function NuevaPersonaModal({ onClose, onCreated }: Props) {
 
           <p style={{ color: 'var(--ek-ink-muted)', fontSize: '0.9375rem' }}>
             Cuenta lista para usar. Envíalas por WhatsApp o en persona.
-            El usuario puede cambiar la password después en su perfil.
+            El miembro puede cambiar la password después en su perfil.
           </p>
 
           <div className="ek-card" style={{ background: 'var(--ek-cream-warm)' }}>
@@ -85,10 +77,6 @@ export function NuevaPersonaModal({ onClose, onCreated }: Props) {
                   {success.password}
                 </code>
               </div>
-              <div>
-                <div className="adm-info-label">Rol</div>
-                <code style={{ fontFamily: 'var(--ek-font-mono)' }}>{success.rol}</code>
-              </div>
             </div>
           </div>
 
@@ -100,83 +88,29 @@ export function NuevaPersonaModal({ onClose, onCreated }: Props) {
     );
   }
 
-  if (needsAdminConfirm) {
-    return (
-      <div className="adm-modal-backdrop" onClick={() => !submitting && setNeedsAdminConfirm(false)}>
-        <div className="adm-modal" onClick={(e) => e.stopPropagation()}>
-          <p className="ek-eyebrow" style={{ color: 'var(--ek-danger)' }}>CONFIRMAR PROMOCIÓN A ADMIN</p>
-          <h3 className="ek-h3">Esta persona tendrá acceso total</h3>
-          <p style={{ color: 'var(--ek-ink-muted)', fontSize: '0.9375rem' }}>
-            <strong>{nombre}</strong> ({email}) podrá ver y modificar TODO en EKKO:
-            crear/eliminar usuarios, cambiar precios, ver datos privados, cancelar reservas, etc.
-            <br /><br />
-            ¿Estás seguro?
-          </p>
-
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button
-              onClick={() => setNeedsAdminConfirm(false)}
-              disabled={submitting}
-              className="ek-cta ek-cta--secondary"
-              style={{ flex: 1 }}
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSubmit as any}
-              disabled={submitting}
-              className="ek-cta"
-              style={{ flex: 1, background: 'var(--ek-danger)' }}
-            >
-              {submitting ? 'Creando…' : 'Sí, crear admin'}
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="adm-modal-backdrop" onClick={() => !submitting && onClose()}>
       <div className="adm-modal" onClick={(e) => e.stopPropagation()}>
-        <p className="ek-eyebrow">NUEVA PERSONA</p>
-        <h3 className="ek-h3" style={{ marginBottom: '0.5rem' }}>Crear cuenta</h3>
+        <p className="ek-eyebrow">NUEVO MIEMBRO</p>
+        <h3 className="ek-h3" style={{ marginBottom: '0.5rem' }}>Crear cuenta de miembro</h3>
 
         <form onSubmit={handleSubmit} className="ek-stack-md">
           <div className="ek-form-field">
-            <label className="ek-label" htmlFor="np-rol">Rol</label>
+            <label className="ek-label" htmlFor="np-tier">Plan inicial (opcional)</label>
             <select
-              id="np-rol"
-              value={rol}
-              onChange={(e) => setRol(e.target.value as Rol)}
+              id="np-tier"
+              value={tier}
+              onChange={(e) => setTier(e.target.value as Tier)}
               className="ek-input"
-              required
             >
-              <option value="miembro">Miembro (cliente que paga membresía)</option>
-              <option value="recepcionista">Recepción (escanea QR en mostrador)</option>
-              <option value="staff">Staff (empleado con permisos parciales)</option>
-              <option value="admin">Admin (acceso total al negocio)</option>
+              <option value="">— sin plan asignado —</option>
+              <option value="basica">Básica</option>
+              <option value="pro">Pro</option>
             </select>
+            <p className="ek-helper-text">
+              Si no asignas plan, el miembro queda en pendiente_pago hasta cobrar.
+            </p>
           </div>
-
-          {rol === 'miembro' && (
-            <div className="ek-form-field">
-              <label className="ek-label" htmlFor="np-tier">Plan inicial (opcional)</label>
-              <select
-                id="np-tier"
-                value={tier}
-                onChange={(e) => setTier(e.target.value as Tier)}
-                className="ek-input"
-              >
-                <option value="">— sin plan asignado —</option>
-                <option value="basica">Básica</option>
-                <option value="pro">Pro</option>
-              </select>
-              <p className="ek-helper-text">
-                Si no asignas plan, el miembro queda en pendiente_pago hasta cobrar.
-              </p>
-            </div>
-          )}
 
           <div className="ek-form-field">
             <label className="ek-label" htmlFor="np-nombre">Nombre completo</label>
@@ -251,7 +185,7 @@ export function NuevaPersonaModal({ onClose, onCreated }: Props) {
               Cancelar
             </button>
             <button type="submit" disabled={submitting || !email || !password || !nombre} className="ek-cta" style={{ flex: 1 }}>
-              {submitting ? 'Creando…' : 'Crear cuenta'}
+              {submitting ? 'Creando…' : 'Crear miembro'}
             </button>
           </div>
         </form>
