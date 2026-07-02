@@ -597,6 +597,10 @@ function EditarRecursoModal({
   const [capacidadPersonas, setCapacidadPersonas] = useState<number>(
     recurso?.capacidad_personas ?? 0
   );
+  // costo_creditos aún no está en los tipos generados → lectura defensiva.
+  const [costoCreditos, setCostoCreditos] = useState<number>(
+    (recurso as { costo_creditos?: number } | null | undefined)?.costo_creditos ?? 1
+  );
   const [tipoContenido, setTipoContenido] = useState<string[]>(recurso?.tipo_contenido ?? []);
   const [equipoIncluido, setEquipoIncluido] = useState<string[]>(recurso?.equipo_incluido ?? []);
   const [estiloVisual, setEstiloVisual] = useState<string>(recurso?.estilo_visual ?? '');
@@ -627,7 +631,7 @@ function EditarRecursoModal({
         return;
       }
 
-      const { error: err } = await insertRecurso({
+      const nuevoRecurso = {
         tenant_id: tenant.id,
         slug: slugFinal,
         nombre: nombre.trim(),
@@ -642,7 +646,10 @@ function EditarRecursoModal({
         tipo_contenido: tipoContenido,
         equipo_incluido: equipoIncluido,
         estilo_visual: estiloVisual || null
-      });
+      };
+      const { error: err } = await insertRecurso(
+        Object.assign(nuevoRecurso, { costo_creditos: Math.max(1, costoCreditos) })
+      );
 
       if (err) {
         setError(err);
@@ -654,7 +661,7 @@ function EditarRecursoModal({
     }
 
     // Edit mode
-    const { error: err } = await updateRecurso(recurso!.id, {
+    const cambios = {
       nombre,
       descripcion: descripcion || null,
       activo,
@@ -665,7 +672,11 @@ function EditarRecursoModal({
       tipo_contenido: tipoContenido,
       equipo_incluido: equipoIncluido,
       estilo_visual: estiloVisual || null
-    });
+    };
+    const { error: err } = await updateRecurso(
+      recurso!.id,
+      Object.assign(cambios, { costo_creditos: Math.max(1, costoCreditos) })
+    );
 
     if (err) {
       setError(err);
@@ -780,6 +791,23 @@ function EditarRecursoModal({
           />
           <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
             Capacidad máxima total (titular + invitados).
+          </p>
+        </div>
+
+        <div className="ek-form-field" style={{ marginTop: '16px' }}>
+          <label className="ek-label">Costo en créditos</label>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={costoCreditos || ''}
+            onChange={(e) => setCostoCreditos(parseInt(e.target.value) || 1)}
+            className="ek-input"
+            placeholder="1"
+          />
+          <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
+            Créditos que descuenta una reserva de este estudio (planes por paquete). Los planes
+            mensuales ilimitados no se ven afectados. Default: 1.
           </p>
         </div>
 

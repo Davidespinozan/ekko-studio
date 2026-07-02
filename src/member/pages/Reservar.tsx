@@ -19,7 +19,13 @@ import {
   type TenantReservaConfig,
   type Slot
 } from '../logic/reservaLogic';
+import { useResumenMiembro } from '../hooks/useResumenMiembro';
 import type { Database } from '@shared/types/database';
+
+/** Créditos que descuenta reservar este estudio (default 1). */
+function costoCreditos(recurso: Recurso | null): number {
+  return Math.max(1, (recurso as { costo_creditos?: number } | null)?.costo_creditos ?? 1);
+}
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 
@@ -50,6 +56,11 @@ export default function Reservar() {
 
   const tier = usuario?.membresia_tier ?? null;
   const puedeUsar = (r: Recurso) => tierTieneAcceso(r, tier);
+
+  // Saldo de créditos (null = plan por tiempo/ilimitado → no aplica el costo).
+  const { resumen } = useResumenMiembro(usuario?.id, tenant.id, usuario?.membresia_tier);
+  const saldoCreditos = resumen.membresia?.creditosRestantes ?? null;
+  const esPlanCreditos = saldoCreditos !== null;
 
   const fechas = useMemo(() => generarFechasReservables(config), [config]);
 
@@ -226,6 +237,30 @@ export default function Reservar() {
                       ? recursoSel.descripcion
                       : `Hasta ${recursoSel.capacidad_personas} ${recursoSel.capacidad_personas === 1 ? 'persona' : 'personas'}`}
                   </p>
+                )}
+                {esPlanCreditos && (
+                  <div style={{ marginTop: '10px', display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        color: '#111',
+                        background: 'var(--ek-mustard)',
+                        padding: '4px 10px',
+                        borderRadius: '999px'
+                      }}
+                    >
+                      Cuesta {costoCreditos(recursoSel)} {costoCreditos(recursoSel) === 1 ? 'crédito' : 'créditos'}
+                    </span>
+                    <span style={{ fontSize: '12px', color: saldoCreditos! < costoCreditos(recursoSel) ? '#ffb4b4' : 'rgba(255,255,255,0.72)' }}>
+                      {saldoCreditos! < costoCreditos(recursoSel)
+                        ? 'No te alcanza el saldo'
+                        : `Te quedan ${saldoCreditos}`}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
