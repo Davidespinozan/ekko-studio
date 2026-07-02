@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, UserX, Camera, Pencil, KeyRound, Unlock, CalendarPlus, Send, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, UserX, CalendarPlus } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { activarMembresiaMostrador } from '@shared/lib/checkout';
 import { EmptyState } from '@shared/components/EmptyState';
-import { TierBadge } from '@shared/components/TierBadge';
-import { StatusBadge } from '@shared/components/StatusBadge';
 import { NotasMiembro } from '@shared/components/NotasMiembro';
 import { EnviarAvisoModal } from '@shared/components/EnviarAvisoModal';
-import { statusMiembro } from '../lib/miembroStatus';
 import { CrearReservaModal, type ReservaOriginal } from '../components/CrearReservaModal';
 import {
   CancelarReservaRecepcionModal,
@@ -20,71 +17,23 @@ import { FotoMiembroModal } from '../components/FotoMiembroModal';
 import { FichaIdentidadModal } from '../components/FichaIdentidadModal';
 import { ResetPasswordModal } from '../components/ResetPasswordModal';
 import { DesbloquearModal } from '../components/DesbloquearModal';
-import { useAuditLogDeUsuario, type AuditEntryUsuario } from '../hooks/useAuditLogDeUsuario';
+import { useAuditLogDeUsuario } from '../hooks/useAuditLogDeUsuario';
+import { PerfilHeader } from '../components/perfil/PerfilHeader';
+import { EstadoCuentaCard } from '../components/perfil/EstadoCuentaCard';
+import { DatosOperativosCard } from '../components/perfil/DatosOperativosCard';
+import { AccionesCuenta } from '../components/perfil/AccionesCuenta';
+import { FichaIdentidadCard } from '../components/perfil/FichaIdentidadCard';
+import { FilaReserva } from '../components/perfil/FilaReserva';
+import { HistorialCambios } from '../components/perfil/HistorialCambios';
+import { nombreMostrado } from '../components/perfil/perfilUtils';
+import type { MiembroPerfil, ReservaPerfil } from '../components/perfil/types';
 
 /**
  * Perfil de miembro para recepción — hub de gestión (agenda, no-show, notas,
- * activar membresía, reprogramar). Empezó READ-ONLY (Sprint RP-2) y creció.
- *
- * Vista NUEVA — NO reusa `MiembroDetalle` de admin (riesgo R3: ese
- * componente edita rol, resetea password y borra — acciones peligrosas que
- * recepción no debe tener). Tampoco lee campos sensibles (stripe_customer_id,
- * ob_data — riesgo R6): el SELECT ni los pide.
+ * activar membresía, reprogramar). Orquesta datos + modales; la UI vive en
+ * `components/perfil/`. NO reusa `MiembroDetalle` de admin (acciones peligrosas
+ * que recepción no debe tener) ni lee campos sensibles (R6).
  */
-
-interface MiembroPerfil {
-  id: string;
-  nombre: string | null;
-  email: string;
-  telefono: string | null;
-  avatar_url: string | null;
-  membresia_tier: string | null;
-  status: string;
-  no_shows_count: number | null;
-  bloqueado_hasta: string | null;
-  identidad_completa: boolean;
-  contrato_firmado: boolean;
-  created_at: string;
-}
-
-interface ReservaPerfil {
-  id: string;
-  slot_inicio: string;
-  slot_fin: string;
-  status: string;
-  folio: string;
-  recurso_id: string;
-  recurso: { nombre: string } | null;
-}
-
-function capitalizar(s: string | null | undefined): string {
-  if (!s) return '';
-  return s
-    .toLowerCase()
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
-
-function fechaHora(iso: string): string {
-  return new Date(iso).toLocaleString('es-MX', {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  });
-}
-
-function fechaCorta(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-MX', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  });
-}
-
 export default function PerfilMiembroRecepcion() {
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
@@ -155,14 +104,14 @@ export default function PerfilMiembroRecepcion() {
     };
   }, [id, recargarMiembro, recargarReservas]);
 
-  // Tras una acción de cuenta: recargar datos del miembro + su historial de cambios.
+  // Tras una acción de cuenta: recargar datos del miembro + su historial.
   const recargarPerfil = useCallback(async () => {
     await recargarMiembro();
     await recargarAudit();
   }, [recargarMiembro, recargarAudit]);
 
-  // Activación en mostrador (D4: recepción confirma el pago y activa). Pasa por
-  // el RPC keystone `activar_membresia` — cierra B3.
+  // Activación en mostrador (D4): recepción confirma el pago y activa vía el RPC
+  // keystone `activar_membresia` (cierra B3).
   async function activarMembresia() {
     if (!miembro) return;
     if (!miembro.membresia_tier) {
@@ -193,11 +142,7 @@ export default function PerfilMiembroRecepcion() {
   if (noEncontrado || !miembro) {
     return (
       <div className="rec-main">
-        <Link
-          to="/recepcion/miembros"
-          className="adm-link"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-        >
+        <Link to="/recepcion/miembros" className="adm-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
           <ArrowLeft size={15} aria-hidden="true" />
           Volver a búsqueda
         </Link>
@@ -211,11 +156,7 @@ export default function PerfilMiembroRecepcion() {
     );
   }
 
-  const st = statusMiembro(miembro.status);
-  const bloqueado =
-    miembro.bloqueado_hasta != null &&
-    new Date(miembro.bloqueado_hasta).getTime() > Date.now();
-
+  const nombre = nombreMostrado(miembro.nombre, miembro.email);
   const ahora = Date.now();
   const proximas = reservas.filter(
     (r) => r.status === 'confirmada' && new Date(r.slot_inicio).getTime() > ahora
@@ -224,165 +165,26 @@ export default function PerfilMiembroRecepcion() {
 
   return (
     <div className="rec-main">
-      <Link
-        to="/recepcion/miembros"
-        className="adm-link"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-      >
-        <ArrowLeft size={15} aria-hidden="true" />
-        Volver a búsqueda
-      </Link>
+      <PerfilHeader miembro={miembro} onFoto={() => setFotoOpen(true)} />
 
-      <div style={{ marginTop: '12px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-        {/* Avatar editable: recepción toma/cambia la foto del cliente */}
-        <button
-          type="button"
-          onClick={() => setFotoOpen(true)}
-          aria-label="Cambiar foto"
-          style={{
-            position: 'relative', width: '64px', height: '64px', flexShrink: 0,
-            borderRadius: '50%', border: 'none', padding: 0, cursor: 'pointer', background: 'none'
-          }}
-        >
-          {miembro.avatar_url ? (
-            <img src={miembro.avatar_url} alt={miembro.nombre ?? 'Miembro'} style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
-          ) : (
-            <span style={{
-              width: '64px', height: '64px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: 'var(--ek-bg-elevated)', color: 'var(--ek-mustard)',
-              fontFamily: 'var(--ek-font-display)', fontSize: '22px', fontWeight: 700, border: '0.5px solid var(--ek-line)'
-            }}>{iniciales(miembro.nombre, miembro.email)}</span>
-          )}
-          <span className="ek-media-ctrl" style={{ position: 'absolute', bottom: '-2px', right: '-2px', width: '26px', height: '26px', boxShadow: '0 2px 8px rgba(0,0,0,0.5)' }}>
-            <Camera size={13} aria-hidden="true" />
-          </span>
-        </button>
-        <div style={{ minWidth: 0 }}>
-          <h1
-            style={{
-              fontFamily: 'var(--ek-font-display)',
-              fontSize: '24px',
-              fontWeight: 700,
-              letterSpacing: '-0.03em',
-              margin: 0,
-              color: 'var(--ek-ink)'
-            }}
-          >
-            {capitalizar(miembro.nombre) || miembro.email}
-          </h1>
-        </div>
-      </div>
+      <EstadoCuentaCard
+        miembro={miembro}
+        activando={activando}
+        onActivar={activarMembresia}
+        onDesbloquear={() => setDesbloquearOpen(true)}
+      />
 
-      {/* Estado de cuenta — recepción debe poder explicárselo al cliente. */}
-      {(st.alerta || bloqueado) && (
-        <div
-          style={{
-            background: 'var(--ek-bg-soft)',
-            border: `0.5px solid ${st.color}`,
-            borderLeft: `3px solid ${st.color}`,
-            borderRadius: 'var(--ek-r-md)',
-            padding: '12px 14px',
-            marginBottom: '16px'
-          }}
-        >
-          <p style={{ fontSize: '13px', fontWeight: 600, color: st.color, margin: 0 }}>
-            {st.label}
-          </p>
-          {miembro.status !== 'activo' && (
-            <>
-              <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '4px 0 8px' }}>
-                La cuenta no está activa. Confirmá el pago y activá la membresía
-                {miembro.membresia_tier ? '' : ' (asigná un plan primero en "Editar datos")'}.
-              </p>
-              <button
-                type="button"
-                onClick={activarMembresia}
-                disabled={activando || !miembro.membresia_tier}
-                className="ek-cta ek-cta--gold"
-                style={{
-                  minHeight: '40px',
-                  padding: '8px 14px',
-                  fontSize: '13px',
-                  opacity: !miembro.membresia_tier ? 0.5 : 1,
-                  cursor: !miembro.membresia_tier ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {activando ? 'Activando…' : 'Activar membresía'}
-              </button>
-            </>
-          )}
-          {bloqueado && (
-            <>
-              <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '4px 0 8px' }}>
-                Restricción para reservar hasta el{' '}
-                {fechaCorta(miembro.bloqueado_hasta as string)} (penalización por inasistencia).
-              </p>
-              <button
-                type="button"
-                onClick={() => setDesbloquearOpen(true)}
-                className="ek-cta ek-cta--secondary"
-                style={{ minHeight: '40px', padding: '8px 14px', fontSize: '13px' }}
-              >
-                <Unlock size={15} aria-hidden="true" /> Desbloquear ahora
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      <DatosOperativosCard miembro={miembro} />
 
-      {/* Datos operativos */}
-      <div
-        style={{
-          background: 'var(--ek-bg-soft)',
-          border: '0.5px solid var(--ek-line)',
-          borderRadius: 'var(--ek-r-md)',
-          padding: '14px 16px',
-          marginBottom: '20px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '10px'
-        }}
-      >
-        <Dato label="Email" valor={miembro.email} />
-        {miembro.telefono && <Dato label="Teléfono" valor={miembro.telefono} />}
-        <Dato
-          label="Plan"
-          valor={
-            miembro.membresia_tier === 'pro' || miembro.membresia_tier === 'basica' ? (
-              <TierBadge pro={miembro.membresia_tier === 'pro'} />
-            ) : (
-              'Sin plan'
-            )
-          }
-        />
-        <Dato
-          label="Estado"
-          valor={<span style={{ color: st.color, fontWeight: 600 }}>{st.label}</span>}
-        />
-        <Dato label="Inasistencias" valor={String(miembro.no_shows_count ?? 0)} />
-        <Dato label="Miembro desde" valor={fechaCorta(miembro.created_at)} />
-      </div>
+      <AccionesCuenta
+        tieneFoto={!!miembro.avatar_url}
+        onEditar={() => setEditarOpen(true)}
+        onFoto={() => setFotoOpen(true)}
+        onReset={() => setResetOpen(true)}
+        onAviso={() => setAvisoOpen(true)}
+      />
 
-      {/* Acciones de cuenta (Recepción Plus): foto, datos, credenciales. */}
-      <section style={{ marginBottom: '20px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>ACCIONES DE CUENTA</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
-          <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={() => setEditarOpen(true)}>
-            <Pencil size={15} aria-hidden="true" /> Editar datos
-          </button>
-          <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={() => setFotoOpen(true)}>
-            <Camera size={15} aria-hidden="true" /> {miembro.avatar_url ? 'Cambiar foto' : 'Tomar foto'}
-          </button>
-          <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={() => setResetOpen(true)}>
-            <KeyRound size={15} aria-hidden="true" /> Resetear acceso
-          </button>
-          <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={() => setAvisoOpen(true)}>
-            <Send size={15} aria-hidden="true" /> Enviar aviso
-          </button>
-        </div>
-      </section>
-
-      {/* Acciones de reserva: crear (RP-3a) + reprogramar/cancelar por fila (RP-3a/3b). */}
+      {/* Crear reserva (RP-3a) */}
       <div style={{ marginBottom: '20px' }}>
         <button
           type="button"
@@ -413,11 +215,7 @@ export default function PerfilMiembroRecepcion() {
               key={r.id}
               reserva={r}
               onCancelar={() =>
-                setCancelarTarget({
-                  id: r.id,
-                  slot_inicio: r.slot_inicio,
-                  recurso_nombre: r.recurso?.nombre ?? 'Estudio'
-                })
+                setCancelarTarget({ id: r.id, slot_inicio: r.slot_inicio, recurso_nombre: r.recurso?.nombre ?? 'Estudio' })
               }
               onReprogramar={() =>
                 setReprogramarTarget({
@@ -442,46 +240,11 @@ export default function PerfilMiembroRecepcion() {
         )}
       </Seccion>
 
-      <section style={{ marginBottom: '20px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>FICHA DE IDENTIDAD</p>
-        {(() => {
-          const habilitado = miembro.identidad_completa && miembro.contrato_firmado;
-          return (
-            <div
-              className="ek-card"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                borderColor: habilitado ? undefined : 'var(--ek-warning)',
-                background: habilitado ? undefined : 'var(--ek-warning-soft)'
-              }}
-            >
-              {habilitado
-                ? <ShieldCheck size={22} style={{ color: 'var(--ek-success)', flexShrink: 0 }} aria-hidden="true" />
-                : <ShieldAlert size={22} style={{ color: 'var(--ek-warning)', flexShrink: 0 }} aria-hidden="true" />}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>
-                  {habilitado ? 'Ingreso habilitado' : 'Ingreso bloqueado'}
-                </p>
-                <p className="ek-body-muted" style={{ margin: '2px 0 0', fontSize: '12.5px' }}>
-                  {habilitado
-                    ? 'Ficha completa y contrato firmado.'
-                    : `Falta: ${[!miembro.identidad_completa && 'datos/foto/INE', !miembro.contrato_firmado && 'contrato firmado'].filter(Boolean).join(' y ')}.`}
-                </p>
-              </div>
-              <button
-                type="button"
-                className={habilitado ? 'ek-cta ek-cta--secondary' : 'ek-cta ek-cta--gold'}
-                style={{ padding: '9px 16px', fontSize: '13px', flexShrink: 0 }}
-                onClick={() => setFichaOpen(true)}
-              >
-                {habilitado ? 'Ver ficha' : 'Completar ficha'}
-              </button>
-            </div>
-          );
-        })()}
-      </section>
+      <FichaIdentidadCard
+        identidadCompleta={miembro.identidad_completa}
+        contratoFirmado={miembro.contrato_firmado}
+        onAbrir={() => setFichaOpen(true)}
+      />
 
       <section style={{ marginBottom: '20px' }}>
         <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>NOTAS OPERATIVAS</p>
@@ -495,11 +258,7 @@ export default function PerfilMiembroRecepcion() {
 
       {crearOpen && (
         <CrearReservaModal
-          miembro={{
-            id: miembro.id,
-            nombre: capitalizar(miembro.nombre) || miembro.email,
-            membresia_tier: miembro.membresia_tier
-          }}
+          miembro={{ id: miembro.id, nombre, membresia_tier: miembro.membresia_tier }}
           onClose={() => setCrearOpen(false)}
           onCreada={recargarReservas}
         />
@@ -508,7 +267,7 @@ export default function PerfilMiembroRecepcion() {
       {cancelarTarget && (
         <CancelarReservaRecepcionModal
           reserva={cancelarTarget}
-          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
+          miembroNombre={nombre}
           onClose={() => setCancelarTarget(null)}
           onCancelada={recargarReservas}
         />
@@ -516,11 +275,7 @@ export default function PerfilMiembroRecepcion() {
 
       {reprogramarTarget && (
         <CrearReservaModal
-          miembro={{
-            id: miembro.id,
-            nombre: capitalizar(miembro.nombre) || miembro.email,
-            membresia_tier: miembro.membresia_tier
-          }}
+          miembro={{ id: miembro.id, nombre, membresia_tier: miembro.membresia_tier }}
           reprogramarDe={reprogramarTarget}
           onClose={() => setReprogramarTarget(null)}
           onCreada={recargarReservas}
@@ -545,7 +300,7 @@ export default function PerfilMiembroRecepcion() {
       {fotoOpen && (
         <FotoMiembroModal
           miembroId={miembro.id}
-          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
+          miembroNombre={nombre}
           onClose={() => setFotoOpen(false)}
           onActualizada={recargarPerfil}
         />
@@ -554,7 +309,7 @@ export default function PerfilMiembroRecepcion() {
       {fichaOpen && (
         <FichaIdentidadModal
           miembroId={miembro.id}
-          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
+          miembroNombre={nombre}
           tieneFoto={!!miembro.avatar_url}
           onClose={() => setFichaOpen(false)}
           onGuardada={recargarPerfil}
@@ -564,7 +319,7 @@ export default function PerfilMiembroRecepcion() {
       {resetOpen && (
         <ResetPasswordModal
           miembroId={miembro.id}
-          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
+          miembroNombre={nombre}
           onClose={() => {
             setResetOpen(false);
             void recargarAudit();
@@ -575,131 +330,15 @@ export default function PerfilMiembroRecepcion() {
       {desbloquearOpen && (
         <DesbloquearModal
           miembroId={miembro.id}
-          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
+          miembroNombre={nombre}
           onClose={() => setDesbloquearOpen(false)}
           onDesbloqueado={recargarPerfil}
         />
       )}
 
       {avisoOpen && (
-        <EnviarAvisoModal
-          miembroId={miembro.id}
-          miembroNombre={capitalizar(miembro.nombre) || miembro.email}
-          onClose={() => setAvisoOpen(false)}
-        />
+        <EnviarAvisoModal miembroId={miembro.id} miembroNombre={nombre} onClose={() => setAvisoOpen(false)} />
       )}
-    </div>
-  );
-}
-
-function iniciales(nombre: string | null, email: string): string {
-  const base = (nombre ?? email ?? '?').trim();
-  const parts = base.split(/[\s@.]+/).filter(Boolean).slice(0, 2);
-  const ini = parts.map((p) => p[0]?.toUpperCase() ?? '').join('');
-  return ini || '?';
-}
-
-function Dato({ label, valor }: { label: string; valor: React.ReactNode }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-      <span style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', flexShrink: 0 }}>
-        {label}
-      </span>
-      <span style={{ fontSize: '13px', color: 'var(--ek-ink)', textAlign: 'right' }}>
-        {valor}
-      </span>
-    </div>
-  );
-}
-
-function actorLabel(rol: string | null): string {
-  if (rol === 'admin') return 'Admin';
-  if (rol === 'recepcionista') return 'Recepción';
-  return rol ?? '—';
-}
-
-function valorTexto(v: unknown): string {
-  if (v == null || v === '') return '—';
-  return String(v);
-}
-
-function planLabel(v: unknown): string {
-  return v == null ? 'sin plan' : String(v);
-}
-
-function describirCambio(e: AuditEntryUsuario): string {
-  switch (e.accion) {
-    case 'status_change':
-      return `Cambió estado: ${valorTexto(e.antes?.status)} → ${valorTexto(e.despues?.status)}`;
-    case 'tier_change':
-      return `Cambió plan: ${planLabel(e.antes?.membresia_tier)} → ${planLabel(e.despues?.membresia_tier)}`;
-    case 'unblock':
-      return 'Levantó el bloqueo por inasistencia';
-    case 'no_show_manual':
-      return 'Marcó inasistencia (no-show)';
-    case 'checkin_correction':
-      return 'Corrigió un check-in';
-    case 'contact_change':
-      return 'Editó datos de contacto';
-    case 'avatar_change':
-      return 'Actualizó la foto';
-    case 'password_reset':
-      return 'Reseteó el acceso';
-    case 'create_member':
-      return 'Registró al miembro';
-    default:
-      return e.accion;
-  }
-}
-
-function HistorialCambios({
-  entries,
-  isLoading,
-  error
-}: {
-  entries: AuditEntryUsuario[];
-  isLoading: boolean;
-  error: boolean;
-}) {
-  if (isLoading) {
-    return <div className="ek-skeleton" style={{ height: '48px', borderRadius: 'var(--ek-r-sm)' }} />;
-  }
-  if (error) {
-    return <p className="ek-body-faint">No se pudo cargar el historial.</p>;
-  }
-  if (entries.length === 0) {
-    return <p className="ek-body-faint">Sin cambios registrados.</p>;
-  }
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {entries.map((e) => (
-        <div
-          key={e.id}
-          style={{
-            padding: '10px 14px',
-            background: 'var(--ek-bg-soft)',
-            border: '0.5px solid var(--ek-line)',
-            borderRadius: 'var(--ek-r-sm)'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--ek-ink)', fontWeight: 600 }}>
-              {describirCambio(e)}
-            </span>
-            <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-              {fechaHora(e.creada_at)}
-            </span>
-          </div>
-          <div style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '2px' }}>
-            {actorLabel(e.actor_rol)}
-          </div>
-          {e.motivo && (
-            <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '6px 0 0', fontStyle: 'italic' }}>
-              "{e.motivo}"
-            </p>
-          )}
-        </div>
-      ))}
     </div>
   );
 }
@@ -710,116 +349,5 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
       <p className="ek-eyebrow" style={{ marginBottom: '10px' }}>{titulo}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>{children}</div>
     </section>
-  );
-}
-
-function FilaReserva({
-  reserva,
-  historico,
-  onCancelar,
-  onReprogramar,
-  reprogramarBloqueado
-}: {
-  reserva: ReservaPerfil;
-  historico?: boolean;
-  onCancelar?: () => void;
-  onReprogramar?: () => void;
-  reprogramarBloqueado?: boolean;
-}) {
-  const cancelada = reserva.status === 'cancelada' || reserva.status === 'cancelada_admin';
-  const conAcciones = onCancelar != null || onReprogramar != null;
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        padding: '10px 14px',
-        background: 'var(--ek-bg-soft)',
-        border: '0.5px solid var(--ek-line)',
-        borderRadius: 'var(--ek-r-sm)',
-        opacity: historico && cancelada ? 0.55 : 1
-      }}
-    >
-      <span
-        style={{
-          fontFamily: 'var(--ek-font-mono)',
-          fontSize: '13px',
-          fontWeight: 600,
-          color: 'var(--ek-ink)',
-          minWidth: '92px'
-        }}
-      >
-        {fechaHora(reserva.slot_inicio)}
-      </span>
-      <span
-        style={{
-          flex: 1,
-          minWidth: 0,
-          fontSize: '13px',
-          color: 'var(--ek-ink-muted)',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
-        }}
-      >
-        {reserva.recurso?.nombre ?? '—'}
-      </span>
-      {conAcciones ? (
-        <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-          {onReprogramar && (
-            <button
-              type="button"
-              onClick={onReprogramar}
-              disabled={reprogramarBloqueado}
-              title={
-                reprogramarBloqueado
-                  ? 'El miembro no está activo — no se puede reprogramar'
-                  : undefined
-              }
-              style={{
-                minHeight: '44px',
-                padding: '4px 8px',
-                background: 'transparent',
-                border: 'none',
-                color: reprogramarBloqueado ? 'var(--ek-ink-faint)' : 'var(--ek-mustard)',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: reprogramarBloqueado ? 'not-allowed' : 'pointer',
-                opacity: reprogramarBloqueado ? 0.5 : 1,
-                textDecoration: 'underline',
-                textUnderlineOffset: '3px'
-              }}
-            >
-              Reprogramar
-            </button>
-          )}
-          {onCancelar && (
-            <button
-              type="button"
-              onClick={onCancelar}
-              style={{
-                minHeight: '44px',
-                padding: '4px 8px',
-                background: 'transparent',
-                border: 'none',
-                color: 'var(--ek-danger)',
-                fontSize: '12px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                textDecoration: 'underline',
-                textUnderlineOffset: '3px'
-              }}
-            >
-              Cancelar
-            </button>
-          )}
-        </div>
-      ) : (
-        <span style={{ flexShrink: 0 }}>
-          <StatusBadge status={reserva.status} size={11} />
-        </span>
-      )}
-    </div>
   );
 }
