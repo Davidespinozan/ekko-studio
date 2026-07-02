@@ -288,6 +288,15 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     padding: 8px 0;
   }
 
+  .ek-header-title {
+    font-family: var(--ek-font-display);
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0;
+    color: var(--ek-ink);
+  }
+
   @media (min-width: 768px) {
     .ek-header-glass {
       padding: 10px 0;

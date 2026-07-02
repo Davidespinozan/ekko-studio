@@ -48,13 +48,9 @@ export default function Estudios() {
 
   return (
     <div className="ek-container">
-      <div style={{ marginBottom: '24px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>EXPLORAR</p>
-        <h1 className="ek-display-xl">Nuestros estudios</h1>
-        <p className="ek-body-muted" style={{ marginTop: '8px' }}>
-          Espacios profesionales diseñados para creadores. Cada uno con su personalidad.
-        </p>
-      </div>
+      <p className="ek-body-muted" style={{ margin: '4px 0 20px' }}>
+        Espacios profesionales diseñados para creadores. Cada uno con su personalidad.
+      </p>
 
       <div style={{
         display: 'grid',

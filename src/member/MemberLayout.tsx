@@ -18,6 +18,20 @@ const MiQRProxima = lazy(() => import('./pages/MiQRProxima'));
 const Estudios = lazy(() => import('./pages/Estudios'));
 const EstudioDetalle = lazy(() => import('./pages/EstudioDetalle'));
 
+/**
+ * Título de la sección para el header. En Inicio devuelve null → se muestra el
+ * logo; en el resto el título ocupa ese espacio (el logo no aporta ahí).
+ */
+function tituloDeSeccion(path: string): string | null {
+  if (path === '/app' || path === '/app/') return null;
+  if (path.startsWith('/app/estudios')) return 'Estudios';
+  if (path.startsWith('/app/reservar')) return 'Reservar';
+  if (path.startsWith('/app/reservas')) return 'Mis reservas';
+  if (path.startsWith('/app/perfil')) return 'Perfil';
+  if (path.startsWith('/app/qr')) return 'Mi QR';
+  return null;
+}
+
 export default function MemberLayout() {
   const { authUser, usuario, isLoading, signOut } = useAuth();
   const location = useLocation();
@@ -60,16 +74,16 @@ export default function MemberLayout() {
       <DemoBanner vista="Miembro" />
       <header className="ek-header-glass">
         <div className="ek-header-inner">
-          <Link
-            to="/app"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              textDecoration: 'none'
-            }}
-          >
-            <BrandLogo height={52} maxWidth={180} />
-          </Link>
+          {tituloDeSeccion(location.pathname) ? (
+            <h1 className="ek-header-title">{tituloDeSeccion(location.pathname)}</h1>
+          ) : (
+            <Link
+              to="/app"
+              style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}
+            >
+              <BrandLogo height={52} maxWidth={180} />
+            </Link>
+          )}
           <NotificacionesBell />
         </div>
       </header>

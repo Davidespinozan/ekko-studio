@@ -24,13 +24,8 @@ export default function Perfil() {
 
   return (
     <div className="ek-container">
-      <div className="ek-stack-lg">
-        <div className="ek-stack-md">
-          <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar">PERFIL</p>
-          <h1 className="ek-display-md">{nombreFormat || 'Tu cuenta'}</h1>
-        </div>
-
-        {/* Avatar + datos de contacto (compacto, sin campos internos) */}
+      <div className="ek-stack-lg" style={{ paddingTop: '4px' }}>
+        {/* Avatar + nombre + contacto (compacto, sin campos internos) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <span className="ek-avatar-ring" style={{ flexShrink: 0 }}>
             {usuario?.avatar_url ? (
@@ -59,9 +54,12 @@ export default function Perfil() {
             )}
           </span>
           <div style={{ minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: '15px', fontWeight: 600, wordBreak: 'break-word' }}>{authUser?.email}</p>
+            <p style={{ margin: 0, fontFamily: 'var(--ek-font-display)', fontSize: '18px', fontWeight: 700, letterSpacing: '-0.02em' }}>
+              {nombreFormat || 'Tu cuenta'}
+            </p>
+            <p className="ek-body-faint" style={{ margin: '3px 0 0', wordBreak: 'break-word' }}>{authUser?.email}</p>
             {usuario?.telefono && (
-              <p className="ek-body-faint" style={{ margin: '2px 0 0' }}>{usuario.telefono}</p>
+              <p className="ek-body-faint" style={{ margin: '1px 0 0' }}>{usuario.telefono}</p>
             )}
           </div>
         </div>

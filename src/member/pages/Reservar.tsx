@@ -170,11 +170,6 @@ export default function Reservar() {
   return (
     <div className="ek-container">
       <div className="ek-stack-xl">
-        <div className="ek-stack-md">
-          <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar">RESERVAR</p>
-          <h1 className="ek-h2">Elige tu sesión</h1>
-        </div>
-
         {/* Selector de recurso */}
         <div className="ek-stack-sm">
           <label className="ek-field-label">Estudio</label>

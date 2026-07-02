@@ -107,13 +107,8 @@ export default function MisReservas() {
 
   return (
     <div className="ek-container">
-      <div className="ek-stack-md" style={{ marginBottom: '20px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar">TUS SESIONES</p>
-        <h1 className="ek-display-md">Mis reservas</h1>
-      </div>
-
       {/* Toggle de tabs */}
-      <div className="ek-tabs" role="tablist" aria-label="Filtrar reservas">
+      <div className="ek-tabs" role="tablist" aria-label="Filtrar reservas" style={{ marginTop: '4px' }}>
         <button
           type="button"
           role="tab"
