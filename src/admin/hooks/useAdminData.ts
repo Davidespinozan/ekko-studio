@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { backendPost } from '@shared/lib/backend';
+import { inicioDeHoyEnZona, inicioDeMesEnZona } from '@shared/lib/timezone';
 import type { Database } from '@shared/types/database';
 
 type Usuario = Database['public']['Tables']['usuarios']['Row'];
@@ -233,9 +234,9 @@ export function useAdminMetrics() {
 
     async function load() {
       const now = new Date();
-      const inicioHoy = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const inicioHoy = inicioDeHoyEnZona(now);
       const finHoy = new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
-      const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+      const inicioMes = inicioDeMesEnZona(0, now);
       const hace7d = new Date(inicioHoy.getTime() - 7 * 24 * 60 * 60 * 1000);
 
       const [activos, total, hoy, mes, noShows, reservas7d, proximas] = await Promise.all([
@@ -344,10 +345,10 @@ export function useDashboardData() {
     setIsLoading(true);
     setError(false);
     const now = new Date();
-    const inicioHoy = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const inicioHoy = inicioDeHoyEnZona(now);
     const finHoy = new Date(inicioHoy.getTime() + 24 * 60 * 60 * 1000);
-    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
-    const inicioMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const inicioMes = inicioDeMesEnZona(0, now);
+    const inicioMesAnterior = inicioDeMesEnZona(-1, now);
     const finMesAnterior = inicioMes;
     const hace30dias = new Date(inicioHoy.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -503,8 +504,8 @@ export function useDineroMetrics() {
     setIsLoading(true);
     setError(false);
     const now = new Date();
-    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
-    const inicioMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const inicioMes = inicioDeMesEnZona(0, now);
+    const inicioMesAnterior = inicioDeMesEnZona(-1, now);
 
     const { data, error: qErr } = await supabase
       .from('payment_events')

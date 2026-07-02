@@ -78,15 +78,14 @@ describe('calcularOcupacion', () => {
     expect(res.ocupacionPct).toBe(100);
   });
 
-  it('heatmap acumula por día de semana (lunes primero) y hora', () => {
-    // 2026-06-15 es lunes; 14:00Z. Uso mediodía para evitar cruces de día por TZ.
+  it('heatmap agrupa por día/hora DEL ESTUDIO (Mazatlan), no del navegador', () => {
+    // 2026-06-15T22:00Z → en Mazatlan (UTC-7) es lunes 15 a las 15:00.
     const res = calcularOcupacion([EST1], [
-      { recurso_id: 'r1', status: 'completada', duracion_min: 60, slot_inicio: '2026-06-15T12:00:00' },
-      { recurso_id: 'r1', status: 'confirmada', duracion_min: 60, slot_inicio: '2026-06-15T12:00:00' }
+      { recurso_id: 'r1', status: 'completada', duracion_min: 60, slot_inicio: '2026-06-15T22:00:00Z' },
+      { recurso_id: 'r1', status: 'confirmada', duracion_min: 60, slot_inicio: '2026-06-15T22:00:00Z' }
     ], 7);
-    const d = new Date('2026-06-15T12:00:00');
-    const fila = (d.getDay() + 6) % 7;
-    expect(res.heatmap[fila][d.getHours()]).toBe(2);
+    // lunes = fila 0 (lunes-primero), 15:00 hora del estudio
+    expect(res.heatmap[0][15]).toBe(2);
     expect(res.heatmapMax).toBe(2);
   });
 

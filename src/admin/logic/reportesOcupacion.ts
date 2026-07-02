@@ -49,6 +49,8 @@ export interface OcupacionResult {
   heatmapMax: number;
 }
 
+import { partesEnZona } from '@shared/lib/timezone';
+
 // Reservas que OCUPARON el slot (bloquearon la agenda). Canceladas liberan.
 const BOOKED = new Set(['confirmada', 'completada', 'no_show']);
 
@@ -96,12 +98,12 @@ export function calcularOcupacion(
       if (rv.status === 'completada') a.completadas += 1;
       if (rv.status === 'no_show') a.noShows += 1;
     }
-    // Heatmap de demanda (hora local del navegador, como el resto del admin).
+    // Heatmap de demanda en la HORA DEL ESTUDIO (no la del navegador).
     const d = new Date(rv.slot_inicio);
     if (!Number.isNaN(d.getTime())) {
-      const fila = filaLunesPrimero(d.getDay());
-      const hora = d.getHours();
-      const v = (heatmap[fila][hora] += 1);
+      const { dow, hour } = partesEnZona(d);
+      const fila = filaLunesPrimero(dow);
+      const v = (heatmap[fila][hour] += 1);
       if (v > heatmapMax) heatmapMax = v;
     }
   }
