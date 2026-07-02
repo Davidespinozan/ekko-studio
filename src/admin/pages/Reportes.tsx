@@ -1,8 +1,10 @@
 import { useReportesEconomia } from '../hooks/useReportesEconomia';
 import { useReportesOcupacion } from '../hooks/useReportesOcupacion';
+import { useReportesEngagement } from '../hooks/useReportesEngagement';
 import { InfoTooltip } from '@shared/components/InfoTooltip';
 import type { EconomiaResult } from '../logic/reportesEconomia';
 import type { OcupacionResult } from '../logic/reportesOcupacion';
+import type { EngagementResult } from '../logic/reportesEngagement';
 
 // ============================================================================
 // /admin/reportes — Analítica del negocio para el dueño. Empieza con el bloque
@@ -30,12 +32,21 @@ const AYUDA = {
   noShows:
     'Reservas donde el miembro no se presentó en los últimos 90 días. Cada no-show es un slot que bloqueaste y quedó vacío. Vigilalo por estudio para detectar patrones.',
   heatmap:
-    'Demanda por día y hora en los últimos 90 días: cuanto más intenso el color, más se reserva ese horario. Te dice qué franjas abrir, cuáles cerrar y dónde subir el precio.'
+    'Demanda por día y hora en los últimos 90 días: cuanto más intenso el color, más se reserva ese horario. Te dice qué franjas abrir, cuáles cerrar y dónde subir el precio.',
+  vienen:
+    'De los miembros que pagan, qué % de verdad vino al estudio en los últimos 30 días (MAU ÷ activos). Si es bajo, mucha gente paga y no usa: riesgo de baja. Sano arriba de ~50%.',
+  activacion:
+    'De los miembros nuevos (últimos 90 días), qué % ya hizo su primera reserva. Mide tu onboarding: si es bajo, la gente se registra pero no arranca. Sano arriba de ~50%.',
+  ttv:
+    'Cuántos días tardan los miembros nuevos en hacer su primera reserva desde que se dan de alta. Cuanto menos, mejor: significa que enganchan rápido.',
+  riesgo:
+    'Miembros activos (que pagan) que NO vienen hace más de 21 días — o que nunca vinieron. Son los que están por darse de baja. Contactalos antes de perderlos.'
 } as const;
 
 export default function Reportes() {
   const { data, isLoading, error } = useReportesEconomia();
   const ocupacion = useReportesOcupacion();
+  const engagement = useReportesEngagement();
 
   return (
     <div className="adm-page">
@@ -103,6 +114,108 @@ export default function Reportes() {
           <BloqueOcupacion data={ocupacion.data} />
         )}
       </section>
+
+      <section>
+        <p className="ek-eyebrow" style={{ fontSize: '10px', margin: '0 0 12px' }}>
+          ENGAGEMENT Y RETENCIÓN · 90 DÍAS
+        </p>
+
+        {engagement.isLoading ? (
+          <div className="adm-metricas-grid">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="ek-skeleton" style={{ height: '104px', borderRadius: 'var(--ek-r-card)' }} />
+            ))}
+          </div>
+        ) : engagement.error || !engagement.data ? (
+          <div className="ek-card" style={{ padding: '20px' }}>
+            <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0 }}>
+              No pudimos cargar el engagement. Reintentá en un momento.
+            </p>
+          </div>
+        ) : (
+          <BloqueEngagement data={engagement.data} />
+        )}
+      </section>
+    </div>
+  );
+}
+
+function BloqueEngagement({ data }: { data: EngagementResult }) {
+  const vienenBaja = data.porcentajeVienen != null && data.porcentajeVienen < 50;
+  const activBaja = data.activacionPct != null && data.activacionPct < 50;
+  return (
+    <>
+      <div className="adm-metricas-grid">
+        <KpiCard
+          label="Vienen (30d)"
+          valor={pct(data.porcentajeVienen)}
+          alerta={vienenBaja}
+          nota={`${data.mau} de ${data.activos} activos`}
+          ayuda={AYUDA.vienen}
+        />
+        <KpiCard
+          label="Activación"
+          valor={pct(data.activacionPct)}
+          alerta={activBaja}
+          nota={`${data.cohorteNuevos} nuevos (90d)`}
+          ayuda={AYUDA.activacion}
+        />
+        <KpiCard
+          label="Time to value"
+          valor={data.ttvDias == null ? '—' : `${data.ttvDias.toFixed(1)} d`}
+          nota="alta → 1ª reserva"
+          ayuda={AYUDA.ttv}
+        />
+      </div>
+
+      <MiembrosEnRiesgo data={data} />
+    </>
+  );
+}
+
+function MiembrosEnRiesgo({ data }: { data: EngagementResult }) {
+  const top = data.enRiesgo.slice(0, 12);
+  return (
+    <div className="ek-card" style={{ padding: '20px', marginTop: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+        <p className="ek-eyebrow" style={{ fontSize: '10px', margin: 0, color: data.enRiesgo.length > 0 ? 'var(--ek-danger)' : undefined }}>
+          MIEMBROS EN RIESGO
+        </p>
+        <InfoTooltip titulo="Miembros en riesgo" texto={AYUDA.riesgo} />
+      </div>
+      <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', margin: '0 0 14px' }}>
+        {data.enRiesgo.length === 0
+          ? 'Nadie en riesgo — todos tus activos vinieron en las últimas 3 semanas.'
+          : `${data.enRiesgo.length} ${data.enRiesgo.length === 1 ? 'miembro' : 'miembros'} sin venir hace +21 días${data.enRiesgo.length > 12 ? ' · muestro los 12 más urgentes' : ''}`}
+      </p>
+
+      {top.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {top.map((m) => (
+            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              <span style={{ flex: 1, minWidth: '140px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--ek-ink)', display: 'block' }}>
+                  {m.nombre || m.email || 'Miembro'}
+                </span>
+                {m.email && m.nombre && (
+                  <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)' }}>{m.email}</span>
+                )}
+              </span>
+              <span
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: 'var(--ek-danger)',
+                  fontVariantNumeric: 'tabular-nums',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {m.diasSinVenir == null ? 'Nunca vino' : `${m.diasSinVenir} d sin venir`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
