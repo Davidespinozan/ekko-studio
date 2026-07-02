@@ -272,12 +272,11 @@ export default function Reservar() {
           <label className="ek-field-label">Fecha</label>
           <div className="ek-hscroll-fade">
             <div
+              className="ek-no-scrollbar"
               style={{
                 display: 'flex',
                 gap: '0.5rem',
                 overflowX: 'auto',
-                paddingBottom: '0.5rem',
-                scrollbarWidth: 'thin',
                 scrollSnapType: 'x proximity'
               }}
             >

@@ -3528,3 +3528,14 @@ select.ek-input option {
   font-size: 13px;
   color: var(--ek-ink-faint);
 }
+
+/* Scroll horizontal con el dedo, SIN barra visible (se veía fea con fondo claro
+   en el selector de fecha de Reservar). */
+.ek-no-scrollbar {
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE/Edge viejo */
+  -webkit-overflow-scrolling: touch;
+}
+.ek-no-scrollbar::-webkit-scrollbar {
+  display: none;                /* Chrome/Safari */
+}
