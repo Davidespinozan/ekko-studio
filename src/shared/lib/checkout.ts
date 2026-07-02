@@ -101,3 +101,26 @@ export interface BillingInfo {
 export function obtenerBillingInfo(): Promise<BillingInfo> {
   return backendPost<BillingInfo>('stripe-billing-info', {});
 }
+
+// ── Gestión de la suscripción IN-APP (sin portal de Stripe) ─────────────────
+
+export interface SetupIntentResult {
+  clientSecret?: string;
+  account?: string;
+  reason?: string;
+}
+
+/** Crea un SetupIntent para registrar/actualizar la tarjeta con Elements. */
+export function crearSetupIntent(): Promise<SetupIntentResult> {
+  return backendPost<SetupIntentResult>('stripe-setup-intent', {});
+}
+
+/** Fija la nueva tarjeta (pm_...) como default del customer y la suscripción. */
+export function actualizarTarjeta(paymentMethodId: string): Promise<{ success: boolean }> {
+  return backendPost<{ success: boolean }>('stripe-actualizar-tarjeta', { payment_method: paymentMethodId });
+}
+
+/** Cancela al fin del periodo (o reactiva) la suscripción del miembro. */
+export function cancelarSuscripcion(reactivar = false): Promise<{ success: boolean; cancel_at_period_end: boolean }> {
+  return backendPost<{ success: boolean; cancel_at_period_end: boolean }>('stripe-cancelar-suscripcion', { reactivar });
+}

@@ -88,6 +88,8 @@ describe('MiSuscripcion', () => {
     h.membresias = [{ status: 'past_due', stripe_subscription_id: 'sub_1', cancel_at_period_end: false, periodo_actual_fin: null }];
     renderComp('pro');
     await waitFor(() => expect(screen.getByText('Tu último pago no se procesó')).toBeInTheDocument());
-    expect(screen.getByText('Gestionar suscripción')).toBeInTheDocument();
+    // Gestión ahora es 100% in-app: actualizar tarjeta + cancelar plan (sin portal).
+    expect(screen.getByText('Actualizar tarjeta')).toBeInTheDocument();
+    expect(screen.getByText('Cancelar plan')).toBeInTheDocument();
   });
 });

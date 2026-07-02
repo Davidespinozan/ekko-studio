@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Settings, Ticket, CalendarClock } from 'lucide-react';
+import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Ticket, CalendarClock, Ban, RotateCcw } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
-import { abrirPortal, obtenerBillingInfo, type MetodoPago, type PagoHistorial } from '@shared/lib/checkout';
+import { obtenerBillingInfo, cancelarSuscripcion, type MetodoPago, type PagoHistorial } from '@shared/lib/checkout';
+import { TarjetaModal } from '@shared/components/TarjetaModal';
 import { PaymentModal } from '@shared/components/PaymentModal';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
@@ -59,6 +60,19 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const currentSlug = tierSlug;
   const [gestionando, setGestionando] = useState(false);
   const [pagarTier, setPagarTier] = useState<TierInfo | null>(null);
+  const [tarjetaOpen, setTarjetaOpen] = useState(false);
+  const [confirmarCancelar, setConfirmarCancelar] = useState(false);
+
+  // Recarga tarjeta + historial tras un cambio (nueva tarjeta guardada).
+  async function recargarBilling() {
+    try {
+      const info = await obtenerBillingInfo();
+      setPaymentMethod(info.paymentMethod);
+      setPagos(info.pagos ?? []);
+    } catch {
+      /* la sección muestra su estado */
+    }
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -147,16 +161,19 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
     setPagarTier(destino);
   }
 
-  async function gestionarSuscripcion() {
+  async function togglenCancelacion(reactivar: boolean) {
     setGestionando(true);
     try {
-      const res = await abrirPortal();
-      if (res.url) return; // abrirPortal ya redirige al Customer Portal
-      if (res.reason === 'stripe_pendiente') {
-        toast.info('La gestión en línea estará disponible cuando el estudio active los pagos.');
-      }
+      const res = await cancelarSuscripcion(reactivar);
+      setMembresia((prev) => (prev ? { ...prev, cancel_at_period_end: res.cancel_at_period_end } : prev));
+      setConfirmarCancelar(false);
+      toast.success(
+        reactivar
+          ? '¡Listo! Tu plan se renovará normalmente.'
+          : 'Tu plan se cancelará al final del periodo. Podés reactivarlo cuando quieras.'
+      );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No pudimos abrir la gestión. Intentá de nuevo.');
+      toast.error(e instanceof Error ? e.message : 'No pudimos actualizar tu suscripción. Intentá de nuevo.');
     } finally {
       setGestionando(false);
     }
@@ -194,12 +211,11 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                 </p>
                 <button
                   type="button"
-                  className="ek-cta"
+                  className="ek-cta ek-cta--gold"
                   style={{ padding: '9px 16px', fontSize: '13px' }}
-                  onClick={gestionarSuscripcion}
-                  disabled={gestionando}
+                  onClick={() => setTarjetaOpen(true)}
                 >
-                  {gestionando ? <Spinner size={15} /> : 'Actualizar pago'}
+                  Actualizar tarjeta
                 </button>
               </div>
             </div>
@@ -276,7 +292,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             {finPeriodo && (
               cancelaAlFin ? (
                 <p className="ek-helper-text" style={{ marginTop: 0, marginBottom: '12px', color: 'var(--ek-warning)' }}>
-                  Tu plan se cancela el {finPeriodo}. Podés reactivarlo desde “Gestionar suscripción”.
+                  Tu plan se cancela el {finPeriodo}. Podés reactivarlo acá abajo.
                 </p>
               ) : (
                 <div style={{
@@ -298,16 +314,29 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               Cambiar de plan <ArrowRight size={16} aria-hidden="true" />
             </button>
 
+            {/* Cancelar / reactivar — todo in-app, sin salir a Stripe */}
             {tieneSuscripcion && (
-              <button
-                type="button"
-                className="ek-cta ek-cta--secondary ek-cta--full"
-                style={{ marginTop: '10px' }}
-                onClick={gestionarSuscripcion}
-                disabled={gestionando}
-              >
-                {gestionando ? <Spinner size={15} /> : <>Gestionar suscripción <Settings size={15} aria-hidden="true" /></>}
-              </button>
+              cancelaAlFin ? (
+                <button
+                  type="button"
+                  className="ek-cta ek-cta--secondary ek-cta--full"
+                  style={{ marginTop: '10px' }}
+                  onClick={() => void togglenCancelacion(true)}
+                  disabled={gestionando}
+                >
+                  {gestionando ? <Spinner size={15} /> : <>Reactivar plan <RotateCcw size={15} aria-hidden="true" /></>}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="ek-cta ek-cta--secondary ek-cta--full"
+                  style={{ marginTop: '10px' }}
+                  onClick={() => setConfirmarCancelar(true)}
+                  disabled={gestionando}
+                >
+                  Cancelar plan <Ban size={15} aria-hidden="true" />
+                </button>
+              )
             )}
           </div>
 
@@ -343,10 +372,9 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                   type="button"
                   className="ek-cta ek-cta--secondary"
                   style={{ padding: '9px 14px', fontSize: '12px' }}
-                  onClick={gestionarSuscripcion}
-                  disabled={gestionando}
+                  onClick={() => setTarjetaOpen(true)}
                 >
-                  {gestionando ? <Spinner size={14} /> : 'Actualizar'}
+                  Actualizar
                 </button>
               </div>
             ) : (
@@ -354,7 +382,12 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                 icon={CreditCard}
                 tone="neutral"
                 title="Sin tarjeta registrada"
-                hint="Cuando pagues tu primer plan, tu tarjeta quedará guardada de forma segura en Stripe."
+                hint="Guardá una tarjeta para pagar y renovar sin salir de la app."
+                action={
+                  <button type="button" className="ek-cta ek-cta--gold" onClick={() => setTarjetaOpen(true)}>
+                    Agregar tarjeta <CreditCard size={15} aria-hidden="true" />
+                  </button>
+                }
               />
             )}
           </div>
@@ -470,6 +503,39 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             toast.success('¡Pago recibido! Tu plan se está activando, puede tardar unos segundos.');
           }}
         />
+      )}
+
+      {/* Actualizar tarjeta in-app (SetupIntent + Elements) */}
+      {tarjetaOpen && (
+        <TarjetaModal
+          onClose={() => setTarjetaOpen(false)}
+          onGuardada={() => {
+            setTarjetaOpen(false);
+            toast.success('¡Tarjeta actualizada!');
+            void recargarBilling();
+          }}
+        />
+      )}
+
+      {/* Confirmación de cancelación */}
+      {confirmarCancelar && (
+        <div className="ek-backdrop" onClick={() => !gestionando && setConfirmarCancelar(false)} role="dialog" aria-modal="true">
+          <div className="ek-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '100%', animation: 'ek-scale-in 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>CANCELAR PLAN</p>
+            <h3 className="ek-display-md" style={{ margin: '0 0 8px' }}>¿Seguro que querés cancelar?</h3>
+            <p className="ek-body-muted" style={{ marginTop: 0, marginBottom: '18px' }}>
+              Mantenés el acceso {finPeriodo ? `hasta el ${finPeriodo}` : 'hasta el final del periodo'}. No se te vuelve a cobrar y podés reactivarlo cuando quieras.
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" className="ek-cta ek-cta--secondary ek-cta--full" onClick={() => setConfirmarCancelar(false)} disabled={gestionando}>
+                Mantener plan
+              </button>
+              <button type="button" className="ek-cta ek-cta--danger ek-cta--full" onClick={() => void togglenCancelacion(false)} disabled={gestionando}>
+                {gestionando ? <Spinner size={15} /> : 'Sí, cancelar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );
