@@ -415,11 +415,21 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
      BUTTONS
      ============================================================================ */
 
+  /* ============================================================================
+     SISTEMA DE BOTONES — 3 niveles, sin excepciones:
+       1. PRIMARY  (.ek-cta--gold) → oro sólido, texto negro. UNA por pantalla.
+       2. DEFAULT  (.ek-cta)       → gris metálico, borde neutro, texto claro.
+       3. GHOST    (.ek-cta--secondary) → transparente, texto tenue. Terciaria.
+       + DANGER    (.ek-cta--danger) → destructiva (rojo tenue).
+     El DEFAULT ya NO lleva borde amarillo (eso creaba el "relajo": gris con
+     contorno oro compitiendo con el oro sólido). El oro se reserva para la
+     acción principal, nada más.
+     ============================================================================ */
   .ek-cta,
   .ek-btn-primary {
-    background: linear-gradient(180deg, #26272c 0%, #16171a 100%);
+    background: linear-gradient(180deg, #2a2b30 0%, #1a1b1f 100%);
     color: var(--ek-ink);
-    border: 1px solid rgba(229, 184, 41, 0.38);
+    border: 1px solid rgba(255, 255, 255, 0.10);
     border-radius: var(--ek-r-sm);
     padding: 12px 22px;
     font-family: var(--ek-font-body);
@@ -427,7 +437,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     font-weight: 600;
     letter-spacing: -0.01em;
     min-height: 44px;
-    box-shadow: var(--ek-highlight-top), 0 4px 14px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--ek-highlight-top), 0 4px 14px rgba(0, 0, 0, 0.32);
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -443,9 +453,10 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-cta:hover,
   .ek-btn-primary:hover {
-    border-color: var(--ek-mustard);
+    background: linear-gradient(180deg, #33343a 0%, #202127 100%);
+    border-color: rgba(255, 255, 255, 0.18);
     transform: translateY(-1px);
-    box-shadow: 0 12px 24px rgba(229, 184, 41, 0.16);
+    box-shadow: var(--ek-highlight-strong), 0 10px 24px rgba(0, 0, 0, 0.42);
   }
 
   .ek-cta:active,
@@ -465,14 +476,15 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   .ek-btn-secondary {
     background: transparent;
     color: var(--ek-ink-muted);
-    border: 0.5px solid var(--ek-line);
+    border: 1px solid transparent;
     box-shadow: none;
   }
 
   .ek-cta--secondary:hover {
     color: var(--ek-ink);
     border-color: var(--ek-line-strong);
-    background: rgba(245, 241, 232, 0.03);
+    background: rgba(255, 255, 255, 0.03);
+    transform: none;
     box-shadow: none;
   }
 
