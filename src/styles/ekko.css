@@ -3551,3 +3551,29 @@ select.ek-input option {
 .ek-no-scrollbar::-webkit-scrollbar {
   display: none;                /* Chrome/Safari */
 }
+
+/* Control segmentado reutilizable (SegmentedToggle) — recepción y donde aplique. */
+.ek-segmented {
+  display: inline-flex;
+  border: 0.5px solid var(--ek-line);
+  border-radius: var(--ek-r-md);
+  overflow: hidden;
+}
+.ek-segmented-btn {
+  min-height: 44px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--ek-ink-muted);
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.ek-segmented-btn--active {
+  background: var(--ek-mustard);
+  color: var(--ek-bg);
+}
+.ek-segmented--block { display: flex; width: 100%; }
+.ek-segmented--block .ek-segmented-btn { flex: 1; }

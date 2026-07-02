@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 /**
@@ -43,10 +43,12 @@ describe('ReceptionLayout · bottom-nav 4 ítems', () => {
     renderEn('/recepcion');
     const nav = await screen.findByRole('navigation', { name: /navegación de recepción/i });
     expect(nav).toBeInTheDocument();
-    expect(screen.getByText('Hoy')).toBeInTheDocument();
-    expect(screen.getByText('Agenda')).toBeInTheDocument();
-    expect(screen.getByText('Miembros')).toBeInTheDocument();
-    expect(screen.getByText('Check-in')).toBeInTheDocument();
+    // Scopeado al nav: el header ahora también muestra el título de sección.
+    const enNav = within(nav);
+    expect(enNav.getByText('Hoy')).toBeInTheDocument();
+    expect(enNav.getByText('Agenda')).toBeInTheDocument();
+    expect(enNav.getByText('Miembros')).toBeInTheDocument();
+    expect(enNav.getByText('Check-in')).toBeInTheDocument();
   });
 
   it('ruta default (/recepcion) = Hoy', async () => {

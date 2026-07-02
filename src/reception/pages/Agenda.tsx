@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Wrench } from 'lucide-react';
+import { SegmentedToggle } from '@shared/components/SegmentedToggle';
 import VistaSemana from '@shared/components/calendario/VistaSemana';
 import ReservasVistaLista from '@admin/components/ReservasVistaLista';
 import DetalleReservaModal from '@admin/components/DetalleReservaModal';
@@ -43,30 +44,13 @@ export default function Agenda() {
       <div
         style={{
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-end',
+          justifyContent: 'flex-end',
+          alignItems: 'center',
           marginBottom: '18px',
           gap: '12px',
           flexWrap: 'wrap'
         }}
       >
-        <div>
-          <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '4px' }}>
-            AGENDA
-          </p>
-          <h1
-            style={{
-              fontFamily: 'var(--ek-font-display)',
-              fontSize: '22px',
-              fontWeight: 700,
-              letterSpacing: '-0.03em',
-              margin: 0,
-              color: 'var(--ek-ink)'
-            }}
-          >
-            Reservas del estudio
-          </h1>
-        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             type="button"
@@ -77,7 +61,15 @@ export default function Agenda() {
           >
             <Wrench size={15} aria-hidden="true" /> Estudios
           </button>
-          <VistaToggle value={vista} onChange={setVista} />
+          <SegmentedToggle
+            ariaLabel="Cambiar vista"
+            value={vista}
+            onChange={setVista}
+            options={[
+              { value: 'semana', label: 'Semana' },
+              { value: 'lista', label: 'Lista' }
+            ]}
+          />
         </div>
       </div>
 
@@ -94,50 +86,6 @@ export default function Agenda() {
       <DetalleReservaModal reservaId={detalleId} onClose={() => setDetalleId(null)} />
 
       {estudiosOpen && <EstudiosServicioModal onClose={() => setEstudiosOpen(false)} />}
-    </div>
-  );
-}
-
-function VistaToggle({ value, onChange }: { value: Vista; onChange: (v: Vista) => void }) {
-  const opciones: { vista: Vista; label: string }[] = [
-    { vista: 'semana', label: 'Semana' },
-    { vista: 'lista', label: 'Lista' }
-  ];
-  return (
-    <div
-      role="group"
-      aria-label="Cambiar vista"
-      style={{
-        display: 'inline-flex',
-        border: '0.5px solid var(--ek-line)',
-        borderRadius: 'var(--ek-r-md)',
-        overflow: 'hidden'
-      }}
-    >
-      {opciones.map((o) => {
-        const activa = value === o.vista;
-        return (
-          <button
-            key={o.vista}
-            type="button"
-            onClick={() => onChange(o.vista)}
-            aria-pressed={activa}
-            style={{
-              minHeight: '44px',
-              padding: '8px 18px',
-              fontSize: '13px',
-              fontWeight: 600,
-              border: 'none',
-              cursor: 'pointer',
-              background: activa ? 'var(--ek-mustard)' : 'transparent',
-              color: activa ? 'var(--ek-bg)' : 'var(--ek-ink-muted)',
-              transition: 'background 0.18s ease, color 0.18s ease'
-            }}
-          >
-            {o.label}
-          </button>
-        );
-      })}
     </div>
   );
 }

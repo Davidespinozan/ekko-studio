@@ -3,8 +3,16 @@ import { lazy, Suspense } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { DemoBanner } from '@shared/components/DemoBanner';
-import { BrandLogo } from '@shared/components/BrandLogo';
 import { ReceptionBottomNav } from './components/ReceptionBottomNav';
+
+/** Título de sección para el header (mismo patrón que miembro). */
+function tituloDeSeccion(path: string): string {
+  if (path.startsWith('/recepcion/agenda')) return 'Agenda';
+  if (path.startsWith('/recepcion/miembros/')) return 'Miembro';
+  if (path.startsWith('/recepcion/miembros')) return 'Miembros';
+  if (path.startsWith('/recepcion/checkin')) return 'Check-in';
+  return 'Hoy';
+}
 
 const Hoy = lazy(() => import('./pages/Hoy'));
 const Agenda = lazy(() => import('./pages/Agenda'));
@@ -41,26 +49,25 @@ export default function ReceptionLayout() {
       <DemoBanner vista="Recepción" />
 
       <header className="ek-header-glass">
-        <div
-          className="ek-header-inner"
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-        >
-          <div>
-            <p
-              className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar"
-              style={{ marginBottom: '6px', fontSize: '10px' }}
+        <div className="ek-header-inner">
+          <h1 className="ek-header-title">{tituloDeSeccion(location.pathname)}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+            <span
+              style={{
+                fontSize: '13px',
+                color: 'var(--ek-ink-muted)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: '38vw'
+              }}
             >
-              RECEPCIÓN
-            </p>
-            <BrandLogo height={52} maxWidth={180} />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '13px', color: 'var(--ek-ink-muted)' }}>{nombre}</span>
+              {nombre}
+            </span>
             <button
               onClick={signOut}
               className="ek-icon-btn"
-              style={{ width: 'auto', minHeight: '44px', padding: '8px 14px', fontSize: '13px' }}
+              style={{ width: 'auto', minHeight: '44px', padding: '8px 14px', fontSize: '13px', flexShrink: 0 }}
             >
               Salir
             </button>

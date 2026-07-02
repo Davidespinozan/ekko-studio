@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, CheckCircle2, Search, CalendarDays, UserX, RotateCcw } from 'lucide-react';
+import { X, CheckCircle2, Search, CalendarDays, UserX, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { StatusBadge } from '@shared/components/StatusBadge';
@@ -257,18 +257,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
           aria-label="Día anterior"
           style={{ width: '44px', height: '44px', padding: 0 }}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
+          <ChevronLeft size={18} aria-hidden="true" />
         </button>
 
         <div style={{ textAlign: 'center', flex: 1 }}>
@@ -295,36 +284,23 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
           aria-label="Día siguiente"
           style={{ width: '44px', height: '44px', padding: 0 }}
         >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
+          <ChevronRight size={18} aria-hidden="true" />
         </button>
       </div>
 
-      {/* Ocupación del día */}
-      {!cargandoInicial && (
-        <p
-          style={{
-            fontSize: '12px',
-            color: 'var(--ek-ink-muted)',
-            margin: '0 0 4px',
-            textAlign: 'center'
-          }}
-        >
-          {ocupacion.total === 0
-            ? 'Sin reservas para este día'
-            : `${ocupacion.total} ${ocupacion.total === 1 ? 'sesión' : 'sesiones'} · ${ocupacion.conCheckIn} con check-in`}
-        </p>
-      )}
+      {/* Ocupación del día: stat-cards compactas (como en miembro) */}
+      {!cargandoInicial &&
+        (ocupacion.total === 0 ? (
+          <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '0 0 4px', textAlign: 'center' }}>
+            Sin reservas para este día
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '14px' }}>
+            <StatMini valor={ocupacion.total} label="Sesiones" />
+            <StatMini valor={ocupacion.conCheckIn} label="Check-ins" />
+            <StatMini valor={ocupacion.total - ocupacion.conCheckIn} label="Pendientes" />
+          </div>
+        ))}
 
       {/* Búsqueda + filtro recurso */}
       <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -599,6 +575,19 @@ function toReservaInfo(r: ReservaConJoin): ReservaInfo {
   };
 }
 
+function StatMini({ valor, label }: { valor: number; label: string }) {
+  return (
+    <div className="ek-stat-card" style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+      <span style={{ fontFamily: 'var(--ek-font-display)', fontSize: '24px', fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+        {valor}
+      </span>
+      <span style={{ fontSize: '10px', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ek-ink-faint)' }}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
 function ReservaCard({
   reserva,
   onSelect,
@@ -629,57 +618,13 @@ function ReservaCard({
     <button
       onClick={() => onSelect(reserva)}
       disabled={disabled}
-      className="ek-card ek-card-interactive"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '16px',
-        padding: '16px 18px',
-        textAlign: 'left',
-        background: 'var(--ek-bg-soft)',
-        border: highlight
-          ? '0.5px solid var(--ek-mustard-dim)'
-          : '0.5px solid var(--ek-line)',
-        borderRadius: 'var(--ek-r-md)',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        font: 'inherit',
-        color: 'inherit',
-        width: '100%',
-        opacity: disabled ? 0.55 : 1,
-        boxShadow: highlight ? '0 0 0 1px var(--ek-mustard-dim)' : 'none'
-      }}
+      className={`rec-card ${highlight ? 'rec-card--highlight' : ''}`}
     >
-      <div
-        style={{
-          fontFamily: 'var(--ek-font-display)',
-          fontSize: '22px',
-          fontWeight: 700,
-          letterSpacing: '-0.02em',
-          color: 'var(--ek-ink)',
-          minWidth: '70px'
-        }}
-      >
-        {hora}
-      </div>
+      <div className="rec-card-hora">{hora}</div>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <p
-          style={{
-            fontFamily: 'var(--ek-font-display)',
-            fontSize: '16px',
-            fontWeight: 600,
-            letterSpacing: '-0.02em',
-            margin: 0,
-            marginBottom: '4px',
-            color: 'var(--ek-ink)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}
-        >
-          {nombreFormat}
-        </p>
-        <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: 0 }}>
+      <div className="rec-card-info">
+        <p className="rec-card-nombre">{nombreFormat}</p>
+        <p className="rec-card-meta">
           {reserva.recurso?.nombre ?? '—'}
           {tier && ` · ${tier}`}
         </p>

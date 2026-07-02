@@ -4,6 +4,7 @@ import { X, Search, UserX, ShieldAlert, UserPlus } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { EmptyState } from '@shared/components/EmptyState';
+import { SegmentedToggle } from '@shared/components/SegmentedToggle';
 import { TierBadge } from '@shared/components/TierBadge';
 import { statusMiembro } from '../lib/miembroStatus';
 import { RegistrarMiembroModal } from '../components/RegistrarMiembroModal';
@@ -111,10 +112,7 @@ export default function BuscarMiembro() {
 
   return (
     <div className="rec-main">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ margin: 0 }}>
-          MIEMBROS
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
         <button
           type="button"
           onClick={() => setRegistrarOpen(true)}
@@ -126,42 +124,17 @@ export default function BuscarMiembro() {
       </div>
 
       {/* Toggle Buscar / Penalizados (Bloque D) */}
-      <div
-        role="group"
-        aria-label="Modo de miembros"
-        style={{
-          display: 'flex',
-          border: '0.5px solid var(--ek-line)',
-          borderRadius: 'var(--ek-r-md)',
-          overflow: 'hidden',
-          marginBottom: '16px'
-        }}
-      >
-        {(['buscar', 'penalizados'] as Modo[]).map((m) => {
-          const activo = modo === m;
-          const label = m === 'buscar' ? 'Buscar' : `Penalizados${penalizados.length ? ` (${penalizados.length})` : ''}`;
-          return (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setModo(m)}
-              aria-pressed={activo}
-              style={{
-                flex: 1,
-                minHeight: '44px',
-                fontSize: '13px',
-                fontWeight: 600,
-                border: 'none',
-                cursor: 'pointer',
-                background: activo ? 'var(--ek-mustard)' : 'transparent',
-                color: activo ? 'var(--ek-bg)' : 'var(--ek-ink-muted)',
-                transition: 'background 0.18s ease, color 0.18s ease'
-              }}
-            >
-              {label}
-            </button>
-          );
-        })}
+      <div style={{ marginBottom: '16px' }}>
+        <SegmentedToggle
+          block
+          ariaLabel="Modo de miembros"
+          value={modo}
+          onChange={setModo}
+          options={[
+            { value: 'buscar', label: 'Buscar' },
+            { value: 'penalizados', label: `Penalizados${penalizados.length ? ` (${penalizados.length})` : ''}` }
+          ]}
+        />
       </div>
 
       {modo === 'buscar' ? (

@@ -258,9 +258,6 @@ export default function PerfilMiembroRecepcion() {
           </span>
         </button>
         <div style={{ minWidth: 0 }}>
-          <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '4px' }}>
-            MIEMBRO
-          </p>
           <h1
             style={{
               fontFamily: 'var(--ek-font-display)',

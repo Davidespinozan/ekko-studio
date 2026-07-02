@@ -80,9 +80,6 @@ export default function Checkin() {
         </div>
 
         <div>
-          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '6px' }}>
-            CHECK-IN
-          </p>
           <h1
             style={{
               fontFamily: 'var(--ek-font-display)',
