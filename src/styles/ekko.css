@@ -6,9 +6,9 @@
   /* Base — DARK premium, LIMPIO: negro profundo neutro, superficies apenas por
      encima, sin glows ni tintes de color (nada de "manchas amarillas"). El
      contraste de luminancia + la tipografía hacen el trabajo, no los efectos. */
-  --ek-bg:           #0b0b0c;
-  --ek-bg-soft:      #141416;
-  --ek-bg-elevated:  #1a1a1c;
+  --ek-bg:           #050506;
+  --ek-bg-soft:      #101012;
+  --ek-bg-elevated:  #17171a;
 
   /* Superficies de card: gris neutro plano, un paso claro sobre el fondo. */
   --ek-metal-top:    #191919;
