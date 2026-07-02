@@ -44,7 +44,10 @@ export function useCentroPendientes() {
         .from('membresias')
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tenant.id)
-        .in('status', ['activa', 'active'])
+        // 'activa' y 'past_due' con el periodo ya terminado = vencidas operativas
+        // (past_due sigue dando acceso pero requiere acción). 'active' no existe
+        // en membresias (era valor muerto).
+        .in('status', ['activa', 'past_due'])
         .lt('periodo_actual_fin', now.toISOString()),
       supabase
         .from('reservas')

@@ -196,8 +196,12 @@ export interface MontoEvento {
  */
 export function extraerMontoDeEvento(event: Stripe.Event): MontoEvento | null {
   if (event.type === 'payment_intent.succeeded') {
-    const pi = event.data.object as Stripe.PaymentIntent;
+    const pi = event.data.object as Stripe.PaymentIntent & { invoice?: string | { id: string } | null };
     if (typeof pi.amount !== 'number') return null;
+    // Si el PI pagó una FACTURA de suscripción, el ingreso ya se cuenta por
+    // `invoice.paid` — NO contarlo otra vez acá (evita duplicar el ingreso).
+    // Solo se cuentan los PI sin factura: los paquetes (pago único).
+    if (pi.invoice) return null;
     return {
       monto_centavos: pi.amount,
       moneda: pi.currency ?? 'mxn',

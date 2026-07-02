@@ -94,8 +94,6 @@ export interface BillingInfo {
   paymentMethod: MetodoPago | null;
   pagos: PagoHistorial[];
   reason?: string;
-  /** Diagnóstico temporal (no sensible). */
-  debug?: Record<string, unknown>;
 }
 
 export function obtenerBillingInfo(): Promise<BillingInfo> {

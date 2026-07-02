@@ -187,6 +187,12 @@ describe('extraerMontoDeEvento', () => {
     expect(r?.stripe_payment_intent_id).toBe('pi_9');
   });
 
+  it('payment_intent.succeeded CON invoice → null (ya lo cuenta invoice.paid, no duplicar)', () => {
+    expect(
+      extraerMontoDeEvento(ev('payment_intent.succeeded', { id: 'pi_1', amount: 29900, currency: 'mxn', invoice: 'in_1', customer: 'cus_1' }))
+    ).toBeNull();
+  });
+
   it('NO cuenta checkout.session.completed (evitar doble conteo)', () => {
     expect(
       extraerMontoDeEvento(ev('checkout.session.completed', { amount_total: 45000, currency: 'mxn' }))

@@ -18,6 +18,9 @@ export default function MiQRProxima() {
   useEffect(() => {
     if (!usuario) return;
     let mounted = true;
+    // Reset por si cambió el usuario: no navegar con el reservaId del anterior.
+    setReservaId(null);
+    setEstado('loading');
     (async () => {
       const { data } = await supabase
         .from('reservas')

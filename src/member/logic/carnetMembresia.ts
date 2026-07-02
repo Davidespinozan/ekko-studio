@@ -36,8 +36,42 @@ export interface ResumenCarnet {
   requiereAccion: boolean;
 }
 
-function esActiva(status: string | null | undefined): boolean {
-  return status === 'activa' || status === 'active';
+// Estado normalizado. Los status vienen de DOS tablas con convenciones distintas:
+//   membresias.status → 'pendiente','trialing','activa','past_due','cancelada','expirada'
+//   usuarios.status   → 'pendiente_onboarding','pendiente_pago','activo','suspendido','cancelado'
+// Sin normalizar, cualquier estado no exactamente 'activa'/'active' caía a verde.
+type EstadoNorm = 'activa' | 'trial' | 'past_due' | 'pendiente' | 'suspendida' | 'cancelada' | 'vencida' | 'sin_plan';
+
+function normalizarEstado(status: string | null | undefined): EstadoNorm {
+  switch (status) {
+    case 'activa':
+    case 'active':
+    case 'activo':
+      return 'activa';
+    case 'trialing':
+      return 'trial';
+    case 'past_due':
+      return 'past_due';
+    case 'pendiente':
+    case 'pendiente_pago':
+    case 'pendiente_onboarding':
+      return 'pendiente';
+    case 'suspendida':
+    case 'suspendido':
+      return 'suspendida';
+    case 'cancelada':
+    case 'cancelado':
+      return 'cancelada';
+    case 'expirada':
+      return 'vencida';
+    default:
+      // null/vacío = sin plan; cualquier otro desconocido → sin plan (NO verde).
+      return 'sin_plan';
+  }
+}
+
+function esActiva(estado: EstadoNorm): boolean {
+  return estado === 'activa' || estado === 'trial';
 }
 
 function formatearFechaCorta(iso: string): string {
@@ -58,9 +92,19 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
   const { tipo, status, creditosRestantes, periodoActualFin } = entrada;
   const ahora = entrada.ahora ?? new Date();
   const creditos = creditosRestantes ?? 0;
+  const estado = normalizarEstado(status);
 
   // --- Estados que bloquean, en orden de prioridad -------------------------
-  if (status === 'pendiente_pago') {
+  if (estado === 'past_due') {
+    return {
+      titulo: 'Tu último pago no se procesó',
+      subtitulo: 'Actualizá tu tarjeta para no perder el acceso.',
+      estadoLabel: 'Pago vencido',
+      estadoTono: 'danger',
+      requiereAccion: true
+    };
+  }
+  if (estado === 'pendiente') {
     return {
       titulo: 'Tu plan está pendiente de pago',
       subtitulo: 'Completá el pago para activar tu acceso.',
@@ -69,7 +113,7 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
       requiereAccion: true
     };
   }
-  if (status === 'suspendida') {
+  if (estado === 'suspendida') {
     return {
       titulo: 'Membresía suspendida',
       subtitulo: 'Contactá a EKKO para reactivarla.',
@@ -78,7 +122,16 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
       requiereAccion: true
     };
   }
-  if (status === 'cancelada' || !status) {
+  if (estado === 'vencida') {
+    return {
+      titulo: 'Tu membresía venció',
+      subtitulo: 'Renová para seguir reservando.',
+      estadoLabel: 'Vencida',
+      estadoTono: 'warning',
+      requiereAccion: true
+    };
+  }
+  if (estado === 'cancelada' || estado === 'sin_plan') {
     return {
       titulo: 'Sin membresía activa',
       subtitulo: 'Elegí un plan para empezar a reservar.',
@@ -91,7 +144,7 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
   // --- Vencida por fecha (planes con periodo) ------------------------------
   const finDate = periodoActualFin ? new Date(periodoActualFin) : null;
   const venció = finDate && !Number.isNaN(finDate.getTime()) && finDate < ahora;
-  if (esActiva(status) && venció && (tipo === 'tiempo' || tipo === 'hibrido')) {
+  if (esActiva(estado) && venció && (tipo === 'tiempo' || tipo === 'hibrido')) {
     return {
       titulo: 'Tu periodo venció',
       subtitulo: 'Renová para seguir reservando.',
@@ -102,7 +155,7 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
   }
 
   // --- Sin créditos (planes por créditos) ----------------------------------
-  if (esActiva(status) && tipo === 'creditos' && creditos <= 0) {
+  if (esActiva(estado) && tipo === 'creditos' && creditos <= 0) {
     return {
       titulo: 'Te quedaste sin créditos',
       subtitulo: 'Comprá más para seguir reservando.',

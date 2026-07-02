@@ -96,11 +96,18 @@ export default function Dashboard() {
     error: errorReservas,
     refetch: refetchReservas
   } = useProximasReservas(usuario?.id);
-  const { resumen, isLoading: loadingResumen } = useResumenMiembro(
+  const { resumen, isLoading: loadingResumen, refetch: refetchResumen } = useResumenMiembro(
     usuario?.id,
     tenant?.id,
     usuario?.membresia_tier
   );
+
+  // Al cancelar una reserva, refrescar TANTO el hero como los chips (proximasCount
+  // se quedaba stale antes).
+  const onReservaCancelada = useCallback(() => {
+    void refetchReservas();
+    void refetchResumen();
+  }, [refetchReservas, refetchResumen]);
 
   const ahora = new Date();
   const bloqueado = usuario?.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > ahora;
@@ -167,7 +174,7 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          <ProximaSesionHero reserva={proximaReserva ?? null} onCancelada={refetchReservas} />
+          <ProximaSesionHero reserva={proximaReserva ?? null} onCancelada={onReservaCancelada} />
           {proximaReserva && (
             <div style={{ marginTop: '-14px', marginBottom: '16px', textAlign: 'right' }}>
               <Link

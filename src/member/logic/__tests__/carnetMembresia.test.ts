@@ -20,6 +20,49 @@ describe('resumenCarnet', () => {
     expect(r.requiereAccion).toBe(true);
   });
 
+  it('past_due (pago fallido) → NO verde: danger + requiere acción', () => {
+    const r = resumenCarnet({ tipo: 'tiempo', status: 'past_due', creditosRestantes: null, periodoActualFin: PASADO, ahora: AHORA });
+    expect(r.estadoTono).toBe('danger');
+    expect(r.estadoLabel).toBe('Pago vencido');
+    expect(r.requiereAccion).toBe(true);
+  });
+
+  it('membresia "pendiente" (default de la tabla) → NO verde, requiere acción', () => {
+    const r = resumenCarnet({ tipo: 'tiempo', status: 'pendiente', creditosRestantes: null, periodoActualFin: null, ahora: AHORA });
+    expect(r.estadoLabel).toBe('Pendiente');
+    expect(r.requiereAccion).toBe(true);
+  });
+
+  it('membresia "expirada" → Vencida, NO verde', () => {
+    const r = resumenCarnet({ tipo: 'tiempo', status: 'expirada', creditosRestantes: null, periodoActualFin: PASADO, ahora: AHORA });
+    expect(r.estadoLabel).toBe('Vencida');
+    expect(r.requiereAccion).toBe(true);
+  });
+
+  it('usuarios.status masculino "suspendido" → Suspendida (no cae a verde)', () => {
+    const r = resumenCarnet({ tipo: 'tiempo', status: 'suspendido', creditosRestantes: null, periodoActualFin: FUTURO, ahora: AHORA });
+    expect(r.estadoLabel).toBe('Suspendida');
+    expect(r.requiereAccion).toBe(true);
+  });
+
+  it('usuarios.status masculino "cancelado" → Sin plan (no cae a verde)', () => {
+    const r = resumenCarnet({ tipo: 'tiempo', status: 'cancelado', creditosRestantes: null, periodoActualFin: FUTURO, ahora: AHORA });
+    expect(r.estadoLabel).toBe('Sin plan');
+    expect(r.requiereAccion).toBe(true);
+  });
+
+  it('usuarios.status masculino "activo" → activa sana', () => {
+    const r = resumenCarnet({ tipo: 'tiempo', status: 'activo', creditosRestantes: null, periodoActualFin: FUTURO, ahora: AHORA });
+    expect(r.estadoTono).toBe('success');
+    expect(r.requiereAccion).toBe(false);
+  });
+
+  it('status desconocido → NO verde (Sin plan)', () => {
+    const r = resumenCarnet({ tipo: 'tiempo', status: 'algo_raro', creditosRestantes: null, periodoActualFin: FUTURO, ahora: AHORA });
+    expect(r.requiereAccion).toBe(true);
+    expect(r.estadoTono).not.toBe('success');
+  });
+
   it('sin status → "Sin plan", neutral, requiere acción', () => {
     const r = resumenCarnet({ tipo: null, status: null, creditosRestantes: null, periodoActualFin: null, ahora: AHORA });
     expect(r.estadoLabel).toBe('Sin plan');

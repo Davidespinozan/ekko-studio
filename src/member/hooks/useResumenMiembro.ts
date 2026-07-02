@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 
 // ============================================================================
@@ -39,16 +39,15 @@ export function useResumenMiembro(
   const [resumen, setResumen] = useState<ResumenMiembro>(VACIO);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const refetch = useCallback(async () => {
     if (!usuarioId) {
       setResumen(VACIO);
       setIsLoading(false);
       return;
     }
-    let mounted = true;
     setIsLoading(true);
 
-    async function load() {
+    {
       const inicioMes = new Date();
       inicioMes.setDate(1);
       inicioMes.setHours(0, 0, 0, 0);
@@ -83,8 +82,6 @@ export function useResumenMiembro(
           : Promise.resolve({ data: null })
       ]);
 
-      if (!mounted) return;
-
       const mem = (memRes.data ?? [])[0] as
         | { status: string | null; creditos_restantes: number | null; periodo_actual_fin: string | null }
         | undefined;
@@ -104,12 +101,11 @@ export function useResumenMiembro(
       });
       setIsLoading(false);
     }
-
-    void load();
-    return () => {
-      mounted = false;
-    };
   }, [usuarioId, tenantId, membresiaTier]);
 
-  return { resumen, isLoading };
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  return { resumen, isLoading, refetch };
 }
