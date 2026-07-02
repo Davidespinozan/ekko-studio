@@ -5,6 +5,7 @@ import { EmptyState } from '@shared/components/EmptyState';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
+import { celebrar } from '@shared/lib/celebrar';
 import {
   useRecursosDelTenant,
   fetchReservasDelRecurso,
@@ -132,6 +133,7 @@ export default function Reservar() {
         month: 'long'
       });
       const horaFmt = formatHora(slotPendiente.inicio);
+      celebrar();
       toast.success(`Reserva confirmada · ${fechaFmt}, ${horaFmt}`);
       navigate('/app');
     } catch (e) {

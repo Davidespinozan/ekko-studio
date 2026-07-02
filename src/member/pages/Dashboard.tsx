@@ -5,8 +5,8 @@ import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
-import { BotonCancelarReserva } from '@member/components/BotonCancelarReserva';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ProximaSesionHero } from '@member/components/ProximaSesionHero';
 import { CarnetMembresia } from '@member/components/CarnetMembresia';
 import { ResumenChips } from '@member/components/ResumenChips';
 import { useResumenMiembro } from '@member/hooks/useResumenMiembro';
@@ -16,7 +16,7 @@ type Recurso = Database['public']['Tables']['recursos']['Row'];
 type Reserva = Database['public']['Tables']['reservas']['Row'];
 
 interface ReservaConRecurso extends Reserva {
-  recurso: Pick<Recurso, 'id' | 'slug' | 'nombre'> | null;
+  recurso: Pick<Recurso, 'id' | 'slug' | 'nombre' | 'foto_url'> | null;
 }
 
 // ============================================================================
@@ -40,7 +40,7 @@ export function useProximasReservas(usuarioId: string | undefined) {
     setError(false);
     const { data, error: queryError } = await supabase
       .from('reservas')
-      .select('*, recurso:recursos(id, nombre, slug)')
+      .select('*, recurso:recursos(id, nombre, slug, foto_url)')
       .eq('usuario_id', usuarioId)
       .eq('status', 'confirmada')
       .gte('slot_inicio', new Date().toISOString())
@@ -73,13 +73,6 @@ export function useProximasReservas(usuarioId: string | undefined) {
 // ============================================================================
 // Helpers
 // ============================================================================
-
-function formatearFecha(iso: string): string {
-  const d = new Date(iso);
-  const fecha = d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
-  const hora = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
-  return `${fecha} · ${hora}`;
-}
 
 function capitalizarNombre(nombre: string | null | undefined): string {
   if (!nombre) return '';
@@ -208,35 +201,7 @@ export default function Dashboard() {
           </button>
         </div>
       ) : proximaReserva ? (
-        <div className="ek-card--hero ek-lift" style={{ marginBottom: '24px' }}>
-          <h2 className="ek-display-lg" style={{ marginBottom: '6px' }}>
-            {proximaReserva.recurso?.nombre ?? 'Estudio'}
-          </h2>
-          <p className="ek-body-muted" style={{ marginBottom: '14px' }}>
-            {formatearFecha(proximaReserva.slot_inicio)}
-          </p>
-          <p className="ek-body-faint" style={{ marginBottom: '20px' }}>
-            Folio: <span style={{ fontFamily: 'var(--ek-font-mono)' }}>
-              {proximaReserva.folio}
-            </span>
-          </p>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <Link to={`/app/qr/${proximaReserva.id}`} className="ek-cta">
-              Ver QR <ArrowRight size={16} aria-hidden="true" />
-            </Link>
-          </div>
-          <div style={{ marginTop: '14px' }}>
-            <BotonCancelarReserva
-              reserva={{
-                id: proximaReserva.id,
-                slot_inicio: proximaReserva.slot_inicio,
-                folio: proximaReserva.folio,
-                recurso_nombre: proximaReserva.recurso?.nombre ?? 'Estudio'
-              }}
-              onCancelada={refetchReservas}
-            />
-          </div>
-        </div>
+        <ProximaSesionHero reserva={proximaReserva} onCancelada={refetchReservas} />
       ) : (
         <div className="ek-card" style={{ marginBottom: '24px' }}>
           <EmptyState
