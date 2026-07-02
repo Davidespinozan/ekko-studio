@@ -3,21 +3,22 @@
    ============================================================================ */
 
 :root {
-  /* Base — negro profundo (fondo) vs gris metálico frío (superficies). El salto
-     de luminancia entre --ek-bg y las cards es lo que da el contraste premium. */
-  --ek-bg:           #070708;
-  --ek-bg-soft:      #101013;
-  --ek-bg-elevated:  #191a1e;
+  /* Base — DARK premium, LIMPIO: negro profundo neutro, superficies apenas por
+     encima, sin glows ni tintes de color (nada de "manchas amarillas"). El
+     contraste de luminancia + la tipografía hacen el trabajo, no los efectos. */
+  --ek-bg:           #0b0b0c;
+  --ek-bg-soft:      #141416;
+  --ek-bg-elevated:  #1a1a1c;
 
-  /* Gris metálico de las tarjetas (frío, con "chapa" iluminada arriba). */
-  --ek-metal-top:    #26272c;
-  --ek-metal-mid:    #1c1d21;
-  --ek-metal-bottom: #16171a;
+  /* Superficies de card: gris neutro plano, un paso claro sobre el fondo. */
+  --ek-metal-top:    #191919;
+  --ek-metal-mid:    #171717;
+  --ek-metal-bottom: #151515;
 
-  /* Ink */
-  --ek-ink:          #f5f1e8;
-  --ek-ink-muted:    #888888;
-  --ek-ink-faint:    #555555;
+  /* Ink — off-white neutro (no blanco puro). */
+  --ek-ink:          #EDEDEA;
+  --ek-ink-muted:    #8A8A86;
+  --ek-ink-faint:    #5C5C58;
 
   /* Brand */
   --ek-mustard:        #e5b829;
@@ -49,19 +50,14 @@
   --ek-ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
   --ek-ease-out:     cubic-bezier(0.22, 1, 0.36, 1);
 
-  /* Highlight superior: borde de luz "iluminado desde arriba" que da
-     profundidad premium a cualquier superficie (se combina con las sombras). */
-  --ek-highlight-top:    inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  --ek-highlight-strong: inset 0 1px 0 rgba(255, 255, 255, 0.11);
+  /* Sin "highlight" de línea (se leía como raya). No-op transparente para no
+     romper las listas de box-shadow que lo referencian. */
+  --ek-highlight-top:    0 0 0 0 rgba(0, 0, 0, 0);
+  --ek-highlight-strong: 0 0 0 0 rgba(0, 0, 0, 0);
 
-  /* Shadows — capas (contacto + ambiente + proyectada) TEÑIDAS del acento en la
-     capa profunda (como SALA/HSC/Renovacell): da calidez premium, no negro plano. */
-  --ek-shadow-card:    0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 30px -8px rgba(0, 0, 0, 0.5), 0 28px 60px -24px rgba(229, 184, 41, 0.10);
-  --ek-shadow-hero:    0 2px 6px rgba(0, 0, 0, 0.45), 0 20px 44px -14px rgba(0, 0, 0, 0.55), 0 40px 80px -30px rgba(229, 184, 41, 0.14);
-
-  /* Bisel de luz superior de la card: hairline dorado que se desvanece en los
-     cantos (técnica de SALA/HSC). Va como pseudo-elemento, no como borde. */
-  --ek-bevel: linear-gradient(90deg, transparent, rgba(229, 184, 41, 0.4), transparent);
+  /* Shadows — negro neutro, suaves. SIN tinte de color (nada de manchas). */
+  --ek-shadow-card:    0 1px 2px rgba(0, 0, 0, 0.4), 0 10px 30px -12px rgba(0, 0, 0, 0.55);
+  --ek-shadow-hero:    0 2px 6px rgba(0, 0, 0, 0.45), 0 24px 50px -20px rgba(0, 0, 0, 0.6);
   --ek-shadow-cta:     0 8px 20px rgba(229, 184, 41, 0.12);
   --ek-shadow-modal:   0 32px 80px rgba(0, 0, 0, 0.6);
   --ek-shadow:         var(--ek-shadow-card);
@@ -113,11 +109,7 @@ html {
 
 body {
   margin: 0;
-  background:
-    radial-gradient(ellipse 800px 500px at top right, rgba(229, 184, 41, 0.05), transparent 50%),
-    radial-gradient(ellipse 600px 400px at bottom left, rgba(120, 130, 150, 0.03), transparent 50%),
-    linear-gradient(180deg, #070708 0%, #050506 100%);
-  background-attachment: fixed;
+  background: var(--ek-bg);
   color: var(--ek-ink);
   font-family: var(--ek-font-body);
   font-size: 15px;
@@ -133,19 +125,7 @@ body {
   }
 }
 
-/* Grano fílmico global: textura sutilísima que quita la sensación "plana
-   digital" y da acabado premium. Overlay no interactivo, no afecta legibilidad. */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9998;
-  opacity: 0.04;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 140px 140px;
-}
+/* (Grano fílmico eliminado: se leía como ruido/líneas, no premium.) */
 
 /* Global transition (technique #8) */
 button, a, input, select, textarea, .ek-card, .ek-stat-card {
@@ -351,17 +331,6 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     color: var(--ek-ink);
   }
 
-  /* Bisel de luz dorado en el canto superior (solo cards metálicas base). */
-  .ek-card:not(.ek-card--hero):not(.ek-card--gold):not(.ek-card--cream)::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 14px;
-    right: 14px;
-    height: 1px;
-    background: var(--ek-bevel);
-    pointer-events: none;
-  }
 
   .ek-card--md {
     border-radius: var(--ek-r-md);
@@ -369,28 +338,14 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   }
 
   .ek-card--hero {
-    background:
-      radial-gradient(120% 100% at 0% 0%, rgba(229, 184, 41, 0.06), transparent 55%),
-      linear-gradient(180deg, #2a2b30 0%, #1c1d21 55%, #161719 100%);
+    background: linear-gradient(180deg, #1c1c1e 0%, #161617 100%);
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-card);
     padding: 26px;
-    box-shadow: var(--ek-highlight-strong), var(--ek-shadow-hero);
+    box-shadow: var(--ek-shadow-hero);
     position: relative;
     overflow: hidden;
     color: var(--ek-ink);
-  }
-
-  .ek-card--hero::before {
-    content: '';
-    position: absolute;
-    top: -40px;
-    right: -40px;
-    width: 180px;
-    height: 180px;
-    background: radial-gradient(circle, rgba(229, 184, 41, 0.12), transparent 70%);
-    border-radius: 50%;
-    pointer-events: none;
   }
 
   .ek-card--elevated { box-shadow: var(--ek-shadow-hero); }
@@ -2215,44 +2170,25 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
      y tracking que dan sensación de calidad sin agregar ruido visual.
      ============================================================================ */
 
-  /* 1. Glow mostaza en botones primarios (.ek-cta sin --secondary) */
-  .ek-cta:not(.ek-cta--secondary) {
-    transition: box-shadow 0.2s ease, transform 0.1s ease, background 0.18s ease, border-color 0.18s ease;
-  }
-  .ek-cta:not(.ek-cta--secondary):hover {
-    box-shadow: 0 0 24px rgba(229, 184, 41, 0.25);
-  }
-  .ek-cta:not(.ek-cta--secondary):active {
-    box-shadow: 0 0 32px rgba(229, 184, 41, 0.4);
-    transform: scale(0.98);
-  }
-
-  /* 2. Gradient sutil en sidebar admin */
+  /* Sidebar admin: chrome neutro oscuro (sin tinte cálido). */
   .adm-sidebar {
-    background: linear-gradient(
-      180deg,
-      var(--ek-bg-soft) 0%,
-      rgba(13, 11, 8, 1) 50%,
-      rgba(15, 13, 8, 1) 100%
-    );
+    background: linear-gradient(180deg, #141416 0%, #100f11 100%);
   }
 
-  /* 3. Cards con border-glow mostaza al hover */
+  /* Hover de card: elevación limpia, SIN glow amarillo ni borde mostaza. */
   .ek-card {
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
   .ek-card:hover {
-    border-color: rgba(229, 184, 41, 0.3);
+    border-color: var(--ek-line-strong);
     box-shadow:
-      var(--ek-highlight-strong),
-      0 1px 2px rgba(0, 0, 0, 0.35),
-      0 10px 30px rgba(0, 0, 0, 0.4),
-      0 0 32px rgba(229, 184, 41, 0.10);
+      0 1px 2px rgba(0, 0, 0, 0.4),
+      0 14px 36px -12px rgba(0, 0, 0, 0.6);
   }
 
-  /* 4. Item activo del sidebar con glow lateral */
+  /* Item activo del sidebar: relleno neutro sutil, sin glow amarillo. */
   .adm-sidebar-item--active {
-    box-shadow: inset 0 0 24px rgba(229, 184, 41, 0.08);
+    background: rgba(255, 255, 255, 0.05);
   }
 
   /* 5. Tipografía con tracking ajustado */
@@ -2429,7 +2365,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   width: 18px;
   height: 2px;
   border-radius: 2px;
-  background: var(--ek-mustard);
+  background: var(--ek-line-strong);
 }
 
 /* --- Ring de avatar con gradiente de marca (técnica #12) ----------------- */
@@ -2537,7 +2473,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-estudio-body {
   padding: 20px;
   /* Oscuro con tinte cálido, como los pasos (no crema). */
-  background: linear-gradient(150deg, rgba(229, 184, 41, 0.05), var(--ek-bg-soft) 60%);
+  background: var(--ek-bg-elevated);
   color: var(--ek-ink);
 }
 .ek-estudio-detalle { display: inline-flex; }
@@ -2600,7 +2536,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   overflow: hidden;
   /* Oscuro pero distinto de los estudios (crema) y con vida: tinte cálido +
      acento mostaza a la izquierda + icono gold. */
-  background: linear-gradient(150deg, rgba(229, 184, 41, 0.06), var(--ek-bg-soft) 55%) !important;
+  background: var(--ek-bg-elevated) !important;
   border-color: var(--ek-line) !important;
   border-left: 3px solid var(--ek-mustard) !important;
   color: var(--ek-ink) !important;
@@ -2757,11 +2693,6 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
-/* Slot disponible: borde dorado sutil como affordance (uso funcional del acento). */
-.ek-slot:not(:disabled) {
-  border-color: rgba(229, 184, 41, 0.28);
-  box-shadow: var(--ek-highlight-top);
-}
 .ek-slot:hover:not(:disabled) {
   border-color: var(--ek-mustard);
   background: var(--ek-mustard-soft);
@@ -2841,7 +2772,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-quick-action:hover .ek-quick-action-arrow { color: var(--ek-mustard); transform: translateX(3px); }
 .ek-quick-action--accent {
   border-color: var(--ek-mustard-dim) !important;
-  background: linear-gradient(160deg, rgba(229, 184, 41, 0.07), var(--ek-bg-soft)) !important;
+  background: var(--ek-bg-elevated) !important;
 }
 
 @media (max-width: 600px) {
@@ -2894,7 +2825,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
    fondo. Sin la línea de acento — solo el contraste card↔fondo.
    ============================================================================ */
 :root {
-  --ek-surface: linear-gradient(150deg, rgba(229, 184, 41, 0.05) 0%, var(--ek-bg-soft) 58%);
+  --ek-surface: var(--ek-bg-elevated);
 }
 .ek-card:not(.ek-card--gold):not(.ek-card--cream),
 .ek-card--md:not(.ek-card--gold):not(.ek-card--cream),
@@ -2964,16 +2895,7 @@ select.ek-input option {
   33%      { transform: translate(28px, -36px); }
   66%      { transform: translate(-22px, 20px); }
 }
-.ek-orb {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(64px);
-  opacity: 0.4;
-  background: radial-gradient(circle, var(--ek-mustard), transparent 70%);
-  animation: ek-float-orb 22s var(--ek-ease-premium) infinite;
-  pointer-events: none;
-  z-index: 0;
-}
+.ek-orb { display: none; }  /* orbs mostaza eliminados: se leían como manchas */
 
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1 !important; transform: none !important; }
@@ -3029,15 +2951,7 @@ select.ek-input option {
 @media (min-width: 900px) {
   .ek-showcase-phones { justify-content: flex-end; padding-right: 8px; }
 }
-.ek-showcase-glow {
-  position: absolute;
-  width: 420px;
-  height: 420px;
-  background: radial-gradient(circle, rgba(229, 184, 41, 0.14), transparent 70%);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 0;
-}
+.ek-showcase-glow { display: none; }  /* glow mostaza eliminado */
 
 /* --- Marco del dispositivo --- */
 .ek-phone {
