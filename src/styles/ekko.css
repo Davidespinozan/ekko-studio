@@ -662,13 +662,13 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     background: linear-gradient(150deg, var(--ek-mustard) 0%, var(--ek-mustard-active) 100%);
     color: #111;
     border: none;
-    box-shadow: 0 6px 16px rgba(229, 184, 41, 0.35);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
     text-decoration: none;
-    transition: transform 0.18s var(--ek-ease-out), box-shadow 0.18s var(--ek-ease-out), filter 0.18s var(--ek-ease-out);
+    transition: transform 0.18s var(--ek-ease-out), filter 0.18s var(--ek-ease-out);
   }
-  .ek-bottom-nav-qr:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(229, 184, 41, 0.45); filter: brightness(1.04); }
+  .ek-bottom-nav-qr:hover { transform: translateY(-1px); filter: brightness(1.04); }
   .ek-bottom-nav-qr:active { transform: scale(0.95); }
-  .ek-bottom-nav-qr.active { box-shadow: 0 0 0 3px rgba(229, 184, 41, 0.3), 0 6px 16px rgba(229, 184, 41, 0.4); }
+  .ek-bottom-nav-qr.active { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15), 0 2px 6px rgba(0, 0, 0, 0.4); }
 
   .ek-bottom-nav-item--active { background: rgba(255, 255, 255, 0.06); }
   .ek-bottom-nav-item--active .ek-bottom-nav-item-label {
