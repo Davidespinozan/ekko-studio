@@ -7,9 +7,12 @@ export function BottomNav() {
       <div className="ek-bottom-nav-inner">
         <NavItem to="/app" end icon={<Home size={22} className="ek-bottom-nav-icon" />} label="Inicio" />
         <NavItem to="/app/estudios" icon={<LayoutGrid size={22} className="ek-bottom-nav-icon" />} label="Estudios" />
-        {/* Botón dorado central: abre el QR de tu próxima sesión */}
+        {/* Botón dorado central: ocupa un slot igual que los demás (flex:1) con
+            el círculo centrado → los 5 quedan equidistantes. */}
         <NavLink to="/app/qr" className="ek-bottom-nav-qr" aria-label="Mi QR de acceso">
-          <QrCode size={22} aria-hidden="true" />
+          <span className="ek-bottom-nav-qr-circle">
+            <QrCode size={22} aria-hidden="true" />
+          </span>
         </NavLink>
         <NavItem to="/app/reservar" icon={<Calendar size={22} className="ek-bottom-nav-icon" />} label="Reservar" />
         <NavItem to="/app/perfil" icon={<User size={22} className="ek-bottom-nav-icon" />} label="Perfil" />

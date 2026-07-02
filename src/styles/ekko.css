@@ -127,6 +127,13 @@ body {
   overflow-x: clip;
 }
 
+/* El contenedor raíz pinta el mismo canvas de arriba a abajo: evita que
+   cualquier hueco de altura (100dvh vs 100vh, overscroll) muestre otro tono. */
+#root {
+  min-height: 100dvh;
+  background: var(--ek-bg);
+}
+
 @media (max-width: 768px) {
   input, select, textarea {
     font-size: 16px !important;
@@ -674,26 +681,30 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     color: var(--ek-ink-faint);
   }
 
-  /* Botón QR central: dorado, circular, más chico que los items — destaca. */
+  /* Botón QR central: ocupa un slot igual (flex:1) que los otros 4 items para
+     que los 5 queden equidistantes; el círculo dorado va centrado dentro. */
   .ek-bottom-nav-qr {
-    flex: 0 0 auto;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .ek-bottom-nav-qr-circle {
     width: 46px;
     height: 46px;
-    align-self: center;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
     background: linear-gradient(150deg, var(--ek-mustard) 0%, var(--ek-mustard-active) 100%);
     color: #111;
-    border: none;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
-    text-decoration: none;
     transition: transform 0.18s var(--ek-ease-out), filter 0.18s var(--ek-ease-out);
   }
-  .ek-bottom-nav-qr:hover { transform: translateY(-1px); filter: brightness(1.04); }
-  .ek-bottom-nav-qr:active { transform: scale(0.95); }
-  .ek-bottom-nav-qr.active { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15), 0 2px 6px rgba(0, 0, 0, 0.4); }
+  .ek-bottom-nav-qr:hover .ek-bottom-nav-qr-circle { transform: translateY(-1px); filter: brightness(1.04); }
+  .ek-bottom-nav-qr:active .ek-bottom-nav-qr-circle { transform: scale(0.95); }
+  .ek-bottom-nav-qr.active .ek-bottom-nav-qr-circle { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15), 0 2px 6px rgba(0, 0, 0, 0.4); }
 
   .ek-bottom-nav-item--active { background: rgba(255, 255, 255, 0.06); }
   .ek-bottom-nav-item--active .ek-bottom-nav-item-label {
@@ -1518,6 +1529,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-page {
     min-height: 100dvh;
+    background: var(--ek-bg);
     /* El safe-area SUPERIOR lo maneja SOLO el header (fijo). Acá se quitó para
        no duplicarlo y para que ese espacio no scrollee (se veía "moverse"). */
     color: var(--ek-ink);
