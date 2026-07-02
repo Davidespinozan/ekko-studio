@@ -7,6 +7,7 @@ import { useToast } from '@shared/hooks/useToast';
 import { useDashboardData, type DashboardData } from '../hooks/useAdminData';
 import CardMenuDropdown from '../components/CardMenuDropdown';
 import CancelarReservaModal, { type ReservaParaCancelar } from '../components/CancelarReservaModal';
+import { CentroPendientes } from '../components/CentroPendientes';
 
 function capitalizar(s: string | null | undefined): string {
   if (!s) return '';
@@ -92,6 +93,7 @@ export default function AdminDashboard() {
         <SaludoIcon size={15} aria-hidden="true" />
       </p>
 
+      <CentroPendientes />
       <SeccionHoy data={data} onCancelar={setCancelar} />
       <SeccionTuMes data={data} />
       <SeccionDinero />
