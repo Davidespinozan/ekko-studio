@@ -314,8 +314,15 @@ export default function Signup() {
             style={{ marginTop: '3px', flexShrink: 0 }}
           />
           <span>
-            Acepto los <strong style={{ color: 'var(--ek-ink)' }}>términos y condiciones</strong> y el{' '}
-            <strong style={{ color: 'var(--ek-ink)' }}>aviso de privacidad</strong>. Compromiso mínimo de 6 meses.
+            Acepto los{' '}
+            <a href="/terminos" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--ek-mustard)', fontWeight: 600 }}>
+              términos y condiciones
+            </a>{' '}
+            y el{' '}
+            <a href="/privacidad" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--ek-mustard)', fontWeight: 600 }}>
+              aviso de privacidad
+            </a>
+            . Compromiso mínimo de 6 meses.
           </span>
         </label>
 

@@ -209,6 +209,18 @@ export default function Footer() {
             >
               Contacto
             </a>
+            <a
+              href="/terminos"
+              style={{ fontSize: '13px', color: 'var(--ek-ink)', textDecoration: 'none', minHeight: '44px', display: 'inline-flex', alignItems: 'center' }}
+            >
+              Términos y condiciones
+            </a>
+            <a
+              href="/privacidad"
+              style={{ fontSize: '13px', color: 'var(--ek-ink)', textDecoration: 'none', minHeight: '44px', display: 'inline-flex', alignItems: 'center' }}
+            >
+              Aviso de privacidad
+            </a>
           </div>
         </div>
       </div>

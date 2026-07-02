@@ -3482,3 +3482,49 @@ select.ek-input option {
 .ek-stat-card, .ek-metricas-grid, .adm-metricas-grid {
   font-variant-numeric: tabular-nums;
 }
+
+/* ============================================================================
+   PÁGINAS LEGALES (Términos, Aviso de Privacidad) — prosa legible sobre dark.
+   ============================================================================ */
+.ek-legal {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 8px 24px 80px;
+  color: var(--ek-ink-muted);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.ek-legal h2 {
+  font-family: var(--ek-font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ek-ink);
+  margin: 34px 0 10px;
+}
+.ek-legal h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ek-ink);
+  margin: 20px 0 6px;
+}
+.ek-legal p { margin: 0 0 12px; }
+.ek-legal ul { margin: 0 0 14px; padding-left: 20px; }
+.ek-legal li { margin: 0 0 6px; }
+.ek-legal strong { color: var(--ek-ink); font-weight: 600; }
+.ek-legal a { color: var(--ek-mustard); text-decoration: none; }
+.ek-legal a:hover { text-decoration: underline; }
+.ek-legal-lead {
+  font-size: 13px;
+  color: var(--ek-ink-faint);
+  margin: 0 0 8px;
+}
+.ek-legal-nota {
+  margin-top: 40px;
+  padding: 14px 16px;
+  border: 0.5px solid var(--ek-line-strong);
+  border-radius: 12px;
+  background: var(--ek-bg-soft);
+  font-size: 13px;
+  color: var(--ek-ink-faint);
+}

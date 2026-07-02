@@ -8,6 +8,8 @@ import { DemoBanner } from '@shared/components/DemoBanner';
 const Landing = lazy(() => import('./pages/Landing'));
 const Login = lazy(() => import('./pages/Login'));
 const Signup = lazy(() => import('./pages/Signup'));
+const Terminos = lazy(() => import('./pages/Terminos'));
+const Privacidad = lazy(() => import('./pages/Privacidad'));
 
 export default function PublicLayout() {
   const { authUser, signOut } = useAuth();
@@ -71,6 +73,8 @@ export default function PublicLayout() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/terminos" element={<Terminos />} />
+          <Route path="/privacidad" element={<Privacidad />} />
         </Routes>
       </Suspense>
     </div>
