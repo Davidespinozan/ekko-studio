@@ -130,9 +130,10 @@ export const handler: Handler = async (event) => {
     }
     // kind === 'ignore' → no-op (evento que no nos interesa).
 
-    // ── Registrar el pago en payment_events (métricas de dinero del admin) ────
-    // Solo eventos de cobranza real (invoice.paid / payment_intent.succeeded).
-    // Falla suave: si no se puede registrar, NO revierte la activación ya hecha.
+    // ── Registrar el evento de cobranza en payment_events (métricas del admin) ─
+    // Cobros exitosos (invoice.paid / payment_intent.succeeded) Y fallidos
+    // (invoice.payment_failed → status='failed'). Falla suave: si no se puede
+    // registrar, NO revierte la activación/sync ya hecha.
     const monto = extraerMontoDeEvento(stripeEvent);
     if (monto) {
       try {

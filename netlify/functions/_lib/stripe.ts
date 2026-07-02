@@ -232,6 +232,29 @@ export function extraerMontoDeEvento(event: Stripe.Event): MontoEvento | null {
     };
   }
 
+  // Cobro fallido: se registra como `failed` con el monto que se intentó cobrar
+  // (amount_due). NO suma a ingresos (esos leen status='succeeded'), pero le da
+  // ojos a la cobranza/dunning en el admin.
+  if (event.type === 'invoice.payment_failed') {
+    const inv = event.data.object as Stripe.Invoice & {
+      subscription?: string | { id: string } | null;
+      payment_intent?: string | { id: string } | null;
+    };
+    const monto = typeof inv.amount_due === 'number' ? inv.amount_due : inv.amount_remaining;
+    if (typeof monto !== 'number') return null;
+    return {
+      monto_centavos: monto,
+      moneda: inv.currency ?? 'mxn',
+      status: 'failed',
+      stripe_invoice_id: inv.id ?? null,
+      stripe_payment_intent_id:
+        typeof inv.payment_intent === 'string' ? inv.payment_intent : inv.payment_intent?.id ?? null,
+      stripe_subscription_id:
+        typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id ?? null,
+      stripe_customer_id: typeof inv.customer === 'string' ? inv.customer : inv.customer?.id ?? null
+    };
+  }
+
   return null;
 }
 

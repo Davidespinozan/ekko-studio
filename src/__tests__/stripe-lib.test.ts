@@ -199,8 +199,13 @@ describe('extraerMontoDeEvento', () => {
     ).toBeNull();
   });
 
-  it('invoice.payment_failed → null (no es cobranza exitosa)', () => {
-    expect(extraerMontoDeEvento(ev('invoice.payment_failed', { amount_paid: 0 }))).toBeNull();
+  it('invoice.payment_failed → registro failed con el monto intentado (amount_due)', () => {
+    const r = extraerMontoDeEvento(
+      ev('invoice.payment_failed', { id: 'in_2', amount_due: 29900, currency: 'mxn', subscription: 'sub_9', customer: 'cus_2' })
+    );
+    expect(r?.status).toBe('failed');
+    expect(r?.monto_centavos).toBe(29900);
+    expect(r?.stripe_subscription_id).toBe('sub_9');
   });
 
   it('subscription.updated → null', () => {
