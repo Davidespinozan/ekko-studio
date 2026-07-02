@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Ticket, CalendarClock, Ban, RotateCcw } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
-import { sufijoPrecio, detallePlan } from '@shared/lib/planPresentacion';
+import { sufijoPrecio, detallePlan, esPlanPaquete } from '@shared/lib/planPresentacion';
 import { obtenerBillingInfo, cancelarSuscripcion, type MetodoPago, type PagoHistorial } from '@shared/lib/checkout';
 import { TarjetaModal } from '@shared/components/TarjetaModal';
 import { PaymentModal } from '@shared/components/PaymentModal';
@@ -65,6 +65,8 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const [pagarTier, setPagarTier] = useState<TierInfo | null>(null);
   const [tarjetaOpen, setTarjetaOpen] = useState(false);
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
+  // Destino de un cambio créditos→mensual que perdería el saldo (aviso).
+  const [confirmarCambio, setConfirmarCambio] = useState<TierInfo | null>(null);
 
   // Recarga tarjeta + historial tras un cambio (nueva tarjeta guardada).
   async function recargarBilling() {
@@ -160,6 +162,19 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
 
   // Abre el modal de pago propio (Elements) para el plan elegido.
   function cambiarPlan(destino: TierInfo) {
+    // Aviso: pasar de un paquete con créditos restantes a un plan mensual
+    // (ilimitado) descarta el saldo. Que sea una elección consciente.
+    const saldo = membresia?.creditos_restantes ?? 0;
+    if (saldo > 0 && !esPlanPaquete(destino)) {
+      setConfirmarCambio(destino);
+      return;
+    }
+    setCambiarOpen(false);
+    setPagarTier(destino);
+  }
+
+  function procederCambio(destino: TierInfo) {
+    setConfirmarCambio(null);
     setCambiarOpen(false);
     setPagarTier(destino);
   }
@@ -541,6 +556,31 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               </button>
               <button type="button" className="ek-cta ek-cta--danger ek-cta--full" onClick={() => void togglenCancelacion(false)} disabled={gestionando}>
                 {gestionando ? <Spinner size={15} /> : 'Sí, cancelar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmarCambio && (
+        <div className="ek-backdrop" onClick={() => setConfirmarCambio(null)} role="dialog" aria-modal="true">
+          <div className="ek-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '100%', animation: 'ek-scale-in 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
+            <p className="ek-eyebrow" style={{ color: 'var(--ek-warning)', marginBottom: '8px' }}>
+              <AlertTriangle size={12} aria-hidden="true" /> PERDÉS TUS CRÉDITOS
+            </p>
+            <h3 className="ek-display-md" style={{ margin: '0 0 8px' }}>
+              Te quedan {creditos} {creditos === 1 ? 'crédito' : 'créditos'}
+            </h3>
+            <p className="ek-body-muted" style={{ marginTop: 0, marginBottom: '18px' }}>
+              El plan <strong>{confirmarCambio.nombre}</strong> es mensual (acceso ilimitado), así que
+              tu saldo de créditos <strong>se perderá</strong>. Si querés aprovecharlos, usalos antes de cambiar.
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" className="ek-cta ek-cta--secondary ek-cta--full" onClick={() => setConfirmarCambio(null)}>
+                Mejor no
+              </button>
+              <button type="button" className="ek-cta ek-cta--full" onClick={() => procederCambio(confirmarCambio)}>
+                Continuar igual
               </button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import { ArrowLeft, UserX, CalendarPlus } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { activarMembresiaMostrador } from '@shared/lib/checkout';
+import ConfirmDialog from '@admin/components/ConfirmDialog';
 import { EmptyState } from '@shared/components/EmptyState';
 import { NotasMiembro } from '@shared/components/NotasMiembro';
 import { EnviarAvisoModal } from '@shared/components/EnviarAvisoModal';
@@ -38,6 +39,8 @@ export default function PerfilMiembroRecepcion() {
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
   const [activando, setActivando] = useState(false);
+  // Saldo de créditos que se perdería si se activa un plan mensual (aviso).
+  const [confirmarPerderCreditos, setConfirmarPerderCreditos] = useState<number | null>(null);
   const [miembro, setMiembro] = useState<MiembroPerfil | null>(null);
   const [reservas, setReservas] = useState<ReservaPerfil[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -118,6 +121,35 @@ export default function PerfilMiembroRecepcion() {
       toast.error('Asigná un plan primero en "Editar datos".');
       return;
     }
+    // Aviso: si el miembro tiene créditos y el plan a activar es mensual
+    // (ilimitado), esos créditos se perderían. Que sea consciente.
+    const [{ data: mem }, { data: tierDestino }] = await Promise.all([
+      supabase
+        .from('membresias')
+        .select('creditos_restantes')
+        .eq('usuario_id', miembro.id)
+        .in('status', ['trialing', 'activa', 'past_due'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('tiers')
+        .select('tipo')
+        .eq('slug', miembro.membresia_tier)
+        .maybeSingle()
+    ]);
+    const saldo = mem?.creditos_restantes ?? 0;
+    const destinoMensual = tierDestino?.tipo !== 'creditos' && tierDestino?.tipo !== 'hibrido';
+    if (saldo > 0 && destinoMensual) {
+      setConfirmarPerderCreditos(saldo);
+      return;
+    }
+    await activarConfirmado();
+  }
+
+  async function activarConfirmado() {
+    if (!miembro?.membresia_tier) return;
+    setConfirmarPerderCreditos(null);
     setActivando(true);
     try {
       await activarMembresiaMostrador(miembro.id, miembro.membresia_tier);
@@ -340,6 +372,17 @@ export default function PerfilMiembroRecepcion() {
       {avisoOpen && (
         <EnviarAvisoModal miembroId={miembro.id} miembroNombre={nombre} onClose={() => setAvisoOpen(false)} />
       )}
+
+      <ConfirmDialog
+        isOpen={confirmarPerderCreditos !== null}
+        variant="warning"
+        title={`Le quedan ${confirmarPerderCreditos ?? 0} ${confirmarPerderCreditos === 1 ? 'crédito' : 'créditos'}`}
+        description="El plan a activar es mensual (acceso ilimitado), así que su saldo de créditos se perderá. ¿Activar de todos modos?"
+        confirmLabel="Activar igual"
+        cancelLabel="Cancelar"
+        onConfirm={activarConfirmado}
+        onCancel={() => setConfirmarPerderCreditos(null)}
+      />
     </div>
   );
 }
