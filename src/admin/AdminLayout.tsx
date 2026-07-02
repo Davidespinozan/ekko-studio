@@ -8,6 +8,7 @@ import { BrandLogo } from '@shared/components/BrandLogo';
 import { Sidebar } from './components/Sidebar';
 
 const Dashboard = lazy(() => import('./pages/AdminDashboard'));
+const Reportes = lazy(() => import('./pages/Reportes'));
 const Miembros = lazy(() => import('./pages/Miembros'));
 const MiembroDetalle = lazy(() => import('./pages/MiembroDetalle'));
 const Calendario = lazy(() => import('./pages/Calendario'));
@@ -74,6 +75,7 @@ export default function AdminLayout() {
           <Suspense fallback={<LoadingScreen />}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/reportes" element={<Reportes />} />
               <Route path="/miembros" element={<Miembros />} />
               <Route path="/miembros/:id" element={<MiembroDetalle />} />
               <Route path="/calendario" element={<Calendario />} />
