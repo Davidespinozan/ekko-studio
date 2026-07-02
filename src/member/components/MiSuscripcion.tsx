@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Ticket, CalendarClock, Ban, RotateCcw } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
+import { sufijoPrecio, detallePlan } from '@shared/lib/planPresentacion';
 import { obtenerBillingInfo, cancelarSuscripcion, type MetodoPago, type PagoHistorial } from '@shared/lib/checkout';
 import { TarjetaModal } from '@shared/components/TarjetaModal';
 import { PaymentModal } from '@shared/components/PaymentModal';
@@ -26,6 +27,8 @@ interface TierInfo {
   beneficios: Beneficio[];
   descripcion: string | null;
   tipo: string;
+  clases_incluidas: number | null;
+  duracion_dias: number | null;
 }
 
 function formatearPesos(centavos: number): string {
@@ -80,7 +83,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
       const [tiersRes, memRes] = await Promise.all([
         supabase
           .from('tiers')
-          .select('slug, nombre, precio_centavos, beneficios, descripcion, tipo')
+          .select('slug, nombre, precio_centavos, beneficios, descripcion, tipo, clases_incluidas, duracion_dias')
           .eq('tenant_id', tenant.id)
           .eq('activo', true)
           .order('precio_centavos', { ascending: true }),
@@ -99,7 +102,9 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           precio_centavos: t.precio_centavos,
           beneficios: parseBeneficios(t.beneficios),
           descripcion: t.descripcion,
-          tipo: t.tipo
+          tipo: t.tipo,
+          clases_incluidas: t.clases_incluidas,
+          duracion_dias: t.duracion_dias
         }))
       );
       setMembresia(((memRes.data ?? [])[0] as MembresiaInfo | undefined) ?? null);
@@ -243,11 +248,16 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               {planActual && (
                 <p style={{ fontFamily: 'var(--ek-font-display)', fontSize: '34px', fontWeight: 700, margin: 0, letterSpacing: '-0.03em' }}>
                   {formatearPesos(planActual.precio_centavos)}
-                  <span style={{ fontSize: '14px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>/mes</span>
+                  <span style={{ fontSize: '14px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>{sufijoPrecio(planActual)}</span>
                 </p>
               )}
               <span className={`ek-badge ${statusMeta.clase}`}>{statusMeta.texto}</span>
             </div>
+            {planActual && (
+              <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: '-8px 0 14px' }}>
+                {detallePlan(planActual)}
+              </p>
+            )}
 
             {/* Saldo de créditos (solo planes por paquete) */}
             {creditos !== null && (
@@ -463,8 +473,9 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                         {esActual && <span className="ek-badge ek-badge--neutral">Actual</span>}
                       </div>
                       <p style={{ margin: 0, fontWeight: 600 }}>
-                        {formatearPesos(t.precio_centavos)}<span style={{ color: 'var(--ek-ink-muted)', fontWeight: 500, fontSize: '13px' }}>/mes</span>
+                        {formatearPesos(t.precio_centavos)}<span style={{ color: 'var(--ek-ink-muted)', fontWeight: 500, fontSize: '13px' }}>{sufijoPrecio(t)}</span>
                       </p>
+                      <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--ek-ink-faint)' }}>{detallePlan(t)}</p>
                     </div>
                     {!esActual && (
                       <button

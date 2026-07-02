@@ -3,6 +3,7 @@ import { useSearchParams, Link, Navigate } from 'react-router-dom';
 import { ArrowLeft, Star, Check, Eye, EyeOff, AlertCircle, User } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios } from '@shared/lib/beneficios';
+import { sufijoPrecio, detallePlan } from '@shared/lib/planPresentacion';
 import { Spinner } from '@shared/components/Spinner';
 
 type Tier = 'basica' | 'pro';
@@ -13,6 +14,9 @@ interface PlanInfo {
   tier: Tier;
   beneficios: string[];
   esPaquete: boolean;
+  tipo: string;
+  clases_incluidas: number | null;
+  duracion_dias: number | null;
 }
 
 interface TierRow {
@@ -21,6 +25,8 @@ interface TierRow {
   precio_centavos: number;
   beneficios: unknown;
   tipo: string;
+  clases_incluidas: number | null;
+  duracion_dias: number | null;
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -34,7 +40,7 @@ function useTierPorSlug(slug: string) {
     async function load() {
       const { data, error } = await supabase
         .from('tiers')
-        .select('slug, nombre, precio_centavos, beneficios, tipo')
+        .select('slug, nombre, precio_centavos, beneficios, tipo, clases_incluidas, duracion_dias')
         .eq('slug', slug)
         .eq('activo', true)
         .maybeSingle();
@@ -74,7 +80,10 @@ export default function Signup() {
           .filter((b) => b.incluido)
           .map((b) => b.label)
           .slice(0, 4),
-        esPaquete: tierRow.tipo === 'creditos' || tierRow.tipo === 'hibrido'
+        esPaquete: tierRow.tipo === 'creditos' || tierRow.tipo === 'hibrido',
+        tipo: tierRow.tipo,
+        clases_incluidas: tierRow.clases_incluidas,
+        duracion_dias: tierRow.duracion_dias
       }
     : null;
 
@@ -219,8 +228,9 @@ export default function Signup() {
           lineHeight: 1
         }}>
           ${plan.precio.toLocaleString('es-MX')}
-          <span style={{ fontSize: '14px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>/mes</span>
+          <span style={{ fontSize: '14px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>{sufijoPrecio(plan)}</span>
         </p>
+        <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: '6px 0 0' }}>{detallePlan(plan)}</p>
         <ul style={{ listStyle: 'none', padding: 0, margin: '16px 0 0 0', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {plan.beneficios.map((b) => (
             <li key={b} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
