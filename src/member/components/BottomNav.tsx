@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Calendar, LayoutGrid, User } from 'lucide-react';
+import { Home, Calendar, LayoutGrid, User, QrCode } from 'lucide-react';
 
 export function BottomNav() {
   return (
@@ -7,6 +7,10 @@ export function BottomNav() {
       <div className="ek-bottom-nav-inner">
         <NavItem to="/app" end icon={<Home size={22} className="ek-bottom-nav-icon" />} label="Inicio" />
         <NavItem to="/app/estudios" icon={<LayoutGrid size={22} className="ek-bottom-nav-icon" />} label="Estudios" />
+        {/* Botón dorado central: abre el QR de tu próxima sesión */}
+        <NavLink to="/app/qr" className="ek-bottom-nav-qr" aria-label="Mi QR de acceso">
+          <QrCode size={22} aria-hidden="true" />
+        </NavLink>
         <NavItem to="/app/reservar" icon={<Calendar size={22} className="ek-bottom-nav-icon" />} label="Reservar" />
         <NavItem to="/app/perfil" icon={<User size={22} className="ek-bottom-nav-icon" />} label="Perfil" />
       </div>

@@ -5,7 +5,6 @@ import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
-import { EmptyState } from '@shared/components/EmptyState';
 import { ProximaSesionHero } from '@member/components/ProximaSesionHero';
 import { CarnetMembresia } from '@member/components/CarnetMembresia';
 import { ResumenChips } from '@member/components/ResumenChips';
@@ -156,6 +155,32 @@ export default function Dashboard() {
         </h1>
       </div>
 
+      {/* Próxima sesión — ARRIBA, imagen fija, SIEMPRE visible (le da imagen al
+          inicio). Con sesión → datos + Ver QR; sin sesión → mensaje + Reservar. */}
+      {loadingReservas ? (
+        <div className="ek-skeleton" style={{ height: '260px', borderRadius: 'var(--ek-r-card)', marginBottom: '24px' }} />
+      ) : errorReservas ? (
+        <div className="ek-card" style={{ marginBottom: '24px', textAlign: 'center' }}>
+          <p className="ek-eyebrow" style={{ color: 'var(--ek-danger)', marginBottom: '12px' }}>NO SE PUDO CARGAR</p>
+          <p className="ek-body" style={{ marginBottom: '20px' }}>No pudimos cargar tu próxima sesión. Verificá tu conexión.</p>
+          <button type="button" onClick={() => void refetchReservas()} className="ek-cta">Reintentar</button>
+        </div>
+      ) : (
+        <>
+          <ProximaSesionHero reserva={proximaReserva ?? null} onCancelada={refetchReservas} />
+          {proximaReserva && (
+            <div style={{ marginTop: '-12px', marginBottom: '24px', textAlign: 'right' }}>
+              <Link
+                to="/app/reservas"
+                style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--ek-mustard)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+              >
+                Ver todas mis reservas <ArrowRight size={13} aria-hidden="true" />
+              </Link>
+            </div>
+          )}
+        </>
+      )}
+
       {/* Carnet de membresía + chips de resumen (panel de "tu actividad") */}
       {loadingResumen ? (
         <>
@@ -171,45 +196,6 @@ export default function Dashboard() {
             creditosRestantes={creditosChip}
           />
         </>
-      )}
-
-      {/* Próxima sesión: cargando / error / hero / empty (ERROR-UI-FIX E-02) */}
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ margin: 0 }}>TU PRÓXIMA SESIÓN</p>
-        <Link
-          to="/app/reservas"
-          style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--ek-mustard)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-        >
-          Ver todas <ArrowRight size={13} aria-hidden="true" />
-        </Link>
-      </div>
-      {loadingReservas ? (
-        <div
-          className="ek-skeleton"
-          style={{ height: '220px', borderRadius: 'var(--ek-r-card)', marginBottom: '24px' }}
-        />
-      ) : errorReservas ? (
-        <div className="ek-card" style={{ marginBottom: '24px', textAlign: 'center' }}>
-          <p className="ek-eyebrow" style={{ color: 'var(--ek-danger)', marginBottom: '12px' }}>
-            NO SE PUDO CARGAR
-          </p>
-          <p className="ek-body" style={{ marginBottom: '20px' }}>
-            No pudimos cargar tu próxima sesión. Verificá tu conexión.
-          </p>
-          <button type="button" onClick={() => void refetchReservas()} className="ek-cta">
-            Reintentar
-          </button>
-        </div>
-      ) : proximaReserva ? (
-        <ProximaSesionHero reserva={proximaReserva} onCancelada={refetchReservas} />
-      ) : (
-        <div className="ek-card" style={{ marginBottom: '24px' }}>
-          <EmptyState
-            icon={CalendarPlus}
-            title="Sin sesiones agendadas"
-            hint="Reserva tu próxima grabación y aparecerá acá."
-          />
-        </div>
       )}
 
       {/* Accesos rápidos */}

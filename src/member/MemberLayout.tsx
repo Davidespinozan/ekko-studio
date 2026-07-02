@@ -14,6 +14,7 @@ const Reservar = lazy(() => import('./pages/Reservar'));
 const MisReservas = lazy(() => import('./pages/MisReservas'));
 const Perfil = lazy(() => import('./pages/Perfil'));
 const MiQR = lazy(() => import('./pages/MiQR'));
+const MiQRProxima = lazy(() => import('./pages/MiQRProxima'));
 const Estudios = lazy(() => import('./pages/Estudios'));
 const EstudioDetalle = lazy(() => import('./pages/EstudioDetalle'));
 
@@ -83,6 +84,7 @@ export default function MemberLayout() {
           {/* bookmarks viejos → nueva página de reservas */}
           <Route path="/historial" element={<Navigate to="/app/reservas" replace />} />
           <Route path="/perfil" element={<Perfil />} />
+          <Route path="/qr" element={<MiQRProxima />} />
           <Route path="/qr/:reservaId" element={<MiQR />} />
         </Routes>
       </Suspense>
