@@ -285,7 +285,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     background: var(--ek-chrome-grad-h);
     border-bottom: 1px solid rgba(0, 0, 0, 0.5);
     box-shadow: inset 0 1px 0 var(--ek-chrome-edge);
-    padding: 8px 0;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 0 8px;
   }
 
   .ek-header-title {
@@ -299,13 +299,13 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   @media (min-width: 768px) {
     .ek-header-glass {
-      padding: 10px 0;
+      padding: calc(10px + env(safe-area-inset-top, 0px)) 0 10px;
     }
   }
 
   @media (min-width: 1280px) {
     .ek-header-glass {
-      padding: 12px 0;
+      padding: calc(12px + env(safe-area-inset-top, 0px)) 0 12px;
     }
   }
 
@@ -2874,6 +2874,18 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .rec-detail,
 .adm-stat-card {
   background: var(--ek-surface) !important;
+}
+
+/* Carnet de membresía: la ÚNICA card con superficie premium (no plana). Gradiente
+   oscuro con un matiz cálido apenas perceptible + un filo cálido arriba — le da
+   "cuerpo" de tarjeta sin glows ni manchas. */
+.ek-card.ek-carnet {
+  background:
+    linear-gradient(145deg, #23201a 0%, #1a1a1d 52%, #151517 100%) !important;
+  border: 0.5px solid rgba(229, 184, 41, 0.14) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(229, 184, 41, 0.10),
+    0 12px 34px -14px rgba(0, 0, 0, 0.6) !important;
 }
 
 /* ============================================================================

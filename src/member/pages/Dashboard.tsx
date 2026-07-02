@@ -148,7 +148,7 @@ export default function Dashboard() {
       )}
 
       {/* Greeting */}
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: '18px' }}>
         <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>BIENVENIDA</p>
         <h1 className="ek-display-xl">
           Hola, {nombreFormat}.
@@ -169,7 +169,7 @@ export default function Dashboard() {
         <>
           <ProximaSesionHero reserva={proximaReserva ?? null} onCancelada={refetchReservas} />
           {proximaReserva && (
-            <div style={{ marginTop: '-12px', marginBottom: '24px', textAlign: 'right' }}>
+            <div style={{ marginTop: '-14px', marginBottom: '16px', textAlign: 'right' }}>
               <Link
                 to="/app/reservas"
                 style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--ek-mustard)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}

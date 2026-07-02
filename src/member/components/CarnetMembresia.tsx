@@ -23,7 +23,7 @@ export function CarnetMembresia({ tierNombre, resumen }: Props) {
   const { titulo, subtitulo, estadoLabel, estadoTono, requiereAccion } = resumen;
 
   return (
-    <div className="ek-card ek-card--hero ek-lift" style={{ marginBottom: '24px' }}>
+    <div className="ek-card ek-carnet ek-lift" style={{ marginBottom: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
         <p className="ek-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', margin: 0, color: 'var(--ek-mustard)' }}>
           <Sparkles size={13} aria-hidden="true" /> MEMBRESÍA

@@ -36,7 +36,7 @@ export function ResumenChips({ proximasCount, sesionesEsteMes, creditosRestantes
         display: 'grid',
         gridTemplateColumns: `repeat(${chips.length}, 1fr)`,
         gap: '10px',
-        marginBottom: '24px'
+        marginBottom: '18px'
       }}
     >
       {chips.map((c) => (
