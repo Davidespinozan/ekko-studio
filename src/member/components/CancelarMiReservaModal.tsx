@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useToast } from '@shared/hooks/useToast';
 import { cancelarReserva } from '@member/hooks/useReservas';
 
@@ -51,6 +52,7 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
   }, [onClose, submitting]);
 
   const fechaFmt = formatearFecha(reserva.slot_inicio);
+  const target = typeof document !== 'undefined' ? document.body : null;
 
   function handleChip(sug: string) {
     setChipActivo(sug);
@@ -82,7 +84,9 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
     onClose();
   }
 
-  return (
+  if (!target) return null;
+
+  return createPortal(
     <div
       onClick={() => !submitting && onClose()}
       role="dialog"
@@ -292,6 +296,7 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
           </>
         )}
       </div>
-    </div>
+    </div>,
+    target
   );
 }
