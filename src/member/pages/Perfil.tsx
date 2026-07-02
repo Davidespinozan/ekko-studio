@@ -24,30 +24,25 @@ export default function Perfil() {
 
   return (
     <div className="ek-container">
-      <div className="ek-stack-xl">
+      <div className="ek-stack-lg">
         <div className="ek-stack-md">
           <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar">PERFIL</p>
           <h1 className="ek-display-md">{nombreFormat || 'Tu cuenta'}</h1>
         </div>
 
-        {/* Avatar */}
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <span className="ek-avatar-ring">
+        {/* Avatar + datos de contacto (compacto, sin campos internos) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span className="ek-avatar-ring" style={{ flexShrink: 0 }}>
             {usuario?.avatar_url ? (
               <img
                 src={usuario.avatar_url}
                 alt={usuario.nombre ?? 'Avatar'}
-                style={{
-                  width: '120px',
-                  height: '120px',
-                  borderRadius: '50%',
-                  objectFit: 'cover'
-                }}
+                style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover' }}
               />
             ) : (
               <div style={{
-                width: '120px',
-                height: '120px',
+                width: '72px',
+                height: '72px',
                 borderRadius: '50%',
                 background: 'linear-gradient(135deg, var(--ek-bg-elevated), var(--ek-bg-soft))',
                 color: 'var(--ek-mustard)',
@@ -55,7 +50,7 @@ export default function Perfil() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontFamily: 'var(--ek-font-display)',
-                fontSize: '40px',
+                fontSize: '26px',
                 fontWeight: 700,
                 letterSpacing: '-0.04em'
               }}>
@@ -63,30 +58,11 @@ export default function Perfil() {
               </div>
             )}
           </span>
-        </div>
-
-        <div className="adm-info-grid perfil-info-grid">
-          <div className="adm-info-cell">
-            <p className="adm-info-label">Email</p>
-            <p className="adm-info-value">{authUser?.email}</p>
-          </div>
-          {usuario?.telefono && (
-            <div className="adm-info-cell">
-              <p className="adm-info-label">Teléfono</p>
-              <p className="adm-info-value">{usuario.telefono}</p>
-            </div>
-          )}
-          <div className="adm-info-cell">
-            <p className="adm-info-label">Tenant</p>
-            <p className="adm-info-value">{tenant.nombre}</p>
-          </div>
-          <div className="adm-info-cell">
-            <p className="adm-info-label">Rol</p>
-            <p className="adm-info-value adm-info-value--mono">{usuario?.rol}</p>
-          </div>
-          <div className="adm-info-cell">
-            <p className="adm-info-label">Status</p>
-            <p className="adm-info-value adm-info-value--mono">{usuario?.status}</p>
+          <div style={{ minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: '15px', fontWeight: 600, wordBreak: 'break-word' }}>{authUser?.email}</p>
+            {usuario?.telefono && (
+              <p className="ek-body-faint" style={{ margin: '2px 0 0' }}>{usuario.telefono}</p>
+            )}
           </div>
         </div>
 
