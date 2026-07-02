@@ -75,7 +75,20 @@ export const handler: Handler = async (event) => {
       .eq('id', socio.tenant_id)
       .maybeSingle();
 
-    const customerId = dp?.stripe_customer_id ?? null;
+    // El customer puede estar en usuarios_datos_privados (pago in-app) o solo en
+    // membresias (activación en recepción / portal). Probar ambos.
+    let customerId = dp?.stripe_customer_id ?? null;
+    if (!customerId) {
+      const { data: mem } = await admin
+        .from('membresias')
+        .select('stripe_customer_id')
+        .eq('usuario_id', socio.id)
+        .not('stripe_customer_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      customerId = mem?.stripe_customer_id ?? null;
+    }
     const stripeAccount = tenant?.stripe_account_id ?? null;
     if (!customerId || !stripeAccount) {
       return ok({ paymentMethod: null, pagos: [] });

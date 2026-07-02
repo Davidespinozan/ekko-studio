@@ -52,6 +52,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const [pagos, setPagos] = useState<PagoHistorial[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<MetodoPago | null>(null);
   const [billingLoading, setBillingLoading] = useState(true);
+  const [billingError, setBillingError] = useState(false);
   const [membresia, setMembresia] = useState<MembresiaInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [cambiarOpen, setCambiarOpen] = useState(false);
@@ -100,13 +101,16 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
     let mounted = true;
     (async () => {
       setBillingLoading(true);
+      setBillingError(false);
       try {
         const info = await obtenerBillingInfo();
         if (!mounted) return;
         setPaymentMethod(info.paymentMethod);
         setPagos(info.pagos ?? []);
-      } catch {
-        // silencioso: la sección muestra su estado vacío
+      } catch (e) {
+        if (!mounted) return;
+        console.error('[MiSuscripcion] billing-info', e);
+        setBillingError(true);
       } finally {
         if (mounted) setBillingLoading(false);
       }
@@ -310,6 +314,11 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>MÉTODO DE PAGO</p>
             {billingLoading ? (
               <div className="ek-skeleton" style={{ height: '54px', borderRadius: 'var(--ek-r-md)' }} />
+            ) : billingError ? (
+              <p className="ek-body-muted" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={16} style={{ color: 'var(--ek-warning)' }} aria-hidden="true" />
+                No pudimos cargar tu método de pago. Recargá la página.
+              </p>
             ) : paymentMethod ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <span style={{
@@ -353,6 +362,11 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>HISTORIAL DE PAGOS</p>
             {billingLoading ? (
               <div className="ek-skeleton" style={{ height: '48px', borderRadius: 'var(--ek-r-md)' }} />
+            ) : billingError ? (
+              <p className="ek-body-muted" style={{ margin: 0, display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={16} style={{ color: 'var(--ek-warning)' }} aria-hidden="true" />
+                No pudimos cargar tu historial. Recargá la página.
+              </p>
             ) : pagos.length === 0 ? (
               <EmptyState
                 icon={CreditCard}
