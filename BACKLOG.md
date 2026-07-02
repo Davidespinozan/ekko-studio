@@ -52,6 +52,13 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
       Decisiones: una membresía a la vez · no-show quema · paquetes suman. SALA.
 - [ ] **Aplicar** `20260620150000_planes_creditos.sql` al Supabase de EKKO.
 - [ ] Cargar `stripe_price_id` de **pago único** para los tiers de paquete.
+- [x] **Costo variable en créditos por estudio** — `recursos.costo_creditos`
+      (default 1) + triggers usan el costo del estudio; la devolución lee el
+      débito real del ledger. Admin (campo "Costo en créditos") + miembro (badge
+      "Cuesta N créditos" en Reservar).
+- [ ] **Aplicar** `20260702120000_costo_creditos_por_estudio.sql` al Supabase de
+      EKKO (+ regenerar tipos, opcional — hoy se lee `costo_creditos` de forma
+      defensiva por cast).
 - [ ] (abierto) ¿Cron que marque `status='expirada'` para dashboards? Hoy el
       vencimiento es lazy (se chequea al reservar).
 - [ ] (abierto, feedback cliente #4) "Compras extra" (horas/invitados/servicios)
