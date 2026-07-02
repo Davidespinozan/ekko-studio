@@ -181,7 +181,15 @@ export default function Dashboard() {
       )}
 
       {/* Próxima sesión: cargando / error / hero / empty (ERROR-UI-FIX E-02) */}
-      <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>TU PRÓXIMA SESIÓN</p>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '12px' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ margin: 0 }}>TU PRÓXIMA SESIÓN</p>
+        <Link
+          to="/app/reservas"
+          style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--ek-mustard)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+        >
+          Ver todas <ArrowRight size={13} aria-hidden="true" />
+        </Link>
+      </div>
       {loadingReservas ? (
         <div
           className="ek-skeleton"

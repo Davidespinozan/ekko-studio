@@ -3175,3 +3175,64 @@ select.ek-input option {
 @media (prefers-reduced-motion: no-preference) {
   .ek-phone { transition: transform 0.5s var(--ek-ease-premium); }
 }
+
+/* ============================================================================
+   TABS (pill toggle) + encabezado de día — usados en Mis reservas
+   ============================================================================ */
+.ek-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--ek-bg-soft);
+  border: 0.5px solid var(--ek-line);
+}
+.ek-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 18px;
+  border: none;
+  background: transparent;
+  color: var(--ek-ink-muted);
+  font-family: var(--ek-font-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.22s var(--ek-ease-out), background 0.22s var(--ek-ease-out);
+}
+.ek-tab:hover { color: var(--ek-ink); }
+.ek-tab--active {
+  background: var(--ek-mustard);
+  color: var(--ek-bg);
+  box-shadow: 0 4px 14px rgba(229, 184, 41, 0.28);
+}
+.ek-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--ek-mustard-dim);
+  color: var(--ek-mustard);
+}
+.ek-tab--active .ek-tab-count {
+  background: rgba(10, 10, 10, 0.16);
+  color: var(--ek-bg);
+}
+
+.ek-day-heading {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ek-ink-faint);
+  margin: 0 0 10px 2px;
+}
