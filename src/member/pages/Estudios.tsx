@@ -59,7 +59,6 @@ export default function Estudios() {
       }}>
         {recursos.map((r) => {
           const esPro = r.tiers_permitidos.length === 1 && r.tiers_permitidos[0] === 'pro';
-          const tiposContenido = r.tipo_contenido ?? [];
           return (
             <Link
               key={r.id}
@@ -101,10 +100,7 @@ export default function Estudios() {
                 <TierBadge pro={esPro} style={{ position: 'absolute', top: '12px', left: '12px' }} />
               </div>
 
-              <div style={{
-                padding: '18px',
-                background: 'linear-gradient(150deg, rgba(229, 184, 41, 0.05), var(--ek-bg-soft) 60%)'
-              }}>
+              <div style={{ padding: '16px', background: 'var(--ek-bg-soft)' }}>
                 <h3 style={{
                   fontFamily: 'var(--ek-font-display)',
                   fontSize: '20px',
@@ -119,25 +115,16 @@ export default function Estudios() {
                     fontSize: '13px',
                     color: 'var(--ek-ink-muted)',
                     margin: 0,
-                    marginBottom: '14px',
+                    marginBottom: '12px',
                     lineHeight: 1.4
                   }}>{r.descripcion}</p>
-                )}
-
-                {tiposContenido.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '14px' }}>
-                    {tiposContenido.slice(0, 3).map((tipo) => (
-                      <span key={tipo} className="ek-badge ek-badge--neutral">
-                        {tipo}
-                      </span>
-                    ))}
-                  </div>
                 )}
 
                 <div style={{
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
+                  marginTop: '10px',
                   fontSize: '12px',
                   color: 'var(--ek-ink-muted)'
                 }}>
