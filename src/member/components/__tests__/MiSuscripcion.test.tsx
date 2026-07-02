@@ -66,7 +66,10 @@ describe('MiSuscripcion', () => {
 
   it('muestra estado vacío de pagos cuando no hay historial', async () => {
     renderComp('pro');
-    await waitFor(() => expect(screen.getByText('Sin pagos registrados')).toBeInTheDocument());
+    // El historial ahora viene del backend (stripe-billing-info); el mock no
+    // trae pagos → estado vacío.
+    await waitFor(() => expect(screen.getByText('Sin pagos todavía')).toBeInTheDocument());
+    expect(screen.getByText('Sin tarjeta registrada')).toBeInTheDocument();
   });
 
   it('cambiar de plan abre el modal de pago propio', async () => {

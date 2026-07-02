@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Settings, Ticket } from 'lucide-react';
+import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Settings, Ticket, CalendarClock } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
-import { abrirPortal } from '@shared/lib/checkout';
+import { abrirPortal, obtenerBillingInfo, type MetodoPago, type PagoHistorial } from '@shared/lib/checkout';
 import { PaymentModal } from '@shared/components/PaymentModal';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
@@ -27,14 +27,6 @@ interface TierInfo {
   tipo: string;
 }
 
-interface PagoInfo {
-  id: string;
-  monto_centavos: number | null;
-  moneda: string | null;
-  status: string | null;
-  created_at: string;
-}
-
 function formatearPesos(centavos: number): string {
   return `$${Math.round(centavos / 100).toLocaleString('es-MX')}`;
 }
@@ -57,7 +49,9 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const tenant = useTenant();
   const toast = useToast();
   const [tiers, setTiers] = useState<TierInfo[]>([]);
-  const [pagos, setPagos] = useState<PagoInfo[]>([]);
+  const [pagos, setPagos] = useState<PagoHistorial[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<MetodoPago | null>(null);
+  const [billingLoading, setBillingLoading] = useState(true);
   const [membresia, setMembresia] = useState<MembresiaInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [cambiarOpen, setCambiarOpen] = useState(false);
@@ -68,19 +62,13 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const [tiersRes, pagosRes, memRes] = await Promise.all([
+      const [tiersRes, memRes] = await Promise.all([
         supabase
           .from('tiers')
           .select('slug, nombre, precio_centavos, beneficios, descripcion, tipo')
           .eq('tenant_id', tenant.id)
           .eq('activo', true)
           .order('precio_centavos', { ascending: true }),
-        supabase
-          .from('payment_events')
-          .select('id, monto_centavos, moneda, status, created_at')
-          .eq('usuario_id', usuarioId)
-          .order('created_at', { ascending: false })
-          .limit(12),
         supabase
           .from('membresias')
           .select('status, stripe_subscription_id, cancel_at_period_end, periodo_actual_fin, creditos_restantes')
@@ -99,13 +87,32 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           tipo: t.tipo
         }))
       );
-      setPagos((pagosRes.data ?? []) as PagoInfo[]);
       setMembresia(((memRes.data ?? [])[0] as MembresiaInfo | undefined) ?? null);
       setLoading(false);
     }
     load();
     return () => { mounted = false; };
   }, [tenant.id, usuarioId]);
+
+  // Tarjeta + historial vienen de Stripe (cuenta conectada) vía backend: los
+  // miembros NO pueden leer payment_events (RLS admin-only).
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setBillingLoading(true);
+      try {
+        const info = await obtenerBillingInfo();
+        if (!mounted) return;
+        setPaymentMethod(info.paymentMethod);
+        setPagos(info.pagos ?? []);
+      } catch {
+        // silencioso: la sección muestra su estado vacío
+      } finally {
+        if (mounted) setBillingLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [usuarioId]);
 
   // Retorno desde el Checkout de Stripe (?suscripcion=ok|cancelado).
   useEffect(() => {
@@ -259,10 +266,26 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               </ul>
             )}
 
-            {cancelaAlFin && (
-              <p className="ek-helper-text" style={{ marginTop: 0, marginBottom: '12px', color: 'var(--ek-warning)' }}>
-                Tu plan se cancela{finPeriodo ? ` el ${finPeriodo}` : ' al terminar el período'}. Podés reactivarlo desde “Gestionar suscripción”.
-              </p>
+            {/* Renovación / vencimiento del plan */}
+            {finPeriodo && (
+              cancelaAlFin ? (
+                <p className="ek-helper-text" style={{ marginTop: 0, marginBottom: '12px', color: 'var(--ek-warning)' }}>
+                  Tu plan se cancela el {finPeriodo}. Podés reactivarlo desde “Gestionar suscripción”.
+                </p>
+              ) : (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '10px 14px', marginBottom: '14px',
+                  borderRadius: 'var(--ek-r-md)', background: 'var(--ek-bg-soft)',
+                  border: '0.5px solid var(--ek-line)'
+                }}>
+                  <CalendarClock size={16} style={{ color: 'var(--ek-mustard)', flexShrink: 0 }} aria-hidden="true" />
+                  <p style={{ margin: 0, fontSize: '13px' }}>
+                    {creditos !== null ? 'Tu paquete vence el ' : tieneSuscripcion ? 'Se renueva el ' : 'Vigente hasta el '}
+                    <strong>{finPeriodo}</strong>
+                  </p>
+                </div>
+              )
             )}
 
             <button type="button" className="ek-cta ek-cta--full" onClick={() => setCambiarOpen(true)}>
@@ -282,15 +305,60 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             )}
           </div>
 
-          {/* Método de pago e historial */}
-          <div className="ek-card">
-            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>PAGOS</p>
-            {pagos.length === 0 ? (
+          {/* Método de pago */}
+          <div className="ek-card" style={{ marginBottom: '16px' }}>
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>MÉTODO DE PAGO</p>
+            {billingLoading ? (
+              <div className="ek-skeleton" style={{ height: '54px', borderRadius: 'var(--ek-r-md)' }} />
+            ) : paymentMethod ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{
+                  minWidth: 46, height: 32, borderRadius: '7px',
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'var(--ek-bg-elevated)', border: '0.5px solid var(--ek-line-strong)',
+                  fontSize: '10px', fontWeight: 700, letterSpacing: '0.02em', textTransform: 'uppercase'
+                }}>
+                  {paymentMethod.brand}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>
+                    {paymentMethod.brand.charAt(0).toUpperCase() + paymentMethod.brand.slice(1)} ···· {paymentMethod.last4}
+                  </p>
+                  <p className="ek-body-faint" style={{ margin: 0 }}>
+                    Vence {String(paymentMethod.expMonth).padStart(2, '0')}/{String(paymentMethod.expYear).slice(-2)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="ek-cta ek-cta--secondary"
+                  style={{ padding: '9px 14px', fontSize: '12px' }}
+                  onClick={gestionarSuscripcion}
+                  disabled={gestionando}
+                >
+                  {gestionando ? <Spinner size={14} /> : 'Actualizar'}
+                </button>
+              </div>
+            ) : (
               <EmptyState
                 icon={CreditCard}
                 tone="neutral"
-                title="Sin pagos registrados"
-                hint="Tu método de pago y el historial de cobros aparecerán aquí cuando el estudio active la pasarela de pago."
+                title="Sin tarjeta registrada"
+                hint="Cuando pagues tu primer plan, tu tarjeta quedará guardada de forma segura en Stripe."
+              />
+            )}
+          </div>
+
+          {/* Historial de cobros */}
+          <div className="ek-card">
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>HISTORIAL DE PAGOS</p>
+            {billingLoading ? (
+              <div className="ek-skeleton" style={{ height: '48px', borderRadius: 'var(--ek-r-md)' }} />
+            ) : pagos.length === 0 ? (
+              <EmptyState
+                icon={CreditCard}
+                tone="neutral"
+                title="Sin pagos todavía"
+                hint="Tus cobros aparecerán aquí después de tu primer pago."
               />
             ) : (
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -299,17 +367,17 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     paddingBottom: '10px', borderBottom: '0.5px solid var(--ek-line)'
                   }}>
-                    <div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
                       <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>
-                        {p.monto_centavos != null ? formatearPesos(p.monto_centavos) : '—'}
-                        {p.moneda ? ` ${p.moneda.toUpperCase()}` : ''}
+                        {formatearPesos(p.monto_centavos)}
+                        <span style={{ color: 'var(--ek-ink-muted)', fontWeight: 500 }}> {p.moneda.toUpperCase()}</span>
                       </p>
                       <p className="ek-body-faint" style={{ margin: 0 }}>
-                        {new Date(p.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {new Date(p.fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
                       </p>
                     </div>
-                    <span className={`ek-badge ${p.status === 'succeeded' || p.status === 'paid' ? 'ek-badge--success' : 'ek-badge--neutral'}`}>
-                      {p.status ?? '—'}
+                    <span className={`ek-badge ${p.status === 'succeeded' ? 'ek-badge--success' : p.status === 'pending' ? 'ek-badge--outline' : 'ek-badge--danger'}`}>
+                      {p.status === 'succeeded' ? 'Pagado' : p.status === 'pending' ? 'Pendiente' : 'Falló'}
                     </span>
                   </li>
                 ))}

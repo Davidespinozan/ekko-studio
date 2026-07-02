@@ -71,3 +71,31 @@ export interface PagoIntentResult {
 export function crearPagoIntent(tierSlug: string): Promise<PagoIntentResult> {
   return backendPost<PagoIntentResult>('crear-pago-intent', { tier: tierSlug });
 }
+
+/**
+ * Tarjeta registrada + historial de cobros del miembro, leídos de Stripe sobre
+ * la cuenta conectada del estudio (los miembros no pueden leer payment_events).
+ */
+export interface MetodoPago {
+  brand: string;
+  last4: string;
+  expMonth: number;
+  expYear: number;
+}
+export interface PagoHistorial {
+  id: string;
+  monto_centavos: number;
+  moneda: string;
+  fecha: string;
+  status: string;
+  descripcion: string;
+}
+export interface BillingInfo {
+  paymentMethod: MetodoPago | null;
+  pagos: PagoHistorial[];
+  reason?: string;
+}
+
+export function obtenerBillingInfo(): Promise<BillingInfo> {
+  return backendPost<BillingInfo>('stripe-billing-info', {});
+}
