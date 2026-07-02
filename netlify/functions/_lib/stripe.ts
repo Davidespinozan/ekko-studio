@@ -174,6 +174,63 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
   }
 }
 
+// ── Extracción de montos para payment_events (PURA) ─────────────────────────
+export interface MontoEvento {
+  monto_centavos: number;
+  moneda: string;
+  status: string;
+  stripe_invoice_id: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_subscription_id: string | null;
+  stripe_customer_id: string | null;
+}
+
+/**
+ * Extrae el monto de un evento de Stripe para registrarlo en `payment_events`.
+ *
+ * SOLO reconoce los dos eventos que representan UNA cobranza real en el flujo
+ * activo (Elements): `invoice.paid` (suscripción: 1ª factura + renovaciones) y
+ * `payment_intent.succeeded` (paquete de créditos, pago único). Deliberadamente
+ * NO cuenta `checkout.session.completed` para no DUPLICAR el monto (Stripe emite
+ * ambos por el mismo pago). Devuelve null para cualquier otro evento.
+ */
+export function extraerMontoDeEvento(event: Stripe.Event): MontoEvento | null {
+  if (event.type === 'payment_intent.succeeded') {
+    const pi = event.data.object as Stripe.PaymentIntent;
+    if (typeof pi.amount !== 'number') return null;
+    return {
+      monto_centavos: pi.amount,
+      moneda: pi.currency ?? 'mxn',
+      status: 'succeeded',
+      stripe_invoice_id: null,
+      stripe_payment_intent_id: pi.id,
+      stripe_subscription_id: null,
+      stripe_customer_id: typeof pi.customer === 'string' ? pi.customer : pi.customer?.id ?? null
+    };
+  }
+
+  if (event.type === 'invoice.paid') {
+    const inv = event.data.object as Stripe.Invoice & {
+      subscription?: string | { id: string } | null;
+      payment_intent?: string | { id: string } | null;
+    };
+    if (typeof inv.amount_paid !== 'number') return null;
+    return {
+      monto_centavos: inv.amount_paid,
+      moneda: inv.currency ?? 'mxn',
+      status: 'succeeded',
+      stripe_invoice_id: inv.id ?? null,
+      stripe_payment_intent_id:
+        typeof inv.payment_intent === 'string' ? inv.payment_intent : inv.payment_intent?.id ?? null,
+      stripe_subscription_id:
+        typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id ?? null,
+      stripe_customer_id: typeof inv.customer === 'string' ? inv.customer : inv.customer?.id ?? null
+    };
+  }
+
+  return null;
+}
+
 /**
  * Devuelve el customer de Stripe del miembro, creándolo si no existe.
  * Anti-duplicados: reusa por `metadata.usuario_id` (NO por email — el email

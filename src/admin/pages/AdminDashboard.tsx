@@ -4,7 +4,7 @@ import { Sun, CloudSun, Moon, Eye, Ban, ArrowRight, ArrowUp, ArrowDown, PartyPop
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
-import { useDashboardData, type DashboardData } from '../hooks/useAdminData';
+import { useDashboardData, useDineroMetrics, type DashboardData } from '../hooks/useAdminData';
 import CardMenuDropdown from '../components/CardMenuDropdown';
 import CancelarReservaModal, { type ReservaParaCancelar } from '../components/CancelarReservaModal';
 import { CentroPendientes } from '../components/CentroPendientes';
@@ -468,85 +468,55 @@ function Grafica30Dias({ data }: { data: Array<{ fecha: string; count: number }>
 // SECCIÓN DINERO
 // ============================================================================
 
-function SeccionDinero() {
-  const toast = useToast();
-  return (
-    <section style={{ marginBottom: '24px' }}>
-      <SectionHeader title="DINERO" subtitle="Pendiente Stripe" />
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: '12px',
-          marginBottom: '14px'
-        }}
-      >
-        <DisabledCard label="FACTURADO ESTE MES" />
-        <DisabledCard label="COBROS FALLIDOS" />
-      </div>
-      <div
-        style={{
-          background: 'var(--ek-bg-soft)',
-          border: '0.5px dashed var(--ek-mustard-dim)',
-          borderRadius: 'var(--ek-r-md)',
-          padding: '16px 18px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '12px',
-          flexWrap: 'wrap'
-        }}
-      >
-        <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0 }}>
-          Conecta Stripe para ver tus métricas financieras.
-        </p>
-        <button
-          type="button"
-          disabled
-          onClick={() =>
-            toast.info('Sprint Stripe pendiente. Se implementa próximamente.')
-          }
-          className="ek-cta ek-cta--secondary"
-          style={{ padding: '10px 18px', fontSize: '12px', opacity: 0.6, cursor: 'not-allowed' }}
-        >
-          + Conectar Stripe (próximamente)
-        </button>
-      </div>
-    </section>
-  );
+function pesos(centavos: number): string {
+  return `$${Math.round(centavos / 100).toLocaleString('es-MX')}`;
 }
 
-function DisabledCard({ label }: { label: string }) {
+function SeccionDinero() {
+  const { metrics, isLoading } = useDineroMetrics();
+
+  const ahora = new Date();
+  const mesActual = nombreMes(ahora);
+  const mesAnteriorNombre = nombreMes(new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1));
+  const tendencia = metrics ? calcTendencia(metrics.facturadoMesActual, metrics.facturadoMesAnterior) : null;
+
   return (
-    <div
-      className="ek-card"
-      title="Disponible al conectar Stripe"
-      style={{
-        padding: '20px',
-        opacity: 0.5,
-        cursor: 'not-allowed',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '6px'
-      }}
-    >
-      <p className="ek-eyebrow" style={{ fontSize: '10px', margin: 0 }}>{label}</p>
-      <p
-        style={{
-          fontFamily: 'var(--ek-font-display)',
-          fontSize: '36px',
-          fontWeight: 700,
-          letterSpacing: '-0.03em',
-          lineHeight: 1,
-          margin: 0
-        }}
-      >
-        —
-      </p>
-      <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', margin: 0 }}>
-        Conecta Stripe para ver
-      </p>
-    </div>
+    <section style={{ marginBottom: '24px' }}>
+      <SectionHeader title="DINERO" subtitle={`${mesActual.charAt(0).toUpperCase() + mesActual.slice(1)} ${ahora.getFullYear()}`} />
+
+      {isLoading ? (
+        <div className="adm-metricas-grid">
+          <div className="ek-skeleton" style={{ height: '110px', borderRadius: 'var(--ek-r-md)' }} />
+          <div className="ek-skeleton" style={{ height: '110px', borderRadius: 'var(--ek-r-md)' }} />
+        </div>
+      ) : !metrics || (metrics.facturadoMesActual === 0 && metrics.facturadoMesAnterior === 0 && metrics.cobrosMesActual === 0) ? (
+        <div className="ek-card ek-card--md">
+          <p className="ek-eyebrow" style={{ fontSize: '10px', marginBottom: '6px' }}>FACTURADO ESTE MES</p>
+          <p style={{ fontFamily: 'var(--ek-font-display)', fontSize: '36px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, margin: 0 }}>$0</p>
+          <p className="ek-body-faint" style={{ margin: '8px 0 0' }}>
+            Aún no hay cobros registrados este mes. Aparecerán aquí en cuanto entren pagos por Stripe.
+          </p>
+        </div>
+      ) : (
+        <div className="adm-metricas-grid">
+          <MetricaCard
+            valor={pesos(metrics.facturadoMesActual)}
+            label="FACTURADO ESTE MES"
+            tendencia={tendencia}
+            mesAnteriorNombre={mesAnteriorNombre}
+          />
+          <div className="ek-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <p className="ek-eyebrow" style={{ fontSize: '10px', margin: 0 }}>COBROS</p>
+            <p style={{ fontFamily: 'var(--ek-font-display)', fontSize: '36px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, margin: 0 }}>
+              {metrics.cobrosMesActual}
+            </p>
+            <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', margin: 0 }}>
+              {metrics.cobrosMesActual === 1 ? 'pago exitoso este mes' : 'pagos exitosos este mes'}
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

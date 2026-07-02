@@ -8,7 +8,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { getStripe, clasificarEvento, periodoFinFromSubscription } from '../_lib/stripe';
+import { getStripe, clasificarEvento, periodoFinFromSubscription, extraerMontoDeEvento } from '../_lib/stripe';
 
 /**
  * POST /stripe-webhook — materializa los cambios de la suscripción del miembro.
@@ -79,6 +79,9 @@ export const handler: Handler = async (event) => {
 
   try {
     const accion = clasificarEvento(stripeEvent);
+    // usuario del pago (para payment_events): se captura en cada rama donde ya
+    // lo conocemos; en renovaciones (sync) se resuelve por la suscripción.
+    let usuarioIdPago: string | null = null;
 
     if (accion.kind === 'activar') {
       // Mensual: leer la suscripción para el periodo_fin. Paquete (pago único):
@@ -96,6 +99,7 @@ export const handler: Handler = async (event) => {
         p_periodo_fin: periodoFin
       });
       if (error) throw new Error(`activar_membresia: ${error.message}`);
+      usuarioIdPago = accion.usuario_id;
     } else if (accion.kind === 'activar-sub') {
       // Suscripción in-app (Elements): leer metadata + periodo de la suscripción,
       // sobre la cuenta conectada (Connect).
@@ -112,6 +116,7 @@ export const handler: Handler = async (event) => {
           p_periodo_fin: periodoFinFromSubscription(sub)
         });
         if (error) throw new Error(`activar_membresia (sub): ${error.message}`);
+        usuarioIdPago = usuarioId;
       }
     } else if (accion.kind === 'sync') {
       const { error } = await admin.rpc('sync_membresia_stripe', {
@@ -124,6 +129,56 @@ export const handler: Handler = async (event) => {
       if (error) throw new Error(`sync_membresia_stripe: ${error.message}`);
     }
     // kind === 'ignore' → no-op (evento que no nos interesa).
+
+    // ── Registrar el pago en payment_events (métricas de dinero del admin) ────
+    // Solo eventos de cobranza real (invoice.paid / payment_intent.succeeded).
+    // Falla suave: si no se puede registrar, NO revierte la activación ya hecha.
+    const monto = extraerMontoDeEvento(stripeEvent);
+    if (monto) {
+      try {
+        let tenantIdPago: string | null = null;
+        // Renovación (sync): resolver usuario + tenant por la suscripción.
+        if (!usuarioIdPago && monto.stripe_subscription_id) {
+          const { data: mem } = await admin
+            .from('membresias')
+            .select('usuario_id, tenant_id')
+            .eq('stripe_subscription_id', monto.stripe_subscription_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          usuarioIdPago = mem?.usuario_id ?? null;
+          tenantIdPago = mem?.tenant_id ?? null;
+        }
+        if (usuarioIdPago && !tenantIdPago) {
+          const { data: u } = await admin
+            .from('usuarios')
+            .select('tenant_id')
+            .eq('id', usuarioIdPago)
+            .maybeSingle();
+          tenantIdPago = u?.tenant_id ?? null;
+        }
+        await admin.from('payment_events').upsert(
+          {
+            stripe_event_id: stripeEvent.id,
+            stripe_event_type: stripeEvent.type,
+            tenant_id: tenantIdPago,
+            usuario_id: usuarioIdPago,
+            monto_centavos: monto.monto_centavos,
+            moneda: monto.moneda,
+            status: monto.status,
+            stripe_invoice_id: monto.stripe_invoice_id,
+            stripe_payment_intent_id: monto.stripe_payment_intent_id,
+            stripe_subscription_id: monto.stripe_subscription_id,
+            stripe_customer_id: monto.stripe_customer_id,
+            raw_payload: stripeEvent as unknown as Record<string, unknown>,
+            processed_at: new Date().toISOString()
+          },
+          { onConflict: 'stripe_event_id', ignoreDuplicates: true }
+        );
+      } catch (pagoErr) {
+        console.error('[stripe-webhook] no se pudo registrar payment_events', pagoErr);
+      }
+    }
 
     return ok({ received: true });
   } catch (err) {

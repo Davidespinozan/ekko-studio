@@ -483,6 +483,69 @@ export function useDashboardData() {
 }
 
 /**
+ * Métricas de dinero (payment_events). Suma los cobros exitosos del mes actual
+ * y del anterior (para tendencia). Se leen filas y se suman en cliente: el
+ * volumen de pagos por mes es bajo. Solo admin puede leer payment_events (RLS).
+ */
+export interface DineroMetrics {
+  facturadoMesActual: number;
+  facturadoMesAnterior: number;
+  cobrosMesActual: number;
+}
+
+export function useDineroMetrics() {
+  const tenant = useTenant();
+  const [metrics, setMetrics] = useState<DineroMetrics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const refetch = useCallback(async () => {
+    setIsLoading(true);
+    setError(false);
+    const now = new Date();
+    const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+    const inicioMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+
+    const { data, error: qErr } = await supabase
+      .from('payment_events')
+      .select('monto_centavos, created_at')
+      .eq('tenant_id', tenant.id)
+      .eq('status', 'succeeded')
+      .gte('created_at', inicioMesAnterior.toISOString());
+
+    if (qErr) {
+      console.error('[useDineroMetrics]', qErr);
+      setError(true);
+      setIsLoading(false);
+      return;
+    }
+
+    let facturadoMesActual = 0;
+    let facturadoMesAnterior = 0;
+    let cobrosMesActual = 0;
+    for (const row of data ?? []) {
+      const monto = row.monto_centavos ?? 0;
+      const fecha = new Date(row.created_at);
+      if (fecha >= inicioMes) {
+        facturadoMesActual += monto;
+        cobrosMesActual += 1;
+      } else {
+        facturadoMesAnterior += monto;
+      }
+    }
+
+    setMetrics({ facturadoMesActual, facturadoMesAnterior, cobrosMesActual });
+    setIsLoading(false);
+  }, [tenant.id]);
+
+  useEffect(() => {
+    void refetch();
+  }, [refetch]);
+
+  return { metrics, isLoading, error, refetch };
+}
+
+/**
  * Reservas en un rango de fechas para vista calendario.
  * Movido a `@shared/hooks/useReservasRango` (lo comparten admin y recepción —
  * Bloque B/C). Se re-exporta acá por compatibilidad de imports.

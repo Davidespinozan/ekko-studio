@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   mapStripeStatus,
   periodoFinFromSubscription,
-  clasificarEvento
+  clasificarEvento,
+  extraerMontoDeEvento
 } from '../../netlify/functions/_lib/stripe';
 
 /**
@@ -157,5 +158,46 @@ describe('clasificarEvento', () => {
     if (r.kind === 'sync') {
       expect(r.event_at).toBe(new Date(1_650_000_000 * 1000).toISOString());
     }
+  });
+});
+
+describe('extraerMontoDeEvento', () => {
+  it('payment_intent.succeeded → monto del PI', () => {
+    const r = extraerMontoDeEvento(
+      ev('payment_intent.succeeded', { id: 'pi_1', amount: 45000, currency: 'mxn', customer: 'cus_1' })
+    );
+    expect(r).toEqual({
+      monto_centavos: 45000,
+      moneda: 'mxn',
+      status: 'succeeded',
+      stripe_invoice_id: null,
+      stripe_payment_intent_id: 'pi_1',
+      stripe_subscription_id: null,
+      stripe_customer_id: 'cus_1'
+    });
+  });
+
+  it('invoice.paid → monto de amount_paid + ids', () => {
+    const r = extraerMontoDeEvento(
+      ev('invoice.paid', { id: 'in_1', amount_paid: 29900, currency: 'mxn', subscription: 'sub_9', customer: 'cus_2', payment_intent: 'pi_9' })
+    );
+    expect(r?.monto_centavos).toBe(29900);
+    expect(r?.stripe_subscription_id).toBe('sub_9');
+    expect(r?.stripe_invoice_id).toBe('in_1');
+    expect(r?.stripe_payment_intent_id).toBe('pi_9');
+  });
+
+  it('NO cuenta checkout.session.completed (evitar doble conteo)', () => {
+    expect(
+      extraerMontoDeEvento(ev('checkout.session.completed', { amount_total: 45000, currency: 'mxn' }))
+    ).toBeNull();
+  });
+
+  it('invoice.payment_failed → null (no es cobranza exitosa)', () => {
+    expect(extraerMontoDeEvento(ev('invoice.payment_failed', { amount_paid: 0 }))).toBeNull();
+  });
+
+  it('subscription.updated → null', () => {
+    expect(extraerMontoDeEvento(ev('customer.subscription.updated', { id: 'sub_1' }))).toBeNull();
   });
 });
