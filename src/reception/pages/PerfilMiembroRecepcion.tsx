@@ -180,6 +180,7 @@ export default function PerfilMiembroRecepcion() {
         tieneFoto={!!miembro.avatar_url}
         onEditar={() => setEditarOpen(true)}
         onFoto={() => setFotoOpen(true)}
+        onFicha={() => setFichaOpen(true)}
         onReset={() => setResetOpen(true)}
         onAviso={() => setAvisoOpen(true)}
       />
