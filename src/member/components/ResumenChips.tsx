@@ -41,7 +41,7 @@ export function ResumenChips({ proximasCount, sesionesEsteMes, creditosRestantes
     >
       {chips.map((c) => (
         <div key={c.label} className="ek-stat-card ek-stat-card--accent" style={{ padding: '14px 14px 16px' }}>
-          <c.Icon size={16} aria-hidden="true" style={{ color: 'var(--ek-mustard)', marginBottom: '8px' }} />
+          <c.Icon size={16} aria-hidden="true" style={{ color: 'var(--ek-ink-faint)', marginBottom: '8px' }} />
           <div style={{ fontFamily: 'var(--ek-font-display)', fontSize: '26px', fontWeight: 700, lineHeight: 1, letterSpacing: '-0.02em' }}>
             {c.valor}
           </div>

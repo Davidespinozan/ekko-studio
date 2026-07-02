@@ -233,7 +233,9 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     line-height: 1;
   }
 
-  .ek-eyebrow--mustard { color: var(--ek-mustard); }
+  /* Monocromo premium: las etiquetas de sección NO van en oro (eso saturaba).
+     Quedan en gris; el único guiño de marca es el tick de --bar. */
+  .ek-eyebrow--mustard { color: var(--ek-ink-muted); }
   .ek-eyebrow--muted { color: var(--ek-ink-muted); }
 
   .ek-kpi {
@@ -409,7 +411,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     box-shadow: var(--ek-highlight-top), 0 4px 14px rgba(0, 0, 0, 0.3);
   }
 
-  .ek-stat-card--accent { border-color: var(--ek-mustard-dim); }
+  .ek-stat-card--accent { border-color: var(--ek-line-strong); }
 
   /* ============================================================================
      BUTTONS

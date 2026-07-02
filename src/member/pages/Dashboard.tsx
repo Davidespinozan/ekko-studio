@@ -215,7 +215,7 @@ export default function Dashboard() {
       {/* Accesos rápidos */}
       <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>ACCESOS RÁPIDOS</p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <Link to="/app/reservar" className="ek-card ek-card-interactive ek-quick-action ek-card--gold">
+        <Link to="/app/reservar" className="ek-card ek-card-interactive ek-quick-action">
           <span className="ek-empty-icon" style={{ width: 44, height: 44, margin: 0 }}>
             <CalendarPlus size={20} aria-hidden="true" />
           </span>

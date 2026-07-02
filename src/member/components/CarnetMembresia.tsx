@@ -23,9 +23,9 @@ export function CarnetMembresia({ tierNombre, resumen }: Props) {
   const { titulo, subtitulo, estadoLabel, estadoTono, requiereAccion } = resumen;
 
   return (
-    <div className="ek-card ek-card--hero ek-card--gold ek-lift" style={{ marginBottom: '24px' }}>
+    <div className="ek-card ek-card--hero ek-lift" style={{ marginBottom: '24px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-        <p className="ek-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+        <p className="ek-eyebrow" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', margin: 0, color: 'var(--ek-mustard)' }}>
           <Sparkles size={13} aria-hidden="true" /> MEMBRESÍA
         </p>
         <span
@@ -35,8 +35,8 @@ export function CarnetMembresia({ tierNombre, resumen }: Props) {
             gap: '6px',
             fontSize: '12px',
             fontWeight: 600,
-            color: 'rgba(10,10,10,0.72)',
-            background: 'rgba(10,10,10,0.10)',
+            color: 'var(--ek-ink-muted)',
+            background: 'rgba(255,255,255,0.06)',
             borderRadius: '999px',
             padding: '4px 10px'
           }}
@@ -65,7 +65,7 @@ export function CarnetMembresia({ tierNombre, resumen }: Props) {
 
       {requiereAccion && (
         <div style={{ marginTop: '18px' }}>
-          <Link to="/app/perfil" className="ek-cta">
+          <Link to="/app/perfil" className="ek-cta ek-cta--gold">
             Ver planes <ArrowRight size={16} aria-hidden="true" />
           </Link>
         </div>
