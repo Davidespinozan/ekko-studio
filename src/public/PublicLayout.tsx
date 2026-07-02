@@ -20,7 +20,7 @@ export default function PublicLayout() {
       <DemoBanner vista="Landing" />
       <header
         style={{
-          padding: '1rem 1.25rem',
+          padding: 'calc(1rem + env(safe-area-inset-top, 0px)) 1.25rem 1rem',
           borderBottom: '1px solid var(--ek-line)',
           display: 'flex',
           justifyContent: 'space-between',
