@@ -213,45 +213,20 @@ export default function Reservar() {
             })}
           </div>
 
-          {/* Preview del estudio seleccionado: foto + nombre para que sepan
-              cuál están eligiendo. */}
+          {/* Preview del estudio seleccionado: misma card de foto (mismo tamaño)
+              que el hero del inicio, para que sepan cuál están eligiendo. */}
           {recursoSel && (
-            <div
-              style={{
-                position: 'relative',
-                marginTop: '12px',
-                borderRadius: 'var(--ek-r-md)',
-                overflow: 'hidden',
-                minHeight: '150px',
-                display: 'flex',
-                boxShadow: 'var(--ek-shadow-card)',
-                border: '0.5px solid var(--ek-line)'
-              }}
-            >
-              {recursoSel.foto_url ? (
-                <img
-                  src={recursoSel.foto_url}
-                  alt={recursoSel.nombre}
-                  loading="lazy"
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                <div style={{ position: 'absolute', inset: 0, background: 'var(--ek-bg-elevated)' }} />
+            <div className="ek-hero-foto" style={{ marginTop: '12px', background: 'var(--ek-bg-elevated)' }}>
+              {recursoSel.foto_url && (
+                <img className="ek-hero-foto-img" src={recursoSel.foto_url} alt={recursoSel.nombre} loading="lazy" />
               )}
-              <div
-                style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background:
-                    'linear-gradient(180deg, rgba(6,6,7,0.05) 0%, rgba(6,6,7,0.55) 60%, rgba(6,6,7,0.9) 100%)'
-                }}
-              />
-              <div style={{ position: 'relative', alignSelf: 'flex-end', padding: '16px', width: '100%' }}>
-                <h3 style={{ fontFamily: 'var(--ek-font-display)', fontSize: '20px', fontWeight: 700, letterSpacing: '-0.02em', margin: 0, color: '#fff' }}>
+              <div className="ek-hero-foto-scrim" />
+              <div className="ek-hero-foto-body">
+                <h3 style={{ fontFamily: 'var(--ek-font-display)', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em', margin: 0, color: '#fff' }}>
                   {recursoSel.nombre}
                 </h3>
                 {(recursoSel.descripcion || recursoSel.capacidad_personas) && (
-                  <p style={{ margin: '3px 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.72)' }}>
+                  <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.72)' }}>
                     {recursoSel.descripcion
                       ? recursoSel.descripcion
                       : `Hasta ${recursoSel.capacidad_personas} ${recursoSel.capacidad_personas === 1 ? 'persona' : 'personas'}`}
