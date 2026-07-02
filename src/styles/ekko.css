@@ -2854,6 +2854,51 @@ select.ek-input option {
 }
 
 /* ============================================================================
+   CAPA DE MOVIMIENTO PREMIUM (portable, accesible) — tomada de SALA
+   ============================================================================
+   Reglas: easing único (--ek-ease-premium), solo transform/opacity, sutileza,
+   y respeto TOTAL a prefers-reduced-motion (kill-switch al final). */
+
+/* Scroll reveal — el contenido sube + aparece al entrar al viewport (<Reveal>). */
+.reveal {
+  opacity: 0;
+  transform: translateY(34px);
+  transition:
+    opacity 0.8s var(--ek-ease-premium),
+    transform 0.8s var(--ek-ease-premium);
+  will-change: transform, opacity;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: none;
+}
+.reveal-delay-1 { transition-delay: 0.10s; }
+.reveal-delay-2 { transition-delay: 0.20s; }
+.reveal-delay-3 { transition-delay: 0.30s; }
+
+/* Orbs flotantes de fondo (marca, muy difuminados, lentos) — dan "vida". */
+@keyframes ek-float-orb {
+  0%, 100% { transform: translate(0, 0); }
+  33%      { transform: translate(28px, -36px); }
+  66%      { transform: translate(-22px, 20px); }
+}
+.ek-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(64px);
+  opacity: 0.4;
+  background: radial-gradient(circle, var(--ek-mustard), transparent 70%);
+  animation: ek-float-orb 22s var(--ek-ease-premium) infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1 !important; transform: none !important; }
+  .ek-orb { animation: none !important; }
+}
+
+/* ============================================================================
    LANDING — sección 2 "Tu estudio en el bolsillo" (AppShowcase)
    ============================================================================
    Showcase de la app del miembro con mockups de teléfono en CSS (sin imágenes).

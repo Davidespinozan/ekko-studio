@@ -6,6 +6,7 @@ import { parseBeneficios } from '@shared/lib/beneficios';
 import { useLandingConfig } from '@shared/hooks/useLandingConfig';
 import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
 import AppShowcase from '../components/AppShowcase';
+import { Reveal } from '../components/Reveal';
 import Footer from '../components/Footer';
 
 interface EstudioPublico {
@@ -149,6 +150,10 @@ export default function Landing() {
           pointerEvents: 'none'
         }} />
 
+        {/* Orbs animados de fondo — dan "vida" al hero (respetan reduced-motion) */}
+        <div className="ek-orb" aria-hidden="true" style={{ width: 320, height: 320, top: '-40px', right: 'clamp(-120px, -8vw, 20px)', opacity: 0.28 }} />
+        <div className="ek-orb" aria-hidden="true" style={{ width: 260, height: 260, bottom: '-60px', left: '-80px', opacity: 0.2, animationDelay: '-8s', animationDuration: '26s' }} />
+
         {hero.eyebrow && (
           <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>
             {hero.eyebrow}
@@ -207,11 +212,12 @@ export default function Landing() {
       {/* ============================================================
           TU ESTUDIO EN EL BOLSILLO (sección 2 — showcase de la app)
           ============================================================ */}
-      <AppShowcase />
+      <Reveal><AppShowcase /></Reveal>
 
       {/* ============================================================
           CÓMO FUNCIONA
           ============================================================ */}
+      <Reveal>
       <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
         <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>CÓMO FUNCIONA</p>
         <h2 style={{
@@ -278,10 +284,12 @@ export default function Landing() {
           ))}
         </div>
       </section>
+      </Reveal>
 
       {/* ============================================================
           ESTUDIOS
           ============================================================ */}
+      <Reveal>
       <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
         <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>NUESTROS ESPACIOS</p>
         <h2 style={{
@@ -380,10 +388,12 @@ export default function Landing() {
           </div>
         )}
       </section>
+      </Reveal>
 
       {/* ============================================================
           MEMBRESÍAS
           ============================================================ */}
+      <Reveal>
       <section id="membresias" style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
         <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>MEMBRESÍAS</p>
         <h2 style={{
@@ -497,10 +507,12 @@ export default function Landing() {
           </div>
         )}
       </section>
+      </Reveal>
 
       {/* ============================================================
           FAQ
           ============================================================ */}
+      <Reveal>
       <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
         <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>PREGUNTAS FRECUENTES</p>
         <h2 style={{
@@ -571,10 +583,12 @@ export default function Landing() {
           ))}
         </div>
       </section>
+      </Reveal>
 
       {/* ============================================================
           CTA + CONTACTO
           ============================================================ */}
+      <Reveal>
       <section id="contacto" style={{ padding: 'clamp(44px, 8vw, 72px) 0' }}>
         <div style={{
           background:
@@ -654,6 +668,7 @@ export default function Landing() {
           </div>
         </div>
       </section>
+      </Reveal>
 
       {/* ============================================================
           FOOTER (extraído a src/public/components/Footer.tsx)
