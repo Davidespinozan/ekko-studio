@@ -98,8 +98,11 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
       maneja parciales con avisos, pero puede dejar al miembro sin reserva).
 - [ ] **Comentario obsoleto** en `PerfilMiembroRecepcion.tsx` ("READ-ONLY") — ya
       es un hub de gestión.
-- [ ] **Timezone centralizado** — `shared/lib/timezone.ts` + `date-fns-tz` en vez
-      de `'America/Mazatlan'` hardcodeado en SQL y JS.
+- [x] **Timezone centralizado (JS)** — `shared/lib/timezone.ts` (Intl, sin dep) con
+      `ZONA_ESTUDIO='America/Mazatlan'`. Métricas del admin (bordes día/mes) y el
+      heatmap ahora en zona del estudio → arregla el off-by-one. Culiacán = Mazatlan.
+- [ ] (opcional) `agruparReservas` del miembro sigue en hora local; el SQL usa
+      `America/Mazatlan` inline (correcto, no centralizado en una constante).
 
 ## 3. CI / testing
 
