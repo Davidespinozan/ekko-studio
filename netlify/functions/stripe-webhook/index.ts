@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { getStripe, clasificarEvento, periodoFinFromSubscription, extraerMontoDeEvento } from '../_lib/stripe';
+import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo } from '../_lib/email';
 
 /**
  * POST /stripe-webhook — materializa los cambios de la suscripción del miembro.
@@ -176,8 +177,36 @@ export const handler: Handler = async (event) => {
           },
           { onConflict: 'stripe_event_id', ignoreDuplicates: true }
         );
+
+        // ── Aviso por email al miembro (best-effort, no-op sin Resend) ────────
+        // Pago fallido → "actualizá tu tarjeta"; primer pago → bienvenida;
+        // renovación → recibo. Solo para facturas de suscripción.
+        if (usuarioIdPago) {
+          const { data: u } = await admin
+            .from('usuarios')
+            .select('email, nombre')
+            .eq('id', usuarioIdPago)
+            .maybeSingle();
+          const email = u?.email ?? null;
+          if (email) {
+            let estudio = 'EKKO Studio';
+            if (tenantIdPago) {
+              const { data: t } = await admin.from('tenants').select('nombre').eq('id', tenantIdPago).maybeSingle();
+              if (t?.nombre) estudio = t.nombre;
+            }
+            const base = { estudio, nombre: u?.nombre ?? null, montoCentavos: monto.monto_centavos, moneda: monto.moneda };
+            let tpl: { subject: string; html: string } | null = null;
+            if (monto.status === 'failed') {
+              tpl = emailPagoFallido(base);
+            } else if (monto.status === 'succeeded' && stripeEvent.type === 'invoice.paid') {
+              const inv = stripeEvent.data.object as { billing_reason?: string };
+              tpl = inv?.billing_reason === 'subscription_create' ? emailBienvenida(base) : emailRecibo(base);
+            }
+            if (tpl) await enviarEmail({ to: email, subject: tpl.subject, html: tpl.html });
+          }
+        }
       } catch (pagoErr) {
-        console.error('[stripe-webhook] no se pudo registrar payment_events', pagoErr);
+        console.error('[stripe-webhook] no se pudo registrar payment_events/email', pagoErr);
       }
     }
 
