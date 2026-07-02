@@ -6,7 +6,7 @@ import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
 import { ProximaSesionHero } from '@member/components/ProximaSesionHero';
-import { CarnetMembresia } from '@member/components/CarnetMembresia';
+import { ResumenHome } from '@member/components/ResumenHome';
 import { useResumenMiembro } from '@member/hooks/useResumenMiembro';
 import { resumenCarnet } from '@member/logic/carnetMembresia';
 
@@ -187,16 +187,17 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* Carnet de membresía + chips de resumen (panel de "tu actividad") */}
+      {/* Resumen compacto: Próximas · Sesiones · Membresía · (Créditos) */}
       {loadingResumen ? (
-        <>
-          <div className="ek-skeleton" style={{ height: '150px', borderRadius: 'var(--ek-r-card)', marginBottom: '24px' }} />
-          <div className="ek-skeleton" style={{ height: '90px', borderRadius: 'var(--ek-r-md)', marginBottom: '24px' }} />
-        </>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="ek-skeleton" style={{ height: '92px', borderRadius: 'var(--ek-r-md)' }} />
+          ))}
+        </div>
       ) : (
-        <CarnetMembresia
+        <ResumenHome
           tierNombre={tierNombre}
-          resumen={carnet}
+          carnet={carnet}
           proximasCount={resumen.proximasCount}
           sesionesEsteMes={resumen.sesionesEsteMes}
           creditosRestantes={creditosChip}

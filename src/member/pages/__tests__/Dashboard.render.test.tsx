@@ -36,14 +36,14 @@ function renderDashboard() {
 describe('Dashboard · inicio del member', () => {
   it('muestra el carnet de membresía y NO los accesos rápidos (viven en el menú)', async () => {
     renderDashboard();
-    expect(await screen.findByText('MEMBRESÍA')).toBeInTheDocument();
+    expect(await screen.findByText('Membresía')).toBeInTheDocument();
     expect(screen.queryByText('Reservar sesión')).not.toBeInTheDocument();
     expect(screen.queryByText('Ver estudios')).not.toBeInTheDocument();
   });
 
   it('ya no renderiza el grid de estudios en el inicio', async () => {
     renderDashboard();
-    await waitFor(() => expect(screen.getByText('MEMBRESÍA')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Membresía')).toBeInTheDocument());
     expect(screen.queryByText('FOTO PRÓXIMAMENTE')).not.toBeInTheDocument();
     expect(screen.queryByText('DISPONIBLE')).not.toBeInTheDocument();
   });
