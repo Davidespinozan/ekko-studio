@@ -6,20 +6,21 @@
   /* Base — DARK premium, LIMPIO: negro profundo neutro, superficies apenas por
      encima, sin glows ni tintes de color (nada de "manchas amarillas"). El
      contraste de luminancia + la tipografía hacen el trabajo, no los efectos. */
-  --ek-bg:           #050506;
-  --ek-bg-soft:      #101012;
-  --ek-bg-elevated:  #17171a;
+  /* ESCALA NEUTRA ÚNICA (una sola familia de grises, sin ad-hoc). Del canvas
+     casi-negro hacia arriba: cada superficie es un peldaño claro y consistente. */
+  --ek-bg:           #060607;   /* canvas */
+  --ek-bg-soft:      #101012;   /* s1: filas, slots, chips, hovers de superficie */
+  --ek-bg-elevated:  #202024;   /* s3: superficies elevadas / botones */
 
-  /* Superficies de card: gris neutro plano, un paso claro sobre el fondo. */
-  --ek-metal-top:    #191919;
-  --ek-metal-mid:    #171717;
-  --ek-metal-bottom: #151515;
+  /* Superficies de card (s2): gradiente sutil dentro de la MISMA familia. */
+  --ek-metal-top:    #1a1a1d;
+  --ek-metal-mid:    #171719;
+  --ek-metal-bottom: #141416;
 
-  /* CHROME (menús: header, sidebar, bottom-nav) — metal MÁS CLARO que el canvas,
-     con gradiente direccional (luz arriba) y filo especular. Así el menú se lee
-     como un marco aparte del contenido, no como el mismo plano. Idea de Renovacell. */
-  --ek-chrome-grad:   linear-gradient(177deg, #26262c 0%, #1a1a1e 52%, #101012 100%);
-  --ek-chrome-grad-h: linear-gradient(180deg, #232329 0%, #141417 100%);
+  /* CHROME (menús) — metal MÁS CLARO que el canvas, mismo tono neutro, con
+     gradiente direccional (luz arriba) + filo especular → marco aparte. */
+  --ek-chrome-grad:   linear-gradient(177deg, #26262b 0%, #19191c 52%, #0e0e10 100%);
+  --ek-chrome-grad-h: linear-gradient(180deg, #232327 0%, #131315 100%);
   --ek-chrome-edge:   rgba(255, 255, 255, 0.08);
 
   /* Ink — off-white neutro (no blanco puro). */
@@ -40,8 +41,8 @@
 
   /* Lines — casi invisibles: el canto de las cards lo define la luz/sombra,
      no un borde marcado (pedido: "los recuadros tienen muy marcados sus márgenes"). */
-  --ek-line:         rgba(255, 255, 255, 0.045);
-  --ek-line-strong:  rgba(255, 255, 255, 0.09);
+  --ek-line:         rgba(255, 255, 255, 0.06);
+  --ek-line-strong:  rgba(255, 255, 255, 0.12);
 
   /* Semantic */
   --ek-success:      #5dca8a;
@@ -344,7 +345,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   }
 
   .ek-card--hero {
-    background: linear-gradient(180deg, #1c1c1e 0%, #161617 100%);
+    background: linear-gradient(180deg, var(--ek-metal-top) 0%, var(--ek-metal-bottom) 100%);
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-card);
     padding: 26px;
@@ -382,7 +383,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   }
 
   .ek-stat-card {
-    background: linear-gradient(180deg, #212226 0%, #17181b 100%);
+    background: linear-gradient(180deg, var(--ek-metal-top) 0%, var(--ek-metal-bottom) 100%);
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-md);
     padding: 16px;
@@ -407,7 +408,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
      ============================================================================ */
   .ek-cta,
   .ek-btn-primary {
-    background: linear-gradient(180deg, #2a2b30 0%, #1a1b1f 100%);
+    background: linear-gradient(180deg, var(--ek-bg-elevated) 0%, var(--ek-metal-mid) 100%);
     color: var(--ek-ink);
     border: 0.5px solid rgba(255, 255, 255, 0.10);
     border-radius: var(--ek-r-sm);
@@ -433,7 +434,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-cta:hover,
   .ek-btn-primary:hover {
-    background: linear-gradient(180deg, #33343a 0%, #202127 100%);
+    background: linear-gradient(180deg, #2b2b30 0%, var(--ek-bg-elevated) 100%);
     border-color: rgba(255, 255, 255, 0.18);
     transform: translateY(-1px);
     box-shadow: var(--ek-highlight-strong), 0 10px 24px rgba(0, 0, 0, 0.42);
@@ -482,7 +483,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     width: 40px;
     height: 40px;
     border-radius: var(--ek-r-sm);
-    background: rgba(245, 241, 232, 0.04);
+    background: rgba(255, 255, 255, 0.04);
     border: 0.5px solid var(--ek-line);
     color: var(--ek-ink-muted);
     display: inline-flex;
@@ -492,7 +493,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   }
 
   .ek-icon-btn:hover {
-    background: rgba(245, 241, 232, 0.08);
+    background: rgba(255, 255, 255, 0.08);
     color: var(--ek-ink);
   }
 
@@ -502,7 +503,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-input {
     width: 100%;
-    background: rgba(245, 241, 232, 0.03);
+    background: rgba(255, 255, 255, 0.03);
     color: var(--ek-ink);
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-sm);
@@ -521,7 +522,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-input:focus {
     border-color: var(--ek-mustard);
-    background: rgba(245, 241, 232, 0.05);
+    background: rgba(255, 255, 255, 0.05);
     outline: none;
     box-shadow: 0 0 0 3px rgba(229, 184, 41, 0.12);
   }
@@ -591,7 +592,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   }
 
   .ek-badge--neutral {
-    background: rgba(245, 241, 232, 0.06);
+    background: rgba(255, 255, 255, 0.06);
     color: var(--ek-ink-muted);
     border: 0.5px solid var(--ek-line);
   }
@@ -648,7 +649,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     color: var(--ek-ink-faint);
   }
 
-  .ek-bottom-nav-item--active { background: var(--ek-mustard-soft); }
+  .ek-bottom-nav-item--active { background: rgba(255, 255, 255, 0.06); }
   .ek-bottom-nav-item--active .ek-bottom-nav-item-label {
     color: var(--ek-mustard);
     font-weight: 700;
@@ -722,9 +723,9 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   .ek-skeleton {
     background: linear-gradient(
       90deg,
-      rgba(245, 241, 232, 0.03) 0%,
-      rgba(245, 241, 232, 0.08) 50%,
-      rgba(245, 241, 232, 0.03) 100%
+      rgba(255, 255, 255, 0.03) 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      rgba(255, 255, 255, 0.03) 100%
     );
     background-size: 200% 100%;
     animation: ek-shimmer 1.5s ease-in-out infinite;
@@ -764,7 +765,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 16px;
-    background: rgba(245, 241, 232, 0.02);
+    background: rgba(255, 255, 255, 0.02);
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-sm);
     padding: 16px;
@@ -1023,7 +1024,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     border-radius: var(--ek-r-sm);
   }
 
-  .rec-day-label:hover { background: rgba(245, 241, 232, 0.03); }
+  .rec-day-label:hover { background: rgba(255, 255, 255, 0.03); }
 
   .rec-day-text {
     font-family: var(--ek-font-display);
@@ -1056,7 +1057,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   .rec-search {
     width: 100%;
     margin-bottom: 20px;
-    background: rgba(245, 241, 232, 0.03);
+    background: rgba(255, 255, 255, 0.03);
     color: var(--ek-ink);
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-sm);
@@ -1181,7 +1182,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   .rec-input {
     width: 100%;
     padding: 12px 16px;
-    background: rgba(245, 241, 232, 0.04);
+    background: rgba(255, 255, 255, 0.04);
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-sm);
     color: var(--ek-ink);
@@ -1761,7 +1762,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   }
 
   .adm-table tbody tr:last-child td { border-bottom: none; }
-  .adm-table tbody tr:hover { background: rgba(245, 241, 232, 0.03); }
+  .adm-table tbody tr:hover { background: rgba(255, 255, 255, 0.03); }
 
   .adm-filters {
     display: flex;
@@ -1778,7 +1779,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   }
 
   .adm-stat-card {
-    background: linear-gradient(180deg, rgba(245, 241, 232, 0.02) 0%, transparent 100%);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-md);
     padding: 18px;
@@ -2348,11 +2349,11 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   color: var(--ek-mustard);
   background: var(--ek-mustard-soft);
   border: 0.5px solid var(--ek-mustard-dim);
-  box-shadow: inset 0 1px 0 rgba(245, 241, 232, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 .ek-empty-icon--neutral {
   color: var(--ek-ink-muted);
-  background: rgba(245, 241, 232, 0.04);
+  background: rgba(255, 255, 255, 0.04);
   border-color: var(--ek-line);
 }
 .ek-empty-icon--danger {
@@ -2394,7 +2395,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   background: transparent;
   border-color: transparent;
 }
-.ek-icon-btn--ghost:hover { background: rgba(245, 241, 232, 0.06); }
+.ek-icon-btn--ghost:hover { background: rgba(255, 255, 255, 0.06); }
 .ek-icon-btn--sm { width: 32px; height: 32px; border-radius: var(--ek-r-xs); }
 .ek-icon-btn--danger:hover {
   background: var(--ek-danger-soft);
@@ -2970,7 +2971,7 @@ select.ek-input option {
   border-radius: 38px;
   padding: 9px;
   box-shadow:
-    0 2px 0 rgba(245, 241, 232, 0.04) inset,
+    0 2px 0 rgba(255, 255, 255, 0.04) inset,
     0 40px 80px rgba(0, 0, 0, 0.55),
     0 8px 24px rgba(0, 0, 0, 0.4);
   z-index: 1;
@@ -3099,7 +3100,7 @@ select.ek-input option {
 .ek-mini-when svg, .ek-mini-badge svg { flex-shrink: 0; }
 .ek-mini-progress {
   height: 4px; border-radius: 999px;
-  background: rgba(245, 241, 232, 0.08);
+  background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 .ek-mini-progress i {
