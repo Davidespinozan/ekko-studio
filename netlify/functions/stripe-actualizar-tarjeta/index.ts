@@ -95,15 +95,31 @@ export const handler: Handler = async (event) => {
       acctOpt
     );
 
+    let reintentado = false;
     if (mem?.stripe_subscription_id) {
-      await stripe.subscriptions.update(
+      const sub = await stripe.subscriptions.update(
         mem.stripe_subscription_id,
         { default_payment_method: pmId },
         acctOpt
       );
+
+      // Si el pago estaba vencido (past_due), reintentar cobrar la última factura
+      // con la nueva tarjeta ahora mismo — así el acceso se restablece sin esperar
+      // el reintento automático de Stripe. Best-effort: si falla, no rompe el
+      // guardado de la tarjeta (Stripe reintentará por su cuenta).
+      const latestInvoice = (sub as unknown as { latest_invoice?: string | { id: string } | null }).latest_invoice;
+      const invoiceId = typeof latestInvoice === 'string' ? latestInvoice : latestInvoice?.id;
+      if (sub.status === 'past_due' && invoiceId) {
+        try {
+          await stripe.invoices.pay(invoiceId, { payment_method: pmId }, acctOpt);
+          reintentado = true;
+        } catch (payErr) {
+          console.error('[stripe-actualizar-tarjeta] reintento de cobro', payErr instanceof Error ? payErr.message : payErr);
+        }
+      }
     }
 
-    return ok({ success: true });
+    return ok({ success: true, reintentado });
   } catch (err) {
     console.error('[stripe-actualizar-tarjeta]', err);
     return serverError(err instanceof Error ? err.message : 'Error inesperado');

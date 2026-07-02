@@ -141,23 +141,24 @@ export default function MiQR() {
     let mounted = true;
     setIsLoading(true);
     setError(null);
+    setReserva(null); // no arrastrar la reserva vieja al reintentar
 
     async function load() {
-      const { data: r } = await supabase
-        .from('reservas')
-        .select('*, recurso:recursos(id, slug, nombre)')
-        .eq('id', reservaId!)
-        .maybeSingle();
-
-      if (!mounted) return;
-      if (!r) {
-        setError('Reserva no encontrada');
-        setIsLoading(false);
-        return;
-      }
-      setReserva(r);
-
       try {
+        const { data: r } = await supabase
+          .from('reservas')
+          .select('*, recurso:recursos(id, slug, nombre)')
+          .eq('id', reservaId!)
+          .maybeSingle();
+
+        if (!mounted) return;
+        if (!r) {
+          setError('Reserva no encontrada');
+          setIsLoading(false);
+          return;
+        }
+        setReserva(r);
+
         const res = await backendPost<IssueResponse>('qr-issue', { reserva_id: reservaId });
         if (!mounted) return;
         setQrPayload(res.qr_payload);
