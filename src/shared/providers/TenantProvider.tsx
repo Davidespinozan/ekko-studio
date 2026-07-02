@@ -28,23 +28,11 @@ const TenantContext = createContext<TenantContextValue>({
  * Para SaaS multi-tenant en producción, el subdominio decide.
  */
 function resolveTenantSlug(): string {
-  if (typeof window === 'undefined') return 'ekko';
-
-  const host = window.location.hostname;
-
-  // localhost / 127.0.0.1 / preview deploys → default ekko
-  if (host === 'localhost' || host.startsWith('127.') || host.endsWith('.netlify.app')) {
-    return 'ekko';
-  }
-
-  // app.ekko.studio → ekko
-  // pilates-noria.sala.app → pilates-noria
-  const parts = host.split('.');
-  if (parts.length >= 2) {
-    return parts[0] === 'app' && parts.length >= 3 ? parts[1] : parts[0];
-  }
-
-  return 'ekko';
+  // EKKO es SINGLE-TENANT por deploy: el slug es fijo (env var, default 'ekko').
+  // NO se resuelve por hostname — eso se rompía con dominios custom
+  // (ej. ekkostudio.app → 'ekkostudio' ≠ 'ekko'). Cada clone del sistema setea
+  // su VITE_TENANT_SLUG; si no, 'ekko'.
+  return (import.meta.env.VITE_TENANT_SLUG as string | undefined)?.trim() || 'ekko';
 }
 
 interface TenantProviderProps {
