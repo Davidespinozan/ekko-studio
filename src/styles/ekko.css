@@ -639,7 +639,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     z-index: 20;
     background: var(--ek-chrome-grad-h);
     border-top: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: inset 0 1px 0 var(--ek-chrome-edge), 0 -10px 30px rgba(0, 0, 0, 0.4);
+    box-shadow: inset 0 1px 0 var(--ek-chrome-edge);
     padding: 8px env(safe-area-inset-left, 8px) calc(8px + env(safe-area-inset-bottom, 0px));
   }
 
@@ -2868,7 +2868,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-bottom-nav {
   background: var(--ek-chrome-grad-h) !important;
   border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
-  box-shadow: inset 0 1px 0 var(--ek-chrome-edge), 0 -10px 28px rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 0 var(--ek-chrome-edge);
 }
 
 /* ============================================================================
