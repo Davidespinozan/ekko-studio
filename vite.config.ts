@@ -22,24 +22,17 @@ export default defineConfig(({ mode }) => {
           short_name: 'EKKO',
           description: 'Tu espacio para crear contenido profesional',
           theme_color: '#0A0A0A',
-          background_color: '#F5F1E8',
+          background_color: '#0A0A0A',
           display: 'standalone',
           orientation: 'portrait',
           scope: '/',
           start_url: '/',
+          lang: 'es-MX',
           icons: [
-            {
-              src: '/icons/icon-192.png',
-              sizes: '192x192',
-              type: 'image/png',
-              purpose: 'any maskable'
-            },
-            {
-              src: '/icons/icon-512.png',
-              sizes: '512x512',
-              type: 'image/png',
-              purpose: 'any maskable'
-            }
+            { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+            { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+            { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+            { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
           ]
         },
         workbox: {
