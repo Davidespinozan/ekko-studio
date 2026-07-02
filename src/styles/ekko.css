@@ -2757,6 +2757,11 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
+/* Slot disponible: borde dorado sutil como affordance (uso funcional del acento). */
+.ek-slot:not(:disabled) {
+  border-color: rgba(229, 184, 41, 0.28);
+  box-shadow: var(--ek-highlight-top);
+}
 .ek-slot:hover:not(:disabled) {
   border-color: var(--ek-mustard);
   background: var(--ek-mustard-soft);

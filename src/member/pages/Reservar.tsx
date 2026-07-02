@@ -262,6 +262,13 @@ export default function Reservar() {
             <p className="ek-body-muted">
               El estudio no opera este día.
             </p>
+          ) : slots.every((s) => !s.disponible) ? (
+            <div className="ek-card ek-card--md" style={{ textAlign: 'center' }}>
+              <p style={{ margin: 0, fontWeight: 600 }}>No quedan horarios disponibles</p>
+              <p className="ek-body-faint" style={{ margin: '4px 0 0' }}>
+                Todos los horarios de este día ya pasaron o están reservados. Probá otra fecha.
+              </p>
+            </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
               {slots.map((slot, i) => {
