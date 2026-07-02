@@ -146,6 +146,7 @@ export async function updateRecurso(
     | 'cupos'
     | 'foto_url'
     | 'capacidad_personas'
+    | 'costo_creditos'
     | 'tipo_contenido'
     | 'equipo_incluido'
     | 'estilo_visual'

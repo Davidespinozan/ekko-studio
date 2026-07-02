@@ -44,6 +44,7 @@ function makeRecurso(overrides: Partial<Recurso> = {}): Recurso {
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     capacidad_personas: null,
+    costo_creditos: 1,
     equipo_incluido: null,
     estilo_visual: null,
     foto_url: null,

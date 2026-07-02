@@ -24,7 +24,7 @@ import type { Database } from '@shared/types/database';
 
 /** Créditos que descuenta reservar este estudio (default 1). */
 function costoCreditos(recurso: Recurso | null): number {
-  return Math.max(1, (recurso as { costo_creditos?: number } | null)?.costo_creditos ?? 1);
+  return Math.max(1, recurso?.costo_creditos ?? 1);
 }
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];

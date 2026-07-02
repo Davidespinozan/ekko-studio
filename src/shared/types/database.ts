@@ -429,6 +429,7 @@ export type Database = {
         Row: {
           activo: boolean
           capacidad_personas: number | null
+          costo_creditos: number
           created_at: string
           cupos: number
           descripcion: string | null
@@ -453,6 +454,7 @@ export type Database = {
         Insert: {
           activo?: boolean
           capacidad_personas?: number | null
+          costo_creditos?: number
           created_at?: string
           cupos?: number
           descripcion?: string | null
@@ -477,6 +479,7 @@ export type Database = {
         Update: {
           activo?: boolean
           capacidad_personas?: number | null
+          costo_creditos?: number
           created_at?: string
           cupos?: number
           descripcion?: string | null

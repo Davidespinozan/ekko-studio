@@ -597,10 +597,7 @@ function EditarRecursoModal({
   const [capacidadPersonas, setCapacidadPersonas] = useState<number>(
     recurso?.capacidad_personas ?? 0
   );
-  // costo_creditos aún no está en los tipos generados → lectura defensiva.
-  const [costoCreditos, setCostoCreditos] = useState<number>(
-    (recurso as { costo_creditos?: number } | null | undefined)?.costo_creditos ?? 1
-  );
+  const [costoCreditos, setCostoCreditos] = useState<number>(recurso?.costo_creditos ?? 1);
   const [tipoContenido, setTipoContenido] = useState<string[]>(recurso?.tipo_contenido ?? []);
   const [equipoIncluido, setEquipoIncluido] = useState<string[]>(recurso?.equipo_incluido ?? []);
   const [estiloVisual, setEstiloVisual] = useState<string>(recurso?.estilo_visual ?? '');
@@ -631,7 +628,7 @@ function EditarRecursoModal({
         return;
       }
 
-      const nuevoRecurso = {
+      const { error: err } = await insertRecurso({
         tenant_id: tenant.id,
         slug: slugFinal,
         nombre: nombre.trim(),
@@ -643,13 +640,11 @@ function EditarRecursoModal({
         horarios: horarios as never,
         foto_url: fotoUrl || null,
         capacidad_personas: capacidadPersonas || null,
+        costo_creditos: Math.max(1, costoCreditos),
         tipo_contenido: tipoContenido,
         equipo_incluido: equipoIncluido,
         estilo_visual: estiloVisual || null
-      };
-      const { error: err } = await insertRecurso(
-        Object.assign(nuevoRecurso, { costo_creditos: Math.max(1, costoCreditos) })
-      );
+      });
 
       if (err) {
         setError(err);
@@ -661,7 +656,7 @@ function EditarRecursoModal({
     }
 
     // Edit mode
-    const cambios = {
+    const { error: err } = await updateRecurso(recurso!.id, {
       nombre,
       descripcion: descripcion || null,
       activo,
@@ -669,14 +664,11 @@ function EditarRecursoModal({
       horarios: horarios as never,
       foto_url: fotoUrl || null,
       capacidad_personas: capacidadPersonas || null,
+      costo_creditos: Math.max(1, costoCreditos),
       tipo_contenido: tipoContenido,
       equipo_incluido: equipoIncluido,
       estilo_visual: estiloVisual || null
-    };
-    const { error: err } = await updateRecurso(
-      recurso!.id,
-      Object.assign(cambios, { costo_creditos: Math.max(1, costoCreditos) })
-    );
+    });
 
     if (err) {
       setError(err);
