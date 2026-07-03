@@ -1,8 +1,10 @@
+import { AlertTriangle, AlertCircle, CheckCircle2, type LucideIcon } from 'lucide-react';
 import { useReportesEconomia } from '../hooks/useReportesEconomia';
 import { useReportesOcupacion } from '../hooks/useReportesOcupacion';
 import { useReportesEngagement } from '../hooks/useReportesEngagement';
 import { useReportesCreditos } from '../hooks/useReportesCreditos';
 import { InfoTooltip } from '@shared/components/InfoTooltip';
+import { generarResumen, type TonoResumen } from '../logic/reportesResumen';
 import type { EconomiaResult } from '../logic/reportesEconomia';
 import type { OcupacionResult } from '../logic/reportesOcupacion';
 import type { EngagementResult } from '../logic/reportesEngagement';
@@ -79,6 +81,14 @@ export default function Reportes() {
           Ingreso recurrente y retención. Toca el ⓘ de cada dato para entender qué significa.
         </p>
       </header>
+
+      <ResumenEjecutivo
+        eco={data ?? null}
+        ocu={ocupacion.data ?? null}
+        eng={engagement.data ?? null}
+        cre={creditos.data ?? null}
+        cargando={isLoading || ocupacion.isLoading || engagement.isLoading}
+      />
 
       <section>
         <p className="ek-eyebrow" style={{ fontSize: '10px', marginBottom: '12px' }}>
@@ -365,6 +375,66 @@ function RankingEstudios({ data }: { data: OcupacionResult }) {
         ))}
       </div>
     </div>
+  );
+}
+
+const RESUMEN_ICON: Record<TonoResumen, LucideIcon> = {
+  bad: AlertTriangle,
+  warn: AlertCircle,
+  good: CheckCircle2
+};
+const RESUMEN_COLOR: Record<TonoResumen, string> = {
+  bad: 'var(--ek-danger)',
+  warn: 'var(--ek-mustard)',
+  good: 'var(--ek-success)'
+};
+
+function ResumenEjecutivo({
+  eco,
+  ocu,
+  eng,
+  cre,
+  cargando
+}: {
+  eco: EconomiaResult | null;
+  ocu: OcupacionResult | null;
+  eng: EngagementResult | null;
+  cre: CreditosResult | null;
+  cargando: boolean;
+}) {
+  const insights = generarResumen(eco, ocu, eng, cre);
+
+  return (
+    <section style={{ marginBottom: '24px' }}>
+      <div className="ek-card">
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ fontSize: '10px', marginBottom: '14px' }}>
+          RESUMEN · QUÉ MIRAR
+        </p>
+        {cargando ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="ek-skeleton" style={{ height: '18px', borderRadius: '6px' }} />
+            ))}
+          </div>
+        ) : insights.length === 0 ? (
+          <p className="ek-body-muted" style={{ margin: 0, fontSize: '13.5px' }}>
+            Aún no hay suficientes datos para un resumen. Vuelve cuando tengas más reservas y miembros.
+          </p>
+        ) : (
+          <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {insights.map((it, i) => {
+              const Icon = RESUMEN_ICON[it.tono];
+              return (
+                <li key={i} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <Icon size={16} aria-hidden="true" style={{ color: RESUMEN_COLOR[it.tono], flexShrink: 0, marginTop: '2px' }} />
+                  <span style={{ fontSize: '13.5px', lineHeight: 1.5, color: 'var(--ek-ink)' }}>{it.texto}</span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </section>
   );
 }
 
