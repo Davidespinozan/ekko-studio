@@ -87,9 +87,11 @@ export default function Login() {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      // Cuadro centrado (el logo ya vive en el header, no se repite acá).
-      justifyContent: 'center',
+      // El contenedor va DEBAJO del header, así que centrar lo empujaba muy
+      // abajo en móvil. Lo anclamos arriba con un margen cómodo.
+      justifyContent: 'flex-start',
       padding: '24px 20px',
+      paddingTop: 'clamp(20px, 5vh, 52px)',
       paddingBottom: 'calc(48px + env(safe-area-inset-bottom, 0px))'
     }}>
       <div style={{ maxWidth: '400px', width: '100%' }}>
