@@ -53,18 +53,15 @@ BEGIN
      true, 4)
   ON CONFLICT (tenant_id, slug) DO NOTHING;
 
-  -- ── 2. Costo en créditos por estudio (ANTES de tocar tiers_permitidos) ─────
-  -- Pro = estudio que NO admite el plan mensual 'basica' (era exclusivo Pro) → 2.
-  -- El resto (Básicos) → 1. Regla, no slugs hardcodeados (hay 5 estudios reales).
-  UPDATE recursos
-  SET costo_creditos = 2
-  WHERE tenant_id = ekko_tenant_id
-    AND NOT ('basica' = ANY(tiers_permitidos));
+  -- ── 2. Costo en créditos por estudio ──────────────────────────────────────
+  -- Estudio 1 y 2 son los ÚNICOS Pro (2 créditos); el resto Básico (1 crédito).
+  -- Así 1 crédito = 1 sesión en Básico, y una sesión Pro = 2. Se identifican por
+  -- slug o nombre (por si se editó alguno).
+  UPDATE recursos SET costo_creditos = 1 WHERE tenant_id = ekko_tenant_id;
 
-  UPDATE recursos
-  SET costo_creditos = 1
+  UPDATE recursos SET costo_creditos = 2
   WHERE tenant_id = ekko_tenant_id
-    AND 'basica' = ANY(tiers_permitidos);
+    AND (slug IN ('estudio-1', 'estudio-2') OR nombre IN ('Estudio 1', 'Estudio 2'));
 
   -- ── 3. Permitir que los planes de crédito reserven en TODOS los estudios ───
   -- Se AGREGAN los slugs de paquete a tiers_permitidos (sin quitar basica/pro,

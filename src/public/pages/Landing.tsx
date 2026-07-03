@@ -16,6 +16,7 @@ interface EstudioPublico {
   nombre: string;
   descripcion: string | null;
   tiers_permitidos: string[];
+  costo_creditos: number;
   tipo_contenido: string[] | null;
   equipo_incluido: string[] | null;
   estilo_visual: string | null;
@@ -45,7 +46,7 @@ function useEstudiosPublicos() {
       const { data, error } = await supabase
         .from('recursos')
         .select(
-          'id, slug, nombre, descripcion, tiers_permitidos, tipo_contenido, equipo_incluido, estilo_visual, capacidad_personas, foto_url'
+          'id, slug, nombre, descripcion, tiers_permitidos, costo_creditos, tipo_contenido, equipo_incluido, estilo_visual, capacidad_personas, foto_url'
         )
         .eq('activo', true)
         .order('orden', { ascending: true });
@@ -102,7 +103,9 @@ export default function Landing() {
   const precioBasica = tiers.find((t) => t.slug === 'basica')?.precio_centavos;
 
   const aEstudioInfo = (r: EstudioPublico): EstudioInfo => {
-    const esPro = r.tiers_permitidos.length === 1 && r.tiers_permitidos[0] === 'pro';
+    // Pro/Básica se deriva del costo en créditos (config del admin), no de
+    // tiers_permitidos — así el landing refleja lo que se configura en admin.
+    const esPro = (r.costo_creditos ?? 1) >= 2;
     const tier: 'basica' | 'pro' = esPro ? 'pro' : 'basica';
     return {
       slug: r.slug,

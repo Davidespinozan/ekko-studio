@@ -188,7 +188,7 @@ export default function Reservar() {
             {recursos.map((r) => {
               const activo = recursoSel?.id === r.id;
               const accesible = puedeUsar(r);
-              const esPro = r.tiers_permitidos.length === 1 && r.tiers_permitidos[0] === 'pro';
+              const esPro = (r.costo_creditos ?? 1) >= 2;
               return (
                 <button
                   key={r.id}
