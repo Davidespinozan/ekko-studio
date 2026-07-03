@@ -75,7 +75,59 @@ export default function Miembros() {
           tone="neutral"
         />
       ) : (
-        <div className="adm-table-wrapper">
+        <>
+        {/* Móvil: tarjetas apiladas (la tabla no entra en pantallas chicas). */}
+        <div className="adm-cards-mobile">
+          {miembros.map((m) => (
+            <Link
+              key={m.id}
+              to={`/admin/miembros/${m.id}`}
+              className="adm-card adm-card--interactive"
+              style={{
+                padding: '14px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                textDecoration: 'none',
+                color: 'inherit'
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ margin: 0, fontSize: '15px', fontWeight: 600 }}>{m.nombre ?? '—'}</p>
+                <p
+                  style={{
+                    margin: '2px 0 0',
+                    fontSize: '12px',
+                    color: 'var(--ek-ink-muted)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {m.email}
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                      color: 'var(--ek-ink-muted)'
+                    }}
+                  >
+                    {m.membresia_tier ?? 'sin plan'}
+                  </span>
+                  <StatusBadge status={m.status} />
+                </div>
+              </div>
+              <ArrowRight size={16} aria-hidden="true" style={{ color: 'var(--ek-mustard)', flexShrink: 0 }} />
+            </Link>
+          ))}
+        </div>
+
+        {/* Desktop: tabla */}
+        <div className="adm-table-wrapper adm-table-desktop">
           <table className="adm-table">
             <thead>
               <tr>
@@ -114,6 +166,7 @@ export default function Miembros() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {showNuevo && (

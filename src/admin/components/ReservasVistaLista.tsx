@@ -336,7 +336,32 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
         </div>
       ) : (
         <>
+          {/* Móvil: tarjetas apiladas (el grid ancho no entra en pantallas chicas). */}
+          <div className="adm-cards-mobile">
+            {reservasPagina.map((r) => (
+              <ReservaCardMobile
+                key={r.id}
+                reserva={r}
+                onVerDetalle={() => onVerDetalle(r.id)}
+                onCancelar={
+                  onCancelar
+                    ? () =>
+                        onCancelar({
+                          id: r.id,
+                          slot_inicio: r.slot_inicio,
+                          recurso_nombre: r.recurso_nombre,
+                          usuario_nombre: r.usuario_nombre,
+                          tier: r.tier
+                        })
+                    : undefined
+                }
+              />
+            ))}
+          </div>
+
+          {/* Desktop: grid con scroll horizontal si hace falta. */}
           <div
+            className="adm-table-desktop"
             style={{
               background: 'var(--ek-bg-soft)',
               border: '0.5px solid var(--ek-line)',
@@ -535,6 +560,76 @@ function ReservaRow({
             : [])
         ]}
       />
+    </div>
+  );
+}
+
+function ReservaCardMobile({
+  reserva,
+  onVerDetalle,
+  onCancelar
+}: {
+  reserva: ReservaListada;
+  onVerDetalle: () => void;
+  onCancelar?: () => void;
+}) {
+  const fecha = new Date(reserva.slot_inicio);
+  const puedeCancelar = fecha.getTime() > Date.now() && reserva.status === 'confirmada' && !!onCancelar;
+
+  return (
+    <div
+      onClick={onVerDetalle}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onVerDetalle();
+        }
+      }}
+      className="adm-card adm-card--interactive"
+      style={{ padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: '12px' }}
+    >
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--ek-ink-muted)' }}>
+          <span>{fecha.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+          <span style={{ color: 'var(--ek-ink)', fontWeight: 600 }}>
+            {fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })}
+          </span>
+        </div>
+        <p style={{ margin: '6px 0 0', fontSize: '15px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {reserva.recurso_nombre}
+        </p>
+        <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--ek-ink-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {reserva.usuario_nombre}
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+          {reserva.tier && (
+            <span style={{ fontSize: '11px', color: 'var(--ek-ink-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              {reserva.tier}
+            </span>
+          )}
+          <StatusBadge status={reserva.status} size={11} />
+        </div>
+      </div>
+      <div onClick={(e) => e.stopPropagation()}>
+        <CardMenuDropdown
+          items={[
+            { label: 'Ver detalle', icon: Eye, onClick: onVerDetalle },
+            ...(puedeCancelar && onCancelar
+              ? [
+                  {
+                    label: 'Cancelar reserva',
+                    icon: Ban,
+                    onClick: onCancelar,
+                    danger: true,
+                    divider: true
+                  }
+                ]
+              : [])
+          ]}
+        />
+      </div>
     </div>
   );
 }

@@ -845,6 +845,14 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     box-shadow: 0 0 0 1px var(--ek-mustard-dim), var(--ek-shadow-card);
   }
 
+  /* Listas responsive del admin: tabla en desktop, tarjetas apiladas en móvil
+     (las tablas anchas no entran en pantallas chicas → scroll horizontal feo). */
+  .adm-cards-mobile { display: none; }
+  @media (max-width: 720px) {
+    .adm-cards-mobile { display: flex; flex-direction: column; gap: 10px; }
+    .adm-table-desktop { display: none; }
+  }
+
   .adm-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
