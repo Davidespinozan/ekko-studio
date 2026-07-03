@@ -201,9 +201,6 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
 
   return (
     <section>
-      <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '14px' }}>
-        MI SUSCRIPCIÓN
-      </p>
 
       {loading ? (
         <div className="ek-card"><Spinner size={18} label="Cargando tu plan…" /></div>
