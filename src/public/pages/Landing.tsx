@@ -11,6 +11,9 @@ import { Reveal } from '../components/Reveal';
 import { MagneticButton } from '@shared/components/MagneticButton';
 import Footer from '../components/Footer';
 
+// Íconos de "Cómo funciona" por posición (el texto es editable; el ícono no).
+const PASO_ICONS = [CalendarCheck, Clapperboard, FolderDown];
+
 interface EstudioPublico {
   id: string;
   slug: string;
@@ -97,11 +100,9 @@ export default function Landing() {
   const [estudioAbierto, setEstudioAbierto] = useState<EstudioInfo | null>(null);
   const { estudios, isLoading: estudiosLoading } = useEstudiosPublicos();
   const { tiers, isLoading: tiersLoading } = useTiersPublicos();
-  const { hero, cta_final, whatsappUrl } = useLandingConfig();
+  const { hero, cta_final, whatsappUrl, membresias, como_funciona, faq, estudio_modal } =
+    useLandingConfig();
   const ctaWhatsappUrl = whatsappUrl();
-
-  const precioPro = tiers.find((t) => t.slug === 'pro')?.precio_centavos;
-  const precioBasica = tiers.find((t) => t.slug === 'basica')?.precio_centavos;
 
   const aEstudioInfo = (r: EstudioPublico): EstudioInfo => {
     // Pro/Básica se deriva del costo en créditos (config del admin), no de
@@ -119,9 +120,7 @@ export default function Landing() {
       descripcion: r.descripcion ?? '',
       estiloVisual: r.estilo_visual ?? '',
       equipoIncluido: r.equipo_incluido ?? [],
-      fotoUrl: r.foto_url ?? undefined,
-      precioPro: precioPro ? Math.round(precioPro / 100) : undefined,
-      precioBasica: precioBasica ? Math.round(precioBasica / 100) : undefined
+      fotoUrl: r.foto_url ?? undefined
     };
   };
 
@@ -224,7 +223,9 @@ export default function Landing() {
           ============================================================ */}
       <Reveal>
       <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
-        <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>CÓMO FUNCIONA</p>
+        {como_funciona.eyebrow && (
+          <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>{como_funciona.eyebrow}</p>
+        )}
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
           fontSize: 'clamp(36px, 6vw, 56px)',
@@ -234,41 +235,30 @@ export default function Landing() {
           margin: 0,
           marginBottom: '28px'
         }}>
-          De la idea al contenido.<br />
-          <span style={{ color: 'var(--ek-mustard)' }}>En tres pasos.</span>
+          {como_funciona.titulo}
+          {como_funciona.titulo_accent && (
+            <>
+              <br />
+              <span style={{ color: 'var(--ek-mustard)' }}>{como_funciona.titulo_accent}</span>
+            </>
+          )}
         </h2>
 
         <div className="ek-step-grid">
-          {[
-            {
-              n: '01',
-              Icon: CalendarCheck,
-              title: 'Reserva tu sesión',
-              body: 'Elige estudio, fecha y horario desde la app. Sin llamadas, sin esperas.'
-            },
-            {
-              n: '02',
-              Icon: Clapperboard,
-              title: 'Llega y graba',
-              body: 'Equipo profesional ya montado: cámaras, micrófonos, iluminación. Tú solo traés tu contenido.'
-            },
-            {
-              n: '03',
-              Icon: FolderDown,
-              title: 'Recibe tu material',
-              body: 'Te entregamos los archivos limpios después de cada sesión. Vos decidís cómo publicarlo.'
-            }
-          ].map((paso) => (
+          {como_funciona.pasos.map((paso, i) => {
+            const Icon = PASO_ICONS[i % PASO_ICONS.length];
+            const n = String(i + 1).padStart(2, '0');
+            return (
             <div
-              key={paso.n}
+              key={n}
               className="ek-card ek-card--md ek-step-card"
             >
               <span className="ek-empty-icon ek-step-icon" style={{ width: 44, height: 44 }}>
-                <paso.Icon size={20} aria-hidden="true" />
+                <Icon size={20} aria-hidden="true" />
               </span>
               <div className="ek-step-text">
                 <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '6px' }}>
-                  PASO {paso.n}
+                  PASO {n}
                 </p>
                 <h3 className="ek-step-title" style={{
                   fontFamily: 'var(--ek-font-display)',
@@ -277,16 +267,17 @@ export default function Landing() {
                   margin: 0,
                   marginBottom: '6px',
                   letterSpacing: '-0.02em'
-                }}>{paso.title}</h3>
+                }}>{paso.titulo}</h3>
                 <p className="ek-step-body" style={{
                   fontSize: '13.5px',
                   color: 'var(--ek-ink-muted)',
                   lineHeight: 1.5,
                   margin: 0
-                }}>{paso.body}</p>
+                }}>{paso.texto}</p>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </section>
       </Reveal>
@@ -400,7 +391,9 @@ export default function Landing() {
           ============================================================ */}
       <Reveal>
       <section id="membresias" style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
-        <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>MEMBRESÍAS</p>
+        {membresias.eyebrow && (
+          <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>{membresias.eyebrow}</p>
+        )}
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
           fontSize: 'clamp(36px, 6vw, 56px)',
@@ -410,8 +403,13 @@ export default function Landing() {
           margin: 0,
           marginBottom: '28px'
         }}>
-          Elige tu nivel.<br />
-          <span style={{ color: 'var(--ek-mustard)' }}>Crece desde el día uno.</span>
+          {membresias.titulo}
+          {membresias.titulo_accent && (
+            <>
+              <br />
+              <span style={{ color: 'var(--ek-mustard)' }}>{membresias.titulo_accent}</span>
+            </>
+          )}
         </h2>
 
         {tiersLoading ? (
@@ -514,7 +512,9 @@ export default function Landing() {
           ============================================================ */}
       <Reveal>
       <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
-        <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>PREGUNTAS FRECUENTES</p>
+        {faq.eyebrow && (
+          <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>{faq.eyebrow}</p>
+        )}
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
           fontSize: 'clamp(36px, 6vw, 56px)',
@@ -524,40 +524,11 @@ export default function Landing() {
           margin: 0,
           marginBottom: '28px'
         }}>
-          Lo que probablemente quieres saber.
+          {faq.titulo}
         </h2>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          {[
-            {
-              q: '¿Qué incluye la membresía?',
-              a: 'Acceso a los estudios según tu plan, todo el equipo profesional ya montado (cámaras, micrófonos, iluminación), espacio para invitados y reservas vía app.'
-            },
-            {
-              q: '¿Puedo cancelar una grabación programada?',
-              a: 'Sí. Puedes cancelarla con anticipación a través de WhatsApp, para evitar una posible amonestación por inasistencia.'
-            },
-            {
-              q: '¿Puedo cancelar mi membresía?',
-              a: 'El cobro de la membresía está sujeto al contrato, que contempla un mínimo de 6 meses. Pasado ese periodo, podrás cancelarla cuando gustes.'
-            },
-            {
-              q: '¿Qué pasa si no llego a mi reserva?',
-              a: 'Las inasistencias bloquean tu cuenta por 1 semana automáticamente. Pero si avisas con anticipación, puedes cancelar sin penalidad.'
-            },
-            {
-              q: '¿Necesito traer mi propio equipo?',
-              a: 'No. Cada estudio tiene su equipo profesional completo. Solo traes tu contenido y tu disco duro para llevarte el material.'
-            },
-            {
-              q: '¿Puedo invitar gente?',
-              a: 'Sí. Básica permite hasta 2 invitados por sesión, Pro hasta 4. Para producciones más grandes en Black, contáctanos.'
-            },
-            {
-              q: '¿Cómo me cobran?',
-              a: 'Cobro mensual automatizado vía tarjeta. El primer mes incluye onboarding y configuración de tu cuenta.'
-            }
-          ].map((item) => (
+          {faq.items.map((item) => (
             <details key={item.q} className="ek-card" style={{ padding: '20px 24px', cursor: 'pointer' }}>
               <summary style={{
                 fontFamily: 'var(--ek-font-display)',
@@ -678,6 +649,8 @@ export default function Landing() {
       <EstudioModal
         estudio={estudioAbierto}
         onClose={() => setEstudioAbierto(null)}
+        ctaTexto={estudio_modal.cta_texto}
+        ctaLink={estudio_modal.cta_link}
       />
     </div>
   );

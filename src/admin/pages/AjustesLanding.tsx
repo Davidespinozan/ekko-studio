@@ -1,6 +1,21 @@
 import { useEffect, useState } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useTenantConfigEditor } from '../hooks/useTenantConfigEditor';
 import { useToast } from '@shared/hooks/useToast';
+import {
+  MEMBRESIAS_DEFAULT,
+  COMO_FUNCIONA_DEFAULT,
+  FAQ_DEFAULT,
+  ESTUDIO_MODAL_DEFAULT,
+  parseMembresias,
+  parseComoFunciona,
+  parseFaq,
+  parseEstudioModal,
+  type MembresiasConfig,
+  type ComoFuncionaConfig,
+  type FaqConfig,
+  type EstudioModalConfig
+} from '@shared/lib/landingDefaults';
 
 type HeroDraft = {
   eyebrow: string;
@@ -29,12 +44,20 @@ type LandingDraft = {
   hero: HeroDraft;
   cta_final: CtaFinalDraft;
   footer: FooterDraft;
+  membresias: MembresiasConfig;
+  como_funciona: ComoFuncionaConfig;
+  faq: FaqConfig;
+  estudio_modal: EstudioModalConfig;
 };
 
 const EMPTY: LandingDraft = {
   hero: { eyebrow: '', titulo: '', titulo_accent: '', subtitulo: '', cta_texto: '', cta_link: '' },
   cta_final: { eyebrow: '', titulo: '', subtitulo: '', cta_texto: '' },
-  footer: { tagline: '', copyright: '', direccion: '', email: '' }
+  footer: { tagline: '', copyright: '', direccion: '', email: '' },
+  membresias: MEMBRESIAS_DEFAULT,
+  como_funciona: COMO_FUNCIONA_DEFAULT,
+  faq: FAQ_DEFAULT,
+  estudio_modal: ESTUDIO_MODAL_DEFAULT
 };
 
 function readLanding(config: Record<string, unknown> | null): LandingDraft {
@@ -62,7 +85,13 @@ function readLanding(config: Record<string, unknown> | null): LandingDraft {
       copyright: String(footer.copyright ?? ''),
       direccion: footer.direccion == null ? '' : String(footer.direccion),
       email: footer.email == null ? '' : String(footer.email)
-    }
+    },
+    // Estas caen a su copy default (landingDefaults) si el tenant nunca las tocó,
+    // así el editor muestra el contenido real que ve el visitante, no campos vacíos.
+    membresias: parseMembresias(landing.membresias),
+    como_funciona: parseComoFunciona(landing.como_funciona),
+    faq: parseFaq(landing.faq),
+    estudio_modal: parseEstudioModal(landing.estudio_modal)
   };
 }
 
@@ -182,6 +211,8 @@ export default function AjustesLanding() {
   const dirty = JSON.stringify(draft) !== JSON.stringify(original);
 
   async function handleSave() {
+    // OJO: saveTopLevel REEMPLAZA todo el objeto landing, así que hay que incluir
+    // TODAS las secciones o se borrarían las que no van en el payload.
     const payload = {
       hero: { ...draft.hero },
       cta_final: { ...draft.cta_final },
@@ -191,7 +222,11 @@ export default function AjustesLanding() {
         copyright: draft.footer.copyright,
         direccion: draft.footer.direccion || null,
         email: draft.footer.email || null
-      }
+      },
+      membresias: { ...draft.membresias },
+      como_funciona: { ...draft.como_funciona, pasos: draft.como_funciona.pasos },
+      faq: { ...draft.faq, items: draft.faq.items },
+      estudio_modal: { ...draft.estudio_modal }
     };
     const { error } = await saveTopLevel({ landing: payload });
     if (error) {
@@ -204,6 +239,41 @@ export default function AjustesLanding() {
 
   function handleDiscard() {
     setDraft(original);
+  }
+
+  // ── Listas dinámicas: pasos de "Cómo funciona" y preguntas del FAQ ──────────
+  function updatePaso(i: number, patch: Partial<{ titulo: string; texto: string }>) {
+    setDraft((d) => ({
+      ...d,
+      como_funciona: {
+        ...d.como_funciona,
+        pasos: d.como_funciona.pasos.map((p, idx) => (idx === i ? { ...p, ...patch } : p))
+      }
+    }));
+  }
+  function addPaso() {
+    setDraft((d) => ({
+      ...d,
+      como_funciona: { ...d.como_funciona, pasos: [...d.como_funciona.pasos, { titulo: '', texto: '' }] }
+    }));
+  }
+  function removePaso(i: number) {
+    setDraft((d) => ({
+      ...d,
+      como_funciona: { ...d.como_funciona, pasos: d.como_funciona.pasos.filter((_, idx) => idx !== i) }
+    }));
+  }
+  function updateFaq(i: number, patch: Partial<{ q: string; a: string }>) {
+    setDraft((d) => ({
+      ...d,
+      faq: { ...d.faq, items: d.faq.items.map((it, idx) => (idx === i ? { ...it, ...patch } : it)) }
+    }));
+  }
+  function addFaq() {
+    setDraft((d) => ({ ...d, faq: { ...d.faq, items: [...d.faq.items, { q: '', a: '' }] } }));
+  }
+  function removeFaq(i: number) {
+    setDraft((d) => ({ ...d, faq: { ...d.faq, items: d.faq.items.filter((_, idx) => idx !== i) } }));
   }
 
   if (isLoading) {
@@ -387,6 +457,186 @@ export default function AjustesLanding() {
             }
             className="ek-input"
             placeholder="contacto@ekkostudio.com"
+          />
+        </FormField>
+      </Section>
+
+      <Section
+        title="ENCABEZADO DE PLANES"
+        description="El título de la sección de planes. Las tarjetas de precio salen de Admin → Planes."
+      >
+        <FormField label="Etiqueta superior">
+          <input
+            value={draft.membresias.eyebrow}
+            onChange={(e) => setDraft({ ...draft, membresias: { ...draft.membresias, eyebrow: e.target.value } })}
+            className="ek-input"
+            placeholder="PLANES"
+          />
+        </FormField>
+        <FormField label="Título">
+          <input
+            value={draft.membresias.titulo}
+            onChange={(e) => setDraft({ ...draft, membresias: { ...draft.membresias, titulo: e.target.value } })}
+            className="ek-input"
+            placeholder="Elige tu paquete."
+          />
+        </FormField>
+        <FormField label="Palabra destacada (mostaza)" helper="Segunda línea del título, en mostaza. Vacío = sin segunda línea.">
+          <input
+            value={draft.membresias.titulo_accent}
+            onChange={(e) => setDraft({ ...draft, membresias: { ...draft.membresias, titulo_accent: e.target.value } })}
+            className="ek-input"
+            placeholder="Graba cuando quieras."
+          />
+        </FormField>
+      </Section>
+
+      <Section title="CÓMO FUNCIONA" description="Los pasos que explican tu servicio. Los íconos son fijos por posición.">
+        <FormField label="Etiqueta superior">
+          <input
+            value={draft.como_funciona.eyebrow}
+            onChange={(e) => setDraft({ ...draft, como_funciona: { ...draft.como_funciona, eyebrow: e.target.value } })}
+            className="ek-input"
+            placeholder="CÓMO FUNCIONA"
+          />
+        </FormField>
+        <FormField label="Título">
+          <input
+            value={draft.como_funciona.titulo}
+            onChange={(e) => setDraft({ ...draft, como_funciona: { ...draft.como_funciona, titulo: e.target.value } })}
+            className="ek-input"
+            placeholder="De la idea al contenido."
+          />
+        </FormField>
+        <FormField label="Palabra destacada (mostaza)" helper="Segunda línea del título, en mostaza. Vacío = sin segunda línea.">
+          <input
+            value={draft.como_funciona.titulo_accent}
+            onChange={(e) => setDraft({ ...draft, como_funciona: { ...draft.como_funciona, titulo_accent: e.target.value } })}
+            className="ek-input"
+            placeholder="En tres pasos."
+          />
+        </FormField>
+
+        {draft.como_funciona.pasos.map((paso, i) => (
+          <div
+            key={i}
+            style={{ padding: '14px', marginBottom: '10px', background: 'var(--ek-bg-soft)', borderRadius: 'var(--ek-r-md)', border: '0.5px solid var(--ek-line)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span className="ek-eyebrow ek-eyebrow--mustard" style={{ fontSize: '11px' }}>PASO {String(i + 1).padStart(2, '0')}</span>
+              <button
+                type="button"
+                onClick={() => removePaso(i)}
+                aria-label={`Eliminar paso ${i + 1}`}
+                style={{ background: 'none', border: 'none', color: 'var(--ek-ink-faint)', cursor: 'pointer', padding: '4px' }}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+            <input
+              value={paso.titulo}
+              onChange={(e) => updatePaso(i, { titulo: e.target.value })}
+              className="ek-input"
+              placeholder="Título del paso"
+              style={{ marginBottom: '8px' }}
+            />
+            <textarea
+              value={paso.texto}
+              onChange={(e) => updatePaso(i, { texto: e.target.value })}
+              className="ek-input"
+              rows={2}
+              placeholder="Descripción del paso"
+            />
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addPaso}
+          className="ek-cta ek-cta--secondary"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 16px', fontSize: '13px' }}
+        >
+          <Plus size={15} /> Agregar paso
+        </button>
+      </Section>
+
+      <Section title="PREGUNTAS FRECUENTES" description="Las dudas comunes de tus clientes. Se muestran como acordeón en el landing.">
+        <FormField label="Etiqueta superior">
+          <input
+            value={draft.faq.eyebrow}
+            onChange={(e) => setDraft({ ...draft, faq: { ...draft.faq, eyebrow: e.target.value } })}
+            className="ek-input"
+            placeholder="PREGUNTAS FRECUENTES"
+          />
+        </FormField>
+        <FormField label="Título">
+          <input
+            value={draft.faq.titulo}
+            onChange={(e) => setDraft({ ...draft, faq: { ...draft.faq, titulo: e.target.value } })}
+            className="ek-input"
+            placeholder="Lo que probablemente quieres saber."
+          />
+        </FormField>
+
+        {draft.faq.items.map((item, i) => (
+          <div
+            key={i}
+            style={{ padding: '14px', marginBottom: '10px', background: 'var(--ek-bg-soft)', borderRadius: 'var(--ek-r-md)', border: '0.5px solid var(--ek-line)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span className="ek-eyebrow ek-eyebrow--mustard" style={{ fontSize: '11px' }}>PREGUNTA {i + 1}</span>
+              <button
+                type="button"
+                onClick={() => removeFaq(i)}
+                aria-label={`Eliminar pregunta ${i + 1}`}
+                style={{ background: 'none', border: 'none', color: 'var(--ek-ink-faint)', cursor: 'pointer', padding: '4px' }}
+              >
+                <Trash2 size={15} />
+              </button>
+            </div>
+            <input
+              value={item.q}
+              onChange={(e) => updateFaq(i, { q: e.target.value })}
+              className="ek-input"
+              placeholder="¿Pregunta?"
+              style={{ marginBottom: '8px' }}
+            />
+            <textarea
+              value={item.a}
+              onChange={(e) => updateFaq(i, { a: e.target.value })}
+              className="ek-input"
+              rows={3}
+              placeholder="Respuesta"
+            />
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addFaq}
+          className="ek-cta ek-cta--secondary"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '10px 16px', fontSize: '13px' }}
+        >
+          <Plus size={15} /> Agregar pregunta
+        </button>
+      </Section>
+
+      <Section
+        title="BOTÓN DEL DETALLE DE ESTUDIO"
+        description="El botón que aparece dentro del modal cuando alguien abre un estudio."
+      >
+        <FormField label="Texto del botón">
+          <input
+            value={draft.estudio_modal.cta_texto}
+            onChange={(e) => setDraft({ ...draft, estudio_modal: { ...draft.estudio_modal, cta_texto: e.target.value } })}
+            className="ek-input"
+            placeholder="Ver planes y reservar"
+          />
+        </FormField>
+        <FormField label="A dónde lleva el botón" helper="URL o ruta interna (ej. /signup) o anchor (#membresias).">
+          <input
+            value={draft.estudio_modal.cta_link}
+            onChange={(e) => setDraft({ ...draft, estudio_modal: { ...draft.estudio_modal, cta_link: e.target.value } })}
+            className="ek-input"
+            placeholder="/signup"
           />
         </FormField>
       </Section>

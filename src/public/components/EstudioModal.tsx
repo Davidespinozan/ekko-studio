@@ -12,16 +12,16 @@ export interface EstudioInfo {
   estiloVisual: string;
   equipoIncluido: string[];
   fotoUrl?: string;
-  precioPro?: number;
-  precioBasica?: number;
 }
 
 interface Props {
   estudio: EstudioInfo | null;
   onClose: () => void;
+  ctaTexto: string;
+  ctaLink: string;
 }
 
-export default function EstudioModal({ estudio, onClose }: Props) {
+export default function EstudioModal({ estudio, onClose, ctaTexto, ctaLink }: Props) {
   useEffect(() => {
     if (!estudio) return;
 
@@ -228,13 +228,11 @@ export default function EstudioModal({ estudio, onClose }: Props) {
           </div>
 
           <Link
-            to={`/signup?tier=${estudio.tier}`}
+            to={ctaLink}
             className="ek-cta ek-cta--gold ek-cta--full"
             style={{ padding: '16px', fontSize: '15px', textAlign: 'center' }}
           >
-            {esPro
-              ? `Quiero la Pro${estudio.precioPro ? ` · $${estudio.precioPro.toLocaleString('es-MX')}/mes` : ''}`
-              : `Empezar con Básica${estudio.precioBasica ? ` · $${estudio.precioBasica.toLocaleString('es-MX')}/mes` : ''}`}
+            {ctaTexto}
           </Link>
         </div>
       </div>

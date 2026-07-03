@@ -1,4 +1,10 @@
 import { useTenant } from '@shared/hooks/useTenant';
+import {
+  parseMembresias,
+  parseComoFunciona,
+  parseFaq,
+  parseEstudioModal
+} from '@shared/lib/landingDefaults';
 
 type LandingHero = {
   eyebrow: string;
@@ -102,6 +108,12 @@ export function useLandingConfig() {
 
   const contacto = parseObject(contactoRaw, CONTACTO_DEFAULT);
 
+  // Secciones de contenido editable (con copy de arranque en landingDefaults).
+  const membresias = parseMembresias(landing.membresias);
+  const como_funciona = parseComoFunciona(landing.como_funciona);
+  const faq = parseFaq(landing.faq);
+  const estudio_modal = parseEstudioModal(landing.estudio_modal);
+
   // Helper: URL completa de WhatsApp con mensaje encoded.
   // Devuelve null si no hay número configurado → render condicional en el consumidor.
   const whatsappUrl = (mensaje?: string): string | null => {
@@ -115,6 +127,10 @@ export function useLandingConfig() {
     cta_final,
     footer,
     contacto,
+    membresias,
+    como_funciona,
+    faq,
+    estudio_modal,
     whatsappUrl
   };
 }
