@@ -203,10 +203,16 @@ export default function MiQR() {
         </Link>
 
         {reserva && (
-          <div className="ek-stack-md">
-            <p className="ek-eyebrow ek-eyebrow--mustard">TU QR DE ACCESO</p>
-            <h1 className="ek-display-md">{reserva.recurso?.nombre ?? 'Estudio'}</h1>
-            <p className="ek-body-muted">
+          // "Stub" del pase en crema (toque claro estratégico). El QR blanco va
+          // aparte más abajo, separado por el fondo oscuro → no chocan.
+          <div className="ek-card ek-card--cream">
+            <p className="ek-eyebrow" style={{ color: 'rgba(10, 10, 10, 0.5)', marginBottom: '6px' }}>
+              TU PASE DE ACCESO
+            </p>
+            <h1 className="ek-display-md" style={{ color: 'var(--ek-bg)', margin: 0 }}>
+              {reserva.recurso?.nombre ?? 'Estudio'}
+            </h1>
+            <p style={{ color: 'rgba(10, 10, 10, 0.66)', fontSize: '14px', margin: '6px 0 0', lineHeight: 1.5 }}>
               {new Date(reserva.slot_inicio).toLocaleDateString('es-MX', {
                 weekday: 'long', day: 'numeric', month: 'long'
               })}

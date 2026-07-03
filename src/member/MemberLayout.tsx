@@ -81,7 +81,9 @@ export default function MemberLayout() {
         ) : (
           /* Inicio: logo centrado, campana anclada a la derecha */
           <div className="ek-header-inner ek-header-inner--centered">
-            <Link to="/app" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
+            {/* Margen negativo: el logo es grande pero el PNG trae aire arriba/abajo;
+                así el header no queda con una franja gris de más. */}
+            <Link to="/app" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none', marginTop: '-20px', marginBottom: '-20px' }}>
               <BrandLogo height={104} maxWidth={360} />
             </Link>
             <div className="ek-header-bell-abs">
