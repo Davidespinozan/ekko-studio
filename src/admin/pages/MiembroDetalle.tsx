@@ -1,6 +1,6 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, AlertTriangle, Check, Send } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Check, Send, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { useMiembroDetalle, updateMiembro, adminUpdateRole, adminDeleteUser, useTiersAdmin } from '../hooks/useAdminData';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
@@ -8,6 +8,9 @@ import { formatHora } from '@member/logic/reservaLogic';
 import { Spinner } from '@shared/components/Spinner';
 import { NotasMiembro } from '@shared/components/NotasMiembro';
 import { EnviarAvisoModal } from '@shared/components/EnviarAvisoModal';
+import { FichaIdentidadModal } from '@reception/components/FichaIdentidadModal';
+import { HistorialCambios } from '@reception/components/perfil/HistorialCambios';
+import { useAuditLogDeUsuario } from '@reception/hooks/useAuditLogDeUsuario';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type { Database } from '@shared/types/database';
 
@@ -17,6 +20,7 @@ export default function MiembroDetalle() {
   const toast = useToast();
   const { miembro, reservas, isLoading, refetch } = useMiembroDetalle(id);
   const { tiers } = useTiersAdmin();
+  const { entries: auditEntries, isLoading: auditLoading, error: auditError } = useAuditLogDeUsuario(id);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ status: string; membresia_tier: string }>({
@@ -26,6 +30,7 @@ export default function MiembroDetalle() {
   const [eliminarOpen, setEliminarOpen] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [avisoOpen, setAvisoOpen] = useState(false);
+  const [fichaOpen, setFichaOpen] = useState(false);
 
   const totalReservas = reservas.length;
 
@@ -174,6 +179,19 @@ export default function MiembroDetalle() {
       </section>
 
       <section className="adm-section">
+        <h2 className="ek-h3">Ficha de identidad</h2>
+        <p className="adm-body" style={{ marginBottom: '0.75rem' }}>
+          Expediente completo del miembro: fecha de nacimiento, domicilio, INE (folio y foto)
+          y contrato firmado. Mismo acceso que recepción — admin ve y edita todo.
+        </p>
+        <FichaIdentidadResumen
+          identidadCompleta={miembro.identidad_completa}
+          contratoFirmado={miembro.contrato_firmado}
+          onAbrir={() => setFichaOpen(true)}
+        />
+      </section>
+
+      <section className="adm-section">
         <h2 className="ek-h3">Notas operativas</h2>
         <p className="adm-body" style={{ marginBottom: '0.5rem' }}>
           Visible para recepción al hacer check-in. Útil para preferencias,
@@ -203,6 +221,14 @@ export default function MiembroDetalle() {
         <button onClick={() => setAvisoOpen(true)} className="ek-cta ek-cta--secondary" style={{ minHeight: '44px' }}>
           <Send size={15} aria-hidden="true" /> Enviar aviso
         </button>
+      </section>
+
+      <section className="adm-section">
+        <h2 className="ek-h3">Historial de cambios</h2>
+        <p className="adm-body" style={{ marginBottom: '0.75rem' }}>
+          Auditoría de acciones sensibles sobre este miembro (status, plan, identidad, rol…).
+        </p>
+        <HistorialCambios entries={auditEntries} isLoading={auditLoading} error={auditError} />
       </section>
 
       <section
@@ -249,6 +275,16 @@ export default function MiembroDetalle() {
         />
       )}
 
+      {fichaOpen && (
+        <FichaIdentidadModal
+          miembroId={miembro.id}
+          miembroNombre={miembro.nombre ?? miembro.email}
+          tieneFoto={!!miembro.avatar_url}
+          onClose={() => setFichaOpen(false)}
+          onGuardada={() => { void refetch(); }}
+        />
+      )}
+
       <ConfirmDialog
         isOpen={eliminarOpen}
         title={`¿Eliminar a ${miembro.nombre ?? miembro.email}?`}
@@ -288,6 +324,51 @@ export default function MiembroDetalle() {
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function FichaIdentidadResumen({ identidadCompleta, contratoFirmado, onAbrir }: {
+  identidadCompleta: boolean;
+  contratoFirmado: boolean;
+  onAbrir: () => void;
+}) {
+  const completa = identidadCompleta && contratoFirmado;
+  const falta = [!identidadCompleta && 'datos/foto/INE', !contratoFirmado && 'contrato firmado']
+    .filter(Boolean)
+    .join(' y ');
+  return (
+    <div
+      className="ek-card"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        borderColor: completa ? undefined : 'var(--ek-warning)',
+        background: completa ? undefined : 'var(--ek-warning-soft)'
+      }}
+    >
+      {completa ? (
+        <ShieldCheck size={22} style={{ color: 'var(--ek-success)', flexShrink: 0 }} aria-hidden="true" />
+      ) : (
+        <ShieldAlert size={22} style={{ color: 'var(--ek-warning)', flexShrink: 0 }} aria-hidden="true" />
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>
+          {completa ? 'Ficha completa' : 'Ficha incompleta'}
+        </p>
+        <p className="ek-body-muted" style={{ margin: '2px 0 0', fontSize: '12.5px' }}>
+          {completa ? 'Identidad y contrato en orden.' : `Falta: ${falta}.`}
+        </p>
+      </div>
+      <button
+        type="button"
+        className={completa ? 'ek-cta ek-cta--secondary' : 'ek-cta ek-cta--gold'}
+        style={{ padding: '9px 16px', fontSize: '13px', flexShrink: 0 }}
+        onClick={onAbrir}
+      >
+        {completa ? 'Ver ficha' : 'Completar ficha'}
+      </button>
     </div>
   );
 }
