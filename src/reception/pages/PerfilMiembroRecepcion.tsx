@@ -208,6 +208,12 @@ export default function PerfilMiembroRecepcion() {
 
       <DatosOperativosCard miembro={miembro} />
 
+      <FichaIdentidadCard
+        identidadCompleta={miembro.identidad_completa}
+        contratoFirmado={miembro.contrato_firmado}
+        onAbrir={() => setFichaOpen(true)}
+      />
+
       <AccionesCuenta
         tieneFoto={!!miembro.avatar_url}
         onEditar={() => setEditarOpen(true)}
@@ -273,14 +279,8 @@ export default function PerfilMiembroRecepcion() {
         )}
       </Seccion>
 
-      <FichaIdentidadCard
-        identidadCompleta={miembro.identidad_completa}
-        contratoFirmado={miembro.contrato_firmado}
-        onAbrir={() => setFichaOpen(true)}
-      />
-
       <section style={{ marginBottom: '20px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>NOTAS OPERATIVAS</p>
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>NOTAS DEL MIEMBRO</p>
         <NotasMiembro miembroId={miembro.id} />
       </section>
 

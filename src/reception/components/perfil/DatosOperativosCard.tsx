@@ -1,4 +1,5 @@
 import { PlanChip } from '@shared/components/PlanChip';
+import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
 import { statusMiembro } from '../../lib/miembroStatus';
 import { fechaCorta } from './perfilUtils';
 import type { MiembroPerfil } from './types';
@@ -15,13 +16,16 @@ function Dato({ label, valor }: { label: string; valor: React.ReactNode }) {
 /** Datos operativos del miembro (email, plan, estado, inasistencias…). */
 export function DatosOperativosCard({ miembro }: { miembro: MiembroPerfil }) {
   const st = statusMiembro(miembro.status);
+  const { planes } = usePlanesActivos();
+  // Solo mostramos el plan si sigue ACTIVO (no los tiers eliminados tipo pro/basica).
+  const planVigente = miembro.membresia_tier && planes.some((p) => p.slug === miembro.membresia_tier);
   return (
     <div className="ek-card" style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <Dato label="Email" valor={miembro.email} />
       {miembro.telefono && <Dato label="Teléfono" valor={miembro.telefono} />}
       <Dato
         label="Plan"
-        valor={<PlanChip slug={miembro.membresia_tier} />}
+        valor={planVigente ? <PlanChip slug={miembro.membresia_tier} /> : <span style={{ color: 'var(--ek-ink-faint)' }}>Sin plan</span>}
       />
       <Dato label="Estado" valor={<span style={{ color: st.color, fontWeight: 600 }}>{st.label}</span>} />
       <Dato label="Inasistencias" valor={String(miembro.no_shows_count ?? 0)} />
