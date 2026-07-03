@@ -74,12 +74,27 @@ export default function EstudioDetalle() {
 
   return (
     <div className="ek-container">
-      <button
-        onClick={() => navigate(-1)}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: 'var(--ek-ink-muted)', fontSize: '13px', cursor: 'pointer', padding: '2px 0', marginBottom: '10px' }}
-      >
-        <ArrowLeft size={15} aria-hidden="true" /> Volver
-      </button>
+      {/* Header row: Volver a la izquierda, nombre del estudio centrado. */}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '34px', marginBottom: '14px' }}>
+        <button
+          onClick={() => navigate(-1)}
+          style={{ position: 'absolute', left: 0, display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: 'var(--ek-ink-muted)', fontSize: '13px', cursor: 'pointer', padding: '2px 0' }}
+        >
+          <ArrowLeft size={15} aria-hidden="true" /> Volver
+        </button>
+        <h1 style={{
+          fontFamily: 'var(--ek-font-display)',
+          fontSize: '19px',
+          fontWeight: 700,
+          letterSpacing: '-0.02em',
+          margin: 0,
+          textAlign: 'center',
+          maxWidth: '58%',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}>{recurso.nombre}</h1>
+      </div>
 
       {/* Foto grande */}
       <div style={{
@@ -108,22 +123,11 @@ export default function EstudioDetalle() {
         )}
       </div>
 
-      {/* Header */}
-      <div style={{ marginBottom: '16px' }}>
-        <h1 style={{
-          fontFamily: 'var(--ek-font-display)',
-          fontSize: 'clamp(26px, 6.5vw, 36px)',
-          fontWeight: 700,
-          letterSpacing: '-0.03em',
-          lineHeight: 1.05,
-          margin: 0
-        }}>{recurso.nombre}</h1>
-        {recurso.descripcion && (
-          <p className="ek-body" style={{ marginTop: '12px', color: 'var(--ek-ink-muted)' }}>
-            {recurso.descripcion}
-          </p>
-        )}
-      </div>
+      {recurso.descripcion && (
+        <p className="ek-body" style={{ marginBottom: '20px', color: 'var(--ek-ink-muted)' }}>
+          {recurso.descripcion}
+        </p>
+      )}
 
       {tipoContenido.length > 0 && (
         <div className="ek-card ek-card--md ek-card--cream" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
