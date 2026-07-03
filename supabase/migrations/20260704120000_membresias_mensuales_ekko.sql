@@ -8,7 +8,7 @@
 --   • Hasta 60 min por sesión               • Material entregado en MP4
 --   • Invitados: 2 (Esencial) / 4 (Premium)
 --   • Premium agrega: edición básica IA (CapCut) + 2 miniaturas por video
---   Letra chiquita: contrato mínimo 6 meses, pago automático.
+--   Letra chiquita: pago automático mensual, sin permanencia (mes a mes).
 --
 -- Conviven con los paquetes de créditos (uso puntual, sin mensualidad). En la
 -- landing se separan por pestaña (Membresías · Paquetes) para no saturar.
@@ -46,7 +46,7 @@ BEGIN
        {"label":"Hasta 2 invitados","incluido":true},
        {"label":"Edición básica con IA (CapCut)","incluido":false},
        {"label":"2 miniaturas por video","incluido":false}]'::jsonb,
-     '{"max_invitados": 2, "contrato_meses": 6}'::jsonb,
+     '{"max_invitados": 2}'::jsonb,
      true, 1),
 
     (ekko_tenant_id, 'premium', 'Premium',
@@ -59,7 +59,7 @@ BEGIN
        {"label":"Hasta 4 invitados","incluido":true},
        {"label":"Edición básica con IA (CapCut)","incluido":true},
        {"label":"2 miniaturas por video","incluido":true}]'::jsonb,
-     '{"max_invitados": 4, "recomendado": true, "contrato_meses": 6}'::jsonb,
+     '{"max_invitados": 4, "recomendado": true}'::jsonb,
      true, 2)
   ON CONFLICT (tenant_id, slug) DO UPDATE
     SET nombre = EXCLUDED.nombre,

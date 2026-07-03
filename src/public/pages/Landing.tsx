@@ -531,7 +531,7 @@ export default function Landing() {
         {/* Letra chiquita de las membresías (términos que pidió el cliente). */}
         {!tiersLoading && vistaPlan === 'membresias' && planesMensuales.length > 0 && (
           <p className="ek-plan-fineprint">
-            Contrato mínimo de 6 meses · pago automático mensual · el tiempo adicional tiene costo extra · no se reservan horas continuas.
+            Membresía mes a mes, cancela cuando quieras · pago automático mensual · el tiempo adicional tiene costo extra · no se reservan horas continuas.
           </p>
         )}
       </section>

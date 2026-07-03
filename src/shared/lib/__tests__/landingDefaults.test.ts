@@ -100,6 +100,10 @@ describe('landingDefaults parsers', () => {
     it('no hardcodea el costo en créditos por estudio (es configurable)', () => {
       expect(faqTexto).not.toContain('cuestan 1 crédito');
     });
+
+    it('membresías sin permanencia: no exige compromiso mínimo ni 6 meses', () => {
+      expect(faqTexto).not.toMatch(/contrato mínimo|compromiso mínimo|permanencia mínima|6 meses|seis meses/);
+    });
   });
 
   describe('parseEstudioModal', () => {

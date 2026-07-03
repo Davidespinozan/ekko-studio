@@ -41,7 +41,7 @@ export default function Terminos() {
       <ul>
         <li><strong>Membresía mensual:</strong> otorga acceso recurrente según el plan contratado, con cobro periódico automático.</li>
         <li><strong>Planes por créditos o paquetes:</strong> otorgan un número de sesiones que se consumen al reservar.</li>
-        <li><strong>Compromiso mínimo:</strong> las membresías mensuales tienen un compromiso mínimo de <strong>6 meses</strong>, salvo que se indique lo contrario por escrito.</li>
+        <li><strong>Sin permanencia:</strong> las membresías mensuales son mes a mes; puedes cancelarlas cuando quieras, sin compromiso mínimo.</li>
       </ul>
       <p>Las características, precios y reglas de cada plan se muestran al momento de la contratación y pueden actualizarse hacia el futuro.</p>
 
@@ -59,9 +59,9 @@ export default function Terminos() {
 
       <h2>5. Cancelación de la membresía</h2>
       <p>
-        Puedes cancelar tu membresía desde tu perfil o en recepción. La cancelación surte efecto al finalizar el período
-        ya pagado y, cuando aplique, respetando el compromiso mínimo de 6 meses. No se realizan reembolsos de períodos
-        ya cobrados ni de créditos ya adquiridos, salvo que la ley aplicable disponga otra cosa.
+        Puedes cancelar tu membresía cuando quieras desde tu perfil o en recepción, sin permanencia. La cancelación surte
+        efecto al finalizar el período ya pagado. No se realizan reembolsos de períodos ya cobrados ni de créditos ya
+        adquiridos, salvo que la ley aplicable disponga otra cosa.
       </p>
 
       <h2>6. Reservas, cancelaciones y no-shows</h2>

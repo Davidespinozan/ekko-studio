@@ -115,7 +115,7 @@ export const FAQ_DEFAULT: FaqConfig = {
     },
     {
       q: '¿Cómo pago y qué compromisos hay?',
-      a: 'Pagas en línea con tarjeta. La membresía mensual se cobra automáticamente cada mes, con un contrato mínimo de 6 meses; un paquete de créditos es un solo cobro, sin mensualidad. El tiempo adicional a tu sesión tiene costo extra.'
+      a: 'Pagas en línea con tarjeta. La membresía mensual se cobra automáticamente cada mes y la cancelas cuando quieras, sin permanencia; un paquete de créditos es un solo cobro, sin mensualidad. El tiempo adicional a tu sesión tiene costo extra.'
     }
   ]
 };
