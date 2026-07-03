@@ -95,8 +95,7 @@ export default function AdminDashboard() {
 
       <CentroPendientes />
       <SeccionHoy data={data} onCancelar={setCancelar} />
-      <SeccionTuMes data={data} />
-      <SeccionDinero />
+      <PulsoDelMes data={data} />
 
       {cancelar && (
         <CancelarReservaModal
@@ -273,127 +272,135 @@ function SeccionHoy({
 }
 
 // ============================================================================
-// SECCIÓN TU MES
+// PULSO DEL MES — tira compacta (ingresos · reservas · altas · no-shows) +
+// gráfica de 30 días + enlace a Reportes. El análisis profundo (MRR, ocupación,
+// churn, LTV…) vive en Reportes; aquí solo el pulso glanceable, sin badges
+// gigantes que duplican ese reporte.
 // ============================================================================
 
-function SeccionTuMes({ data }: { data: DashboardData }) {
+function PulsoDelMes({ data }: { data: DashboardData }) {
+  const { metrics } = useDineroMetrics();
   const ahora = new Date();
   const mesActual = nombreMes(ahora);
-  const mesAnteriorDate = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1);
-  const mesAnteriorNombre = nombreMes(mesAnteriorDate);
+  const mesAnteriorNombre = nombreMes(new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1));
 
-  const tendenciaReservas = calcTendencia(
-    data.reservasMesActual,
-    data.reservasMesAnterior
-  );
-  const tendenciaMiembros = calcTendencia(
-    data.miembrosNuevosMesActual,
-    data.miembrosNuevosMesAnterior
-  );
+  const tendReservas = calcTendencia(data.reservasMesActual, data.reservasMesAnterior);
+  const tendMiembros = calcTendencia(data.miembrosNuevosMesActual, data.miembrosNuevosMesAnterior);
+  const tendDinero = metrics ? calcTendencia(metrics.facturadoMesActual, metrics.facturadoMesAnterior) : null;
 
-  // No-shows: comparar % no-show
   const pctActual =
-    data.reservasMesActual > 0
-      ? Math.round((data.noShowsMesActual / data.reservasMesActual) * 100)
-      : 0;
+    data.reservasMesActual > 0 ? Math.round((data.noShowsMesActual / data.reservasMesActual) * 100) : 0;
   const pctAnterior =
     data.totalReservasMesAnteriorParaNoShows > 0
-      ? Math.round(
-          (data.noShowsMesAnterior / data.totalReservasMesAnteriorParaNoShows) * 100
-        )
+      ? Math.round((data.noShowsMesAnterior / data.totalReservasMesAnteriorParaNoShows) * 100)
       : 0;
-  const tendenciaNoShows = pctAnterior === 0 ? null : pctActual - pctAnterior;
+  const tendNoShows = pctAnterior === 0 ? null : pctActual - pctAnterior;
+
+  const minis = [
+    { label: 'INGRESOS', valor: metrics ? pesos(metrics.facturadoMesActual) : '—', tendencia: tendDinero },
+    { label: 'RESERVAS', valor: String(data.reservasMesActual), tendencia: tendReservas },
+    { label: 'ALTAS', valor: String(data.miembrosNuevosMesActual), tendencia: tendMiembros },
+    { label: 'NO-SHOWS', valor: `${pctActual}%`, tendencia: tendNoShows, inversa: true }
+  ];
 
   return (
-    <section style={{ marginBottom: '32px' }}>
+    <section style={{ marginBottom: '28px' }}>
       <SectionHeader
         title="ESTE MES"
         subtitle={`${mesActual.charAt(0).toUpperCase() + mesActual.slice(1)} ${ahora.getFullYear()}`}
       />
 
-      <div className="adm-metricas-grid">
-        <MetricaCard
-          valor={data.reservasMesActual}
-          label="RESERVAS"
-          tendencia={tendenciaReservas}
-          mesAnteriorNombre={mesAnteriorNombre}
-        />
-        <MetricaCard
-          valor={data.miembrosNuevosMesActual}
-          label="MIEMBROS NUEVOS"
-          tendencia={tendenciaMiembros}
-          mesAnteriorNombre={mesAnteriorNombre}
-        />
-        <MetricaCard
-          valor={`${pctActual}%`}
-          label="NO-SHOWS"
-          tendencia={tendenciaNoShows}
-          tendenciaInversa
-          mesAnteriorNombre={mesAnteriorNombre}
-          subtexto={`${data.noShowsMesActual} de ${data.reservasMesActual}`}
-        />
+      <div className="ek-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="adm-pulso-grid">
+          {minis.map((m) => (
+            <MiniStat key={m.label} {...m} mesAnteriorNombre={mesAnteriorNombre} />
+          ))}
+        </div>
       </div>
 
-      <Grafica30Dias data={data.reservasUltimos30Dias} />
+      <div style={{ marginTop: '14px' }}>
+        <Grafica30Dias data={data.reservasUltimos30Dias} />
+      </div>
+
+      <Link
+        to="/admin/reportes"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '5px',
+          marginTop: '14px',
+          fontSize: '13px',
+          color: 'var(--ek-mustard)',
+          textDecoration: 'none',
+          fontWeight: 600
+        }}
+      >
+        Ver reportes completos · ocupación, MRR, retención
+        <ArrowRight size={13} aria-hidden="true" />
+      </Link>
     </section>
   );
 }
 
-function MetricaCard({
-  valor,
+function MiniStat({
   label,
+  valor,
   tendencia,
-  tendenciaInversa = false,
-  mesAnteriorNombre,
-  subtexto
+  inversa = false,
+  mesAnteriorNombre
 }: {
-  valor: number | string;
   label: string;
+  valor: string;
   tendencia: number | null;
-  tendenciaInversa?: boolean;
+  inversa?: boolean;
   mesAnteriorNombre: string;
-  subtexto?: string;
 }) {
-  let tendenciaTexto = '';
-  let tendenciaColor = 'var(--ek-ink-faint)';
-  let TendenciaIcon: LucideIcon | null = null;
+  let txt = '';
+  let color = 'var(--ek-ink-faint)';
+  let Icon: LucideIcon | null = null;
 
   if (tendencia === null) {
-    tendenciaTexto = 'Primer mes';
-    TendenciaIcon = PartyPopper;
+    txt = 'primer mes';
+    Icon = PartyPopper;
+  } else if (Math.round(tendencia) === 0) {
+    txt = `igual que ${mesAnteriorNombre}`;
   } else {
-    const abs = Math.abs(tendencia).toFixed(0);
-    TendenciaIcon = tendencia >= 0 ? ArrowUp : ArrowDown;
-    const positivo = tendenciaInversa ? tendencia <= 0 : tendencia >= 0;
-    tendenciaColor = positivo ? 'var(--ek-success)' : 'var(--ek-danger)';
-    tendenciaTexto = `${abs}% vs ${mesAnteriorNombre}`;
+    Icon = tendencia >= 0 ? ArrowUp : ArrowDown;
+    const positivo = inversa ? tendencia < 0 : tendencia > 0;
+    color = positivo ? 'var(--ek-success)' : 'var(--ek-danger)';
+    txt = `${Math.abs(Math.round(tendencia))}% vs ${mesAnteriorNombre}`;
   }
 
   return (
-    <div
-      className="ek-card"
-      style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}
-    >
-      <p className="ek-eyebrow" style={{ fontSize: '10px', margin: 0 }}>{label}</p>
+    <div className="adm-pulso-cell">
+      <p className="ek-eyebrow" style={{ fontSize: '9.5px', margin: 0 }}>{label}</p>
       <p
         style={{
           fontFamily: 'var(--ek-font-display)',
-          fontSize: '36px',
+          fontSize: '24px',
           fontWeight: 700,
           letterSpacing: '-0.03em',
           lineHeight: 1,
-          margin: 0
+          margin: '6px 0 0'
         }}
       >
         {valor}
       </p>
-      <p style={{ fontSize: '12px', color: tendenciaColor, margin: 0, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-        {TendenciaIcon && <TendenciaIcon size={13} aria-hidden="true" />}
-        {tendenciaTexto}
+      <p
+        style={{
+          fontSize: '10.5px',
+          color,
+          margin: '6px 0 0',
+          fontWeight: 600,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '3px',
+          lineHeight: 1.2
+        }}
+      >
+        {Icon && <Icon size={11} aria-hidden="true" style={{ flexShrink: 0 }} />}
+        {txt}
       </p>
-      {subtexto && (
-        <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', margin: 0 }}>{subtexto}</p>
-      )}
     </div>
   );
 }
@@ -465,59 +472,11 @@ function Grafica30Dias({ data }: { data: Array<{ fecha: string; count: number }>
 }
 
 // ============================================================================
-// SECCIÓN DINERO
+// Formateo de dinero (usado por el pulso del mes)
 // ============================================================================
 
 function pesos(centavos: number): string {
   return `$${Math.round(centavos / 100).toLocaleString('es-MX')}`;
-}
-
-function SeccionDinero() {
-  const { metrics, isLoading } = useDineroMetrics();
-
-  const ahora = new Date();
-  const mesActual = nombreMes(ahora);
-  const mesAnteriorNombre = nombreMes(new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1));
-  const tendencia = metrics ? calcTendencia(metrics.facturadoMesActual, metrics.facturadoMesAnterior) : null;
-
-  return (
-    <section style={{ marginBottom: '24px' }}>
-      <SectionHeader title="DINERO" subtitle={`${mesActual.charAt(0).toUpperCase() + mesActual.slice(1)} ${ahora.getFullYear()}`} />
-
-      {isLoading ? (
-        <div className="adm-metricas-grid">
-          <div className="ek-skeleton" style={{ height: '110px', borderRadius: 'var(--ek-r-md)' }} />
-          <div className="ek-skeleton" style={{ height: '110px', borderRadius: 'var(--ek-r-md)' }} />
-        </div>
-      ) : !metrics || (metrics.facturadoMesActual === 0 && metrics.facturadoMesAnterior === 0 && metrics.cobrosMesActual === 0) ? (
-        <div className="ek-card ek-card--md">
-          <p className="ek-eyebrow" style={{ fontSize: '10px', marginBottom: '6px' }}>FACTURADO ESTE MES</p>
-          <p style={{ fontFamily: 'var(--ek-font-display)', fontSize: '36px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, margin: 0 }}>$0</p>
-          <p className="ek-body-faint" style={{ margin: '8px 0 0' }}>
-            Aún no hay cobros registrados este mes. Aparecerán aquí en cuanto entren pagos por Stripe.
-          </p>
-        </div>
-      ) : (
-        <div className="adm-metricas-grid">
-          <MetricaCard
-            valor={pesos(metrics.facturadoMesActual)}
-            label="FACTURADO ESTE MES"
-            tendencia={tendencia}
-            mesAnteriorNombre={mesAnteriorNombre}
-          />
-          <div className="ek-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            <p className="ek-eyebrow" style={{ fontSize: '10px', margin: 0 }}>COBROS</p>
-            <p style={{ fontFamily: 'var(--ek-font-display)', fontSize: '36px', fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1, margin: 0 }}>
-              {metrics.cobrosMesActual}
-            </p>
-            <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', margin: 0 }}>
-              {metrics.cobrosMesActual === 1 ? 'pago exitoso este mes' : 'pagos exitosos este mes'}
-            </p>
-          </div>
-        </div>
-      )}
-    </section>
-  );
 }
 
 // ============================================================================

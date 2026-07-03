@@ -2279,6 +2279,23 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     }
   }
 
+  /* Pulso del mes (dashboard): tira densa de mini-stats. Los divisores hairline
+     salen del gap dejando ver el color de línea de fondo. Mucho más compacta
+     que las badges grandes de 36px. */
+  .adm-pulso-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5px;
+    background: var(--ek-line);
+  }
+  .adm-pulso-cell {
+    padding: 14px 16px;
+    background: var(--ek-bg-elevated);
+  }
+  @media (min-width: 620px) {
+    .adm-pulso-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+
   @media (min-width: 768px) {
     .ek-bottom-nav-inner {
       max-width: 480px;
