@@ -138,15 +138,17 @@ export default function MiembroDetalle() {
               className="ek-input"
             >
               <option value="">— sin tier —</option>
-              {tiers.map((t) => (
-                <option key={t.id} value={t.slug}>
-                  {t.nombre}{t.activo ? '' : ' (eliminado)'}
-                </option>
+              {/* Solo planes ACTIVOS: no se puede asignar uno eliminado. */}
+              {tiers.filter((t) => t.activo).map((t) => (
+                <option key={t.id} value={t.slug}>{t.nombre}</option>
               ))}
-              {/* Si el tier actual ya no existe en la lista, mostralo igual para no
-                  cambiarlo silenciosamente al guardar. */}
-              {draft.membresia_tier && !tiers.some((t) => t.slug === draft.membresia_tier) && (
-                <option value={draft.membresia_tier}>{draft.membresia_tier}</option>
+              {/* Excepción: si el plan ACTUAL del miembro está eliminado, lo
+                  mostramos igual (marcado) para no cambiarlo en silencio al
+                  guardar — pero no ofrecemos los demás eliminados. */}
+              {draft.membresia_tier && !tiers.some((t) => t.activo && t.slug === draft.membresia_tier) && (
+                <option value={draft.membresia_tier}>
+                  {(tiers.find((t) => t.slug === draft.membresia_tier)?.nombre ?? draft.membresia_tier)} (eliminado)
+                </option>
               )}
             </select>
           </label>
