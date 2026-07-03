@@ -48,6 +48,13 @@ export interface EstudioModalConfig {
   cta_link: string;
 }
 
+export interface EstudiosConfig {
+  eyebrow: string;
+  titulo: string;
+  titulo_accent: string;
+  subtitulo: string;
+}
+
 export const MEMBRESIAS_DEFAULT: MembresiasConfig = {
   eyebrow: 'PLANES',
   titulo: 'Elige tu paquete.',
@@ -114,6 +121,15 @@ export const ESTUDIO_MODAL_DEFAULT: EstudioModalConfig = {
   cta_link: '/signup'
 };
 
+// Encabezado de la sección de estudios. Default genérico (no atado a un número
+// de estudios) para que no quede desfasado si agregás o quitás estudios.
+export const ESTUDIOS_DEFAULT: EstudiosConfig = {
+  eyebrow: 'NUESTROS ESPACIOS',
+  titulo: 'Nuestros estudios.',
+  titulo_accent: 'Una personalidad para cada visión.',
+  subtitulo: 'Cada uno diseñado para un tipo de contenido. Elige el que va con tu visión.'
+};
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as Record<string, unknown>;
@@ -173,5 +189,16 @@ export function parseEstudioModal(raw: unknown): EstudioModalConfig {
   return {
     cta_texto: str(o.cta_texto, ESTUDIO_MODAL_DEFAULT.cta_texto),
     cta_link: str(o.cta_link, ESTUDIO_MODAL_DEFAULT.cta_link)
+  };
+}
+
+export function parseEstudios(raw: unknown): EstudiosConfig {
+  const o = asRecord(raw);
+  if (!o) return ESTUDIOS_DEFAULT;
+  return {
+    eyebrow: str(o.eyebrow, ESTUDIOS_DEFAULT.eyebrow),
+    titulo: str(o.titulo, ESTUDIOS_DEFAULT.titulo),
+    titulo_accent: str(o.titulo_accent, ESTUDIOS_DEFAULT.titulo_accent),
+    subtitulo: str(o.subtitulo, ESTUDIOS_DEFAULT.subtitulo)
   };
 }

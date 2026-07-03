@@ -1,11 +1,10 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Check, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 
 export interface EstudioInfo {
   slug: string;
   nombre: string;
-  tier: 'basica' | 'pro';
   capacidad: string;
   contenido: string[];
   descripcion: string;
@@ -39,8 +38,6 @@ export default function EstudioModal({ estudio, onClose, ctaTexto, ctaLink }: Pr
   }, [estudio, onClose]);
 
   if (!estudio) return null;
-
-  const esPro = estudio.tier === 'pro';
 
   return (
     <div
@@ -135,13 +132,6 @@ export default function EstudioModal({ estudio, onClose, ctaTexto, ctaLink }: Pr
             </div>
           )}
 
-          <span
-            className={esPro ? 'ek-badge ek-badge--outline' : 'ek-badge'}
-            style={{ position: 'absolute', top: '16px', left: '16px' }}
-          >
-            {esPro && <Star size={11} fill="currentColor" aria-hidden="true" />}
-            {esPro ? 'PRO' : 'BÁSICA'}
-          </span>
         </div>
 
         <div style={{ padding: 'clamp(16px, 5vw, 32px)' }}>

@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   MEMBRESIAS_DEFAULT,
+  ESTUDIOS_DEFAULT,
   COMO_FUNCIONA_DEFAULT,
   FAQ_DEFAULT,
   ESTUDIO_MODAL_DEFAULT,
   parseMembresias,
+  parseEstudios,
   parseComoFunciona,
   parseFaq,
   parseEstudioModal
@@ -22,6 +24,17 @@ describe('landingDefaults parsers', () => {
       expect(r.titulo).toBe('Mis planes');
       expect(r.eyebrow).toBe(MEMBRESIAS_DEFAULT.eyebrow); // '   ' se ignora
       expect(r.titulo_accent).toBe(MEMBRESIAS_DEFAULT.titulo_accent);
+    });
+  });
+
+  describe('parseEstudios', () => {
+    it('sin config → defaults genéricos (no atados a un número)', () => {
+      expect(parseEstudios(null)).toEqual(ESTUDIOS_DEFAULT);
+    });
+    it('campo lleno gana, vacío cae al default', () => {
+      const r = parseEstudios({ titulo: 'Mis salas', subtitulo: '' });
+      expect(r.titulo).toBe('Mis salas');
+      expect(r.subtitulo).toBe(ESTUDIOS_DEFAULT.subtitulo);
     });
   });
 

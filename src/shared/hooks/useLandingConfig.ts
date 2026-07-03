@@ -3,7 +3,8 @@ import {
   parseMembresias,
   parseComoFunciona,
   parseFaq,
-  parseEstudioModal
+  parseEstudioModal,
+  parseEstudios
 } from '@shared/lib/landingDefaults';
 
 type LandingHero = {
@@ -110,6 +111,7 @@ export function useLandingConfig() {
 
   // Secciones de contenido editable (con copy de arranque en landingDefaults).
   const membresias = parseMembresias(landing.membresias);
+  const estudios = parseEstudios(landing.estudios);
   const como_funciona = parseComoFunciona(landing.como_funciona);
   const faq = parseFaq(landing.faq);
   const estudio_modal = parseEstudioModal(landing.estudio_modal);
@@ -128,6 +130,7 @@ export function useLandingConfig() {
     footer,
     contacto,
     membresias,
+    estudios,
     como_funciona,
     faq,
     estudio_modal,

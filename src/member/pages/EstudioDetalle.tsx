@@ -5,7 +5,6 @@ import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
-import { TierBadge } from '@shared/components/TierBadge';
 import { EmptyState } from '@shared/components/EmptyState';
 import type { Database } from '@shared/types/database';
 
@@ -67,7 +66,6 @@ export default function EstudioDetalle() {
     );
   }
 
-  const esPro = recurso.tiers_permitidos.length === 1 && recurso.tiers_permitidos[0] === 'pro';
   const usuarioPuedeUsar = usuario?.membresia_tier
     ? recurso.tiers_permitidos.includes(usuario.membresia_tier)
     : false;
@@ -109,8 +107,6 @@ export default function EstudioDetalle() {
             <span style={{ fontSize: '11px', letterSpacing: '0.2em', fontWeight: 600 }}>FOTO PRÓXIMAMENTE</span>
           </div>
         )}
-
-        <TierBadge pro={esPro} style={{ position: 'absolute', top: '16px', left: '16px' }} />
       </div>
 
       {/* Header */}

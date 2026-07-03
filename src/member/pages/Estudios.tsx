@@ -4,7 +4,6 @@ import { ArrowRight, ImageIcon } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
-import { TierBadge } from '@shared/components/TierBadge';
 import type { Database } from '@shared/types/database';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
@@ -58,7 +57,6 @@ export default function Estudios() {
         gap: '16px'
       }}>
         {recursos.map((r) => {
-          const esPro = (r.costo_creditos ?? 1) >= 2;
           return (
             <Link
               key={r.id}
@@ -96,8 +94,6 @@ export default function Estudios() {
                     <span style={{ fontSize: '10px', letterSpacing: '0.18em', fontWeight: 600 }}>FOTO PRÓXIMAMENTE</span>
                   </div>
                 )}
-
-                <TierBadge pro={esPro} style={{ position: 'absolute', top: '12px', left: '12px' }} />
               </div>
 
               <div style={{ padding: '16px', background: 'var(--ek-bg-soft)' }}>

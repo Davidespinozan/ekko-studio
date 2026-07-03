@@ -4,14 +4,17 @@ import { useTenantConfigEditor } from '../hooks/useTenantConfigEditor';
 import { useToast } from '@shared/hooks/useToast';
 import {
   MEMBRESIAS_DEFAULT,
+  ESTUDIOS_DEFAULT,
   COMO_FUNCIONA_DEFAULT,
   FAQ_DEFAULT,
   ESTUDIO_MODAL_DEFAULT,
   parseMembresias,
+  parseEstudios,
   parseComoFunciona,
   parseFaq,
   parseEstudioModal,
   type MembresiasConfig,
+  type EstudiosConfig,
   type ComoFuncionaConfig,
   type FaqConfig,
   type EstudioModalConfig
@@ -45,6 +48,7 @@ type LandingDraft = {
   cta_final: CtaFinalDraft;
   footer: FooterDraft;
   membresias: MembresiasConfig;
+  estudios: EstudiosConfig;
   como_funciona: ComoFuncionaConfig;
   faq: FaqConfig;
   estudio_modal: EstudioModalConfig;
@@ -55,6 +59,7 @@ const EMPTY: LandingDraft = {
   cta_final: { eyebrow: '', titulo: '', subtitulo: '', cta_texto: '' },
   footer: { tagline: '', copyright: '', direccion: '', email: '' },
   membresias: MEMBRESIAS_DEFAULT,
+  estudios: ESTUDIOS_DEFAULT,
   como_funciona: COMO_FUNCIONA_DEFAULT,
   faq: FAQ_DEFAULT,
   estudio_modal: ESTUDIO_MODAL_DEFAULT
@@ -89,6 +94,7 @@ function readLanding(config: Record<string, unknown> | null): LandingDraft {
     // Estas caen a su copy default (landingDefaults) si el tenant nunca las tocó,
     // así el editor muestra el contenido real que ve el visitante, no campos vacíos.
     membresias: parseMembresias(landing.membresias),
+    estudios: parseEstudios(landing.estudios),
     como_funciona: parseComoFunciona(landing.como_funciona),
     faq: parseFaq(landing.faq),
     estudio_modal: parseEstudioModal(landing.estudio_modal)
@@ -224,6 +230,7 @@ export default function AjustesLanding() {
         email: draft.footer.email || null
       },
       membresias: { ...draft.membresias },
+      estudios: { ...draft.estudios },
       como_funciona: { ...draft.como_funciona, pasos: draft.como_funciona.pasos },
       faq: { ...draft.faq, items: draft.faq.items },
       estudio_modal: { ...draft.estudio_modal }
@@ -487,6 +494,44 @@ export default function AjustesLanding() {
             onChange={(e) => setDraft({ ...draft, membresias: { ...draft.membresias, titulo_accent: e.target.value } })}
             className="ek-input"
             placeholder="Graba cuando quieras."
+          />
+        </FormField>
+      </Section>
+
+      <Section
+        title="ENCABEZADO DE ESTUDIOS"
+        description="El título de la sección de estudios. Las tarjetas salen de Admin → Estudios."
+      >
+        <FormField label="Etiqueta superior">
+          <input
+            value={draft.estudios.eyebrow}
+            onChange={(e) => setDraft({ ...draft, estudios: { ...draft.estudios, eyebrow: e.target.value } })}
+            className="ek-input"
+            placeholder="NUESTROS ESPACIOS"
+          />
+        </FormField>
+        <FormField label="Título">
+          <input
+            value={draft.estudios.titulo}
+            onChange={(e) => setDraft({ ...draft, estudios: { ...draft.estudios, titulo: e.target.value } })}
+            className="ek-input"
+            placeholder="Nuestros estudios."
+          />
+        </FormField>
+        <FormField label="Palabra destacada (mostaza)" helper="Segunda línea del título, en mostaza. Vacío = sin segunda línea.">
+          <input
+            value={draft.estudios.titulo_accent}
+            onChange={(e) => setDraft({ ...draft, estudios: { ...draft.estudios, titulo_accent: e.target.value } })}
+            className="ek-input"
+            placeholder="Una personalidad para cada visión."
+          />
+        </FormField>
+        <FormField label="Subtítulo">
+          <textarea
+            value={draft.estudios.subtitulo}
+            onChange={(e) => setDraft({ ...draft, estudios: { ...draft.estudios, subtitulo: e.target.value } })}
+            className="ek-input"
+            rows={2}
           />
         </FormField>
       </Section>

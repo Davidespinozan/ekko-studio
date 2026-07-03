@@ -100,19 +100,14 @@ export default function Landing() {
   const [estudioAbierto, setEstudioAbierto] = useState<EstudioInfo | null>(null);
   const { estudios, isLoading: estudiosLoading } = useEstudiosPublicos();
   const { tiers, isLoading: tiersLoading } = useTiersPublicos();
-  const { hero, cta_final, whatsappUrl, membresias, como_funciona, faq, estudio_modal } =
+  const { hero, cta_final, whatsappUrl, membresias, estudios: estudiosCopy, como_funciona, faq, estudio_modal } =
     useLandingConfig();
   const ctaWhatsappUrl = whatsappUrl();
 
   const aEstudioInfo = (r: EstudioPublico): EstudioInfo => {
-    // Pro/Básica se deriva del costo en créditos (config del admin), no de
-    // tiers_permitidos — así el landing refleja lo que se configura en admin.
-    const esPro = (r.costo_creditos ?? 1) >= 2;
-    const tier: 'basica' | 'pro' = esPro ? 'pro' : 'basica';
     return {
       slug: r.slug,
       nombre: r.nombre,
-      tier,
       capacidad: r.capacidad_personas
         ? `Hasta ${r.capacidad_personas} personas`
         : 'Capacidad por confirmar',
@@ -287,7 +282,9 @@ export default function Landing() {
           ============================================================ */}
       <Reveal>
       <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
-        <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>NUESTROS ESPACIOS</p>
+        {estudiosCopy.eyebrow && (
+          <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>{estudiosCopy.eyebrow}</p>
+        )}
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
           fontSize: 'clamp(36px, 6vw, 56px)',
@@ -297,12 +294,19 @@ export default function Landing() {
           margin: 0,
           marginBottom: '16px'
         }}>
-          Tres estudios.<br />
-          <span style={{ color: 'var(--ek-mustard)' }}>Tres personalidades.</span>
+          {estudiosCopy.titulo}
+          {estudiosCopy.titulo_accent && (
+            <>
+              <br />
+              <span style={{ color: 'var(--ek-mustard)' }}>{estudiosCopy.titulo_accent}</span>
+            </>
+          )}
         </h2>
-        <p className="ek-body-muted" style={{ marginBottom: '40px', maxWidth: '600px' }}>
-          Cada uno diseñado para un tipo de contenido. Elige el que va con tu visión.
-        </p>
+        {estudiosCopy.subtitulo && (
+          <p className="ek-body-muted" style={{ marginBottom: '40px', maxWidth: '600px' }}>
+            {estudiosCopy.subtitulo}
+          </p>
+        )}
 
         {estudiosLoading ? (
           <div style={{
@@ -337,13 +341,6 @@ export default function Landing() {
                       <ImageIcon size={22} strokeWidth={1.5} aria-hidden="true" />
                     </div>
                   )}
-                  <span
-                    className={s.tier === 'pro' ? 'ek-badge ek-badge--outline' : 'ek-badge'}
-                    style={{ position: 'absolute', top: '12px', left: '12px' }}
-                  >
-                    {s.tier === 'pro' && <Star size={11} fill="currentColor" aria-hidden="true" />}
-                    {s.tier === 'pro' ? 'PRO' : 'BÁSICA'}
-                  </span>
                 </div>
                 <div className="ek-estudio-body">
                   <h3 className="ek-estudio-title" style={{

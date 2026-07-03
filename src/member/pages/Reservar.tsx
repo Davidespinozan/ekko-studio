@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Star, CalendarX } from 'lucide-react';
+import { CalendarX } from 'lucide-react';
 import { EmptyState } from '@shared/components/EmptyState';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
@@ -188,7 +188,6 @@ export default function Reservar() {
             {recursos.map((r) => {
               const activo = recursoSel?.id === r.id;
               const accesible = puedeUsar(r);
-              const esPro = (r.costo_creditos ?? 1) >= 2;
               return (
                 <button
                   key={r.id}
@@ -203,17 +202,6 @@ export default function Reservar() {
                   }}
                 >
                   {r.nombre}
-                  {esPro && !accesible && (
-                    <span style={{
-                      fontSize: '9px',
-                      color: 'var(--ek-mustard)',
-                      fontWeight: 700,
-                      letterSpacing: '0.12em',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '3px'
-                    }}><Star size={9} fill="currentColor" aria-hidden="true" /> PRO</span>
-                  )}
                 </button>
               );
             })}
