@@ -745,6 +745,21 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-bottom-nav-item--active .ek-bottom-nav-icon { color: var(--ek-mustard); }
 
+  /* Variante CLARA del menú flotante (crema, estilo Instagram). Íconos y texto
+     oscuros; el item activo lleva una burbuja dorada con ícono negro. */
+  .ek-bottom-nav--cream .ek-bottom-nav-inner {
+    background: linear-gradient(160deg, #faf7ef 0%, #ece4d2 100%) !important;
+    border-color: rgba(10, 10, 10, 0.12);
+  }
+  .ek-bottom-nav--cream .ek-bottom-nav-icon { color: rgba(10, 10, 10, 0.55); }
+  .ek-bottom-nav--cream .ek-bottom-nav-item-label { color: rgba(10, 10, 10, 0.5); }
+  .ek-bottom-nav--cream .ek-bottom-nav-item--active { background: rgba(229, 184, 41, 0.22); }
+  .ek-bottom-nav--cream .ek-bottom-nav-item--active .ek-bottom-nav-icon { color: var(--ek-bg); }
+  .ek-bottom-nav--cream .ek-bottom-nav-item--active .ek-bottom-nav-item-label {
+    color: var(--ek-bg);
+    font-weight: 700;
+  }
+
   /* ============================================================================
      MODAL
      ============================================================================ */
