@@ -1,10 +1,12 @@
 import { useReportesEconomia } from '../hooks/useReportesEconomia';
 import { useReportesOcupacion } from '../hooks/useReportesOcupacion';
 import { useReportesEngagement } from '../hooks/useReportesEngagement';
+import { useReportesCreditos } from '../hooks/useReportesCreditos';
 import { InfoTooltip } from '@shared/components/InfoTooltip';
 import type { EconomiaResult } from '../logic/reportesEconomia';
 import type { OcupacionResult } from '../logic/reportesOcupacion';
 import type { EngagementResult } from '../logic/reportesEngagement';
+import type { CreditosResult } from '../logic/reportesCreditos';
 
 // ============================================================================
 // /admin/reportes — Analítica del negocio para el dueño. Empieza con el bloque
@@ -40,13 +42,20 @@ const AYUDA = {
   ttv:
     'Cuántos días tardan los miembros nuevos en hacer su primera reserva desde que se dan de alta. Cuanto menos, mejor: significa que enganchan rápido.',
   riesgo:
-    'Miembros activos (que pagan) que NO vienen hace más de 21 días — o que nunca vinieron. Son los que están por darse de baja. Contactalos antes de perderlos.'
+    'Miembros activos (que pagan) que NO vienen hace más de 21 días — o que nunca vinieron. Son los que están por darse de baja. Contactalos antes de perderlos.',
+  pasivo:
+    'Créditos que tus miembros ya pagaron pero aún NO usaron (saldo vivo de los paquetes). Es caja que recibiste "debiendo" esas sesiones. Si crece y no se consume, la gente compra y no viene: riesgo de baja.',
+  valorPasivo:
+    'El valor en pesos de esos créditos sin usar (saldo × precio por crédito de cada plan). Es tu pasivo real: dinero ya cobrado que representa servicio pendiente de entregar.',
+  tasaUso:
+    'De todos los créditos vendidos, qué % ya se usaron. Bajo (menos de ~50%) significa que muchos pagan paquetes y no los agotan: fuga de valor y señal temprana de churn.'
 } as const;
 
 export default function Reportes() {
   const { data, isLoading, error } = useReportesEconomia();
   const ocupacion = useReportesOcupacion();
   const engagement = useReportesEngagement();
+  const creditos = useReportesCreditos();
 
   return (
     <div className="adm-page">
@@ -90,6 +99,28 @@ export default function Reportes() {
           </div>
         ) : (
           <BloqueEconomia data={data} />
+        )}
+      </section>
+
+      <section>
+        <p className="ek-eyebrow" style={{ fontSize: '10px', margin: '0 0 12px' }}>
+          CRÉDITOS · PASIVO (PAQUETES)
+        </p>
+
+        {creditos.isLoading ? (
+          <div className="adm-metricas-grid">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="ek-skeleton" style={{ height: '104px', borderRadius: 'var(--ek-r-card)' }} />
+            ))}
+          </div>
+        ) : creditos.error || !creditos.data ? (
+          <div className="ek-card" style={{ padding: '20px' }}>
+            <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0 }}>
+              No pudimos cargar el pasivo de créditos. Reintentá en un momento.
+            </p>
+          </div>
+        ) : (
+          <BloqueCreditos data={creditos.data} />
         )}
       </section>
 
@@ -356,6 +387,46 @@ function BloqueEconomia({ data }: { data: EconomiaResult }) {
 
       {data.ingresoPorPlan.length > 0 && <IngresoPorPlan data={data} />}
     </>
+  );
+}
+
+function BloqueCreditos({ data }: { data: CreditosResult }) {
+  const tasaTexto = data.tasaUsoPct == null ? '—' : `${Math.round(data.tasaUsoPct)}%`;
+  const tasaAlerta = data.tasaUsoPct != null && data.tasaUsoPct < 50 && data.vendidos > 0;
+
+  if (data.vendidos === 0 && data.pasivoSesiones === 0) {
+    return (
+      <div className="ek-card" style={{ padding: '20px' }}>
+        <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0 }}>
+          Aún no hay paquetes de créditos vendidos. Cuando entren, aquí verás cuántas
+          sesiones se pagaron por adelantado y cuánto está sin usar.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="adm-metricas-grid">
+      <KpiCard
+        label="Pasivo · créditos sin usar"
+        valor={`${data.pasivoSesiones} ${data.pasivoSesiones === 1 ? 'sesión' : 'sesiones'}`}
+        nota={`${data.miembrosConSaldo} ${data.miembrosConSaldo === 1 ? 'miembro' : 'miembros'} con saldo`}
+        ayuda={AYUDA.pasivo}
+      />
+      <KpiCard
+        label="Valor del pasivo"
+        valor={pesos(data.valorPasivoCentavos)}
+        nota="caja recibida, servicio pendiente"
+        ayuda={AYUDA.valorPasivo}
+      />
+      <KpiCard
+        label="Tasa de uso"
+        valor={tasaTexto}
+        alerta={tasaAlerta}
+        nota={`${data.usados} usados de ${data.vendidos} vendidos`}
+        ayuda={AYUDA.tasaUso}
+      />
+    </div>
   );
 }
 
