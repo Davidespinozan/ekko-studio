@@ -7,7 +7,7 @@ import { LayoutDashboard, CalendarRange, Users, ScanLine } from 'lucide-react';
  */
 export function ReceptionBottomNav() {
   return (
-    <nav className="ek-bottom-nav" aria-label="Navegación de recepción">
+    <nav className="ek-bottom-nav ek-bottom-nav--float ek-bottom-nav--cream" aria-label="Navegación de recepción">
       <div className="ek-bottom-nav-inner">
         <NavItem to="/recepcion" end icon={<LayoutDashboard size={22} className="ek-bottom-nav-icon" />} label="Hoy" />
         <NavItem to="/recepcion/agenda" icon={<CalendarRange size={22} className="ek-bottom-nav-icon" />} label="Agenda" />
