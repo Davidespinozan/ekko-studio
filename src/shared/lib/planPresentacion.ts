@@ -43,7 +43,7 @@ export function esTierRecomendado(reglas: Record<string, unknown> | null | undef
 
 /** Qué incluye el plan, en una línea (para mostrar bajo el precio). */
 export function detallePlan(tier: TierPresentable): string {
-  if (!esPlanPaquete(tier)) return 'Acceso mensual ilimitado';
+  if (!esPlanPaquete(tier)) return 'Acceso mensual · graba todos los días';
   const n = tier.clases_incluidas ?? 0;
   const sesiones = `${n} ${n === 1 ? 'sesión' : 'sesiones'}`;
   if (tier.tipo === 'hibrido' && tier.duracion_dias) {

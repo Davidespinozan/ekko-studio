@@ -57,8 +57,8 @@ export interface EstudiosConfig {
 
 export const MEMBRESIAS_DEFAULT: MembresiasConfig = {
   eyebrow: 'PLANES',
-  titulo: 'Elige tu paquete.',
-  titulo_accent: 'Graba cuando quieras.'
+  titulo: 'Elige cómo grabar.',
+  titulo_accent: 'Membresía o créditos.'
 };
 
 export const COMO_FUNCIONA_DEFAULT: ComoFuncionaConfig = {
@@ -72,11 +72,11 @@ export const COMO_FUNCIONA_DEFAULT: ComoFuncionaConfig = {
     },
     {
       titulo: 'Llega y graba',
-      texto: 'Equipo profesional ya montado: cámaras, micrófonos, iluminación. Tú solo traés tu contenido.'
+      texto: 'Equipo profesional ya montado: cámaras, micrófonos, iluminación. Tú solo traes tu contenido.'
     },
     {
       titulo: 'Recibe tu material',
-      texto: 'Te entregamos los archivos limpios después de cada sesión. Tú decides cómo publicarlo.'
+      texto: 'Te entregamos tu grabación en MP4 después de cada sesión. Tú decides cómo publicarlo.'
     }
   ]
 };
@@ -86,16 +86,24 @@ export const FAQ_DEFAULT: FaqConfig = {
   titulo: 'Lo que probablemente quieres saber.',
   items: [
     {
-      q: '¿Cómo funcionan los créditos?',
-      a: 'Compras un paquete de créditos y cada crédito equivale a una sesión. Los estudios básicos cuestan 1 crédito y los Pro 2. Reservas desde la app cuando quieras.'
-    },
-    {
-      q: '¿Los créditos vencen?',
-      a: 'Sí. Cada paquete tiene una vigencia (por ejemplo 90 días) que ves al comprar y en tu cuenta. Aprovecha tus sesiones antes de esa fecha.'
+      q: '¿Membresía mensual o paquete de créditos?',
+      a: 'Tienes dos formas de grabar: una membresía mensual —grabas todos los días con tu espacio y equipo listos— o un paquete de créditos, donde compras sesiones y las usas cuando quieras dentro de su vigencia, sin mensualidad. Eliges la que se ajuste a ti.'
     },
     {
       q: '¿Qué incluye cada sesión?',
-      a: 'El estudio con todo el equipo profesional ya montado (cámaras, micrófonos, iluminación), espacio para invitados y la reserva vía app.'
+      a: 'El estudio con todo el equipo profesional ya montado (cámaras, micrófonos, iluminación), espacio para tus invitados y tu material entregado en MP4 al terminar. Cada sesión es de hasta 60 minutos.'
+    },
+    {
+      q: '¿Cuántos invitados puedo llevar?',
+      a: 'Según tu plan puedes llevar de 2 a 4 invitados por sesión. El límite exacto lo ves en tu plan al momento de reservar.'
+    },
+    {
+      q: '¿Cómo recibo mi material?',
+      a: 'Te entregamos tu grabación en MP4 después de cada sesión. Los planes Premium además incluyen edición básica con IA y miniaturas para tus videos.'
+    },
+    {
+      q: '¿Necesito traer mi propio equipo?',
+      a: 'No. Cada estudio tiene su equipo profesional completo y listo para grabar. Solo llegas con tu contenido; nosotros te entregamos el material.'
     },
     {
       q: '¿Puedo cancelar una reserva?',
@@ -106,12 +114,8 @@ export const FAQ_DEFAULT: FaqConfig = {
       a: 'Las inasistencias sin aviso pueden bloquear tu cuenta temporalmente. Si avisas con anticipación, cancelas sin penalidad.'
     },
     {
-      q: '¿Necesito traer mi propio equipo?',
-      a: 'No. Cada estudio tiene su equipo profesional completo. Solo traes tu contenido y tu disco duro para llevarte el material.'
-    },
-    {
-      q: '¿Cómo pago?',
-      a: 'Pagas tu paquete de créditos en línea con tarjeta, en un solo cobro. Sin mensualidades ni compromisos a largo plazo.'
+      q: '¿Cómo pago y qué compromisos hay?',
+      a: 'Pagas en línea con tarjeta. La membresía mensual se cobra automáticamente cada mes, con un contrato mínimo de 6 meses; un paquete de créditos es un solo cobro, sin mensualidad. El tiempo adicional a tu sesión tiene costo extra.'
     }
   ]
 };

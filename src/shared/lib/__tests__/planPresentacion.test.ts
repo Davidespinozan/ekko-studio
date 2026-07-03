@@ -6,7 +6,7 @@ describe('planPresentacion', () => {
     const t = { precio_centavos: 80000, tipo: 'tiempo' };
     expect(esPlanPaquete(t)).toBe(false);
     expect(sufijoPrecio(t)).toBe('/mes');
-    expect(detallePlan({ ...t })).toBe('Acceso mensual ilimitado');
+    expect(detallePlan({ ...t })).toBe('Acceso mensual · graba todos los días');
   });
 
   it('créditos → paquete, sufijo pago único, N sesiones sin vencimiento', () => {

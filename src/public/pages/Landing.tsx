@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Star, ArrowRight, Check, X, CalendarCheck, Clapperboard, FolderDown, ImageIcon, Sparkles } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios } from '@shared/lib/beneficios';
-import { sufijoPrecioSesiones, esTierRecomendado } from '@shared/lib/planPresentacion';
+import { sufijoPrecioSesiones, esTierRecomendado, esPlanPaquete } from '@shared/lib/planPresentacion';
 import { useLandingConfig } from '@shared/hooks/useLandingConfig';
 import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
 import AppShowcase from '../components/AppShowcase';
@@ -98,6 +98,7 @@ function formatearPesos(centavos: number): string {
 
 export default function Landing() {
   const [estudioAbierto, setEstudioAbierto] = useState<EstudioInfo | null>(null);
+  const [tipoPlanVista, setTipoPlanVista] = useState<'membresias' | 'paquetes'>('membresias');
   const { estudios, isLoading: estudiosLoading } = useEstudiosPublicos();
   const { tiers, isLoading: tiersLoading } = useTiersPublicos();
   const { hero, cta_final, whatsappUrl, membresias, estudios: estudiosCopy, como_funciona, faq, estudio_modal } =
@@ -120,6 +121,19 @@ export default function Landing() {
   };
 
   const estudiosInfo = estudios.map(aEstudioInfo);
+
+  // Los dos modelos conviven: membresías mensuales (acceso) y paquetes de
+  // créditos (uso puntual). Se separan por pestaña para no saturar el landing.
+  const planesMensuales = tiers.filter((t) => !esPlanPaquete(t));
+  const planesPaquetes = tiers.filter((t) => esPlanPaquete(t));
+  const hayAmbosTipos = planesMensuales.length > 0 && planesPaquetes.length > 0;
+  const vistaPlan =
+    tipoPlanVista === 'paquetes' && planesPaquetes.length > 0
+      ? 'paquetes'
+      : planesMensuales.length > 0
+        ? 'membresias'
+        : 'paquetes';
+  const planesVisibles = vistaPlan === 'membresias' ? planesMensuales : planesPaquetes;
 
   return (
     <div style={{
@@ -396,6 +410,31 @@ export default function Landing() {
           )}
         </h2>
 
+        {/* Toggle Membresías · Paquetes — solo si existen ambos tipos. Resuelve
+            el "muchísimos cuadros": nunca se ven los dos grupos a la vez. */}
+        {!tiersLoading && hayAmbosTipos && (
+          <div className="ek-plan-toggle" role="tablist" aria-label="Tipo de plan">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={vistaPlan === 'membresias'}
+              className={`ek-plan-toggle-btn ${vistaPlan === 'membresias' ? 'is-active' : ''}`}
+              onClick={() => setTipoPlanVista('membresias')}
+            >
+              Membresías mensuales
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={vistaPlan === 'paquetes'}
+              className={`ek-plan-toggle-btn ${vistaPlan === 'paquetes' ? 'is-active' : ''}`}
+              onClick={() => setTipoPlanVista('paquetes')}
+            >
+              Paquetes de créditos
+            </button>
+          </div>
+        )}
+
         {tiersLoading ? (
           <div style={{
             display: 'grid',
@@ -408,7 +447,7 @@ export default function Landing() {
           </div>
         ) : (
           <div className="ek-pricing-grid">
-            {tiers.map((tier) => {
+            {planesVisibles.map((tier) => {
               // El destacado (dorado + estrella) lo controla el admin con el flag
               // reglas.recomendado — no un slug fijo. Así se elige desde admin.
               const esRecomendado = esTierRecomendado(tier.reglas);
@@ -487,6 +526,13 @@ export default function Landing() {
               );
             })}
           </div>
+        )}
+
+        {/* Letra chiquita de las membresías (términos que pidió el cliente). */}
+        {!tiersLoading && vistaPlan === 'membresias' && planesMensuales.length > 0 && (
+          <p className="ek-plan-fineprint">
+            Contrato mínimo de 6 meses · pago automático mensual · el tiempo adicional tiene costo extra · no se reservan horas continuas.
+          </p>
         )}
       </section>
       </Reveal>
