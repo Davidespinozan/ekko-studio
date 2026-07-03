@@ -2519,7 +2519,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   cursor: pointer;
   text-align: left;
   border: 0.5px solid var(--ek-line);
-  border-radius: var(--ek-r-card);
+  border-radius: 0;
   box-shadow: var(--ek-shadow-card);
   background: var(--ek-bg-soft);
   color: var(--ek-ink);
@@ -2551,7 +2551,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     display: grid;
     grid-template-columns: 112px 1fr;
     align-items: stretch;
-    border-radius: var(--ek-r-md);
+    border-radius: 0;
   }
   .ek-estudio-media { aspect-ratio: auto; height: 100%; min-height: 112px; }
   .ek-estudio-body { padding: 14px 16px; display: flex; flex-direction: column; justify-content: center; }

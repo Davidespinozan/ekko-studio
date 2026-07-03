@@ -351,21 +351,8 @@ export default function Landing() {
                     fontSize: '24px',
                     fontWeight: 700,
                     margin: 0,
-                    marginBottom: '6px'
+                    marginBottom: '14px'
                   }}>{s.nombre}</h3>
-                  <p style={{
-                    fontSize: '13px',
-                    color: 'var(--ek-ink-muted)',
-                    margin: 0,
-                    marginBottom: '6px'
-                  }}>{s.capacidad}</p>
-                  <p style={{
-                    fontSize: '12px',
-                    color: 'var(--ek-mustard)',
-                    margin: 0,
-                    marginBottom: '12px',
-                    fontWeight: 700
-                  }}>{s.contenido.join(' · ')}</p>
                   <p className="ek-estudio-detalle" style={{
                     fontSize: '11px',
                     color: 'var(--ek-ink-faint)',
