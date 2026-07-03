@@ -1,7 +1,7 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { ArrowLeft, AlertTriangle, Check, Send } from 'lucide-react';
-import { useMiembroDetalle, updateMiembro, adminUpdateRole, adminDeleteUser } from '../hooks/useAdminData';
+import { useMiembroDetalle, updateMiembro, adminUpdateRole, adminDeleteUser, useTiersAdmin } from '../hooks/useAdminData';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { formatHora } from '@member/logic/reservaLogic';
@@ -16,6 +16,7 @@ export default function MiembroDetalle() {
   const navigate = useNavigate();
   const toast = useToast();
   const { miembro, reservas, isLoading, refetch } = useMiembroDetalle(id);
+  const { tiers } = useTiersAdmin();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ status: string; membresia_tier: string }>({
@@ -132,8 +133,16 @@ export default function MiembroDetalle() {
               className="ek-input"
             >
               <option value="">— sin tier —</option>
-              <option value="basica">basica</option>
-              <option value="pro">pro</option>
+              {tiers.map((t) => (
+                <option key={t.id} value={t.slug}>
+                  {t.nombre}{t.activo ? '' : ' (eliminado)'}
+                </option>
+              ))}
+              {/* Si el tier actual ya no existe en la lista, mostralo igual para no
+                  cambiarlo silenciosamente al guardar. */}
+              {draft.membresia_tier && !tiers.some((t) => t.slug === draft.membresia_tier) && (
+                <option value={draft.membresia_tier}>{draft.membresia_tier}</option>
+              )}
             </select>
           </label>
         </div>

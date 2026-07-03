@@ -799,12 +799,15 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
      ============================================================================ */
 
   .adm-section {
-    background: linear-gradient(180deg, var(--ek-bg-soft) 0%, var(--ek-bg) 100%);
+    /* Mismo acabado metálico que .ek-card (antes era un plano bg-soft → se veía
+       "viejo" frente al resto de la app). */
+    background:
+      linear-gradient(180deg, var(--ek-metal-top) 0%, var(--ek-metal-mid) 52%, var(--ek-metal-bottom) 100%);
     border: 0.5px solid var(--ek-line);
-    border-radius: var(--ek-r-md);
+    border-radius: var(--ek-r-card);
     padding: 24px;
     margin-bottom: 20px;
-    box-shadow: var(--ek-shadow-card);
+    box-shadow: var(--ek-highlight-strong), var(--ek-shadow-card);
     display: flex;
     flex-direction: column;
     gap: 12px;
