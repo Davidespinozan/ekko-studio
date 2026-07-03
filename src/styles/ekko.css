@@ -361,6 +361,9 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-card {
     position: relative;
+    /* OJO: este gradiente está ANULADO por el override !important de la l.~2894
+       (--ek-surface, plano #202024). El look real de la card es PLANO. Si vas a
+       igualar otra superficie a .ek-card, usá var(--ek-bg-elevated), no esto. */
     background:
       linear-gradient(180deg, var(--ek-metal-top) 0%, var(--ek-metal-mid) 52%, var(--ek-metal-bottom) 100%);
     border: 0.5px solid var(--ek-line);

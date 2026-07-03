@@ -112,7 +112,8 @@ export default function ConfirmDialog({
           borderRadius: 'var(--ek-r-card)',
           maxWidth: '480px',
           width: '100%',
-          padding: '28px',
+          padding: 'clamp(16px, 4vw, 24px)',
+          boxShadow: 'var(--ek-shadow-modal)',
           animation: 'ek-scale-in 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
       >

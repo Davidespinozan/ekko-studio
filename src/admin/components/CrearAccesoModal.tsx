@@ -130,7 +130,8 @@ export default function CrearAccesoModal({ onClose, onSuccess }: Props) {
           width: '100%',
           maxHeight: '90vh',
           overflowY: 'auto',
-          padding: '28px',
+          padding: 'clamp(16px, 4vw, 24px)',
+          boxShadow: 'var(--ek-shadow-modal)',
           animation: 'ek-scale-in 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
         }}
       >

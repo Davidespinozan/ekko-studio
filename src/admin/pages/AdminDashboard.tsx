@@ -182,7 +182,7 @@ function SeccionHoy({
                     gap: '16px',
                     background: 'var(--ek-bg-soft)',
                     border: '0.5px solid var(--ek-line)',
-                    borderRadius: '14px',
+                    borderRadius: 'var(--ek-r-sm)',
                     padding: '14px 18px'
                   }}
                 >
