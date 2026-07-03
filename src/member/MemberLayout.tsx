@@ -82,7 +82,7 @@ export default function MemberLayout() {
           /* Inicio: logo centrado, campana anclada a la derecha */
           <div className="ek-header-inner ek-header-inner--centered">
             <Link to="/app" style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}>
-              <BrandLogo height={52} maxWidth={180} />
+              <BrandLogo height={104} maxWidth={360} />
             </Link>
             <div className="ek-header-bell-abs">
               <NotificacionesBell />
