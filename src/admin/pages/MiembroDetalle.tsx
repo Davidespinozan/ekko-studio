@@ -84,36 +84,38 @@ export default function MiembroDetalle() {
         Volver
       </Link>
 
-      {/* Identidad: foto + datos editables en una sola card (sin repetir el
-          nombre arriba y abajo). */}
-      <section className="adm-section" style={{ marginTop: '1rem', display: 'flex', gap: '22px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
-        <AvatarUploadControl
-          usuarioId={miembro.id}
-          avatarUrl={miembro.avatar_url}
-          onChanged={refetch}
-        />
-        <div style={{ flex: 1, minWidth: '260px' }}>
-          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '2px' }}>MIEMBRO</p>
-          <h2 className="ek-h3" style={{ margin: '0 0 14px' }}>Datos del miembro</h2>
-          <EditarDatosForm miembro={miembro} onSaved={refetch} />
-        </div>
-      </section>
+      {/* Todo lo del miembro en UNA card: identidad editable, ficha e info del
+          sistema (los tres son datos del mismo miembro), con divisores finos. */}
+      <section className="adm-section" style={{ marginTop: '1rem' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '2px' }}>MIEMBRO</p>
+        <h2 className="ek-h3" style={{ margin: '0 0 18px' }}>Datos del miembro</h2>
 
-      <section className="adm-section">
-        <h2 className="ek-h3">Ficha de identidad</h2>
-        <p className="adm-body" style={{ marginBottom: '0.75rem' }}>
-          Expediente completo del miembro: fecha de nacimiento, domicilio, INE (folio y foto)
-          y contrato firmado. Mismo acceso que recepción — admin ve y edita todo.
+        <div style={{ display: 'flex', gap: '22px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <AvatarUploadControl
+            usuarioId={miembro.id}
+            avatarUrl={miembro.avatar_url}
+            onChanged={refetch}
+          />
+          <div style={{ flex: 1, minWidth: '260px' }}>
+            <EditarDatosForm miembro={miembro} onSaved={refetch} />
+          </div>
+        </div>
+
+        <div style={{ height: '0.5px', background: 'var(--ek-line)', margin: '24px 0' }} />
+
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>FICHA DE IDENTIDAD</p>
+        <p className="adm-body" style={{ marginBottom: '12px', fontSize: '13px' }}>
+          Expediente: nacimiento, domicilio, INE (folio y foto) y contrato firmado. Admin ve y edita todo.
         </p>
         <FichaIdentidadResumen
           identidadCompleta={miembro.identidad_completa}
           contratoFirmado={miembro.contrato_firmado}
           onAbrir={() => setFichaOpen(true)}
         />
-      </section>
 
-      <section className="adm-section">
-        <h2 className="ek-h3">Información del sistema</h2>
+        <div style={{ height: '0.5px', background: 'var(--ek-line)', margin: '24px 0' }} />
+
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '12px' }}>INFORMACIÓN DEL SISTEMA</p>
         <div className="adm-info-grid">
           <Info label="Alta" value={new Date(miembro.created_at).toLocaleString('es-MX')} />
           {miembro.commitment_ends_at && (
