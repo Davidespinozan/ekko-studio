@@ -337,7 +337,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               )
             )}
 
-            <button type="button" className="ek-cta ek-cta--full" onClick={() => setCambiarOpen(true)}>
+            <button type="button" className="ek-cta ek-cta--gold ek-cta--full" onClick={() => setCambiarOpen(true)}>
               {planActual ? 'Cambiar de plan' : 'Ver planes'} <ArrowRight size={16} aria-hidden="true" />
             </button>
 
@@ -486,9 +486,18 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                 const esActual = t.slug === tierSlug;
                 return (
                   <div key={t.slug} className="ek-card ek-card--md" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <span className="ek-badge ek-badge--neutral" style={{ fontWeight: 700 }}>{t.nombre}</span>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                        <span style={{
+                          background: 'linear-gradient(160deg, #faf7ef 0%, #ece4d2 100%)',
+                          color: 'var(--ek-bg)',
+                          fontWeight: 700,
+                          fontSize: '11px',
+                          letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
+                          padding: '4px 11px',
+                          borderRadius: '999px'
+                        }}>{t.nombre}</span>
                         {esActual && <span className="ek-badge ek-badge--neutral">Actual</span>}
                       </div>
                       <p style={{ margin: 0, fontWeight: 600 }}>
@@ -499,8 +508,8 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                     {!esActual && (
                       <button
                         type="button"
-                        className="ek-cta"
-                        style={{ padding: '10px 16px', fontSize: '13px' }}
+                        className="ek-cta ek-cta--gold"
+                        style={{ padding: '10px 14px', fontSize: '13px', whiteSpace: 'nowrap', flexShrink: 0, gap: '6px' }}
                         onClick={() => cambiarPlan(t)}
                       >
                         Elegir este <ArrowRight size={15} aria-hidden="true" />
@@ -570,7 +579,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
         <div className="ek-backdrop" onClick={() => setConfirmarCambio(null)} role="dialog" aria-modal="true">
           <div className="ek-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '100%', animation: 'ek-scale-in 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
             <p className="ek-eyebrow" style={{ color: 'var(--ek-warning)', marginBottom: '8px' }}>
-              <AlertTriangle size={12} aria-hidden="true" /> PERDÉS TUS CRÉDITOS
+              <AlertTriangle size={12} aria-hidden="true" /> PIERDES TUS CRÉDITOS
             </p>
             <h3 className="ek-display-md" style={{ margin: '0 0 8px' }}>
               Te quedan {creditos} {creditos === 1 ? 'crédito' : 'créditos'}

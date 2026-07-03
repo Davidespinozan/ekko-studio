@@ -25,8 +25,8 @@
 
   /* Ink — off-white neutro (no blanco puro). */
   --ek-ink:          #EDEDEA;
-  --ek-ink-muted:    #8A8A86;
-  --ek-ink-faint:    #5C5C58;
+  --ek-ink-muted:    #ADADA8;   /* subido: el texto secundario se veía muy tenue */
+  --ek-ink-faint:    #8C8C87;   /* subido: antes #5C5C58, apenas legible en cards */
 
   /* Brand */
   --ek-mustard:        #e5b829;
