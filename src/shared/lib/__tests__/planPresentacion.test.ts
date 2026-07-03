@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { esPlanPaquete, sufijoPrecio, detallePlan } from '../planPresentacion';
+import { esPlanPaquete, sufijoPrecio, detallePlan, sufijoPrecioSesiones, esTierRecomendado } from '../planPresentacion';
 
 describe('planPresentacion', () => {
   it('mensual (tiempo) → no es paquete, sufijo /mes', () => {
@@ -25,5 +25,32 @@ describe('planPresentacion', () => {
   it('tipo ausente → se trata como mensual', () => {
     expect(esPlanPaquete({ tipo: null })).toBe(false);
     expect(sufijoPrecio({})).toBe('/mes');
+  });
+
+  describe('sufijoPrecioSesiones (landing)', () => {
+    it('mensual → /mes', () => {
+      expect(sufijoPrecioSesiones({ tipo: 'tiempo' })).toBe('/mes');
+    });
+    it('paquete de 1 → singular "sesión"', () => {
+      expect(sufijoPrecioSesiones({ tipo: 'hibrido', clases_incluidas: 1 })).toBe(' · 1 sesión');
+    });
+    it('paquete de N → plural "sesiones"', () => {
+      expect(sufijoPrecioSesiones({ tipo: 'creditos', clases_incluidas: 6 })).toBe(' · 6 sesiones');
+    });
+    it('paquete sin cupo definido → " · paquete"', () => {
+      expect(sufijoPrecioSesiones({ tipo: 'creditos', clases_incluidas: null })).toBe(' · paquete');
+    });
+  });
+
+  describe('esTierRecomendado', () => {
+    it('reglas.recomendado true → destacado', () => {
+      expect(esTierRecomendado({ recomendado: true })).toBe(true);
+    });
+    it('flag ausente, falso, o reglas null → no destacado', () => {
+      expect(esTierRecomendado({ recomendado: false })).toBe(false);
+      expect(esTierRecomendado({ max_invitados: 2 })).toBe(false);
+      expect(esTierRecomendado(null)).toBe(false);
+      expect(esTierRecomendado(undefined)).toBe(false);
+    });
   });
 });

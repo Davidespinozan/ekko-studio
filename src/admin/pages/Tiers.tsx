@@ -546,6 +546,11 @@ function EditarTierModal({
   );
   const [descripcion, setDescripcion] = useState(tier?.descripcion ?? '');
   const [activo, setActivo] = useState(tier?.activo ?? true);
+  // Destacado en el landing (tarjeta dorada + "RECOMENDADO"). Vive en reglas.
+  const [recomendado, setRecomendado] = useState<boolean>(() => {
+    const reglas = tier?.reglas as Record<string, unknown> | null;
+    return reglas?.recomendado === true;
+  });
   const [beneficios, setBeneficios] = useState<Beneficio[]>(() =>
     tier ? parseBeneficios(tier.beneficios) : []
   );
@@ -611,7 +616,7 @@ function EditarTierModal({
         return;
       }
 
-      const reglas = { max_invitados: maxInvitados };
+      const reglas = { max_invitados: maxInvitados, recomendado };
 
       const { error: err } = await insertTier({
         tenant_id: tenant.id,
@@ -642,7 +647,7 @@ function EditarTierModal({
 
     // Edit mode
     const reglasActuales = (tier!.reglas as Record<string, unknown>) ?? {};
-    const reglasNuevas = { ...reglasActuales, max_invitados: maxInvitados };
+    const reglasNuevas = { ...reglasActuales, max_invitados: maxInvitados, recomendado };
 
     const { error: err } = await updateTier(tier!.id, {
       nombre,
@@ -820,6 +825,15 @@ function EditarTierModal({
             onChange={setActivo}
             label="Plan activo"
             description="Si está inactivo, no se puede asignar a nuevos miembros."
+          />
+        </div>
+
+        <div className="ek-form-field" style={{ marginTop: '12px' }}>
+          <Toggle
+            checked={recomendado}
+            onChange={setRecomendado}
+            label="Destacar como recomendado"
+            description="En el landing sale como tarjeta dorada con ⭐ RECOMENDADO. Destacá solo uno."
           />
         </div>
 

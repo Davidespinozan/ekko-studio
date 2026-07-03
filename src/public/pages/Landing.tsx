@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Star, ArrowRight, Check, X, CalendarCheck, Clapperboard, FolderDown, ImageIcon, Sparkles } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios } from '@shared/lib/beneficios';
+import { sufijoPrecioSesiones, esTierRecomendado } from '@shared/lib/planPresentacion';
 import { useLandingConfig } from '@shared/hooks/useLandingConfig';
 import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
 import AppShowcase from '../components/AppShowcase';
@@ -426,21 +427,23 @@ export default function Landing() {
         ) : (
           <div className="ek-pricing-grid">
             {tiers.map((tier) => {
-              const esPro = tier.slug === 'pro';
+              // El destacado (dorado + estrella) lo controla el admin con el flag
+              // reglas.recomendado — no un slug fijo. Así se elige desde admin.
+              const esRecomendado = esTierRecomendado(tier.reglas);
               const beneficios = parseBeneficios(tier.beneficios);
 
               return (
                 <div
                   key={tier.slug}
-                  className={`ek-card ek-pricing-card ${esPro ? 'ek-card--gold' : 'ek-card--cream'}`}
+                  className={`ek-card ek-pricing-card ${esRecomendado ? 'ek-card--gold' : 'ek-card--cream'}`}
                   style={{ display: 'flex', flexDirection: 'column' }}
                 >
                   <p
-                    className={esPro ? 'ek-eyebrow ek-eyebrow--mustard' : 'ek-eyebrow'}
+                    className={esRecomendado ? 'ek-eyebrow ek-eyebrow--mustard' : 'ek-eyebrow'}
                     style={{ marginBottom: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
-                    {esPro && <Star size={12} fill="currentColor" aria-hidden="true" />}
-                    {esPro ? 'PRO · RECOMENDADA' : tier.nombre.toUpperCase()}
+                    {esRecomendado && <Star size={12} fill="currentColor" aria-hidden="true" />}
+                    {esRecomendado ? `${tier.nombre.toUpperCase()} · RECOMENDADO` : tier.nombre.toUpperCase()}
                   </p>
                   <p className="ek-pricing-price" style={{
                     fontFamily: 'var(--ek-font-display)',
@@ -451,18 +454,11 @@ export default function Landing() {
                   }}>
                     {formatearPesos(tier.precio_centavos)}
                     <span style={{ fontSize: '15px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>
-                      {tier.tipo === 'creditos' || tier.tipo === 'hibrido'
-                        ? tier.clases_incluidas
-                          ? ` · ${tier.clases_incluidas} sesiones`
-                          : ' · paquete'
-                        : '/mes'}
+                      {sufijoPrecioSesiones(tier)}
                     </span>
                   </p>
                   <p className="ek-body-muted ek-pricing-benefit" style={{ marginTop: '8px', marginBottom: '20px' }}>
-                    {tier.descripcion ??
-                      (esPro
-                        ? 'Para creadores serios. Acceso completo.'
-                        : 'Para empezar. Acceso a los estudios básicos.')}
+                    {tier.descripcion ?? 'Sesiones para grabar cuando lo necesites.'}
                   </p>
                   <ul
                     style={{
@@ -499,11 +495,11 @@ export default function Landing() {
                   <Link
                     to={`/signup?tier=${tier.slug}`}
                     className={
-                      esPro ? 'ek-cta ek-cta--full' : 'ek-cta ek-cta--secondary ek-cta--full'
+                      esRecomendado ? 'ek-cta ek-cta--full' : 'ek-cta ek-cta--secondary ek-cta--full'
                     }
                     style={{ marginTop: '24px' }}
                   >
-                    {esPro ? 'Quiero la Pro' : `Empezar con ${tier.nombre}`}
+                    {`Empezar con ${tier.nombre}`}
                   </Link>
                 </div>
               );
