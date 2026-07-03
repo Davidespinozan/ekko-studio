@@ -83,6 +83,9 @@
   --ek-r-card:  28px;
   --ek-r-md:    22px;
   --ek-r-sm:    16px;
+  /* Radio ÚNICO del landing: redondeado moderado, igual en estudios, planes,
+     pasos, FAQ y CTA (consistencia visual). */
+  --ek-r-landing: 20px;
   --ek-r-xs:    13px;
   /* aliases compat */
   --ek-radius-sm:   13px;
@@ -2625,7 +2628,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   cursor: pointer;
   text-align: left;
   border: 0.5px solid var(--ek-line);
-  border-radius: 0;
+  border-radius: var(--ek-r-landing);
   box-shadow: var(--ek-shadow-card);
   background: var(--ek-bg-soft);
   color: var(--ek-ink);
@@ -2666,7 +2669,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 20px;
 }
-.ek-pricing-card { padding: 32px; }
+.ek-pricing-card { padding: 32px; border-radius: var(--ek-r-landing); }
 .ek-pricing-price { font-size: 48px; }
 
 @media (max-width: 720px) {
@@ -2701,6 +2704,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-step-card {
   position: relative;
   overflow: hidden;
+  border-radius: var(--ek-r-landing) !important;
   /* Oscuro pero distinto de los estudios (crema) y con vida: tinte cálido +
      acento mostaza a la izquierda + icono gold. */
   background: var(--ek-bg-elevated) !important;

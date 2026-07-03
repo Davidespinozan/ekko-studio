@@ -315,7 +315,7 @@ export default function Landing() {
             gap: '20px'
           }}>
             {[1, 2, 3].map((n) => (
-              <div key={n} className="ek-skeleton" style={{ height: '380px', borderRadius: 'var(--ek-r-card)' }} />
+              <div key={n} className="ek-skeleton" style={{ height: '380px', borderRadius: 'var(--ek-r-landing)' }} />
             ))}
           </div>
         ) : (
@@ -403,7 +403,7 @@ export default function Landing() {
             gap: '20px'
           }}>
             {[1, 2].map((n) => (
-              <div key={n} className="ek-skeleton" style={{ height: '480px', borderRadius: 'var(--ek-r-card)' }} />
+              <div key={n} className="ek-skeleton" style={{ height: '480px', borderRadius: 'var(--ek-r-landing)' }} />
             ))}
           </div>
         ) : (
@@ -513,7 +513,7 @@ export default function Landing() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {faq.items.map((item) => (
-            <details key={item.q} className="ek-card" style={{ padding: '20px 24px', cursor: 'pointer' }}>
+            <details key={item.q} className="ek-card" style={{ padding: '20px 24px', cursor: 'pointer', borderRadius: 'var(--ek-r-landing)' }}>
               <summary style={{
                 fontFamily: 'var(--ek-font-display)',
                 fontSize: '17px',
@@ -550,7 +550,7 @@ export default function Landing() {
             'radial-gradient(ellipse 90% 70% at 50% 0%, rgba(229, 184, 41, 0.10), transparent 60%),' +
             'linear-gradient(160deg, var(--ek-bg-elevated) 0%, var(--ek-bg-soft) 60%, var(--ek-bg) 100%)',
           border: '0.5px solid var(--ek-mustard-dim)',
-          borderRadius: 'var(--ek-r-card)',
+          borderRadius: 'var(--ek-r-landing)',
           padding: 'clamp(40px, 7vw, 72px) clamp(24px, 5vw, 56px)',
           textAlign: 'center',
           position: 'relative',
