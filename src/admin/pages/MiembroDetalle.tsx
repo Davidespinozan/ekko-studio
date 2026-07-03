@@ -197,10 +197,47 @@ export default function MiembroDetalle() {
         </button>
       </section>
 
+      {/* Historial del miembro: reservas (actividad) + cambios de cuenta
+          (auditoría). Son datos distintos, pero ambos son "el historial" → un
+          solo bloque con subgrupos, en vez de dos cards separadas por la zona
+          peligrosa. */}
       <section className="adm-section">
-        <h2 className="ek-h3">Historial de cambios</h2>
-        <p className="adm-body" style={{ marginBottom: '0.75rem' }}>
-          Auditoría de acciones sensibles sobre este miembro (status, plan, identidad, rol…).
+        <h2 className="ek-h3" style={{ marginBottom: '18px' }}>Historial del miembro</h2>
+
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>
+          RESERVAS ({reservas.length})
+        </p>
+        {reservas.length === 0 ? (
+          <p className="adm-body">Sin reservas.</p>
+        ) : (
+          <div className="adm-table-wrapper">
+            <table className="adm-table">
+              <thead>
+                <tr><th>Folio</th><th>Fecha</th><th>Estudio</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                {reservas.map((r) => (
+                  <tr key={r.id}>
+                    <td><code style={{ fontFamily: 'var(--ek-font-mono)' }}>{r.folio}</code></td>
+                    <td>
+                      {new Date(r.slot_inicio).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
+                      {' · '}
+                      {formatHora(new Date(r.slot_inicio))}
+                    </td>
+                    <td>{r.recurso?.nombre ?? '—'}</td>
+                    <td><code style={{ fontFamily: 'var(--ek-font-mono)' }}>{r.status}</code></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <div style={{ height: '0.5px', background: 'var(--ek-line)', margin: '24px 0' }} />
+
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '4px' }}>CAMBIOS DE CUENTA</p>
+        <p className="adm-body" style={{ marginBottom: '12px', fontSize: '13px' }}>
+          Auditoría de acciones sensibles sobre el miembro (status, plan, identidad…).
         </p>
         <HistorialCambios entries={auditEntries} isLoading={auditLoading} error={auditError} />
       </section>
@@ -269,35 +306,6 @@ export default function MiembroDetalle() {
         onConfirm={handleEliminar}
         onCancel={() => setEliminarOpen(false)}
       />
-
-      <section className="adm-section">
-        <h2 className="ek-h3">Reservas ({reservas.length})</h2>
-        {reservas.length === 0 ? (
-          <p className="adm-body">Sin reservas.</p>
-        ) : (
-          <div className="adm-table-wrapper">
-            <table className="adm-table">
-              <thead>
-                <tr><th>Folio</th><th>Fecha</th><th>Estudio</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                {reservas.map((r) => (
-                  <tr key={r.id}>
-                    <td><code style={{ fontFamily: 'var(--ek-font-mono)' }}>{r.folio}</code></td>
-                    <td>
-                      {new Date(r.slot_inicio).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })}
-                      {' · '}
-                      {formatHora(new Date(r.slot_inicio))}
-                    </td>
-                    <td>{r.recurso?.nombre ?? '—'}</td>
-                    <td><code style={{ fontFamily: 'var(--ek-font-mono)' }}>{r.status}</code></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
     </div>
   );
 }
