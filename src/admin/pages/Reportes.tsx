@@ -28,7 +28,7 @@ const AYUDA = {
   ocupacion:
     'Qué tan llenos están tus estudios: horas reservadas ÷ horas disponibles (según el horario de cada estudio × cupos) en los últimos 90 días. Baja ocupación = agenda vacía; muy alta = te falta capacidad.',
   asistencia:
-    'De las sesiones agendadas, qué % de gente sí se presentó (completadas ÷ completadas + no-shows). Cuanto más alta, mejor. Si cae, tenés fuga de valor: reservan y no vienen.',
+    'De las sesiones agendadas, qué % de gente sí se presentó (completadas ÷ completadas + no-shows). Cuanto más alta, mejor. Si cae, tienes fuga de valor: reservan y no vienen.',
   noShows:
     'Reservas donde el miembro no se presentó en los últimos 90 días. Cada no-show es un slot que bloqueaste y quedó vacío. Vigilalo por estudio para detectar patrones.',
   heatmap:
@@ -67,7 +67,7 @@ export default function Reportes() {
           Salud del negocio
         </h1>
         <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: '4px 0 0' }}>
-          Ingreso recurrente y retención. Tocá el ⓘ de cada dato para entender qué significa.
+          Ingreso recurrente y retención. Toca el ⓘ de cada dato para entender qué significa.
         </p>
       </header>
 

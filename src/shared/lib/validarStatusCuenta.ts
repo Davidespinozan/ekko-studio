@@ -33,31 +33,31 @@ export function validarStatusCuenta(perfil: PerfilStatus): ResultadoValidacion {
     case 'suspendido':
       return {
         permitido: false,
-        mensaje: 'Tu cuenta está suspendida. Contactá al estudio para reactivarla.'
+        mensaje: 'Tu cuenta está suspendida. Contacta al estudio para reactivarla.'
       };
 
     case 'revocado':
       return {
         permitido: false,
-        mensaje: 'Tu acceso fue revocado. Si creés que es un error, contactá al estudio.'
+        mensaje: 'Tu acceso fue revocado. Si creés que es un error, contacta al estudio.'
       };
 
     case 'cancelado':
       return {
         permitido: false,
-        mensaje: 'Tu cuenta fue cancelada. Contactá al estudio si querés reactivarla.'
+        mensaje: 'Tu cuenta fue cancelada. Contacta al estudio si quieres reactivarla.'
       };
 
     case 'pendiente_onboarding':
       return {
         permitido: false,
-        mensaje: 'Tu cuenta está pendiente de activación. Contactá al estudio.'
+        mensaje: 'Tu cuenta está pendiente de activación. Contacta al estudio.'
       };
 
     case 'pendiente_pago':
       return {
         permitido: false,
-        mensaje: 'Tu cuenta está pendiente de pago. Contactá al estudio para activarla.'
+        mensaje: 'Tu cuenta está pendiente de pago. Contacta al estudio para activarla.'
       };
 
     default:
@@ -65,7 +65,7 @@ export function validarStatusCuenta(perfil: PerfilStatus): ResultadoValidacion {
       console.error('[validarStatusCuenta] Status no válido:', perfil.status);
       return {
         permitido: false,
-        mensaje: 'Tu cuenta tiene un estado no válido. Contactá al estudio.'
+        mensaje: 'Tu cuenta tiene un estado no válido. Contacta al estudio.'
       };
   }
 }
@@ -81,14 +81,14 @@ export function traducirErrorAuth(mensajeSupabase: string): string {
     return 'Email o contraseña incorrectos.';
   }
   if (msg.includes('email not confirmed')) {
-    return 'Tu email no está confirmado. Revisá tu correo o contactá al estudio.';
+    return 'Tu email no está confirmado. Revisa tu correo o contacta al estudio.';
   }
   if (msg.includes('too many requests') || msg.includes('rate limit')) {
-    return 'Demasiados intentos. Esperá un momento e intentá de nuevo.';
+    return 'Demasiados intentos. Esperá un momento e intenta de nuevo.';
   }
   if (msg.includes('network') || msg.includes('fetch') || msg.includes('failed to fetch')) {
-    return 'Sin conexión. Verificá tu internet e intentá de nuevo.';
+    return 'Sin conexión. Verifica tu internet e intenta de nuevo.';
   }
 
-  return 'No pudimos iniciar sesión. Intentá de nuevo o contactá al estudio.';
+  return 'No pudimos iniciar sesión. Intenta de nuevo o contacta al estudio.';
 }

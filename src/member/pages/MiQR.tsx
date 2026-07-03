@@ -18,7 +18,7 @@ interface IssueResponse {
 export function traducirErrorQR(raw: string): string {
   const msg = raw.toLowerCase();
   if (msg.includes('cancelada por admin') || msg.includes('cancelada_admin')) {
-    return 'Esta reserva fue cancelada por el estudio. Contactanos si tenés dudas.';
+    return 'Esta reserva fue cancelada por el estudio. Contáctanos si tienes dudas.';
   }
   if (msg.includes('cancelada')) {
     return 'Esta reserva fue cancelada.';
@@ -37,7 +37,7 @@ export function traducirErrorQR(raw: string): string {
   }
   // Fallback (ERROR-UI-FIX E-05): nunca mostrar el mensaje crudo de
   // Supabase/HTTP. Cualquier código no contemplado cae a un genérico.
-  return 'No se pudo generar tu código QR. Intentá de nuevo.';
+  return 'No se pudo generar tu código QR. Intenta de nuevo.';
 }
 
 function QRSkeleton() {
@@ -252,7 +252,7 @@ export default function MiQR() {
           <div className="ek-card">
             <p className="ek-eyebrow" style={{ marginBottom: '8px' }}>INSTRUCCIONES</p>
             <p className="ek-body-muted">
-              Mostrá este código al llegar al estudio. La recepción lo escanea
+              Muestra este código al llegar al estudio. La recepción lo escanea
               para confirmar tu entrada.
               {expiresAt && (
                 <>

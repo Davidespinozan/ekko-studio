@@ -80,7 +80,7 @@ export default function PagarMembresia() {
     <div style={{ maxWidth: '460px', margin: '0 auto', padding: '40px 24px' }}>
       <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>ÚLTIMO PASO</p>
       <h1 style={{ fontFamily: 'var(--ek-font-display)', fontSize: '26px', fontWeight: 700, margin: '0 0 8px', letterSpacing: '-0.02em' }}>
-        Activá tu membresía
+        Activa tu membresía
       </h1>
       <p className="ek-body-muted" style={{ margin: '0 0 24px' }}>
         Tu cuenta está creada. Pagá tu plan para empezar a reservar.

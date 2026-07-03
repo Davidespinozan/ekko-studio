@@ -20,7 +20,7 @@ describe('traducirErrorReserva', () => {
     const out = traducirErrorReserva(crudo);
     // Delega en traducirErrorRPC, cuyo fallback genérico (ERROR-UI-FIX E-04)
     // es "...la operación...". Lo importante: NUNCA el crudo.
-    expect(out).toBe('No se pudo completar la operación. Intentá de nuevo.');
+    expect(out).toBe('No se pudo completar la operación. Intenta de nuevo.');
     expect(out).not.toContain('jwt');
     expect(out).not.toContain('PGRST');
   });

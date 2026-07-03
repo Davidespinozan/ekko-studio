@@ -134,7 +134,7 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
             letterSpacing: '-0.02em'
           }}
         >
-          {step === 'info' ? '¿Querés cancelar esta reserva?' : '¿Estás seguro?'}
+          {step === 'info' ? '¿Quieres cancelar esta reserva?' : '¿Estás seguro?'}
         </h3>
 
         <div

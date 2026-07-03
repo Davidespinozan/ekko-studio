@@ -3,7 +3,7 @@ import { useLandingConfig } from '@shared/hooks/useLandingConfig';
 import { LegalDoc } from '../components/LegalDoc';
 
 // NOTA (David): versión base sólida, NO es asesoría legal. Antes de producción,
-// revisala con un abogado y agregá los datos fiscales del Estudio (razón social,
+// revísala con un abogado y agrega los datos fiscales del Estudio (razón social,
 // RFC, domicilio) si tu abogado lo pide. El contenido usa el nombre y el correo
 // del tenant automáticamente.
 const ACTUALIZADO = '2 de julio de 2026';
@@ -32,9 +32,9 @@ export default function Terminos() {
 
       <h2>2. Tu cuenta</h2>
       <p>
-        Para reservar necesitás una cuenta. Sos responsable de la veracidad de tus datos y de mantener la
-        confidencialidad de tus credenciales; toda actividad realizada desde tu cuenta se considera hecha por vos.
-        Debés ser mayor de edad para contratar. Avisanos de inmediato ante cualquier uso no autorizado.
+        Para reservar necesitas una cuenta. Eres responsable de la veracidad de tus datos y de mantener la
+        confidencialidad de tus credenciales; toda actividad realizada desde tu cuenta se considera hecha por ti.
+        Debes ser mayor de edad para contratar. Avísanos de inmediato ante cualquier uso no autorizado.
       </p>
 
       <h2>3. Membresías, planes y créditos</h2>
@@ -54,12 +54,12 @@ export default function Terminos() {
       </p>
       <p>
         Si un cobro falla, tu acceso puede mantenerse temporalmente mientras se reintenta el cobro; de no regularizarse,
-        la membresía puede suspenderse. También podés activar o regularizar tu pago en recepción.
+        la membresía puede suspenderse. También puedes activar o regularizar tu pago en recepción.
       </p>
 
       <h2>5. Cancelación de la membresía</h2>
       <p>
-        Podés cancelar tu membresía desde tu perfil o en recepción. La cancelación surte efecto al finalizar el período
+        Puedes cancelar tu membresía desde tu perfil o en recepción. La cancelación surte efecto al finalizar el período
         ya pagado y, cuando aplique, respetando el compromiso mínimo de 6 meses. No se realizan reembolsos de períodos
         ya cobrados ni de créditos ya adquiridos, salvo que la ley aplicable disponga otra cosa.
       </p>
@@ -67,7 +67,7 @@ export default function Terminos() {
       <h2>6. Reservas, cancelaciones y no-shows</h2>
       <ul>
         <li>Las reservas se hacen por bloques dentro del horario de cada estudio; cada bloque admite <strong>una sola reserva</strong>.</li>
-        <li>Podés cancelar o reprogramar una sesión con la anticipación indicada en la plataforma.</li>
+        <li>Puedes cancelar o reprogramar una sesión con la anticipación indicada en la plataforma.</li>
         <li>Si no te presentás a una sesión reservada (<strong>no-show</strong>) o cancelás fuera de tiempo, se considera consumida: se descuenta el crédito o se ocupa el cupo correspondiente.</li>
         <li>El uso reiterado de no-shows puede derivar en la restricción temporal de nuevas reservas.</li>
       </ul>
@@ -82,15 +82,15 @@ export default function Terminos() {
 
       <h2>8. Uso del estudio y del equipo</h2>
       <p>
-        Debés usar las instalaciones y el equipo de forma responsable, siguiendo las indicaciones del personal.
-        Sos responsable de los daños que ocasiones al equipo o al espacio durante tu sesión, así como de la conducta
+        Debes usar las instalaciones y el equipo de forma responsable, siguiendo las indicaciones del personal.
+        Eres responsable de los daños que ocasiones al equipo o al espacio durante tu sesión, así como de la conducta
         de tus invitados. Está prohibido cualquier uso ilícito, peligroso o que afecte a otras personas o al inmueble.
       </p>
 
       <h2>9. Tu contenido</h2>
       <p>
         El contenido que produzcas durante tus sesiones es <strong>tuyo</strong>. El Estudio no reclama derechos de
-        propiedad sobre tu material. Sos el único responsable del contenido que crees y de contar con los permisos
+        propiedad sobre tu material. Eres el único responsable del contenido que crees y de contar con los permisos
         necesarios de las personas que aparezcan en él.
       </p>
 
@@ -103,7 +103,7 @@ export default function Terminos() {
       <h2>11. Suspensión y terminación</h2>
       <p>
         Podemos suspender o dar de baja tu acceso ante incumplimientos, falta de pago o conductas que pongan en riesgo a
-        personas, al equipo o a la operación. Vos podés terminar tu relación con el Estudio cancelando tu membresía
+        personas, al equipo o a la operación. Tú puedes terminar tu relación con el Estudio cancelando tu membresía
         conforme a estos Términos.
       </p>
 
@@ -127,7 +127,7 @@ export default function Terminos() {
 
       <h2>15. Contacto</h2>
       <p>
-        Para dudas sobre estos Términos, escribinos a <a href={`mailto:${email}`}>{email}</a>.
+        Para dudas sobre estos Términos, escríbenos a <a href={`mailto:${email}`}>{email}</a>.
       </p>
     </LegalDoc>
   );

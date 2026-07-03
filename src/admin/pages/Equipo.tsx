@@ -249,7 +249,7 @@ export default function Equipo() {
       <ConfirmDialog
         isOpen={hardDelete !== null}
         title={hardDelete ? `¿Eliminar definitivamente a ${capitalizar(hardDelete.nombre) || hardDelete.email}?` : ''}
-        description="Hard delete: borra la cuenta de Auth y todos los datos de la BD. Libera el email para volver a invitarse. Acción irreversible. Si tiene reservas en historial, el backend va a bloquear la operación. Escribí ELIMINAR para confirmar."
+        description="Hard delete: borra la cuenta de Auth y todos los datos de la BD. Libera el email para volver a invitarse. Acción irreversible. Si tiene reservas en historial, el backend va a bloquear la operación. Escribe ELIMINAR para confirmar."
         confirmLabel="Eliminar definitivamente"
         variant="danger"
         requireTypedConfirmation="ELIMINAR"

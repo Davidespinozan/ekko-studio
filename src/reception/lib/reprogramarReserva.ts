@@ -118,7 +118,7 @@ export async function reprogramarReserva(p: ReprogramarParams): Promise<Reprogra
         estado: 'parcial_sin_recrear',
         mensaje:
           `Se canceló la reserva original pero NO se pudo crear la nueva: ${traducirErrorReserva(errCrear)} ` +
-          'El miembro quedó SIN reserva — reservá de nuevo.'
+          'El miembro quedó SIN reserva — reserva de nuevo.'
       };
     }
     return { estado: 'ok', mensaje: 'Reserva reprogramada.' };
@@ -138,7 +138,7 @@ export async function reprogramarReserva(p: ReprogramarParams): Promise<Reprogra
       estado: 'parcial_sin_cancelar',
       mensaje:
         'Se creó la nueva reserva, pero NO se pudo cancelar la anterior. ' +
-        'Cancelá la reserva original manualmente desde el perfil.'
+        'Cancela la reserva original manualmente desde el perfil.'
     };
   }
   return { estado: 'ok', mensaje: 'Reserva reprogramada.' };

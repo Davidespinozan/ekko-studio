@@ -1,7 +1,7 @@
 // ============================================================================
 // Zona horaria del estudio, centralizada. Antes cada métrica armaba los bordes
 // de día/mes con la hora del NAVEGADOR → si el admin miraba desde otra zona,
-// las cuentas se corrían un día en los bordes de mes. Acá todo se calcula en la
+// las cuentas se corrían un día en los bordes de mes. Aquí todo se calcula en la
 // zona del estudio.
 //
 // Culiacán, Sinaloa → America/Mazatlan (UTC-7 fijo; México ya no aplica horario

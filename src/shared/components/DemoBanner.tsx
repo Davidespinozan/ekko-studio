@@ -24,7 +24,7 @@ export function DemoBanner({ vista }: DemoBannerProps) {
   const handleVolver = () => {
     // Intentar cerrar la pestaña primero
     window.close();
-    // Si todavía estamos acá tras un beat, redirigir como fallback
+    // Si todavía estamos aquí tras un beat, redirigir como fallback
     setTimeout(() => {
       window.location.href = '/admin/landing';
     }, 100);

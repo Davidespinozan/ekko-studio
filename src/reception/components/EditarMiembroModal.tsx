@@ -91,7 +91,7 @@ export function EditarMiembroModal({ miembro, onClose, onGuardado }: Props) {
       onGuardado();
       onClose();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'No se pudo guardar. Intentá de nuevo.');
+      toast.error(err instanceof Error ? err.message : 'No se pudo guardar. Intenta de nuevo.');
     } finally {
       setSaving(false);
     }

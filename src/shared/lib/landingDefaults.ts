@@ -4,7 +4,7 @@
 // estudio). Ahora viven en tenant.config.landing.* y se editan en
 // Admin → Ajustes del Landing.
 //
-// Los DEFAULT de acá NO son "hardcode oculto": son el contenido de arranque
+// Los DEFAULT de aquí NO son "hardcode oculto": son el contenido de arranque
 // (fallback) de un campo editable, para que el landing nunca se vea vacío antes
 // de que el admin lo toque. Se eligieron para el modelo de SOLO CRÉDITOS.
 //
@@ -76,7 +76,7 @@ export const COMO_FUNCIONA_DEFAULT: ComoFuncionaConfig = {
     },
     {
       titulo: 'Recibe tu material',
-      texto: 'Te entregamos los archivos limpios después de cada sesión. Vos decidís cómo publicarlo.'
+      texto: 'Te entregamos los archivos limpios después de cada sesión. Tú decides cómo publicarlo.'
     }
   ]
 };
@@ -91,7 +91,7 @@ export const FAQ_DEFAULT: FaqConfig = {
     },
     {
       q: '¿Los créditos vencen?',
-      a: 'Sí. Cada paquete tiene una vigencia (por ejemplo 90 días) que ves al comprar y en tu cuenta. Aprovechá tus sesiones antes de esa fecha.'
+      a: 'Sí. Cada paquete tiene una vigencia (por ejemplo 90 días) que ves al comprar y en tu cuenta. Aprovecha tus sesiones antes de esa fecha.'
     },
     {
       q: '¿Qué incluye cada sesión?',

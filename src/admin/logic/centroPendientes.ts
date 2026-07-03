@@ -37,7 +37,7 @@ export function construirPendientes(c: ConteoPendientes): ItemPendiente[] {
       key: 'vencidas',
       icon: 'calendar-x',
       title: c.membresiasVencidas === 1 ? 'Membresía vencida' : 'Membresías vencidas',
-      detail: 'Periodo terminado y siguen activas. Renová o suspendé.',
+      detail: 'Periodo terminado y siguen activas. Renueva o suspende.',
       count: c.membresiasVencidas,
       tono: 'dang',
       to: '/admin/miembros'
@@ -70,7 +70,7 @@ export function construirPendientes(c: ConteoPendientes): ItemPendiente[] {
       key: 'noshow',
       icon: 'user-x',
       title: c.noShows7d === 1 ? 'No-show reciente' : 'No-shows recientes',
-      detail: 'Inasistencias de los últimos 7 días. Revisá si aplica sanción.',
+      detail: 'Inasistencias de los últimos 7 días. Revisa si aplica sanción.',
       count: c.noShows7d,
       tono: 'neu',
       to: '/admin/calendario'

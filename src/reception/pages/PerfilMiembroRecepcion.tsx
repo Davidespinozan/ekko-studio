@@ -181,7 +181,7 @@ export default function PerfilMiembroRecepcion() {
         <EmptyState
           icon={UserX}
           title="Miembro no encontrado"
-          hint="No pudimos cargar este perfil. Volvé a la búsqueda e intentá de nuevo."
+          hint="No pudimos cargar este perfil. Vuelve a la búsqueda e intenta de nuevo."
           tone="danger"
         />
       </div>
@@ -234,7 +234,7 @@ export default function PerfilMiembroRecepcion() {
         </button>
         {miembro.status !== 'activo' && (
           <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
-            El miembro no está activo — activá la cuenta en "Editar datos" para poder reservar.
+            El miembro no está activo — activa la cuenta en "Editar datos" para poder reservar.
           </p>
         )}
       </div>

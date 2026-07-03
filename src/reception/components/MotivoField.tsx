@@ -38,7 +38,7 @@ export function MotivoField({ opciones, onChange, label = 'Motivo del cambio', i
           emit(e.target.value, libre);
         }}
       >
-        <option value="" disabled>Elegí un motivo…</option>
+        <option value="" disabled>Elige un motivo…</option>
         {opciones.map((o) => (
           <option key={o} value={o}>{o}</option>
         ))}
@@ -49,7 +49,7 @@ export function MotivoField({ opciones, onChange, label = 'Motivo del cambio', i
           id={`${idPrefix}-libre`}
           className="ek-input"
           style={{ marginTop: '8px' }}
-          placeholder="Escribí el motivo"
+          placeholder="Escribe el motivo"
           value={libre}
           onChange={(e) => {
             setLibre(e.target.value);

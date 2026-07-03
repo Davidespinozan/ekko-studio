@@ -72,7 +72,7 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose,
           setMsg('Los pagos online todavía no están configurados. Acercate a recepción.');
         } else {
           setEstado('error');
-          setMsg('No pudimos abrir el pago. Probá de nuevo.');
+          setMsg('No pudimos abrir el pago. Prueba de nuevo.');
         }
       })
       .catch((e) => {
@@ -139,7 +139,7 @@ function CheckoutForm({ onPagado }: { onPagado: () => void }) {
     try {
       const { error: submitErr } = await elements.submit();
       if (submitErr) {
-        setMsg(submitErr.message ?? 'Revisá los datos de la tarjeta.');
+        setMsg(submitErr.message ?? 'Revisa los datos de la tarjeta.');
         return;
       }
       const { error } = await stripe.confirmPayment({

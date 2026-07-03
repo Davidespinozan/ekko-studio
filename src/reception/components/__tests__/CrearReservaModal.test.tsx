@@ -5,7 +5,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
  * Verifica el cableado de CrearReservaModal: que al confirmar llame
  * `reservar_para_miembro_atomic` con `p_usuario_id` = id del MIEMBRO
  * objetivo (no del recepcionista). La lógica de slots (reservaLogic)
- * se mockea — tiene sus propios tests; acá probamos el wiring.
+ * se mockea — tiene sus propios tests; aquí probamos el wiring.
  *
  * IMPORTANTE: los mocks de hooks (`useTenant`, `useRecursosDelTenant`)
  * devuelven SIEMPRE la misma referencia. El componente memoiza `config`

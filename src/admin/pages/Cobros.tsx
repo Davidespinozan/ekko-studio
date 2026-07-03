@@ -61,7 +61,7 @@ export default function Cobros() {
       <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>PAGOS</p>
       <h1 className="ek-h2" style={{ marginBottom: '6px' }}>Cobros online</h1>
       <p className="ek-body-muted" style={{ marginBottom: '24px' }}>
-        Activá los pagos con tarjeta. El dinero cae <strong>directo a tu cuenta bancaria</strong>;
+        Activa los pagos con tarjeta. El dinero cae <strong>directo a tu cuenta bancaria</strong>;
         nosotros solo conectamos la app.
       </p>
 
@@ -78,9 +78,9 @@ export default function Cobros() {
             </p>
             <p className="ek-body-muted" style={{ margin: '4px 0 14px', fontSize: '13.5px' }}>
               {listo
-                ? 'Ya podés recibir pagos online. Los depósitos llegan solos a tu banco.'
+                ? 'Ya puedes recibir pagos online. Los depósitos llegan solos a tu banco.'
                 : enProceso
-                  ? 'Empezaste el formulario de Stripe pero falta completarlo. Continuá para poder cobrar.'
+                  ? 'Empezaste el formulario de Stripe pero falta completarlo. Continúa para poder cobrar.'
                   : 'Conectá tu cuenta para empezar a cobrar online (un formulario corto, una sola vez).'}
             </p>
             {!listo && (

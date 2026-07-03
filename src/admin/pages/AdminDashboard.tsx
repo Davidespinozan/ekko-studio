@@ -64,7 +64,7 @@ export default function AdminDashboard() {
           ERROR
         </p>
         <p className="ek-body" style={{ marginBottom: '20px' }}>
-          No se pudo cargar el dashboard. Verificá tu conexión e intentá de nuevo.
+          No se pudo cargar el dashboard. Verifica tu conexión e intenta de nuevo.
         </p>
         <button type="button" onClick={() => void refetch()} className="ek-cta" style={{ minHeight: '44px' }}>
           Reintentar

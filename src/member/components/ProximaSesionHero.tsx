@@ -60,9 +60,9 @@ export function ProximaSesionHero({ reserva, onCancelada }: Props) {
         ) : (
           <>
             <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>TU PRÓXIMA SESIÓN</p>
-            <h2 className="ek-display-lg" style={{ marginBottom: '6px', color: '#fff' }}>Aún no tenés una agendada</h2>
+            <h2 className="ek-display-lg" style={{ marginBottom: '6px', color: '#fff' }}>Aún no tienes una agendada</h2>
             <p style={{ fontSize: '13.5px', color: 'rgba(255,255,255,0.72)', marginBottom: '20px' }}>
-              Reservá tu próxima grabación y aparecerá acá con tu QR de acceso.
+              Reserva tu próxima grabación y aparecerá aquí con tu QR de acceso.
             </p>
             <Link to="/app/reservar" className="ek-cta ek-cta--gold">
               Reservar ahora <CalendarPlus size={16} aria-hidden="true" />

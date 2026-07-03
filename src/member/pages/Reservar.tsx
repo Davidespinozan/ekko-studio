@@ -51,7 +51,7 @@ export default function Reservar() {
   }, [tenant.config]);
 
   // Ver estudios y horarios es LIBRE para cualquier cuenta. El freno va solo en
-  // el momento de reservar (necesitás plan/créditos), no en explorar.
+  // el momento de reservar (necesitas plan/créditos), no en explorar.
   const tienePlan = !!usuario?.membresia_tier;
 
   // Saldo de créditos (null = plan por tiempo/ilimitado → no aplica el costo).
@@ -77,7 +77,7 @@ export default function Reservar() {
     esPlanCreditos && saldoCreditos !== null && recursoSel !== null &&
     saldoCreditos < costoCreditos(recursoSel);
   const motivoNoReserva = !tienePlan
-    ? 'Necesitás un plan para reservar. Podés ver todo mientras tanto.'
+    ? 'Necesitas un plan para reservar. Puedes ver todo mientras tanto.'
     : saldoInsuficiente
     ? 'No te alcanzan los créditos para este estudio.'
     : null;
@@ -149,7 +149,7 @@ export default function Reservar() {
       navigate('/app');
     } catch (e) {
       const raw = e instanceof Error ? e.message : 'No se pudo crear la reserva';
-      toast.error(raw + ' · Intentalo otra vez');
+      toast.error(raw + ' · Inténtalo otra vez');
       setSubmitting(false);
     }
   }
@@ -247,14 +247,14 @@ export default function Reservar() {
           )}
         </div>
 
-        {/* Aviso: sin plan podés explorar todo, pero no reservar. */}
+        {/* Aviso: sin plan puedes explorar todo, pero no reservar. */}
         {!tienePlan && (
           <div
             className="ek-card ek-card--md"
             style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'space-between', flexWrap: 'wrap' }}
           >
             <p style={{ margin: 0, fontSize: '13px', color: 'var(--ek-ink-muted)' }}>
-              Podés explorar estudios y horarios. Para <strong style={{ color: 'var(--ek-ink)' }}>reservar</strong> necesitás un plan.
+              Puedes explorar estudios y horarios. Para <strong style={{ color: 'var(--ek-ink)' }}>reservar</strong> necesitas un plan.
             </p>
             <button
               type="button"
@@ -318,7 +318,7 @@ export default function Reservar() {
             <div className="ek-card ek-card--md" style={{ textAlign: 'center' }}>
               <p style={{ margin: 0, fontWeight: 600 }}>No quedan horarios disponibles</p>
               <p className="ek-body-faint" style={{ margin: '4px 0 0' }}>
-                Todos los horarios de este día ya pasaron o están reservados. Probá otra fecha.
+                Todos los horarios de este día ya pasaron o están reservados. Prueba otra fecha.
               </p>
             </div>
           ) : (

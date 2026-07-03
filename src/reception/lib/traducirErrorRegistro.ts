@@ -33,7 +33,7 @@ export function traducirErrorRegistro(message: string): string {
     m.includes('recepción o admin') ||
     m.includes('recepcion o admin')
   ) {
-    return 'No tenés permiso para registrar miembros.';
+    return 'No tienes permiso para registrar miembros.';
   }
   if (
     m.includes('sesión') ||
@@ -42,9 +42,9 @@ export function traducirErrorRegistro(message: string): string {
     m.includes('unauthorized') ||
     m.includes('bearer')
   ) {
-    return 'Tu sesión expiró. Iniciá sesión de nuevo.';
+    return 'Tu sesión expiró. Inicia sesión de nuevo.';
   }
 
   // Fallback: nunca exponer el mensaje crudo del servidor.
-  return 'No se pudo registrar al miembro. Intentá de nuevo.';
+  return 'No se pudo registrar al miembro. Intenta de nuevo.';
 }

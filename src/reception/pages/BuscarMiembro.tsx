@@ -180,14 +180,14 @@ export default function BuscarMiembro() {
             <EmptyState
               icon={UserX}
               title="No pudimos cargar el padrón"
-              hint="Revisá tu conexión y recargá la página."
+              hint="Revisa tu conexión y recargá la página."
               tone="danger"
             />
           ) : sinBusqueda ? (
             <EmptyState
               icon={Search}
-              title="Buscá un miembro"
-              hint="Ingresá nombre o email para ver su perfil."
+              title="Busca un miembro"
+              hint="Ingresa nombre o email para ver su perfil."
               tone="neutral"
             />
           ) : isLoading ? (
@@ -210,7 +210,7 @@ export default function BuscarMiembro() {
         <EmptyState
           icon={UserX}
           title="No pudimos cargar el padrón"
-          hint="Revisá tu conexión y recargá la página."
+          hint="Revisa tu conexión y recargá la página."
           tone="danger"
         />
       ) : isLoading ? (
@@ -219,7 +219,7 @@ export default function BuscarMiembro() {
         <EmptyState
           icon={ShieldAlert}
           title="Sin miembros penalizados"
-          hint="Cuando un miembro acumule inasistencias y quede bloqueado, aparecerá acá."
+          hint="Cuando un miembro acumule inasistencias y quede bloqueado, aparecerá aquí."
           tone="neutral"
         />
       ) : (

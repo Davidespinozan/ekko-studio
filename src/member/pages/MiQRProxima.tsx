@@ -7,7 +7,7 @@ import { EmptyState } from '@shared/components/EmptyState';
 
 /**
  * /app/qr — resuelve el QR de la PRÓXIMA reserva confirmada del miembro (el
- * botón del menú abre acá). Si hay reserva → redirige a /app/qr/:id. Si no,
+ * botón del menú abre aquí). Si hay reserva → redirige a /app/qr/:id. Si no,
  * muestra un estado claro con acceso a reservar.
  */
 export default function MiQRProxima() {
@@ -55,8 +55,8 @@ export default function MiQRProxima() {
       <div className="ek-card" style={{ marginTop: '24px' }}>
         <EmptyState
           icon={QrCode}
-          title="No tenés una sesión próxima"
-          hint="Tu QR de acceso aparece cuando tenés una reserva agendada."
+          title="No tienes una sesión próxima"
+          hint="Tu QR de acceso aparece cuando tienes una reserva agendada."
           action={
             <Link to="/app/reservar" className="ek-cta ek-cta--gold">
               Reservar sesión <CalendarPlus size={15} aria-hidden="true" />

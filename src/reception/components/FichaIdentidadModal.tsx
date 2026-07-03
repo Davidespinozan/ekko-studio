@@ -50,7 +50,7 @@ export function FichaIdentidadModal({ miembroId, miembroNombre, tieneFoto, onClo
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      toast.error('Elegí una imagen de la INE.');
+      toast.error('Elige una imagen de la INE.');
       return;
     }
     const { base64, contentType } = await imagenABase64Jpeg(file);

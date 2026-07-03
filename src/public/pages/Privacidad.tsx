@@ -3,7 +3,7 @@ import { useLandingConfig } from '@shared/hooks/useLandingConfig';
 import { LegalDoc } from '../components/LegalDoc';
 
 // NOTA (David): Aviso de Privacidad base conforme a la LFPDPPP (México). NO es
-// asesoría legal — revisalo con un abogado y agregá el domicilio del responsable
+// asesoría legal — revísalo con un abogado y agrega el domicilio del responsable
 // si tu abogado lo requiere. Usa el nombre y el correo del tenant automáticamente.
 const ACTUALIZADO = '2 de julio de 2026';
 
@@ -24,7 +24,7 @@ export default function Privacidad() {
 
       <h2>1. Responsable</h2>
       <p>
-        <strong>{est}</strong> es responsable del tratamiento de tus datos personales. Podés contactarnos en{' '}
+        <strong>{est}</strong> es responsable del tratamiento de tus datos personales. Puedes contactarnos en{' '}
         <a href={`mailto:${email}`}>{email}</a>
         {direccion ? <> o en {direccion}</> : null}.
       </p>
@@ -57,7 +57,7 @@ export default function Privacidad() {
       <h2>5. Finalidades secundarias</h2>
       <p>
         De forma adicional, podríamos usar tus datos para enviarte información promocional o novedades del Estudio.
-        Podés oponerte a estas finalidades en cualquier momento escribiendo a <a href={`mailto:${email}`}>{email}</a>,
+        Puedes oponerte a estas finalidades en cualquier momento escribiendo a <a href={`mailto:${email}`}>{email}</a>,
         sin que ello afecte la prestación del servicio.
       </p>
 
@@ -79,12 +79,12 @@ export default function Privacidad() {
 
       <h2>7. Tus derechos ARCO</h2>
       <p>
-        Tenés derecho a <strong>Acceder</strong> a tus datos, <strong>Rectificar</strong>los cuando sean inexactos,
+        Tienes derecho a <strong>Acceder</strong> a tus datos, <strong>Rectificar</strong>los cuando sean inexactos,
         <strong> Cancelar</strong>los cuando consideres que no se requieren, y <strong>Oponerte</strong> a su
-        tratamiento. También podés revocar el consentimiento otorgado.
+        tratamiento. También puedes revocar el consentimiento otorgado.
       </p>
       <p>
-        Para ejercer estos derechos, enviá tu solicitud a <a href={`mailto:${email}`}>{email}</a> indicando tu nombre,
+        Para ejercer estos derechos, envía tu solicitud a <a href={`mailto:${email}`}>{email}</a> indicando tu nombre,
         el derecho que deseás ejercer y la información suficiente para atenderte. Responderemos en los plazos que marca
         la Ley.
       </p>
@@ -110,7 +110,7 @@ export default function Privacidad() {
 
       <h2>11. Contacto</h2>
       <p>
-        Para cualquier duda sobre este Aviso o sobre el tratamiento de tus datos, escribinos a{' '}
+        Para cualquier duda sobre este Aviso o sobre el tratamiento de tus datos, escríbenos a{' '}
         <a href={`mailto:${email}`}>{email}</a>.
       </p>
     </LegalDoc>

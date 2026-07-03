@@ -68,7 +68,7 @@ export function FotoMiembroModal({ miembroId, miembroNombre, onClose, onActualiz
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      toast.error('Elegí un archivo de imagen.');
+      toast.error('Elige un archivo de imagen.');
       return;
     }
     const { base64, contentType } = await imagenABase64Jpeg(file);

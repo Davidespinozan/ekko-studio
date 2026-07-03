@@ -324,7 +324,7 @@ export default function AjustesLanding() {
 
         <FormField
           label="Palabra destacada (mostaza)"
-          helper="Aparece al final del título en color mostaza. Dejá vacío si no querés highlight."
+          helper="Aparece al final del título en color mostaza. Deja vacío si no quieres highlight."
         >
           <input
             value={draft.hero.titulo_accent}

@@ -52,7 +52,7 @@ export default function Login() {
 
       if (perfilError || !perfil) {
         await supabase.auth.signOut();
-        setError('No encontramos tu cuenta. Contactá al estudio.');
+        setError('No encontramos tu cuenta. Contacta al estudio.');
         setIsSubmitting(false);
         return;
       }
@@ -76,7 +76,7 @@ export default function Login() {
       else if (perfil.rol === 'recepcionista') navigate('/recepcion', { replace: true });
       else navigate('/app', { replace: true });
     } catch {
-      setError('No pudimos iniciar sesión. Intentá de nuevo o contactá al estudio.');
+      setError('No pudimos iniciar sesión. Intenta de nuevo o contacta al estudio.');
       setIsSubmitting(false);
     }
   }

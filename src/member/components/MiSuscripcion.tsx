@@ -190,10 +190,10 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
       toast.success(
         reactivar
           ? '¡Listo! Tu plan se renovará normalmente.'
-          : 'Tu plan se cancelará al final del periodo. Podés reactivarlo cuando quieras.'
+          : 'Tu plan se cancelará al final del periodo. Puedes reactivarlo cuando quieras.'
       );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No pudimos actualizar tu suscripción. Intentá de nuevo.');
+      toast.error(e instanceof Error ? e.message : 'No pudimos actualizar tu suscripción. Intenta de nuevo.');
     } finally {
       setGestionando(false);
     }
@@ -227,7 +227,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               <div style={{ flex: 1 }}>
                 <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>Tu último pago no se procesó</p>
                 <p className="ek-body-muted" style={{ margin: '4px 0 10px' }}>
-                  Actualizá tu método de pago para no perder el acceso al estudio.
+                  Actualiza tu método de pago para no perder el acceso al estudio.
                 </p>
                 <button
                   type="button"
@@ -272,7 +272,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               // Sin plan: NO mostrar "activo"/renovación/cancelar (eso es de una
               // suscripción). Solo un aviso + el CTA para elegir uno.
               <p className="ek-body-muted" style={{ margin: '0 0 16px' }}>
-                No tenés un plan activo. Elegí uno para empezar a reservar.
+                No tienes un plan activo. Elige uno para empezar a reservar.
               </p>
             )}
             {planActual && (
@@ -301,7 +301,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                     {creditos} {creditos === 1 ? 'sesión' : 'sesiones'} disponibles
                   </p>
                   <p className="ek-body-muted" style={{ margin: 0, fontSize: '12px' }}>
-                    {creditos > 0 ? 'Se descuenta 1 por reserva.' : 'Comprá un paquete para seguir reservando.'}
+                    {creditos > 0 ? 'Se descuenta 1 por reserva.' : 'Compra un paquete para seguir reservando.'}
                   </p>
                 </div>
               </div>
@@ -322,7 +322,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             {planActual && finPeriodo && (
               cancelaAlFin ? (
                 <p className="ek-helper-text" style={{ marginTop: 0, marginBottom: '12px', color: 'var(--ek-warning)' }}>
-                  Tu plan se cancela el {finPeriodo}. Podés reactivarlo acá abajo.
+                  Tu plan se cancela el {finPeriodo}. Puedes reactivarlo aquí abajo.
                 </p>
               ) : (
                 <div style={{
@@ -412,7 +412,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                 icon={CreditCard}
                 tone="neutral"
                 title="Sin tarjeta registrada"
-                hint="Guardá una tarjeta para pagar y renovar sin salir de la app."
+                hint="Guarda una tarjeta para pagar y renovar sin salir de la app."
                 action={
                   <button type="button" className="ek-cta ek-cta--gold" onClick={() => setTarjetaOpen(true)}>
                     Agregar tarjeta <CreditCard size={15} aria-hidden="true" />
@@ -481,7 +481,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               </button>
             </div>
             <p className="ek-body-muted" style={{ marginTop: 0, marginBottom: '18px' }}>
-              Elegí tu nuevo plan. Pagás de forma segura sin salir de la app.
+              Elige tu nuevo plan. Pagas de forma segura sin salir de la app.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -553,9 +553,9 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
         <div className="ek-backdrop" onClick={() => !gestionando && setConfirmarCancelar(false)} role="dialog" aria-modal="true">
           <div className="ek-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '100%', animation: 'ek-scale-in 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
             <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>CANCELAR PLAN</p>
-            <h3 className="ek-display-md" style={{ margin: '0 0 8px' }}>¿Seguro que querés cancelar?</h3>
+            <h3 className="ek-display-md" style={{ margin: '0 0 8px' }}>¿Seguro que quieres cancelar?</h3>
             <p className="ek-body-muted" style={{ marginTop: 0, marginBottom: '18px' }}>
-              Mantenés el acceso {finPeriodo ? `hasta el ${finPeriodo}` : 'hasta el final del periodo'}. No se te vuelve a cobrar y podés reactivarlo cuando quieras.
+              Mantienes el acceso {finPeriodo ? `hasta el ${finPeriodo}` : 'hasta el final del periodo'}. No se te vuelve a cobrar y puedes reactivarlo cuando quieras.
             </p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="button" className="ek-cta ek-cta--secondary ek-cta--full" onClick={() => setConfirmarCancelar(false)} disabled={gestionando}>
@@ -580,7 +580,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             </h3>
             <p className="ek-body-muted" style={{ marginTop: 0, marginBottom: '18px' }}>
               El plan <strong>{confirmarCambio.nombre}</strong> es mensual (acceso ilimitado), así que
-              tu saldo de créditos <strong>se perderá</strong>. Si querés aprovecharlos, usalos antes de cambiar.
+              tu saldo de créditos <strong>se perderá</strong>. Si quieres aprovecharlos, úsalos antes de cambiar.
             </p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button type="button" className="ek-cta ek-cta--secondary ek-cta--full" onClick={() => setConfirmarCambio(null)}>

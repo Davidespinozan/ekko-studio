@@ -3,7 +3,7 @@ import { backendPost } from '@shared/lib/backend';
 /**
  * Compra/cambio de plan del miembro (self-serve). ÚNICO punto de enchufe de
  * Stripe en el frontend: hoy `suscribir-membresia` responde `stripe_pendiente`
- * (sin pasarela); cuando se conecte Stripe devolverá `{ url }` y acá redirigimos
+ * (sin pasarela); cuando se conecte Stripe devolverá `{ url }` y aquí redirigimos
  * al Checkout — sin tocar la UI. Ver STRIPE.md.
  */
 

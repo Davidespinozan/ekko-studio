@@ -160,7 +160,7 @@ describe('RegistrarMiembroModal · wiring', () => {
   it('seguridad: el modal no expone ningún campo de rol', () => {
     render(<RegistrarMiembroModal onClose={vi.fn()} onRegistrado={vi.fn()} />);
     // El modal de admin (CrearAccesoModal) usa radios para elegir rol.
-    // Acá no debe existir ninguno: recepción nunca crea staff.
+    // Aquí no debe existir ninguno: recepción nunca crea staff.
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/rol/i)).not.toBeInTheDocument();
   });

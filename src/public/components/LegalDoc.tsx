@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 /**
  * Layout compartido de las páginas legales (Términos, Aviso de Privacidad).
  * Prosa centrada y legible sobre el tema oscuro. El header público (logo + nav)
- * lo pone PublicLayout; acá va solo el documento.
+ * lo pone PublicLayout; aquí va solo el documento.
  */
 export function LegalDoc({
   eyebrow,

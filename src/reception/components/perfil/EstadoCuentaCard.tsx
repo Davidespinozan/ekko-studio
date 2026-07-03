@@ -35,7 +35,7 @@ export function EstadoCuentaCard({
       {miembro.status !== 'activo' && (
         <>
           <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '4px 0 8px' }}>
-            La cuenta no está activa. Confirmá el pago y activá la membresía
+            La cuenta no está activa. Confirma el pago y activa la membresía
             {miembro.membresia_tier ? '' : ' (asigná un plan primero en "Editar datos")'}.
           </p>
           <button

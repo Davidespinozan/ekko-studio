@@ -98,7 +98,7 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
   if (estado === 'past_due') {
     return {
       titulo: 'Tu último pago no se procesó',
-      subtitulo: 'Actualizá tu tarjeta para no perder el acceso.',
+      subtitulo: 'Actualiza tu tarjeta para no perder el acceso.',
       estadoLabel: 'Pago vencido',
       estadoTono: 'danger',
       requiereAccion: true
@@ -107,7 +107,7 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
   if (estado === 'pendiente') {
     return {
       titulo: 'Tu plan está pendiente de pago',
-      subtitulo: 'Completá el pago para activar tu acceso.',
+      subtitulo: 'Completa el pago para activar tu acceso.',
       estadoLabel: 'Pendiente',
       estadoTono: 'warning',
       requiereAccion: true
@@ -116,7 +116,7 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
   if (estado === 'suspendida') {
     return {
       titulo: 'Membresía suspendida',
-      subtitulo: 'Contactá a EKKO para reactivarla.',
+      subtitulo: 'Contacta a EKKO para reactivarla.',
       estadoLabel: 'Suspendida',
       estadoTono: 'danger',
       requiereAccion: true
@@ -125,7 +125,7 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
   if (estado === 'vencida') {
     return {
       titulo: 'Tu membresía venció',
-      subtitulo: 'Renová para seguir reservando.',
+      subtitulo: 'Renueva para seguir reservando.',
       estadoLabel: 'Vencida',
       estadoTono: 'warning',
       requiereAccion: true
@@ -134,7 +134,7 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
   if (estado === 'cancelada' || estado === 'sin_plan') {
     return {
       titulo: 'Sin membresía activa',
-      subtitulo: 'Elegí un plan para empezar a reservar.',
+      subtitulo: 'Elige un plan para empezar a reservar.',
       estadoLabel: 'Sin plan',
       estadoTono: 'neutral',
       requiereAccion: true
@@ -147,7 +147,7 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
   if (esActiva(estado) && venció && (tipo === 'tiempo' || tipo === 'hibrido')) {
     return {
       titulo: 'Tu periodo venció',
-      subtitulo: 'Renová para seguir reservando.',
+      subtitulo: 'Renueva para seguir reservando.',
       estadoLabel: 'Vencida',
       estadoTono: 'warning',
       requiereAccion: true
@@ -158,7 +158,7 @@ export function resumenCarnet(entrada: EntradaCarnet): ResumenCarnet {
   if (esActiva(estado) && tipo === 'creditos' && creditos <= 0) {
     return {
       titulo: 'Te quedaste sin créditos',
-      subtitulo: 'Comprá más para seguir reservando.',
+      subtitulo: 'Compra más para seguir reservando.',
       estadoLabel: 'Sin créditos',
       estadoTono: 'warning',
       requiereAccion: true

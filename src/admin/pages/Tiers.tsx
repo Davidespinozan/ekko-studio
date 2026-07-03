@@ -162,7 +162,7 @@ export default function Tiers() {
     if (!archivar) return '';
     if (archivar.status === 'loading') return 'Verificando miembros activos…';
     if (archivar.activeMembers > 0) {
-      return `${archivar.activeMembers} miembro(s) activo(s) tienen este plan. Migralos a otro plan antes de eliminar este.`;
+      return `${archivar.activeMembers} miembro(s) activo(s) tienen este plan. Cámbialos a otro plan antes de eliminar este.`;
     }
     return 'Este plan se moverá a Eliminados: deja de aparecer en signup y landing. Los miembros existentes con este plan no se afectan. Lo puedes recuperar después.';
   })();
@@ -593,7 +593,7 @@ function EditarTierModal({
         return;
       }
       if (existingSlugs.includes(slug)) {
-        setError(`Ya existe un tier con slug "${slug}". Usá otro.`);
+        setError(`Ya existe un tier con slug "${slug}". Usa otro.`);
         setSaving(false);
         return;
       }
@@ -778,7 +778,7 @@ function EditarTierModal({
               </label>
             )}
             <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '10px' }}>
-              El precio de arriba es el cobro ÚNICO del paquete (no mensual). En Stripe usá un
+              El precio de arriba es el cobro ÚNICO del paquete (no mensual). En Stripe usa un
               precio de pago único para este plan.
             </p>
           </div>
@@ -1027,7 +1027,7 @@ function BeneficiosEditor({
         </button>
       </div>
       <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', margin: 0 }}>
-        Tocá el ✓/✗ para marcar si el plan lo incluye o no. Se muestra como tabla en la landing.
+        Toca el ✓/✗ para marcar si el plan lo incluye o no. Se muestra como tabla en la landing.
       </p>
     </div>
   );

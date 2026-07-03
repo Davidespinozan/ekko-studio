@@ -34,7 +34,7 @@ export default function EstudioDetalle() {
       if (!mounted) return;
       if (error) {
         console.error('[EstudioDetalle]', error);
-        toast.warning('No pudimos cargar el estudio · Intentá refrescar');
+        toast.warning('No pudimos cargar el estudio · Intenta refrescar');
       } else {
         setRecurso(data);
       }

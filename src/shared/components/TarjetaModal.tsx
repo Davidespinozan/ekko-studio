@@ -67,7 +67,7 @@ export function TarjetaModal({ onClose, onGuardada }: Props) {
           setMsg('Los pagos online todavía no están configurados.');
         } else {
           setEstado('error');
-          setMsg('No pudimos abrir el formulario. Probá de nuevo.');
+          setMsg('No pudimos abrir el formulario. Prueba de nuevo.');
         }
       })
       .catch((e) => {
@@ -130,7 +130,7 @@ function TarjetaForm({ onGuardada }: { onGuardada: () => void }) {
     try {
       const { error: submitErr } = await elements.submit();
       if (submitErr) {
-        setMsg(submitErr.message ?? 'Revisá los datos de la tarjeta.');
+        setMsg(submitErr.message ?? 'Revisa los datos de la tarjeta.');
         return;
       }
       const { error, setupIntent } = await stripe.confirmSetup({
@@ -145,7 +145,7 @@ function TarjetaForm({ onGuardada }: { onGuardada: () => void }) {
         ? setupIntent.payment_method
         : setupIntent?.payment_method?.id;
       if (!pmId) {
-        setMsg('No pudimos leer la tarjeta. Probá de nuevo.');
+        setMsg('No pudimos leer la tarjeta. Prueba de nuevo.');
         return;
       }
       await actualizarTarjeta(pmId);

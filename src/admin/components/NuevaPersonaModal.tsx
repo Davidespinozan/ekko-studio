@@ -10,7 +10,7 @@ interface Props {
 /**
  * Alta de MIEMBRO (cliente que paga membresía). Este modal vive en la página
  * Miembros y crea SOLO miembros. Los roles de equipo (admin/recepcionista) se
- * crean desde Equipo con `CrearAccesoModal` — por eso acá no hay selector de rol.
+ * crean desde Equipo con `CrearAccesoModal` — por eso aquí no hay selector de rol.
  */
 export function NuevaPersonaModal({ onClose, onCreated }: Props) {
   const [email, setEmail] = useState('');

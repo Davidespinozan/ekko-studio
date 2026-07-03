@@ -11,25 +11,25 @@ describe('traducirErrorRPC · E-04', () => {
   it('código/error desconocido → genérico, NO el crudo', () => {
     const crudo = 'duplicate key value violates unique constraint "reservas_pkey"';
     const out = traducirErrorRPC(crudo);
-    expect(out).toBe('No se pudo completar la operación. Intentá de nuevo.');
+    expect(out).toBe('No se pudo completar la operación. Intenta de nuevo.');
     expect(out).not.toContain('constraint');
   });
 
   it('un error de red crudo tampoco se filtra', () => {
     expect(traducirErrorRPC('TypeError: Failed to fetch')).toBe(
-      'No se pudo completar la operación. Intentá de nuevo.'
+      'No se pudo completar la operación. Intenta de nuevo.'
     );
   });
 
   it('EKKO_NO_AUTH → mensaje de sesión', () => {
     expect(traducirErrorRPC('EKKO_NO_AUTH: Usuario no autenticado')).toBe(
-      'Tu sesión expiró. Iniciá sesión de nuevo.'
+      'Tu sesión expiró. Inicia sesión de nuevo.'
     );
   });
 
   it('EKKO_NO_AUTORIZADO conserva su mensaje (no lo pisa EKKO_NO_AUTH)', () => {
     // 'EKKO_NO_AUTH' es substring de 'EKKO_NO_AUTORIZADO' — el orden importa.
-    expect(traducirErrorRPC('EKKO_NO_AUTORIZADO: No podés')).toBe(
+    expect(traducirErrorRPC('EKKO_NO_AUTORIZADO: No puedes')).toBe(
       'No puedes hacer esta acción.'
     );
   });
@@ -48,7 +48,7 @@ describe('traducirErrorRPC · E-04', () => {
 describe('traducirErrorQR · E-05', () => {
   it('código desconocido / HTTP crudo → genérico, NO el crudo', () => {
     const out = traducirErrorQR('HTTP 500');
-    expect(out).toBe('No se pudo generar tu código QR. Intentá de nuevo.');
+    expect(out).toBe('No se pudo generar tu código QR. Intenta de nuevo.');
     expect(out).not.toContain('HTTP');
   });
 

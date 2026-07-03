@@ -90,10 +90,10 @@ export default function Checkin() {
               color: 'var(--ek-ink)'
             }}
           >
-            Escaneá el QR del cliente
+            Escanea el QR del cliente
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: '8px auto 0', maxWidth: '320px' }}>
-            Usá el lector o abrí la cámara. El check-in se confirma al leer un QR válido.
+            Usa el lector o abre la cámara. El check-in se confirma al leer un QR válido.
           </p>
         </div>
 

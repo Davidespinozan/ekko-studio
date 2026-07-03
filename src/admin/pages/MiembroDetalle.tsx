@@ -190,7 +190,7 @@ export default function MiembroDetalle() {
         <h2 className="ek-h3">Notas del equipo</h2>
         <p className="adm-body" style={{ marginBottom: '0.5rem' }}>
           Bitácora compartida entre admin y recepción. Cada autor edita o borra
-          lo suyo; vos podés editar todo.
+          lo suyo; tú puedes editar todo.
         </p>
         <NotasMiembro miembroId={miembro.id} />
       </section>
@@ -224,7 +224,7 @@ export default function MiembroDetalle() {
                 Tiene {totalReservas} {totalReservas === 1 ? 'reserva en historial' : 'reservas en historial'}
               </strong>
               {' '}— el sistema bloqueará la eliminación para preservar auditoría.
-              Cambiá el status a <code style={{ fontFamily: 'var(--ek-font-mono)' }}>cancelado</code> si solo querés darlo de baja.
+              Cambia el status a <code style={{ fontFamily: 'var(--ek-font-mono)' }}>cancelado</code> si solo quieres darlo de baja.
             </>
           )}
         </p>
@@ -252,7 +252,7 @@ export default function MiembroDetalle() {
       <ConfirmDialog
         isOpen={eliminarOpen}
         title={`¿Eliminar a ${miembro.nombre ?? miembro.email}?`}
-        description={`Esta acción borra la cuenta de Auth y todos los datos del miembro de la BD (notificaciones, membresías). El email queda libre para volver a invitarse. ${totalReservas > 0 ? `Atención: tiene ${totalReservas} ${totalReservas === 1 ? 'reserva' : 'reservas'} en historial — el backend va a bloquear la operación. ` : ''}Escribí ELIMINAR para confirmar.`}
+        description={`Esta acción borra la cuenta de Auth y todos los datos del miembro de la BD (notificaciones, membresías). El email queda libre para volver a invitarse. ${totalReservas > 0 ? `Atención: tiene ${totalReservas} ${totalReservas === 1 ? 'reserva' : 'reservas'} en historial — el backend va a bloquear la operación. ` : ''}Escribe ELIMINAR para confirmar.`}
         confirmLabel={eliminando ? 'Eliminando…' : 'Eliminar definitivamente'}
         variant="danger"
         requireTypedConfirmation="ELIMINAR"

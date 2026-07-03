@@ -91,7 +91,7 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
-        throw new Error('Tu sesión expiró. Iniciá sesión de nuevo.');
+        throw new Error('Tu sesión expiró. Inicia sesión de nuevo.');
       }
 
       const emailNorm = email.trim().toLowerCase();
@@ -99,7 +99,7 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
       const telNorm = telefono.trim();
 
       // `fetch` crudo en lugar de `backendPost`: backendPost descarta el
-      // body del error y deja solo el status, y acá necesitamos
+      // body del error y deja solo el status, y aquí necesitamos
       // `result.error` para traducir "email duplicado" y demás. NO se
       // manda `rol` ni `tenant_id` — la función los fija (rol='miembro',
       // tenant del caller). Mandar más campos no escalaría: el handler
@@ -280,7 +280,7 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
               </select>
               <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
                 {tier
-                  ? 'Se activa la membresía al registrar (confirmás el cobro en caja).'
+                  ? 'Se activa la membresía al registrar (confirmas el cobro en caja).'
                   : 'Sin plan queda pendiente de pago; lo activás luego desde su perfil.'}
               </p>
             </div>
@@ -367,7 +367,7 @@ function CredencialesView({
     `Email: ${creado.email}`,
     `Contraseña: ${creado.password}`,
     '',
-    `Iniciá sesión en: ${origin}/login`
+    `Inicia sesión en: ${origin}/login`
   ].join('\n');
 
   return (

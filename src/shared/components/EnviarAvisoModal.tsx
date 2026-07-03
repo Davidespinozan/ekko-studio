@@ -27,7 +27,7 @@ export function EnviarAvisoModal({ miembroId, miembroNombre, onClose, onEnviado 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!mensaje.trim()) {
-      toast.error('Escribí un mensaje.');
+      toast.error('Escribe un mensaje.');
       return;
     }
     setSaving(true);
@@ -68,7 +68,7 @@ export function EnviarAvisoModal({ miembroId, miembroNombre, onClose, onEnviado 
             id="aviso-msg"
             value={mensaje}
             onChange={(e) => setMensaje(e.target.value.slice(0, MAX))}
-            placeholder="Ej. Tu pago vence mañana. Pasá por recepción si tenés dudas."
+            placeholder="Ej. Tu pago vence mañana. Pasá por recepción si tienes dudas."
             className="ek-input"
             rows={4}
             style={{ width: '100%', resize: 'vertical' }}

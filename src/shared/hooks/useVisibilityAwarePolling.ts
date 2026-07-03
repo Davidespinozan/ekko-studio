@@ -17,7 +17,7 @@ import { useEffect, useRef } from 'react';
  * gatear el polling cuando aún no hay usuario/contexto.
  *
  * Patrón originado en `useNotificacionesMiembro` (M3) y `useReservasHoy`
- * (MA1); extraído acá para no duplicar la lógica.
+ * (MA1); extraído aquí para no duplicar la lógica.
  */
 export function useVisibilityAwarePolling(
   poll: () => void | Promise<void>,

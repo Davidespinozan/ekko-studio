@@ -154,7 +154,7 @@ export default function Dashboard() {
             </strong>.
           </p>
           <p className="ek-body-faint" style={{ marginTop: '8px' }}>
-            Esto puede deberse a una inasistencia o suspensión. Contactá a EKKO si tienes dudas.
+            Esto puede deberse a una inasistencia o suspensión. Contacta a EKKO si tienes dudas.
           </p>
         </div>
       )}
@@ -185,7 +185,7 @@ export default function Dashboard() {
       ) : errorReservas ? (
         <div className="ek-card" style={{ marginBottom: '24px', textAlign: 'center' }}>
           <p className="ek-eyebrow" style={{ color: 'var(--ek-danger)', marginBottom: '12px' }}>NO SE PUDO CARGAR</p>
-          <p className="ek-body" style={{ marginBottom: '20px' }}>No pudimos cargar tu próxima sesión. Verificá tu conexión.</p>
+          <p className="ek-body" style={{ marginBottom: '20px' }}>No pudimos cargar tu próxima sesión. Verifica tu conexión.</p>
           <button type="button" onClick={() => void refetchReservas()} className="ek-cta">Reintentar</button>
         </div>
       ) : (

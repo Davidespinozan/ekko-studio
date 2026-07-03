@@ -61,7 +61,7 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
   const typedOk = typed === 'CANCELAR';
   const canSubmit = motivoOk && typedOk && !submitting;
 
-  const mensajeWhatsapp = `Hola ${primerNombre(reserva.usuario_nombre)}, te aviso que tuvimos que cancelar tu reserva del ${fechaFmt} en ${reserva.recurso_nombre}. Motivo: ${motivo || '[escribe el motivo arriba]'}. Disculpa las molestias, podés reservar otra fecha desde la app.`;
+  const mensajeWhatsapp = `Hola ${primerNombre(reserva.usuario_nombre)}, te aviso que tuvimos que cancelar tu reserva del ${fechaFmt} en ${reserva.recurso_nombre}. Motivo: ${motivo || '[escribe el motivo arriba]'}. Disculpa las molestias, puedes reservar otra fecha desde la app.`;
 
   async function handleSubmit() {
     if (!usuario) return;
@@ -241,7 +241,7 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
 
         <div style={{ marginBottom: '16px' }}>
           <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', marginBottom: '6px' }}>
-            Escribí <strong style={{ color: 'var(--ek-ink)' }}>CANCELAR</strong> para confirmar:
+            Escribe <strong style={{ color: 'var(--ek-ink)' }}>CANCELAR</strong> para confirmar:
           </p>
           <input
             type="text"

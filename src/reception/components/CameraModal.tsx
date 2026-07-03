@@ -86,8 +86,8 @@ export function CameraModal({ onClose, onScan }: Props) {
                 No pudimos acceder a la cámara
               </p>
               <p style={{ color: 'var(--ek-ink-muted)', fontSize: '0.875rem', marginTop: '0.5rem' }}>
-                Verificá que diste permiso de cámara en los ajustes de tu navegador
-                y volvé a intentar.
+                Verifica que diste permiso de cámara en los ajustes de tu navegador
+                y vuelve a intentar.
               </p>
               <p style={{ color: 'var(--ek-ink-faint)', fontSize: '0.75rem', marginTop: '0.5rem' }}>
                 {cameraError}

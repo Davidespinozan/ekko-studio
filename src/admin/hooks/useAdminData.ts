@@ -550,7 +550,7 @@ export function useDineroMetrics() {
 /**
  * Reservas en un rango de fechas para vista calendario.
  * Movido a `@shared/hooks/useReservasRango` (lo comparten admin y recepción —
- * Bloque B/C). Se re-exporta acá por compatibilidad de imports.
+ * Bloque B/C). Se re-exporta aquí por compatibilidad de imports.
  */
 export { useReservasRango } from '@shared/hooks/useReservasRango';
 

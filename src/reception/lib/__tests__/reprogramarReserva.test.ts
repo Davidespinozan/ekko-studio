@@ -113,7 +113,7 @@ describe('reprogramarReserva · no choca (crear → cancelar)', () => {
     const r = await reprogramarReserva(params());
 
     expect(r.estado).toBe('parcial_sin_cancelar');
-    expect(r.mensaje).toMatch(/cancelá la reserva original manualmente/i);
+    expect(r.mensaje).toMatch(/cancela la reserva original manualmente/i);
   });
 });
 

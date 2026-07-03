@@ -38,7 +38,7 @@ export default function MemberLayout() {
   const yaCerrado = useRef(false);
 
   // Defensa profunda: el chequeo principal de status vive en Login (S1).
-  // Acá cubrimos la sesión vieja cuyo status cambió mientras estaba dentro.
+  // Aquí cubrimos la sesión vieja cuyo status cambió mientras estaba dentro.
   const validacion = usuario ? validarStatusCuenta(usuario) : null;
 
   // `pendiente_pago` NO se echa: puede pagar su membresía self-serve (abajo).

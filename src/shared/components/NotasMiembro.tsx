@@ -55,7 +55,7 @@ export function NotasMiembro({ miembroId }: { miembroId: string | undefined }) {
         <textarea
           value={nueva}
           onChange={(e) => setNueva(e.target.value)}
-          placeholder="Agregá una nota sobre el miembro…"
+          placeholder="Agrega una nota sobre el miembro…"
           className="ek-input"
           rows={2}
           style={{ width: '100%', resize: 'vertical', minHeight: '56px' }}
@@ -78,7 +78,7 @@ export function NotasMiembro({ miembroId }: { miembroId: string | undefined }) {
         <p className="ek-body-faint">No se pudieron cargar las notas.</p>
       ) : notas.length === 0 ? (
         <p className="ek-body-faint" style={{ fontSize: '13px' }}>
-          Sin notas. Usá este espacio para apuntar cosas que recepción o admin deba recordar sobre
+          Sin notas. Usa este espacio para apuntar cosas que recepción o admin deba recordar sobre
           el miembro.
         </p>
       ) : (

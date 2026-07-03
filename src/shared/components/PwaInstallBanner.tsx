@@ -117,7 +117,7 @@ export default function PwaInstallBanner() {
 
           {esIOS() && iosHelp && (
             <p className="ek-body-muted" style={{ margin: '10px 0 0', fontSize: '12.5px', lineHeight: 1.5 }}>
-              Tocá <Share size={13} style={{ verticalAlign: '-2px', color: 'var(--ek-mustard)' }} aria-hidden="true" /> Compartir
+              Toca <Share size={13} style={{ verticalAlign: '-2px', color: 'var(--ek-mustard)' }} aria-hidden="true" /> Compartir
               y luego <strong style={{ color: 'var(--ek-ink)' }}>“Agregar a inicio”</strong>.
             </p>
           )}

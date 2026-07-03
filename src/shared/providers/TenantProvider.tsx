@@ -64,7 +64,7 @@ export function TenantProvider({ children }: TenantProviderProps) {
           // de arranque; el detalle técnico va a consola, nunca a la UI.
           console.error('[TenantProvider] queryError al cargar el tenant:', queryError);
           setError(new Error(
-            'No pudimos cargar la configuración del estudio. Verificá tu conexión e intentá de nuevo.'
+            'No pudimos cargar la configuración del estudio. Verifica tu conexión e intenta de nuevo.'
           ));
           setIsLoading(false);
           return;
@@ -102,7 +102,7 @@ export function TenantProvider({ children }: TenantProviderProps) {
         // path debe filtrar el mensaje crudo a la pantalla de arranque.
         console.error('[TenantProvider] excepción al cargar el tenant:', err);
         setError(new Error(
-          'No pudimos cargar la configuración del estudio. Verificá tu conexión e intentá de nuevo.'
+          'No pudimos cargar la configuración del estudio. Verifica tu conexión e intenta de nuevo.'
         ));
         setIsLoading(false);
       }
@@ -141,7 +141,7 @@ export function TenantProvider({ children }: TenantProviderProps) {
             No se pudo cargar la configuración
           </h1>
           <p style={{ color: 'var(--ek-ink-muted)', maxWidth: '32rem' }}>
-            {error?.message ?? 'No pudimos cargar la configuración del estudio. Verificá tu conexión e intentá de nuevo.'}
+            {error?.message ?? 'No pudimos cargar la configuración del estudio. Verifica tu conexión e intenta de nuevo.'}
           </p>
           <button
             type="button"

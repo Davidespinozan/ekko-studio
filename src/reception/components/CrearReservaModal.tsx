@@ -171,7 +171,7 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
         recursoSel.id === reprogramarDe.recurso_id &&
         slotSel.inicio.getTime() === new Date(reprogramarDe.slot_inicio).getTime();
       if (mismoSlot) {
-        toast.error('Ese es el horario actual de la reserva. Elegí uno distinto.');
+        toast.error('Ese es el horario actual de la reserva. Elige uno distinto.');
         setSubmitting(false);
         return;
       }

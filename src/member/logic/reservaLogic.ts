@@ -236,8 +236,8 @@ export function traducirErrorRPC(message: string): string {
   if (message.includes('EKKO_CONTINUA')) return 'No puedes reservar horas consecutivas.';
   if (message.includes('EKKO_IDENTIDAD_INCOMPLETA')) return 'Falta capturar la ficha de identidad (foto, datos, INE) antes de dar ingreso.';
   if (message.includes('EKKO_CONTRATO_PENDIENTE')) return 'El miembro debe firmar el contrato antes de dar ingreso.';
-  if (message.includes('EKKO_SIN_CREDITOS')) return 'No te quedan créditos. Comprá un paquete para reservar.';
-  if (message.includes('EKKO_MEMBRESIA_VENCIDA')) return 'Tu paquete venció. Renová para seguir reservando.';
+  if (message.includes('EKKO_SIN_CREDITOS')) return 'No te quedan créditos. Compra un paquete para reservar.';
+  if (message.includes('EKKO_MEMBRESIA_VENCIDA')) return 'Tu paquete venció. Renueva para seguir reservando.';
   if (message.includes('EKKO_SLOT_OCUPADO')) return 'Este horario acaba de ser tomado por otro miembro. Elige otro.';
   if (message.includes('EKKO_RESERVA_NO_EXISTE')) return 'La reserva no existe.';
   if (message.includes('EKKO_NO_AUTORIZADO')) return 'No puedes hacer esta acción.';
@@ -247,8 +247,8 @@ export function traducirErrorRPC(message: string): string {
   if (message.includes('EKKO_TENANT_DIFERENTE')) return 'Esa reserva pertenece a otro estudio.';
   // EKKO_NO_AUTH va DESPUÉS de EKKO_NO_AUTORIZADO: 'EKKO_NO_AUTH' es
   // substring de 'EKKO_NO_AUTORIZADO' y matchearía de más si fuera antes.
-  if (message.includes('EKKO_NO_AUTH')) return 'Tu sesión expiró. Iniciá sesión de nuevo.';
+  if (message.includes('EKKO_NO_AUTH')) return 'Tu sesión expiró. Inicia sesión de nuevo.';
   // Fallback (ERROR-UI-FIX E-04): nunca exponer el mensaje crudo de
   // Postgres/Supabase/HTTP. Mismo criterio que traducirErrorReserva.
-  return 'No se pudo completar la operación. Intentá de nuevo.';
+  return 'No se pudo completar la operación. Intenta de nuevo.';
 }

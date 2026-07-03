@@ -105,11 +105,11 @@ export default function Signup() {
     const nombreNorm = nombre.trim();
 
     if (nombreNorm.length < 2) {
-      setError('Ingresá tu nombre completo.');
+      setError('Ingresa tu nombre completo.');
       return;
     }
     if (!EMAIL_REGEX.test(emailNorm)) {
-      setError('Ingresá un email válido.');
+      setError('Ingresa un email válido.');
       return;
     }
     if (password.length < 8) {
@@ -121,7 +121,7 @@ export default function Signup() {
       return;
     }
     if (!acepto) {
-      setError('Debés aceptar los términos y el aviso de privacidad para continuar.');
+      setError('Debes aceptar los términos y el aviso de privacidad para continuar.');
       return;
     }
 
@@ -149,7 +149,7 @@ export default function Signup() {
           errMsg.includes('exists') ||
           errMsg.includes('duplicate')
         ) {
-          throw new Error('Ya existe una cuenta con este email. Iniciá sesión.');
+          throw new Error('Ya existe una cuenta con este email. Inicia sesión.');
         }
         throw new Error(result.error || 'No se pudo crear la cuenta.');
       }
@@ -160,15 +160,15 @@ export default function Signup() {
         password
       });
       if (loginError) {
-        throw new Error('Cuenta creada pero no pudimos iniciar sesión. Iniciá sesión manualmente.');
+        throw new Error('Cuenta creada pero no pudimos iniciar sesión. Inicia sesión manualmente.');
       }
 
       // Cuenta creada + sesión activa. El login dispara el redirect a /app
       // (useRoleRedirect), donde el miembro pendiente_pago paga su membresía.
-      // No hace falta hacer nada más acá; se desmonta al redirigir.
+      // No hace falta hacer nada más aquí; se desmonta al redirigir.
     } catch (err) {
       console.error('[Signup]', err);
-      setError(err instanceof Error ? err.message : 'Error inesperado. Intentá de nuevo.');
+      setError(err instanceof Error ? err.message : 'Error inesperado. Intenta de nuevo.');
       setIsProcessing(false);
     }
   }

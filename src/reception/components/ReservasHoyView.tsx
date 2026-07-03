@@ -211,7 +211,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
         llegando.push(r);
       } else if (esHoy && r.status === 'confirmada' && fin < now) {
         // Confirmada cuyo horario ya pasó sin check-in → faltante (candidata
-        // a no-show; el cron la resuelve, recepción NO la marca acá — Bloque D).
+        // a no-show; el cron la resuelve, recepción NO la marca aquí — Bloque D).
         faltantes.push(r);
       } else {
         resto.push(r);
@@ -462,7 +462,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
             icon={CalendarDays}
             tone="neutral"
             title={esHoy ? 'Sin reservas para hoy' : 'Sin reservas para este día'}
-            hint="Cuando haya reservas aparecerán acá. Escaneá el QR del cliente o registrá un walk-in desde su perfil."
+            hint="Cuando haya reservas aparecerán aquí. Escanea el QR del cliente o registrá un walk-in desde su perfil."
           />
         </div>
       ) : (

@@ -27,7 +27,7 @@ export default function Estudios() {
       if (!mounted) return;
       if (error) {
         console.error('[Estudios]', error);
-        toast.warning('No pudimos cargar los estudios · Intentá refrescar');
+        toast.warning('No pudimos cargar los estudios · Intenta refrescar');
       } else {
         setRecursos(data ?? []);
       }

@@ -19,7 +19,7 @@ export function traducirErrorReserva(message: string): string {
     return 'El miembro tiene una restricción activa por inasistencia.';
   }
   if (message.includes('EKKO_NO_AUTORIZADO')) {
-    return 'No tenés permiso para esta acción.';
+    return 'No tienes permiso para esta acción.';
   }
 
   // Códigos compartidos (slot ocupado, reserva no cancelable, etc.).

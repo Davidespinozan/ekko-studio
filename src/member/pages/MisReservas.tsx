@@ -140,7 +140,7 @@ export default function MisReservas() {
             <EmptyState
               icon={CalendarPlus}
               title="Sin sesiones agendadas"
-              hint="Reserva tu próxima grabación y aparecerá acá."
+              hint="Reserva tu próxima grabación y aparecerá aquí."
               action={
                 <Link to="/app/reservar" className="ek-cta ek-cta--gold">
                   Reservar sesión <ArrowRight size={16} aria-hidden="true" />
@@ -187,7 +187,7 @@ export default function MisReservas() {
             icon={History}
             tone="neutral"
             title="Sin historial todavía"
-            hint="Aún no tienes sesiones completadas. Cuando termines una grabación aparecerá acá."
+            hint="Aún no tienes sesiones completadas. Cuando termines una grabación aparecerá aquí."
           />
         </div>
       ) : (

@@ -83,7 +83,7 @@ describe('traducirErrorAuth', () => {
     const crudo = 'PGRST500: internal jwt malformed at column 42';
     const traducido = traducirErrorAuth(crudo);
     expect(traducido).toBe(
-      'No pudimos iniciar sesión. Intentá de nuevo o contactá al estudio.'
+      'No pudimos iniciar sesión. Intenta de nuevo o contacta al estudio.'
     );
     expect(traducido).not.toContain('jwt');
   });
