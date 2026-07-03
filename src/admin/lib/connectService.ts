@@ -11,6 +11,15 @@ export interface ConnectStatus {
   details_submitted: boolean;
   payouts_enabled: boolean;
   reason?: string;
+  // Enriquecidos (solo cuando connected):
+  account_id?: string | null;
+  business_name?: string | null;
+  email?: string | null;
+  pais?: string | null;
+  payout_interval?: string | null; // daily | weekly | monthly | manual
+  bank?: { bank_name: string | null; last4: string | null } | null;
+  balance?: { disponible_centavos: number; pendiente_centavos: number; moneda: string } | null;
+  dashboard_url?: string | null;
 }
 
 export async function iniciarOnboardingConnect(): Promise<{ url: string | null; reason?: string }> {

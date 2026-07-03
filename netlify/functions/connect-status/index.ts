@@ -75,11 +75,59 @@ export const handler: Handler = async (event) => {
       .update({ stripe_charges_enabled: chargesEnabled, stripe_details_submitted: detailsSubmitted })
       .eq('id', admin.tenant_id);
 
+    // ── Datos enriquecidos (cada uno tolerante a fallo: si Stripe rechaza uno,
+    //    el resto del estado igual se devuelve) ──────────────────────────────
+    const businessName =
+      account.business_profile?.name ||
+      (account.settings?.dashboard?.display_name ?? null);
+
+    // Cuenta bancaria de depósito (la default, si hay).
+    let bank: { bank_name: string | null; last4: string | null } | null = null;
+    try {
+      const banks = await stripe.accounts.listExternalAccounts(accountId, { object: 'bank_account', limit: 1 });
+      const b = banks.data[0] as { bank_name?: string | null; last4?: string | null } | undefined;
+      if (b) bank = { bank_name: b.bank_name ?? null, last4: b.last4 ?? null };
+    } catch (e) {
+      console.error('[connect-status] bank', e instanceof Error ? e.message : e);
+    }
+
+    // Balance de la cuenta conectada (disponible + pendiente).
+    let balance: { disponible_centavos: number; pendiente_centavos: number; moneda: string } | null = null;
+    try {
+      const bal = await stripe.balance.retrieve({ stripeAccount: accountId });
+      const disp = bal.available?.[0];
+      const pend = bal.pending?.[0];
+      balance = {
+        disponible_centavos: disp?.amount ?? 0,
+        pendiente_centavos: pend?.amount ?? 0,
+        moneda: (disp?.currency ?? pend?.currency ?? account.default_currency ?? 'mxn').toUpperCase()
+      };
+    } catch (e) {
+      console.error('[connect-status] balance', e instanceof Error ? e.message : e);
+    }
+
+    // Link al panel Express de Stripe (cambiar banco, ver depósitos, etc.).
+    let dashboard_url: string | null = null;
+    try {
+      const link = await stripe.accounts.createLoginLink(accountId);
+      dashboard_url = link.url ?? null;
+    } catch (e) {
+      console.error('[connect-status] loginLink', e instanceof Error ? e.message : e);
+    }
+
     return ok({
       connected: true,
       charges_enabled: chargesEnabled,
       details_submitted: detailsSubmitted,
-      payouts_enabled: account.payouts_enabled === true
+      payouts_enabled: account.payouts_enabled === true,
+      account_id: accountId,
+      business_name: businessName,
+      email: account.email ?? null,
+      pais: account.country ?? null,
+      payout_interval: account.settings?.payouts?.schedule?.interval ?? null,
+      bank,
+      balance,
+      dashboard_url
     });
   } catch (err) {
     console.error('[connect-status]', err instanceof Error ? err.message : err);
