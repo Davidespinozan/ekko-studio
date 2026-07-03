@@ -6,6 +6,7 @@ import Toggle from '../components/Toggle';
 type ReglasDraft = {
   anticipacion_min_horas: number;
   duracion_default_min: number;
+  max_sesiones_por_dia: number;
   permitir_continuas: boolean;
   no_show_bloqueo_dias: number;
 };
@@ -13,6 +14,7 @@ type ReglasDraft = {
 const DEFAULT: ReglasDraft = {
   anticipacion_min_horas: 24,
   duracion_default_min: 60,
+  max_sesiones_por_dia: 1,
   permitir_continuas: false,
   no_show_bloqueo_dias: 7
 };
@@ -29,6 +31,7 @@ function readDraft(config: Record<string, unknown> | null): ReglasDraft {
   return {
     anticipacion_min_horas: num(reserva.anticipacion_min_horas, DEFAULT.anticipacion_min_horas),
     duracion_default_min: num(reserva.duracion_default_min, DEFAULT.duracion_default_min),
+    max_sesiones_por_dia: num(reserva.max_sesiones_por_dia, DEFAULT.max_sesiones_por_dia),
     permitir_continuas: Boolean(reserva.permitir_continuas ?? DEFAULT.permitir_continuas),
     no_show_bloqueo_dias: num(penalizaciones.no_show_bloqueo_dias, DEFAULT.no_show_bloqueo_dias)
   };
@@ -101,6 +104,10 @@ export default function AjustesReglas() {
       toast.error('Duración debe ser mayor a 0.');
       return;
     }
+    if (!Number.isFinite(draft.max_sesiones_por_dia) || draft.max_sesiones_por_dia < 0) {
+      toast.error('El tope de sesiones por día no puede ser negativo.');
+      return;
+    }
 
     // Merge no destructivo: solo escribimos los campos consumidos.
     // Los campos DEAD (cupos_por_recurso, etc) se preservan en BD.
@@ -112,6 +119,7 @@ export default function AjustesReglas() {
         ...reserva,
         anticipacion_min_horas: draft.anticipacion_min_horas,
         duracion_default_min: draft.duracion_default_min,
+        max_sesiones_por_dia: draft.max_sesiones_por_dia,
         permitir_continuas: draft.permitir_continuas
       },
       penalizaciones: {
@@ -188,6 +196,21 @@ export default function AjustesReglas() {
             value={draft.duracion_default_min}
             onChange={(e) =>
               setDraft({ ...draft, duracion_default_min: parseInt(e.target.value) || 0 })
+            }
+            className="ek-input"
+          />
+        </FormField>
+
+        <FormField
+          label="Máximo de sesiones por día (por miembro)"
+          helper="Cuántas sesiones puede reservar un mismo miembro en un día. Ejemplo: 1 (una diaria, cuida la disponibilidad de los estudios). Pon 0 para no poner límite."
+        >
+          <input
+            type="number"
+            min={0}
+            value={draft.max_sesiones_por_dia}
+            onChange={(e) =>
+              setDraft({ ...draft, max_sesiones_por_dia: parseInt(e.target.value) || 0 })
             }
             className="ek-input"
           />

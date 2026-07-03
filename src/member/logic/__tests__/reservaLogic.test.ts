@@ -4,6 +4,7 @@ import {
   generarFechasReservables,
   filtrarRecursosPorTier,
   puedeReservarRecurso,
+  traducirErrorRPC,
   diaNombre,
   combinarFechaHora,
   formatDateISO,
@@ -212,6 +213,16 @@ describe('puedeReservarRecurso (gate Pro: Esencial fuera, Premium/paquete dentro
   });
   it('sin plan no puede reservar un estudio con tiers definidos', () => {
     expect(puedeReservarRecurso(estandar, null)).toBe(false);
+  });
+});
+
+describe('traducirErrorRPC', () => {
+  it('EKKO_LIMITE_DIARIO → mensaje de tope diario alcanzado', () => {
+    expect(traducirErrorRPC('EKKO_LIMITE_DIARIO: Ya tienes el máximo de 1 sesión por día'))
+      .toBe('Alcanzaste el máximo de sesiones que puedes reservar ese día. Elige otro día.');
+  });
+  it('EKKO_TIER_NO_PERMITIDO → mensaje de plan sin acceso', () => {
+    expect(traducirErrorRPC('EKKO_TIER_NO_PERMITIDO: ...')).toBe('Tu plan no tiene acceso a este estudio.');
   });
 });
 

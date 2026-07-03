@@ -246,6 +246,7 @@ export function traducirErrorRPC(message: string): string {
   if (message.includes('EKKO_ANTICIPACION_EXCESIVA')) return 'No puedes reservar tan lejos en el futuro.';
   if (message.includes('EKKO_CONTINUAS_NO_PERMITIDAS')) return 'No puedes reservar horas consecutivas.';
   if (message.includes('EKKO_CONTINUA')) return 'No puedes reservar horas consecutivas.';
+  if (message.includes('EKKO_LIMITE_DIARIO')) return 'Alcanzaste el máximo de sesiones que puedes reservar ese día. Elige otro día.';
   if (message.includes('EKKO_IDENTIDAD_INCOMPLETA')) return 'Falta capturar la ficha de identidad (foto, datos, INE) antes de dar ingreso.';
   if (message.includes('EKKO_CONTRATO_PENDIENTE')) return 'El miembro debe firmar el contrato antes de dar ingreso.';
   if (message.includes('EKKO_SIN_CREDITOS')) return 'No te quedan créditos. Compra un paquete para reservar.';
