@@ -11,6 +11,7 @@ import { EnviarAvisoModal } from '@shared/components/EnviarAvisoModal';
 import { FichaIdentidadModal } from '@reception/components/FichaIdentidadModal';
 import { HistorialCambios } from '@reception/components/perfil/HistorialCambios';
 import { useAuditLogDeUsuario } from '@reception/hooks/useAuditLogDeUsuario';
+import { actualizarMiembro } from '@reception/lib/accionesMiembro';
 import ConfirmDialog from '../components/ConfirmDialog';
 import type { Database } from '@shared/types/database';
 
@@ -83,25 +84,19 @@ export default function MiembroDetalle() {
         Volver
       </Link>
 
-      <div className="adm-page-header" style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
+      {/* Identidad: foto + datos editables en una sola card (sin repetir el
+          nombre arriba y abajo). */}
+      <section className="adm-section" style={{ marginTop: '1rem', display: 'flex', gap: '22px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <AvatarUploadControl
           usuarioId={miembro.id}
           avatarUrl={miembro.avatar_url}
           onChanged={refetch}
         />
-        <div style={{ minWidth: 0 }}>
-          <p className="ek-eyebrow ek-eyebrow--mustard">MIEMBRO</p>
-          <h1 className="ek-h2" style={{ margin: '2px 0 0' }}>{miembro.nombre ?? miembro.email}</h1>
-          <p className="adm-body" style={{ margin: '2px 0 0', color: 'var(--ek-ink-muted)', wordBreak: 'break-word' }}>{miembro.email}</p>
+        <div style={{ flex: 1, minWidth: '260px' }}>
+          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '2px' }}>MIEMBRO</p>
+          <h2 className="ek-h3" style={{ margin: '0 0 14px' }}>Datos del miembro</h2>
+          <EditarDatosForm miembro={miembro} onSaved={refetch} />
         </div>
-      </div>
-
-      <section className="adm-section">
-        <h2 className="ek-h3">Datos del miembro</h2>
-        <EditarDatosForm
-          miembro={miembro}
-          onSaved={refetch}
-        />
       </section>
 
       <section className="adm-section">
@@ -120,7 +115,6 @@ export default function MiembroDetalle() {
       <section className="adm-section">
         <h2 className="ek-h3">Información del sistema</h2>
         <div className="adm-info-grid">
-          <Info label="Email" value={miembro.email} />
           <Info label="Alta" value={new Date(miembro.created_at).toLocaleString('es-MX')} />
           {miembro.commitment_ends_at && (
             <Info label="Commitment hasta" value={new Date(miembro.commitment_ends_at).toLocaleDateString('es-MX')} />
@@ -448,25 +442,28 @@ function EditarDatosForm({ miembro, onSaved }: {
 }) {
   const [nombre, setNombre] = useState(miembro.nombre ?? '');
   const [telefono, setTelefono] = useState(miembro.telefono ?? '');
+  const [email, setEmail] = useState(miembro.email ?? '');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isDirty = (nombre !== (miembro.nombre ?? '')) || (telefono !== (miembro.telefono ?? ''));
+  const emailCambio = email.trim().toLowerCase() !== (miembro.email ?? '').toLowerCase();
+  const isDirty =
+    nombre !== (miembro.nombre ?? '') || telefono !== (miembro.telefono ?? '') || emailCambio;
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      const { error } = await supabase
-        .from('usuarios')
-        .update({
-          nombre: nombre.trim() || null,
-          telefono: telefono.trim() || null
-        })
-        .eq('id', miembro.id);
-      if (error) throw error;
+      // reception-update-member (autoriza admin): nombre/teléfono en usuarios y
+      // el email también en Auth (es la identidad de login). Queda en audit_log.
+      const res = await actualizarMiembro(miembro.id, {
+        nombre: nombre.trim(),
+        telefono: telefono.trim(),
+        email: email.trim()
+      });
+      if (!res.success && !res.sin_cambios) throw new Error('No se pudo guardar');
       await onSaved();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -489,6 +486,16 @@ function EditarDatosForm({ miembro, onSaved }: {
         />
       </label>
       <label className="ek-label">
+        Email
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="ek-input"
+          placeholder="correo@ejemplo.com"
+        />
+      </label>
+      <label className="ek-label">
         Teléfono
         <input
           type="tel"
@@ -498,6 +505,11 @@ function EditarDatosForm({ miembro, onSaved }: {
           placeholder="+52 667 123 4567"
         />
       </label>
+      {emailCambio && (
+        <p className="adm-body" style={{ gridColumn: '1 / -1', fontSize: '12px', color: 'var(--ek-warning)', margin: 0 }}>
+          Cambiar el email también cambia el correo con el que el miembro inicia sesión.
+        </p>
+      )}
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.75rem', gridColumn: '1 / -1' }}>
         <button
           onClick={handleSave}
