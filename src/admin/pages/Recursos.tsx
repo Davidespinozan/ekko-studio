@@ -429,24 +429,12 @@ function RecursoRow({
           onEdit();
         }
       }}
+      className="adm-card adm-card--interactive"
       style={{
-        background: 'var(--ek-bg-soft)',
-        border: '0.5px solid var(--ek-line)',
-        borderRadius: '16px',
         padding: '14px',
         display: 'flex',
         alignItems: 'center',
-        gap: '16px',
-        cursor: 'pointer',
-        transition: 'background 0.18s ease, border-color 0.18s ease'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--ek-mustard-soft)';
-        e.currentTarget.style.borderColor = 'var(--ek-mustard-dim)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'var(--ek-bg-soft)';
-        e.currentTarget.style.borderColor = 'var(--ek-line)';
+        gap: '16px'
       }}
     >
       <FotoThumb url={r.foto_url} alt={r.nombre} />
@@ -515,10 +503,8 @@ function RecursoArchivedRow({
 }) {
   return (
     <div
+      className="adm-card"
       style={{
-        background: 'var(--ek-bg-soft)',
-        border: '0.5px solid var(--ek-line)',
-        borderRadius: '16px',
         padding: '14px',
         display: 'flex',
         alignItems: 'center',

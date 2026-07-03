@@ -292,10 +292,8 @@ function PersonaCard({
 
   return (
     <div
+      className="adm-card"
       style={{
-        background: 'var(--ek-bg-soft)',
-        border: '0.5px solid var(--ek-line)',
-        borderRadius: '16px',
         padding: '16px 18px',
         display: 'flex',
         alignItems: 'center',

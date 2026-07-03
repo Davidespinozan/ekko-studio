@@ -419,7 +419,8 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-md);
     padding: 16px;
-    box-shadow: var(--ek-highlight-top), 0 4px 14px rgba(0, 0, 0, 0.3);
+    /* Misma sombra que .ek-card para que stat cards y cards grandes matcheen. */
+    box-shadow: var(--ek-shadow-card);
   }
 
   .ek-stat-card--accent { border-color: var(--ek-line-strong); }
@@ -799,21 +800,47 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
      ============================================================================ */
 
   .adm-section {
-    /* Mismo acabado metálico que .ek-card (antes era un plano bg-soft → se veía
-       "viejo" frente al resto de la app). */
-    background:
-      linear-gradient(180deg, var(--ek-metal-top) 0%, var(--ek-metal-mid) 52%, var(--ek-metal-bottom) 100%);
+    /* Superficie CANÓNICA: plana var(--ek-bg-elevated) = #202024, igual que la
+       .ek-card real (el gradiente metálico de .ek-card está anulado por el
+       override !important de la l.2894). Antes esto usaba un gradiente propio y
+       se veía distinto al resto de la app. */
+    background: var(--ek-bg-elevated);
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-card);
     padding: 24px;
     margin-bottom: 20px;
-    box-shadow: var(--ek-highlight-strong), var(--ek-shadow-card);
+    box-shadow: var(--ek-shadow-card);
     display: flex;
     flex-direction: column;
     gap: 12px;
   }
 
   .adm-section + .adm-section { margin-top: 16px; }
+
+  /* Tarjeta de lista del admin (Planes, Estudios, Equipo). MISMA superficie
+     canónica que .ek-card. Antes cada página la reimplementaba inline con
+     bg-soft #101012 (más oscuro), radio 16px hardcodeado y hover mostaza en JS. */
+  .adm-card {
+    background: var(--ek-bg-elevated);
+    border: 0.5px solid var(--ek-line);
+    border-radius: var(--ek-r-md);
+    box-shadow: var(--ek-shadow-card);
+  }
+  /* Variante clickeable (la fila entera abre edición): hover neutro, sin glow. */
+  .adm-card--interactive {
+    cursor: pointer;
+    transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  }
+  .adm-card--interactive:hover {
+    border-color: var(--ek-line-strong);
+    transform: translateY(-1px);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 14px 36px -12px rgba(0, 0, 0, 0.6);
+  }
+  /* Resalte "pro/destacado" (mismo criterio que antes tenía Tiers). */
+  .adm-card--pro {
+    border-color: var(--ek-mustard-dim);
+    box-shadow: 0 0 0 1px var(--ek-mustard-dim), var(--ek-shadow-card);
+  }
 
   .adm-grid {
     display: grid;
@@ -1845,6 +1872,8 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     border: 0.5px solid var(--ek-line);
     border-radius: var(--ek-r-md);
     padding: 18px;
+    /* Sombra canónica: antes no tenía → se veía "más chata" que .ek-card. */
+    box-shadow: var(--ek-shadow-card);
   }
 
   .adm-stat-label {

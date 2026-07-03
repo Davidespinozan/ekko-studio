@@ -363,23 +363,12 @@ function TierRow({
           onEdit();
         }
       }}
+      className={esPro ? 'adm-card adm-card--interactive adm-card--pro' : 'adm-card adm-card--interactive'}
       style={{
-        background: 'var(--ek-bg-soft)',
-        border: esPro ? '0.5px solid var(--ek-mustard-dim)' : '0.5px solid var(--ek-line)',
-        borderRadius: '16px',
         padding: '20px',
         display: 'flex',
         alignItems: 'flex-start',
-        gap: '16px',
-        cursor: 'pointer',
-        transition: 'background 0.18s ease, border-color 0.18s ease',
-        boxShadow: esPro ? '0 0 0 1px var(--ek-mustard-dim)' : 'none'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'var(--ek-mustard-soft)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'var(--ek-bg-soft)';
+        gap: '16px'
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -485,10 +474,8 @@ function TierArchivedRow({
 }) {
   return (
     <div
+      className="adm-card"
       style={{
-        background: 'var(--ek-bg-soft)',
-        border: '0.5px solid var(--ek-line)',
-        borderRadius: '16px',
         padding: '20px',
         display: 'flex',
         alignItems: 'center',
