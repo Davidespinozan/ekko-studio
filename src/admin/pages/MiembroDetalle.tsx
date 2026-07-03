@@ -1,6 +1,6 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, AlertTriangle, Check, Send, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Check, Send, ShieldCheck, ShieldAlert, User } from 'lucide-react';
 import { useMiembroDetalle, updateMiembro, adminUpdateRole, adminDeleteUser, useTiersAdmin } from '../hooks/useAdminData';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
@@ -498,10 +498,15 @@ function AvatarUploadControl({ usuarioId, avatarUrl, onChanged }: {
       ) : (
         <div style={{
           width: '80px', height: '80px', borderRadius: '50%',
-          background: 'var(--ek-cream-deep)', display: 'flex', alignItems: 'center',
-          justifyContent: 'center', color: 'var(--ek-ink-muted)', fontSize: '0.875rem'
+          background: 'var(--ek-bg-elevated)',
+          border: '2px dashed var(--ek-line-strong)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', color: 'var(--ek-ink-faint)', gap: '2px'
         }}>
-          Sin foto
+          <User size={26} strokeWidth={1.5} aria-hidden="true" />
+          <span style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+            Sin foto
+          </span>
         </div>
       )}
       <label className="ek-cta ek-cta--secondary" style={{ cursor: 'pointer' }}>
