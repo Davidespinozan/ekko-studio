@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { DemoBanner } from '@shared/components/DemoBanner';
+import { BrandLogo } from '@shared/components/BrandLogo';
 import { ReceptionBottomNav } from './components/ReceptionBottomNav';
 
 /** Título de sección para el header (mismo patrón que miembro). */
@@ -49,30 +50,46 @@ export default function ReceptionLayout() {
       <DemoBanner vista="Recepción" />
 
       <header className="ek-header-glass">
-        <div className="ek-header-inner">
-          <h1 className="ek-header-title">{tituloDeSeccion(location.pathname)}</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-            <span
-              style={{
-                fontSize: '13px',
-                color: 'var(--ek-ink-muted)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                maxWidth: '38vw'
-              }}
-            >
-              {nombre}
-            </span>
-            <button
-              onClick={signOut}
-              className="ek-icon-btn"
-              style={{ width: 'auto', minHeight: '44px', padding: '8px 14px', fontSize: '13px', flexShrink: 0 }}
-            >
-              Salir
-            </button>
+        {location.pathname === '/recepcion' ? (
+          /* Home (Hoy): logo centrado (como el inicio del miembro), Salir a la derecha. */
+          <div className="ek-header-inner ek-header-inner--centered">
+            <BrandLogo height={104} maxWidth={280} style={{ marginTop: '-18px', marginBottom: '-18px' }} />
+            <div className="ek-header-bell-abs">
+              <button
+                onClick={signOut}
+                className="ek-icon-btn"
+                style={{ width: 'auto', minHeight: '44px', padding: '8px 14px', fontSize: '13px', flexShrink: 0 }}
+              >
+                Salir
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="ek-header-inner">
+            <h1 className="ek-header-title">{tituloDeSeccion(location.pathname)}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              <span
+                style={{
+                  fontSize: '13px',
+                  color: 'var(--ek-ink-muted)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  maxWidth: '38vw'
+                }}
+              >
+                {nombre}
+              </span>
+              <button
+                onClick={signOut}
+                className="ek-icon-btn"
+                style={{ width: 'auto', minHeight: '44px', padding: '8px 14px', fontSize: '13px', flexShrink: 0 }}
+              >
+                Salir
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       <Suspense fallback={<LoadingScreen />}>

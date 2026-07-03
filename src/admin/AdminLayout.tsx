@@ -58,17 +58,16 @@ export default function AdminLayout() {
       )}
 
       <div className="adm-content">
-        <header className="adm-topbar-mobile">
+        <header className="adm-topbar-mobile" style={{ position: 'relative', justifyContent: 'center' }}>
           <button
             onClick={() => setDrawerOpen(true)}
             aria-label="Abrir menú"
             className="ek-icon-btn"
-            style={{ width: '44px', height: '44px', padding: 0 }}
+            style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', width: '44px', height: '44px', padding: 0 }}
           >
             <Menu size={20} aria-hidden="true" />
           </button>
-          <BrandLogo height={88} maxWidth={220} />
-          <div style={{ width: '44px' }} />
+          <BrandLogo height={104} maxWidth={280} style={{ marginTop: '-18px', marginBottom: '-18px' }} />
         </header>
 
         <main className="adm-main">
