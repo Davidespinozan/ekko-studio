@@ -205,20 +205,27 @@ export default function MiQR() {
         {reserva && (
           // "Stub" del pase en crema (toque claro estratégico). El QR blanco va
           // aparte más abajo, separado por el fondo oscuro → no chocan.
-          <div className="ek-card ek-card--cream">
-            <p className="ek-eyebrow" style={{ color: 'rgba(10, 10, 10, 0.5)', marginBottom: '6px' }}>
-              TU PASE DE ACCESO
-            </p>
-            <h1 className="ek-display-md" style={{ color: 'var(--ek-bg)', margin: 0 }}>
-              {reserva.recurso?.nombre ?? 'Estudio'}
-            </h1>
-            <p style={{ color: 'rgba(10, 10, 10, 0.66)', fontSize: '14px', margin: '6px 0 0', lineHeight: 1.5 }}>
+          <div
+            className="ek-card ek-card--cream"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px' }}
+          >
+            {/* Izquierda: etiqueta + estudio. Derecha: fecha/hora a la misma
+                altura (no apilado abajo → aprovecha el ancho). */}
+            <div style={{ minWidth: 0 }}>
+              <p className="ek-eyebrow" style={{ color: 'rgba(10, 10, 10, 0.5)', marginBottom: '6px' }}>
+                TU PASE DE ACCESO
+              </p>
+              <h1 className="ek-display-md" style={{ color: 'var(--ek-bg)', margin: 0 }}>
+                {reserva.recurso?.nombre ?? 'Estudio'}
+              </h1>
+            </div>
+            <div style={{ textAlign: 'right', flexShrink: 0, color: 'rgba(10, 10, 10, 0.72)', fontSize: '13px', lineHeight: 1.45, fontWeight: 600 }}>
               {new Date(reserva.slot_inicio).toLocaleDateString('es-MX', {
-                weekday: 'long', day: 'numeric', month: 'long'
+                weekday: 'short', day: 'numeric', month: 'short'
               })}
               <br />
               {formatHora(new Date(reserva.slot_inicio))} – {formatHora(new Date(reserva.slot_fin))}
-            </p>
+            </div>
           </div>
         )}
 
