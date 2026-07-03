@@ -214,17 +214,20 @@ export default function PerfilMiembroRecepcion() {
         onAbrir={() => setFichaOpen(true)}
       />
 
-      <AccionesCuenta
-        tieneFoto={!!miembro.avatar_url}
-        onEditar={() => setEditarOpen(true)}
-        onFoto={() => setFotoOpen(true)}
-        onFicha={() => setFichaOpen(true)}
-        onReset={() => setResetOpen(true)}
-        onAviso={() => setAvisoOpen(true)}
-      />
+      <div className="ek-card" style={{ marginBottom: '20px' }}>
+        <AccionesCuenta
+          tieneFoto={!!miembro.avatar_url}
+          onEditar={() => setEditarOpen(true)}
+          onFoto={() => setFotoOpen(true)}
+          onFicha={() => setFichaOpen(true)}
+          onReset={() => setResetOpen(true)}
+          onAviso={() => setAvisoOpen(true)}
+        />
+      </div>
 
-      {/* Crear reserva (RP-3a) */}
-      <div style={{ marginBottom: '20px' }}>
+      {/* Reservas del miembro: crear + próximas + historial, en una card con
+          subgrupos (como el admin), no sueltos en el fondo. */}
+      <div className="ek-card" style={{ marginBottom: '20px' }}>
         <button
           type="button"
           onClick={() => setCrearOpen(true)}
@@ -243,51 +246,57 @@ export default function PerfilMiembroRecepcion() {
             El miembro no está activo — activa la cuenta en "Editar datos" para poder reservar.
           </p>
         )}
+
+        <div style={{ height: '0.5px', background: 'var(--ek-line)', margin: '18px 0' }} />
+
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>PRÓXIMAS RESERVAS</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {proximas.length === 0 ? (
+            <p className="ek-body-faint">Sin reservas próximas.</p>
+          ) : (
+            proximas.map((r) => (
+              <FilaReserva
+                key={r.id}
+                reserva={r}
+                onCancelar={() =>
+                  setCancelarTarget({ id: r.id, slot_inicio: r.slot_inicio, recurso_nombre: r.recurso?.nombre ?? 'Estudio' })
+                }
+                onReprogramar={() =>
+                  setReprogramarTarget({
+                    id: r.id,
+                    recurso_id: r.recurso_id,
+                    recurso_nombre: r.recurso?.nombre ?? 'Estudio',
+                    slot_inicio: r.slot_inicio,
+                    slot_fin: r.slot_fin
+                  })
+                }
+                reprogramarBloqueado={miembro.status !== 'activo'}
+              />
+            ))
+          )}
+        </div>
+
+        <div style={{ height: '0.5px', background: 'var(--ek-line)', margin: '18px 0' }} />
+
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>HISTORIAL ({historial.length})</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {historial.length === 0 ? (
+            <p className="ek-body-faint">Sin reservas anteriores.</p>
+          ) : (
+            historial.slice(0, 15).map((r) => <FilaReserva key={r.id} reserva={r} historico />)
+          )}
+        </div>
       </div>
 
-      <Seccion titulo="PRÓXIMAS RESERVAS">
-        {proximas.length === 0 ? (
-          <p className="ek-body-faint">Sin reservas próximas.</p>
-        ) : (
-          proximas.map((r) => (
-            <FilaReserva
-              key={r.id}
-              reserva={r}
-              onCancelar={() =>
-                setCancelarTarget({ id: r.id, slot_inicio: r.slot_inicio, recurso_nombre: r.recurso?.nombre ?? 'Estudio' })
-              }
-              onReprogramar={() =>
-                setReprogramarTarget({
-                  id: r.id,
-                  recurso_id: r.recurso_id,
-                  recurso_nombre: r.recurso?.nombre ?? 'Estudio',
-                  slot_inicio: r.slot_inicio,
-                  slot_fin: r.slot_fin
-                })
-              }
-              reprogramarBloqueado={miembro.status !== 'activo'}
-            />
-          ))
-        )}
-      </Seccion>
-
-      <Seccion titulo={`HISTORIAL (${historial.length})`}>
-        {historial.length === 0 ? (
-          <p className="ek-body-faint">Sin reservas anteriores.</p>
-        ) : (
-          historial.slice(0, 15).map((r) => <FilaReserva key={r.id} reserva={r} historico />)
-        )}
-      </Seccion>
-
-      <section style={{ marginBottom: '20px' }}>
+      <div className="ek-card" style={{ marginBottom: '20px' }}>
         <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>NOTAS DEL MIEMBRO</p>
         <NotasMiembro miembroId={miembro.id} />
-      </section>
+      </div>
 
-      <section style={{ marginBottom: '20px' }}>
-        <p className="ek-eyebrow" style={{ marginBottom: '10px' }}>HISTORIAL DE CAMBIOS</p>
+      <div className="ek-card" style={{ marginBottom: '20px' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>HISTORIAL DE CAMBIOS</p>
         <HistorialCambios entries={auditEntries} isLoading={auditLoading} error={auditError} />
-      </section>
+      </div>
 
       {crearOpen && (
         <CrearReservaModal
@@ -387,11 +396,3 @@ export default function PerfilMiembroRecepcion() {
   );
 }
 
-function Seccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
-  return (
-    <section style={{ marginBottom: '20px' }}>
-      <p className="ek-eyebrow" style={{ marginBottom: '10px' }}>{titulo}</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>{children}</div>
-    </section>
-  );
-}

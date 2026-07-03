@@ -17,7 +17,7 @@ export function AccionesCuenta({
   onAviso: () => void;
 }) {
   return (
-    <section style={{ marginBottom: '20px' }}>
+    <section>
       <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>ACCIONES DE CUENTA</p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
         <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={onEditar}>
