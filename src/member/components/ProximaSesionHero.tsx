@@ -9,11 +9,10 @@ import { BotonCancelarReserva } from '@member/components/BotonCancelarReserva';
 //   · Sin sesión → mensaje + "Reservar sesión".
 // ============================================================================
 
-// Imagen fija del hero (la misma siempre). Placeholder TEMPORAL — reemplazar por
-// la foto oficial de EKKO cuando la pasen (subir a Supabase Storage y cambiar la
-// URL). Si falla la carga, queda el fondo oscuro del contenedor.
+// Imagen fija del hero del inicio (foto oficial de EKKO, en Supabase Storage).
+// Si falla la carga, queda el fondo oscuro del contenedor.
 const HERO_IMG =
-  'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=1400&q=80';
+  'https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/ChatGPT%20Image%2030%20may%202026,%2005_42_17%20p.m..jpg';
 
 interface ReservaHero {
   id: string;
