@@ -29,10 +29,6 @@ function costoCreditos(recurso: Recurso | null): number {
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 
-function tierTieneAcceso(recurso: Recurso, tier: string | null | undefined): boolean {
-  return tier ? recurso.tiers_permitidos.includes(tier) : false;
-}
-
 export default function Reservar() {
   const tenant = useTenant();
   const { usuario } = useAuth();
@@ -54,8 +50,9 @@ export default function Reservar() {
     };
   }, [tenant.config]);
 
-  const tier = usuario?.membresia_tier ?? null;
-  const puedeUsar = (r: Recurso) => tierTieneAcceso(r, tier);
+  // Ver estudios y horarios es LIBRE para cualquier cuenta. El freno va solo en
+  // el momento de reservar (necesitás plan/créditos), no en explorar.
+  const tienePlan = !!usuario?.membresia_tier;
 
   // Saldo de créditos (null = plan por tiempo/ilimitado → no aplica el costo).
   const { resumen } = useResumenMiembro(usuario?.id, tenant.id, usuario?.membresia_tier);
@@ -75,26 +72,29 @@ export default function Reservar() {
   const maxInvitados = usuario?.membresia_tier === 'pro' ? 4 :
                        usuario?.membresia_tier === 'basica' ? 2 : 0;
 
+  // Motivo por el que NO se puede reservar (null = puede). Ver siempre se permite.
+  const saldoInsuficiente =
+    esPlanCreditos && saldoCreditos !== null && recursoSel !== null &&
+    saldoCreditos < costoCreditos(recursoSel);
+  const motivoNoReserva = !tienePlan
+    ? 'Necesitás un plan para reservar. Podés ver todo mientras tanto.'
+    : saldoInsuficiente
+    ? 'No te alcanzan los créditos para este estudio.'
+    : null;
+
   // Resetear invitados cuando se abre/cierra el modal
   useEffect(() => {
     if (!slotPendiente) setInvitados(0);
   }, [slotPendiente]);
 
-  // Auto-seleccionar primer recurso accesible (o el del query param ?recurso=slug)
+  // Auto-seleccionar el estudio del query param (?recurso=slug) o el primero.
   useEffect(() => {
     if (recursoSel || recursos.length === 0) return;
-
-    if (recursoSlugParam) {
-      const found = recursos.find((r) => r.slug === recursoSlugParam);
-      if (found && tierTieneAcceso(found, tier)) {
-        setRecursoSel(found);
-        return;
-      }
-    }
-
-    const primerAccesible = recursos.find((r) => tierTieneAcceso(r, tier));
-    if (primerAccesible) setRecursoSel(primerAccesible);
-  }, [recursos, recursoSel, recursoSlugParam, tier]);
+    const found = recursoSlugParam
+      ? recursos.find((r) => r.slug === recursoSlugParam)
+      : null;
+    setRecursoSel(found ?? recursos[0]);
+  }, [recursos, recursoSel, recursoSlugParam]);
 
   // Recargar slots cuando cambia recurso o fecha
   useEffect(() => {
@@ -187,19 +187,11 @@ export default function Reservar() {
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             {recursos.map((r) => {
               const activo = recursoSel?.id === r.id;
-              const accesible = puedeUsar(r);
               return (
                 <button
                   key={r.id}
-                  className={`ek-chip ${activo && accesible ? 'ek-chip--active' : ''}`}
-                  style={accesible ? undefined : { opacity: 0.55, cursor: 'not-allowed' }}
-                  onClick={() => {
-                    if (!accesible) {
-                      toast.warning('Tu plan no incluye este estudio. Ve a Estudios para más info.');
-                      return;
-                    }
-                    setRecursoSel(r);
-                  }}
+                  className={`ek-chip ${activo ? 'ek-chip--active' : ''}`}
+                  onClick={() => setRecursoSel(r)}
                 >
                   {r.nombre}
                 </button>
@@ -254,6 +246,26 @@ export default function Reservar() {
             </div>
           )}
         </div>
+
+        {/* Aviso: sin plan podés explorar todo, pero no reservar. */}
+        {!tienePlan && (
+          <div
+            className="ek-card ek-card--md"
+            style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'space-between', flexWrap: 'wrap' }}
+          >
+            <p style={{ margin: 0, fontSize: '13px', color: 'var(--ek-ink-muted)' }}>
+              Podés explorar estudios y horarios. Para <strong style={{ color: 'var(--ek-ink)' }}>reservar</strong> necesitás un plan.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate('/app/perfil')}
+              className="ek-cta"
+              style={{ padding: '8px 16px', fontSize: '13px', flexShrink: 0 }}
+            >
+              Ver planes
+            </button>
+          </div>
+        )}
 
         {/* Selector de fecha */}
         <div className="ek-stack-sm">
@@ -325,7 +337,13 @@ export default function Reservar() {
                     key={i}
                     className="ek-slot"
                     disabled={!slot.disponible}
-                    onClick={() => setSlotPendiente(slot)}
+                    onClick={() => {
+                      if (motivoNoReserva) {
+                        toast.warning(motivoNoReserva);
+                        return;
+                      }
+                      setSlotPendiente(slot);
+                    }}
                     title={tooltip}
                   >
                     {formatHora(slot.inicio)}
