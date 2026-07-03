@@ -6,7 +6,6 @@ import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { formatHora } from '@member/logic/reservaLogic';
 import { Spinner } from '@shared/components/Spinner';
-import { NotasMiembro } from '@shared/components/NotasMiembro';
 import { EnviarAvisoModal } from '@shared/components/EnviarAvisoModal';
 import { FichaIdentidadModal } from '@reception/components/FichaIdentidadModal';
 import { HistorialCambios } from '@reception/components/perfil/HistorialCambios';
@@ -176,25 +175,16 @@ export default function MiembroDetalle() {
       </section>
 
       <section className="adm-section">
-        <h2 className="ek-h3">Notas operativas</h2>
+        <h2 className="ek-h3">Nota para el check-in</h2>
         <p className="adm-body" style={{ marginBottom: '0.5rem' }}>
-          Visible para recepción al hacer check-in. Útil para preferencias,
-          equipo solicitado, observaciones del miembro.
+          Recepción la ve cuando el miembro llega a su sesión. Útil para
+          preferencias, equipo solicitado u observaciones importantes.
         </p>
         <NotasControl
           usuarioId={miembro.id}
           notasIniciales={(miembro as { notas_admin?: string | null }).notas_admin ?? null}
           onSaved={refetch}
         />
-      </section>
-
-      <section className="adm-section">
-        <h2 className="ek-h3">Notas del equipo</h2>
-        <p className="adm-body" style={{ marginBottom: '0.5rem' }}>
-          Bitácora compartida entre admin y recepción. Cada autor edita o borra
-          lo suyo; tú puedes editar todo.
-        </p>
-        <NotasMiembro miembroId={miembro.id} />
       </section>
 
       <section className="adm-section">
