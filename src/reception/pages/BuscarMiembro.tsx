@@ -6,6 +6,7 @@ import { useTenant } from '@shared/hooks/useTenant';
 import { EmptyState } from '@shared/components/EmptyState';
 import { SegmentedToggle } from '@shared/components/SegmentedToggle';
 import { PlanChip } from '@shared/components/PlanChip';
+import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
 import { statusMiembro } from '../lib/miembroStatus';
 import { RegistrarMiembroModal } from '../components/RegistrarMiembroModal';
 
@@ -94,14 +95,19 @@ export default function BuscarMiembro() {
     await cargarPadron();
   }
 
+  // Planes activos: para NO mostrar chips de planes borrados (pro/basica viejos).
+  const { planes } = usePlanesActivos();
+  const planesActivos = useMemo(() => new Set(planes.map((p) => p.slug)), [planes]);
+
   const q = norm(query);
-  const sinBusqueda = q.length < 2;
+  const buscando = q.length >= 2;
+  // Por defecto se muestra TODO el padrón; al escribir se filtra.
   const resultados = useMemo(() => {
-    if (q.length < 2) return [];
-    return todos
-      .filter((m) => norm(m.nombre ?? '').includes(q) || norm(m.email).includes(q))
-      .slice(0, 50);
-  }, [q, todos]);
+    const base = buscando
+      ? todos.filter((m) => norm(m.nombre ?? '').includes(q) || norm(m.email).includes(q))
+      : todos;
+    return base.slice(0, 100);
+  }, [q, buscando, todos]);
 
   const penalizados = useMemo(() => {
     const now = Date.now();
@@ -183,25 +189,21 @@ export default function BuscarMiembro() {
               hint="Revisa tu conexión y recargá la página."
               tone="danger"
             />
-          ) : sinBusqueda ? (
-            <EmptyState
-              icon={Search}
-              title="Busca un miembro"
-              hint="Ingresa nombre o email para ver su perfil."
-              tone="neutral"
-            />
           ) : isLoading ? (
             <ListaSkeleton />
           ) : resultados.length === 0 ? (
             <EmptyState
-              icon={UserX}
-              title="Sin coincidencias"
-              hint="No se encontraron miembros que coincidan. Los miembros se dan de alta solos desde la web."
+              icon={buscando ? Search : UserX}
+              title={buscando ? 'Sin coincidencias' : 'Sin miembros todavía'}
+              hint={buscando
+                ? 'No se encontraron miembros que coincidan. Los miembros se dan de alta solos desde la web.'
+                : 'Cuando registres o se den de alta miembros, aparecerán aquí.'}
+              tone="neutral"
             />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {resultados.map((m) => (
-                <MiembroCard key={m.id} miembro={m} />
+                <MiembroCard key={m.id} miembro={m} planesActivos={planesActivos} />
               ))}
             </div>
           )}
@@ -225,7 +227,7 @@ export default function BuscarMiembro() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {penalizados.map((m) => (
-            <MiembroCard key={m.id} miembro={m} mostrarBloqueo />
+            <MiembroCard key={m.id} miembro={m} planesActivos={planesActivos} mostrarBloqueo />
           ))}
         </div>
       )}
@@ -250,15 +252,17 @@ function ListaSkeleton() {
   );
 }
 
-function MiembroCard({ miembro, mostrarBloqueo }: { miembro: MiembroResultado; mostrarBloqueo?: boolean }) {
+function MiembroCard({ miembro, planesActivos, mostrarBloqueo }: { miembro: MiembroResultado; planesActivos?: Set<string>; mostrarBloqueo?: boolean }) {
   const st = statusMiembro(miembro.status);
+  // Solo mostramos el plan si sigue ACTIVO (no los tiers borrados tipo pro/basica).
+  const planVigente = miembro.membresia_tier && planesActivos?.has(miembro.membresia_tier);
   return (
     <Link to={`/recepcion/miembros/${miembro.id}`} className="rec-miembro-card">
       <div className="rec-miembro-card-info">
         <p className="rec-miembro-card-nombre">{capitalizar(miembro.nombre) || miembro.email}</p>
         <p className="rec-miembro-card-email">{miembro.email}</p>
       </div>
-      {miembro.membresia_tier ? (
+      {planVigente ? (
         <PlanChip slug={miembro.membresia_tier} style={{ flexShrink: 0 }} />
       ) : null}
       {mostrarBloqueo && miembro.bloqueado_hasta ? (
