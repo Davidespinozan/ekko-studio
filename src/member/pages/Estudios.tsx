@@ -96,29 +96,27 @@ export default function Estudios() {
                 )}
               </div>
 
-              <div style={{ padding: '16px', background: 'var(--ek-bg-soft)' }}>
+              {/* Cuerpo compacto: la FOTO es la protagonista. Nombre y flecha en
+                  una sola fila (la descripción va en el detalle). */}
+              <div style={{
+                padding: '12px 14px',
+                background: 'var(--ek-bg-soft)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px'
+              }}>
                 <h3 style={{
                   fontFamily: 'var(--ek-font-display)',
-                  fontSize: '20px',
+                  fontSize: '18px',
                   fontWeight: 700,
                   letterSpacing: '-0.03em',
                   margin: 0,
-                  marginBottom: '6px'
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
                 }}>{r.nombre}</h3>
-
-                {r.descripcion && (
-                  <p style={{
-                    fontSize: '13px',
-                    color: 'var(--ek-ink-muted)',
-                    margin: 0,
-                    marginBottom: '12px',
-                    lineHeight: 1.4
-                  }}>{r.descripcion}</p>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginTop: '4px' }}>
-                  <ArrowRight size={18} style={{ color: 'var(--ek-mustard)' }} aria-hidden="true" />
-                </div>
+                <ArrowRight size={18} style={{ color: 'var(--ek-mustard)', flexShrink: 0 }} aria-hidden="true" />
               </div>
             </Link>
           );
