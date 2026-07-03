@@ -3,6 +3,7 @@ import {
   generarSlotsDisponibles,
   generarFechasReservables,
   filtrarRecursosPorTier,
+  puedeReservarRecurso,
   diaNombre,
   combinarFechaHora,
   formatDateISO,
@@ -190,6 +191,27 @@ describe('filtrarRecursosPorTier', () => {
     const e1 = makeRecurso({ slug: 'estudio-1', tiers_permitidos: ['basica', 'pro'] });
     const filtrados = filtrarRecursosPorTier([black, e1], 'pro');
     expect(filtrados).toHaveLength(2);
+  });
+});
+
+describe('puedeReservarRecurso (gate Pro: Esencial fuera, Premium/paquete dentro)', () => {
+  const proStudio = { tiers_permitidos: ['premium', 'sesion-suelta', 'creador'] };
+  const estandar = { tiers_permitidos: ['esencial', 'premium', 'sesion-suelta', 'creador'] };
+
+  it('Esencial NO puede reservar un estudio Pro', () => {
+    expect(puedeReservarRecurso(proStudio, 'esencial')).toBe(false);
+  });
+  it('Premium SÍ puede reservar un estudio Pro', () => {
+    expect(puedeReservarRecurso(proStudio, 'premium')).toBe(true);
+  });
+  it('un paquete de créditos SÍ puede reservar un estudio Pro', () => {
+    expect(puedeReservarRecurso(proStudio, 'creador')).toBe(true);
+  });
+  it('Esencial SÍ puede reservar un estudio estándar', () => {
+    expect(puedeReservarRecurso(estandar, 'esencial')).toBe(true);
+  });
+  it('sin plan no puede reservar un estudio con tiers definidos', () => {
+    expect(puedeReservarRecurso(estandar, null)).toBe(false);
   });
 });
 

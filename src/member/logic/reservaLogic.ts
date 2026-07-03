@@ -163,14 +163,26 @@ export function generarFechasReservables(
 }
 
 /**
+ * ¿El tier del usuario puede reservar ESTE recurso? Un estudio Pro
+ * (costo_creditos ≥ 2) no lista 'esencial' en tiers_permitidos, así que Esencial
+ * queda fuera; Premium y los paquetes sí. Sin plan → solo recursos abiertos.
+ */
+export function puedeReservarRecurso(
+  recurso: Pick<Recurso, 'tiers_permitidos'>,
+  membresia_tier: string | null
+): boolean {
+  if (!membresia_tier) return recurso.tiers_permitidos.length === 0;
+  return recurso.tiers_permitidos.includes(membresia_tier);
+}
+
+/**
  * Filtra recursos accesibles según el tier del usuario.
  */
 export function filtrarRecursosPorTier(
   recursos: Recurso[],
   membresia_tier: string | null
 ): Recurso[] {
-  if (!membresia_tier) return recursos.filter((r) => r.tiers_permitidos.length === 0);
-  return recursos.filter((r) => r.tiers_permitidos.includes(membresia_tier));
+  return recursos.filter((r) => puedeReservarRecurso(r, membresia_tier));
 }
 
 /**

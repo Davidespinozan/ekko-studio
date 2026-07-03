@@ -6,6 +6,7 @@ import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
 import { EmptyState } from '@shared/components/EmptyState';
+import { puedeReservarRecurso } from '../logic/reservaLogic';
 import type { Database } from '@shared/types/database';
 
 type RecursoDetalle = Database['public']['Tables']['recursos']['Row'];
@@ -66,9 +67,15 @@ export default function EstudioDetalle() {
     );
   }
 
-  // Modelo de créditos plano: cualquier plan puede reservar cualquier estudio.
-  // El freno es solo "tener plan"; ver el estudio es libre.
-  const tienePlan = !!usuario?.membresia_tier;
+  // Ver el estudio es libre; reservar depende del plan. Un estudio Pro
+  // (costo_creditos ≥ 2) lo reservan Premium y los paquetes, pero NO Esencial.
+  // El gate real vive en tiers_permitidos (lo valida el backend); aquí lo
+  // reflejamos para no dejar al miembro estrellarse hasta el final.
+  const miTier = usuario?.membresia_tier ?? null;
+  const tienePlan = !!miTier;
+  const esPro = (recurso.costo_creditos ?? 1) >= 2;
+  const puedeReservar = puedeReservarRecurso(recurso, miTier);
+  const bloqueadoPorPlan = tienePlan && !puedeReservar;
   const tipoContenido = recurso.tipo_contenido ?? [];
   const equipo = recurso.equipo_incluido ?? [];
 
@@ -120,6 +127,20 @@ export default function EstudioDetalle() {
             <ImageIcon size={30} strokeWidth={1.5} aria-hidden="true" />
             <span style={{ fontSize: '11px', letterSpacing: '0.2em', fontWeight: 600 }}>FOTO PRÓXIMAMENTE</span>
           </div>
+        )}
+        {esPro && (
+          <span style={{
+            position: 'absolute',
+            top: '12px',
+            left: '12px',
+            padding: '4px 10px',
+            borderRadius: '999px',
+            background: 'var(--ek-mustard)',
+            color: 'var(--ek-bg)',
+            fontSize: '10px',
+            fontWeight: 700,
+            letterSpacing: '0.08em'
+          }}>PRO</span>
         )}
       </div>
 
@@ -215,7 +236,7 @@ export default function EstudioDetalle() {
       )}
 
       <div style={{ marginBottom: '24px' }}>
-        {tienePlan ? (
+        {puedeReservar ? (
           <Link
             to={`/app/reservar?recurso=${recurso.slug}`}
             className="ek-cta ek-cta--gold ek-cta--full"
@@ -223,6 +244,22 @@ export default function EstudioDetalle() {
           >
             Reservar este estudio <ArrowRight size={17} aria-hidden="true" />
           </Link>
+        ) : bloqueadoPorPlan ? (
+          <div className="ek-card" style={{
+            borderColor: 'var(--ek-mustard-dim)',
+            background: 'var(--ek-mustard-soft)',
+            textAlign: 'center'
+          }}>
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>
+              ESTUDIO PRO
+            </p>
+            <p className="ek-body" style={{ marginBottom: '14px' }}>
+              Tu plan actual no incluye este estudio. Sube a <strong>Premium</strong> para grabar en los estudios Pro, o resérvalo con un paquete de créditos.
+            </p>
+            <Link to="/app/perfil" className="ek-cta ek-cta--gold">
+              Ver planes
+            </Link>
+          </div>
         ) : (
           <div className="ek-card" style={{
             borderColor: 'var(--ek-mustard-dim)',

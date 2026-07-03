@@ -94,6 +94,20 @@ export default function Estudios() {
                     <span style={{ fontSize: '10px', letterSpacing: '0.18em', fontWeight: 600 }}>FOTO PRÓXIMAMENTE</span>
                   </div>
                 )}
+                {(r.costo_creditos ?? 1) >= 2 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '10px',
+                    left: '10px',
+                    padding: '3px 9px',
+                    borderRadius: '999px',
+                    background: 'var(--ek-mustard)',
+                    color: 'var(--ek-bg)',
+                    fontSize: '9.5px',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em'
+                  }}>PRO</span>
+                )}
               </div>
 
               {/* Cuerpo compacto: la FOTO es la protagonista. Nombre y flecha en
