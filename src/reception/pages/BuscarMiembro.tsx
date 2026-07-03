@@ -5,7 +5,7 @@ import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { EmptyState } from '@shared/components/EmptyState';
 import { SegmentedToggle } from '@shared/components/SegmentedToggle';
-import { TierBadge } from '@shared/components/TierBadge';
+import { PlanChip } from '@shared/components/PlanChip';
 import { statusMiembro } from '../lib/miembroStatus';
 import { RegistrarMiembroModal } from '../components/RegistrarMiembroModal';
 
@@ -258,8 +258,8 @@ function MiembroCard({ miembro, mostrarBloqueo }: { miembro: MiembroResultado; m
         <p className="rec-miembro-card-nombre">{capitalizar(miembro.nombre) || miembro.email}</p>
         <p className="rec-miembro-card-email">{miembro.email}</p>
       </div>
-      {miembro.membresia_tier === 'pro' || miembro.membresia_tier === 'basica' ? (
-        <TierBadge pro={miembro.membresia_tier === 'pro'} style={{ flexShrink: 0 }} />
+      {miembro.membresia_tier ? (
+        <PlanChip slug={miembro.membresia_tier} style={{ flexShrink: 0 }} />
       ) : null}
       {mostrarBloqueo && miembro.bloqueado_hasta ? (
         <span

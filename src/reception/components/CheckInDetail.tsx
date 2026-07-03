@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { TierBadge } from '@shared/components/TierBadge';
+import { PlanChip } from '@shared/components/PlanChip';
 import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 
 interface MiembroData {
@@ -134,7 +134,7 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMes
           <p className="rec-detail-section-label">MEMBRESÍA</p>
           <div style={{ marginTop: '2px' }}>
             {tieneTier ? (
-              <TierBadge pro={miembro.membresia_tier === 'pro'} />
+              <PlanChip slug={miembro.membresia_tier} />
             ) : (
               <p
                 className="rec-detail-value"

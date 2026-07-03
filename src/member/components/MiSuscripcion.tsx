@@ -8,7 +8,6 @@ import { TarjetaModal } from '@shared/components/TarjetaModal';
 import { PaymentModal } from '@shared/components/PaymentModal';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
-import { TierBadge } from '@shared/components/TierBadge';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Spinner } from '@shared/components/Spinner';
 
@@ -256,7 +255,6 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                   </h3>
                 </div>
               </div>
-              {planActual && <TierBadge pro={planActual.slug === 'pro'} />}
             </div>
 
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '14px' }}>
@@ -484,7 +482,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                   <div key={t.slug} className="ek-card ek-card--md" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                        <TierBadge pro={t.slug === 'pro'} />
+                        <span className="ek-badge ek-badge--neutral" style={{ fontWeight: 700 }}>{t.nombre}</span>
                         {esActual && <span className="ek-badge ek-badge--neutral">Actual</span>}
                       </div>
                       <p style={{ margin: 0, fontWeight: 600 }}>

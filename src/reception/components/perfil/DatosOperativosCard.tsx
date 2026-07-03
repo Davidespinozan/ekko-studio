@@ -1,4 +1,4 @@
-import { TierBadge } from '@shared/components/TierBadge';
+import { PlanChip } from '@shared/components/PlanChip';
 import { statusMiembro } from '../../lib/miembroStatus';
 import { fechaCorta } from './perfilUtils';
 import type { MiembroPerfil } from './types';
@@ -21,13 +21,7 @@ export function DatosOperativosCard({ miembro }: { miembro: MiembroPerfil }) {
       {miembro.telefono && <Dato label="Teléfono" valor={miembro.telefono} />}
       <Dato
         label="Plan"
-        valor={
-          miembro.membresia_tier === 'pro' || miembro.membresia_tier === 'basica' ? (
-            <TierBadge pro={miembro.membresia_tier === 'pro'} />
-          ) : (
-            'Sin plan'
-          )
-        }
+        valor={<PlanChip slug={miembro.membresia_tier} />}
       />
       <Dato label="Estado" valor={<span style={{ color: st.color, fontWeight: 600 }}>{st.label}</span>} />
       <Dato label="Inasistencias" valor={String(miembro.no_shows_count ?? 0)} />
