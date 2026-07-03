@@ -139,7 +139,7 @@ export default function EstudioDetalle() {
               <span key={tipo} style={{
                 padding: '5px 11px',
                 borderRadius: '999px',
-                background: 'rgba(10, 10, 10, 0.08)',
+                background: 'rgba(229, 184, 41, 0.22)',
                 color: 'var(--ek-bg)',
                 fontSize: '10.5px',
                 fontWeight: 700,
