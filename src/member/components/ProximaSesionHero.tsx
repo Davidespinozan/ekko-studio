@@ -43,13 +43,10 @@ export function ProximaSesionHero({ reserva, onCancelada }: Props) {
       <div className="ek-hero-foto-body">
         {reserva ? (
           <>
-            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+            <p className="ek-eyebrow" style={{ marginBottom: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'rgba(255,255,255,0.92)' }}>
               <CalendarClock size={13} aria-hidden="true" /> {formatearFecha(reserva.slot_inicio)}
             </p>
-            <h2 className="ek-display-lg" style={{ marginBottom: '6px', color: '#fff' }}>{nombre}</h2>
-            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.7)', marginBottom: '20px' }}>
-              Folio: <span style={{ fontFamily: 'var(--ek-font-mono)' }}>{reserva.folio}</span>
-            </p>
+            <h2 className="ek-display-lg" style={{ marginBottom: '22px', color: '#fff' }}>{nombre}</h2>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
               <Link to={`/app/qr/${reserva.id}`} className="ek-cta ek-cta--gold">
                 Ver QR <ArrowRight size={16} aria-hidden="true" />

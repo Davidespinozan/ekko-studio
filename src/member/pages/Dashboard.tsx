@@ -111,6 +111,12 @@ export default function Dashboard() {
   const ahora = new Date();
   const bloqueado = usuario?.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > ahora;
   const nombreFormat = capitalizarNombre(usuario?.nombre) || 'creador';
+  const saludo = (() => {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 12) return 'Buenos días';
+    if (h >= 12 && h < 19) return 'Buenas tardes';
+    return 'Buenas noches';
+  })();
   const proximaReserva = proximasReservas[0];
 
   // Carnet: status de la membresía es autoritativo; cae al del usuario.
@@ -153,12 +159,23 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Greeting */}
-      <div style={{ marginBottom: '18px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '12px' }}>BIENVENIDA</p>
-        <h1 className="ek-display-xl">
-          Hola, {nombreFormat}.
+      {/* Greeting — banner cálido, saludo según la hora. Le da vida al inicio. */}
+      <div className="ek-card ek-card--cream" style={{ marginBottom: '20px' }}>
+        <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'rgba(10, 10, 10, 0.55)' }}>
+          {saludo},
+        </p>
+        <h1 style={{
+          fontFamily: 'var(--ek-font-display)',
+          fontSize: 'clamp(28px, 8vw, 42px)',
+          fontWeight: 700,
+          letterSpacing: '-0.03em',
+          lineHeight: 1.05,
+          margin: '2px 0 0',
+          color: 'var(--ek-bg)'
+        }}>
+          {nombreFormat} <span aria-hidden="true">👋</span>
         </h1>
+        <div style={{ width: '44px', height: '4px', borderRadius: '2px', background: 'var(--ek-mustard)', marginTop: '12px' }} />
       </div>
 
       {/* Próxima sesión — ARRIBA, imagen fija, SIEMPRE visible (le da imagen al
