@@ -25,7 +25,8 @@ export default function PublicLayout() {
           padding: 'calc(1rem + env(safe-area-inset-top, 0px)) 1.25rem 1rem',
           borderBottom: '1px solid var(--ek-line)',
           display: 'flex',
-          justifyContent: 'space-between',
+          // En login el nav va vacío → el logo se centra y crece (tamaño miembro).
+          justifyContent: enLogin ? 'center' : 'space-between',
           alignItems: 'center'
         }}
       >
@@ -33,7 +34,7 @@ export default function PublicLayout() {
           <img
             src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_STUDIO_logo_transparente.png"
             alt="EKKO Studio"
-            style={{ height: '86px', width: 'auto', display: 'block' }}
+            style={{ height: enLogin ? '104px' : '86px', width: 'auto', display: 'block' }}
           />
         </Link>
         <nav style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>

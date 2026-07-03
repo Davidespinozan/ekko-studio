@@ -87,20 +87,12 @@ export default function Login() {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'flex-start',
+      // Cuadro centrado (el logo ya vive en el header, no se repite acá).
+      justifyContent: 'center',
       padding: '24px 20px',
-      paddingTop: 'clamp(48px, 12vh, 120px)',
       paddingBottom: 'calc(48px + env(safe-area-inset-bottom, 0px))'
     }}>
       <div style={{ maxWidth: '400px', width: '100%' }}>
-        <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-          <img
-            src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_STUDIO_logo_transparente.png"
-            alt="EKKO Studio"
-            style={{ height: '116px', width: 'auto', display: 'block', margin: '0 auto' }}
-          />
-        </div>
-
         <div className="ek-card">
           <form onSubmit={handleSubmit} className="ek-stack-md">
             <div className="ek-form-field">
