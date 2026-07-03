@@ -1662,7 +1662,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     border-bottom: 0.5px solid var(--ek-line);
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     margin-bottom: 24px;
   }
 
@@ -1673,6 +1673,17 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     gap: 4px;
     padding: 0 12px;
     overflow-y: auto;
+  }
+
+  /* Scroll sin barra visible (con dedo/mouse). La barra blanca se veía fea. */
+  .adm-drawer,
+  .adm-sidebar-nav {
+    scrollbar-width: none;          /* Firefox */
+    -ms-overflow-style: none;       /* IE/Edge viejo */
+  }
+  .adm-drawer::-webkit-scrollbar,
+  .adm-sidebar-nav::-webkit-scrollbar {
+    display: none;                  /* WebKit (Safari/Chrome) */
   }
 
   /* Cuando una sección está expandida, sumamos un poco de aire abajo
