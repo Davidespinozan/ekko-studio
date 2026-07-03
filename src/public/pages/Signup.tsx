@@ -1,17 +1,15 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { useSearchParams, Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, Star, Check, Eye, EyeOff, AlertCircle, User } from 'lucide-react';
+import { ArrowLeft, Check, Eye, EyeOff, AlertCircle, User } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios } from '@shared/lib/beneficios';
 import { sufijoPrecio, detallePlan } from '@shared/lib/planPresentacion';
 import { Spinner } from '@shared/components/Spinner';
 
-type Tier = 'basica' | 'pro';
-
 interface PlanInfo {
   nombre: string;
   precio: number;
-  tier: Tier;
+  tier: string; // slug del plan elegido (paquete de créditos o mensual)
   beneficios: string[];
   esPaquete: boolean;
   tipo: string;
@@ -59,7 +57,8 @@ function useTierPorSlug(slug: string) {
 
 export default function Signup() {
   const [searchParams] = useSearchParams();
-  const tierParam = (searchParams.get('tier') as Tier) || 'basica';
+  // El slug viene del landing (/signup?tier=<slug>). Sin plan válido → redirige.
+  const tierParam = searchParams.get('tier') ?? '';
   const { tier: tierRow, isLoading: tierLoading } = useTierPorSlug(tierParam);
 
   const [nombre, setNombre] = useState('');
@@ -75,7 +74,7 @@ export default function Signup() {
     ? {
         nombre: tierRow.nombre,
         precio: Math.round(tierRow.precio_centavos / 100),
-        tier: tierRow.slug as Tier,
+        tier: tierRow.slug,
         beneficios: parseBeneficios(tierRow.beneficios)
           .filter((b) => b.incluido)
           .map((b) => b.label)
@@ -183,7 +182,8 @@ export default function Signup() {
   }
 
   if (!plan) {
-    return <Navigate to="/" replace />;
+    // Sin plan válido en la URL → mandalo a elegir uno en el landing.
+    return <Navigate to="/#membresias" replace />;
   }
 
   return (
@@ -209,15 +209,14 @@ export default function Signup() {
       <div className="ek-card" style={{
         padding: '24px',
         marginBottom: '32px',
-        borderColor: plan.tier === 'pro' ? 'var(--ek-mustard)' : 'var(--ek-line)',
+        borderColor: 'var(--ek-mustard)',
         position: 'sticky',
         top: 'env(safe-area-inset-top, 0px)',
         zIndex: 5,
         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)'
       }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-          {plan.tier === 'pro' && <Star size={12} fill="currentColor" aria-hidden="true" />}
-          {plan.tier === 'pro' ? 'PRO · MEMBRESÍA' : 'MEMBRESÍA BÁSICA'}
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>
+          {plan.esPaquete ? 'PAQUETE DE CRÉDITOS' : 'MEMBRESÍA'}
         </p>
         <p style={{
           fontFamily: 'var(--ek-font-display)',
@@ -332,7 +331,7 @@ export default function Signup() {
             <a href="/privacidad" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--ek-mustard)', fontWeight: 600 }}>
               aviso de privacidad
             </a>
-            . Compromiso mínimo de 6 meses.
+            .
           </span>
         </label>
 
@@ -369,7 +368,7 @@ export default function Signup() {
           marginTop: '4px',
           lineHeight: 1.5
         }}>
-          El pago es seguro vía Stripe. En tu primera visita en recepción tomamos tus datos y activamos tu membresía.
+          El pago es seguro vía Stripe. En tu primera visita en recepción tomamos tus datos y activamos tu plan.
         </p>
 
         <p style={{

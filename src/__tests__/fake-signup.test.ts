@@ -97,4 +97,16 @@ describe('fake-signup · SEC-FIX C1', () => {
     const res = await invocar({ httpMethod: 'GET', headers: {}, body: null } as unknown as AnyEvent);
     expect(res.statusCode).toBe(405);
   });
+
+  it('acepta un paquete de créditos (sin allowlist hardcodeada basica/pro)', async () => {
+    // La validez del plan la decide la BD (existe + activo + del tenant), no una
+    // lista fija en código → un slug de paquete como "creador" debe pasar.
+    const res = await invocar(evento({ ...BODY_OK, tier: 'creador' }));
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('rechaza tier que no sea string', async () => {
+    const res = await invocar(evento({ ...BODY_OK, tier: { hack: true } }));
+    expect(res.statusCode).toBe(400);
+  });
 });

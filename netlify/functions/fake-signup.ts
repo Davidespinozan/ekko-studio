@@ -11,7 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 
 /**
  * POST /fake-signup
- * Body: { nombre, email, password, tier: 'basica' | 'pro' }
+ * Body: { nombre, email, password, tier: <slug de un plan activo del tenant> }
  *
  * Alta pública de un miembro PENDIENTE DE PAGO (Stripe aún no integrado):
  * - auth.admin.createUser (email confirmado automáticamente)
@@ -26,8 +26,6 @@ import { createClient } from '@supabase/supabase-js';
  * pago: sin `payment_events`. Cuando se integre Stripe real, el webhook
  * reemplaza esta función y es quien activa la cuenta al cobrar.
  */
-
-const TIERS_VALIDOS = ['basica', 'pro'] as const;
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -56,12 +54,15 @@ export const handler: Handler = async (event) => {
       };
     }
 
-    if (!TIERS_VALIDOS.includes(tier)) {
+    if (typeof tier !== 'string') {
       return {
         statusCode: 400,
         body: JSON.stringify({ error: 'Tier inválido' })
       };
     }
+    // La validez real del plan (existe + activo + del tenant) se verifica contra
+    // la BD más abajo (1b). No hay allowlist hardcodeada: cualquier plan activo
+    // del tenant sirve (paquetes de créditos incluidos).
 
     // 1. Obtener tenant 'ekko'
     const { data: tenant, error: tenantError } = await supabaseAdmin
