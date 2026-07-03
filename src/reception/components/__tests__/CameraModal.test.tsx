@@ -5,8 +5,8 @@ import { CameraModal } from '../CameraModal';
 // @zxing/browser: el reader no debe romper; nunca llega a decodificar
 // porque getUserMedia rechaza en estos tests.
 vi.mock('@zxing/browser', () => ({
-  BrowserMultiFormatReader: class {
-    decodeFromVideoElement = vi.fn().mockResolvedValue(undefined);
+  BrowserQRCodeReader: class {
+    decodeFromVideoElement = vi.fn().mockResolvedValue({ stop: vi.fn() });
   }
 }));
 

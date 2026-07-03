@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { BrowserMultiFormatReader } from '@zxing/browser';
+import { BrowserQRCodeReader } from '@zxing/browser';
+import type { IScannerControls } from '@zxing/browser';
 import { X, RefreshCw } from 'lucide-react';
 
 interface Props {
@@ -7,9 +8,13 @@ interface Props {
   onScan: (payload: string) => void;
 }
 
+// BarcodeDetector nativo (Chrome/Android/Safari 17+) no está en los tipos de TS.
+type AnyWin = any;
+
 export function CameraModal({ onClose, onScan }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const readerRef = useRef<BrowserMultiFormatReader | null>(null);
+  const controlsRef = useRef<IScannerControls | null>(null);
+  const rafRef = useRef<number | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
   const cooldownRef = useRef(0);
@@ -26,9 +31,6 @@ export function CameraModal({ onClose, onScan }: Props) {
 
     async function start() {
       try {
-        const reader = new BrowserMultiFormatReader();
-        readerRef.current = reader;
-
         let stream: MediaStream;
         try {
           stream = await navigator.mediaDevices.getUserMedia({
@@ -36,21 +38,58 @@ export function CameraModal({ onClose, onScan }: Props) {
             audio: false
           });
         } catch {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 } },
-            audio: false
-          });
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
         }
 
         videoEl!.srcObject = stream;
         await videoEl!.play();
 
-        await reader.decodeFromVideoElement(videoEl!, (result) => {
-          if (!active || !result) return;
+        // Enfoque continuo (best-effort): permite leer sin esperar al autofoco.
+        try {
+          const track = stream.getVideoTracks()[0];
+          const caps = (track.getCapabilities?.() ?? {}) as AnyWin;
+          if (caps.focusMode?.includes?.('continuous')) {
+            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as AnyWin);
+          }
+        } catch { /* noop */ }
+
+        const hit = (text: string) => {
+          if (!active) return;
           const now = Date.now();
           if (now - cooldownRef.current < 1500) return;
           cooldownRef.current = now;
-          onScan(result.getText());
+          onScan(text);
+        };
+
+        // 1) BarcodeDetector NATIVO: mucho más rápido y robusto (agarra el QR
+        //    aunque el cuadro no esté perfectamente enfocado).
+        const BD = (window as AnyWin).BarcodeDetector as AnyWin;
+        let usarNativo = false;
+        if (BD) {
+          try {
+            const soportados = (await BD.getSupportedFormats?.()) as string[] | undefined;
+            usarNativo = !soportados || soportados.includes('qr_code');
+          } catch { usarNativo = false; }
+        }
+
+        if (usarNativo) {
+          const detector = new BD({ formats: ['qr_code'] });
+          const loop = async () => {
+            if (!active) return;
+            try {
+              const codes = await detector.detect(videoEl!);
+              if (codes && codes.length && codes[0].rawValue) hit(codes[0].rawValue);
+            } catch { /* frame aún no listo */ }
+            if (active) rafRef.current = requestAnimationFrame(loop);
+          };
+          rafRef.current = requestAnimationFrame(loop);
+          return;
+        }
+
+        // 2) Fallback: ZXing SOLO QR (más rápido que multi-formato).
+        const reader = new BrowserQRCodeReader();
+        controlsRef.current = await reader.decodeFromVideoElement(videoEl!, (result) => {
+          if (result) hit(result.getText());
         });
       } catch (e) {
         if (!active) return;
@@ -62,6 +101,8 @@ export function CameraModal({ onClose, onScan }: Props) {
 
     return () => {
       active = false;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      try { controlsRef.current?.stop(); } catch { /* noop */ }
       try {
         const stream = videoEl?.srcObject as MediaStream | null;
         stream?.getTracks().forEach((t) => t.stop());
@@ -124,7 +165,7 @@ export function CameraModal({ onClose, onScan }: Props) {
               <video ref={videoRef} className="rec-video" autoPlay playsInline muted />
               <div className="rec-camera-overlay">
                 <div className="rec-scan-frame" />
-                <p className="rec-scan-hint">Apuntá al QR</p>
+                <p className="rec-scan-hint">Apunta al QR</p>
               </div>
             </>
           )}
