@@ -76,8 +76,7 @@ export default function EstudioDetalle() {
     <div className="ek-container">
       <button
         onClick={() => navigate(-1)}
-        className="ek-icon-btn"
-        style={{ marginBottom: '16px', width: 'auto', padding: '8px 14px', fontSize: '13px', gap: '6px' }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'none', border: 'none', color: 'var(--ek-ink-muted)', fontSize: '13px', cursor: 'pointer', padding: '2px 0', marginBottom: '10px' }}
       >
         <ArrowLeft size={15} aria-hidden="true" /> Volver
       </button>
@@ -110,12 +109,12 @@ export default function EstudioDetalle() {
       </div>
 
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
+      <div style={{ marginBottom: '16px' }}>
         <h1 style={{
           fontFamily: 'var(--ek-font-display)',
-          fontSize: 'clamp(32px, 8vw, 48px)',
+          fontSize: 'clamp(26px, 6.5vw, 36px)',
           fontWeight: 700,
-          letterSpacing: '-0.04em',
+          letterSpacing: '-0.03em',
           lineHeight: 1.05,
           margin: 0
         }}>{recurso.nombre}</h1>
@@ -127,20 +126,20 @@ export default function EstudioDetalle() {
       </div>
 
       {tipoContenido.length > 0 && (
-        <div className="ek-card ek-card--cream" style={{ marginBottom: '32px' }}>
-          <p style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(10, 10, 10, 0.5)', margin: '0 0 10px' }}>
+        <div className="ek-card ek-card--md ek-card--cream" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(10, 10, 10, 0.45)', margin: 0, flexShrink: 0 }}>
             IDEAL PARA
           </p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
             {tipoContenido.map((tipo) => (
               <span key={tipo} style={{
-                padding: '6px 13px',
+                padding: '5px 11px',
                 borderRadius: '999px',
                 background: 'rgba(10, 10, 10, 0.08)',
                 color: 'var(--ek-bg)',
-                fontSize: '11px',
+                fontSize: '10.5px',
                 fontWeight: 700,
-                letterSpacing: '0.06em',
+                letterSpacing: '0.05em',
                 textTransform: 'uppercase'
               }}>
                 {tipo}
