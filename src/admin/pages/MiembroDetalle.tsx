@@ -1,7 +1,7 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, AlertTriangle, Check, Send, ShieldCheck, ShieldAlert, User } from 'lucide-react';
-import { useMiembroDetalle, updateMiembro, adminUpdateRole, adminDeleteUser, useTiersAdmin } from '../hooks/useAdminData';
+import { ArrowLeft, Check, Send, ShieldCheck, ShieldAlert, User } from 'lucide-react';
+import { useMiembroDetalle, updateMiembro, adminDeleteUser, useTiersAdmin } from '../hooks/useAdminData';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { formatHora } from '@member/logic/reservaLogic';
@@ -83,9 +83,17 @@ export default function MiembroDetalle() {
         Volver
       </Link>
 
-      <div className="adm-page-header" style={{ marginTop: '1rem' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard">MIEMBRO</p>
-        <h1 className="ek-h2">{miembro.nombre ?? miembro.email}</h1>
+      <div className="adm-page-header" style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '18px', flexWrap: 'wrap' }}>
+        <AvatarUploadControl
+          usuarioId={miembro.id}
+          avatarUrl={miembro.avatar_url}
+          onChanged={refetch}
+        />
+        <div style={{ minWidth: 0 }}>
+          <p className="ek-eyebrow ek-eyebrow--mustard">MIEMBRO</p>
+          <h1 className="ek-h2" style={{ margin: '2px 0 0' }}>{miembro.nombre ?? miembro.email}</h1>
+          <p className="adm-body" style={{ margin: '2px 0 0', color: 'var(--ek-ink-muted)', wordBreak: 'break-word' }}>{miembro.email}</p>
+        </div>
       </div>
 
       <section className="adm-section">
@@ -97,10 +105,22 @@ export default function MiembroDetalle() {
       </section>
 
       <section className="adm-section">
+        <h2 className="ek-h3">Ficha de identidad</h2>
+        <p className="adm-body" style={{ marginBottom: '0.75rem' }}>
+          Expediente completo del miembro: fecha de nacimiento, domicilio, INE (folio y foto)
+          y contrato firmado. Mismo acceso que recepción — admin ve y edita todo.
+        </p>
+        <FichaIdentidadResumen
+          identidadCompleta={miembro.identidad_completa}
+          contratoFirmado={miembro.contrato_firmado}
+          onAbrir={() => setFichaOpen(true)}
+        />
+      </section>
+
+      <section className="adm-section">
         <h2 className="ek-h3">Información del sistema</h2>
         <div className="adm-info-grid">
           <Info label="Email" value={miembro.email} />
-          <Info label="Rol" value={miembro.rol} mono />
           <Info label="Alta" value={new Date(miembro.created_at).toLocaleString('es-MX')} />
           {miembro.commitment_ends_at && (
             <Info label="Commitment hasta" value={new Date(miembro.commitment_ends_at).toLocaleDateString('es-MX')} />
@@ -157,40 +177,6 @@ export default function MiembroDetalle() {
         <button onClick={handleSave} disabled={saving} className="ek-cta" style={{ marginTop: '1rem', alignSelf: 'flex-start' }}>
           {saving ? 'Guardando…' : 'Guardar cambios'}
         </button>
-      </section>
-
-      <section className="adm-section">
-        <h2 className="ek-h3">Rol</h2>
-        <p className="adm-body">
-          Rol actual: <RolBadge rol={miembro.rol} />
-        </p>
-        <CambiarRolControl
-          usuarioId={miembro.id}
-          rolActual={miembro.rol}
-          onChanged={refetch}
-        />
-      </section>
-
-      <section className="adm-section">
-        <h2 className="ek-h3">Foto del miembro</h2>
-        <AvatarUploadControl
-          usuarioId={miembro.id}
-          avatarUrl={miembro.avatar_url}
-          onChanged={refetch}
-        />
-      </section>
-
-      <section className="adm-section">
-        <h2 className="ek-h3">Ficha de identidad</h2>
-        <p className="adm-body" style={{ marginBottom: '0.75rem' }}>
-          Expediente completo del miembro: fecha de nacimiento, domicilio, INE (folio y foto)
-          y contrato firmado. Mismo acceso que recepción — admin ve y edita todo.
-        </p>
-        <FichaIdentidadResumen
-          identidadCompleta={miembro.identidad_completa}
-          contratoFirmado={miembro.contrato_firmado}
-          onAbrir={() => setFichaOpen(true)}
-        />
       </section>
 
       <section className="adm-section">
@@ -386,73 +372,6 @@ function Info({ label, value, mono }: { label: string; value: React.ReactNode; m
   );
 }
 
-function RolBadge({ rol }: { rol: string }) {
-  return <code style={{ fontFamily: 'var(--ek-font-mono)', background: 'var(--ek-cream-deep)', padding: '2px 8px', borderRadius: '4px' }}>{rol}</code>;
-}
-
-function CambiarRolControl({ usuarioId, rolActual, onChanged }: {
-  usuarioId: string;
-  rolActual: string;
-  onChanged: () => Promise<void>;
-}) {
-  const [nuevoRol, setNuevoRol] = useState<'miembro' | 'recepcionista' | 'staff' | 'admin'>(rolActual as any);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [needsConfirm, setNeedsConfirm] = useState(false);
-
-  async function handleSave() {
-    if (nuevoRol === rolActual) return;
-    if (nuevoRol === 'admin' && !needsConfirm) {
-      setNeedsConfirm(true);
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
-    try {
-      await adminUpdateRole({ usuario_id: usuarioId, rol: nuevoRol });
-      await onChanged();
-      setNeedsConfirm(false);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error cambiando rol');
-    }
-    setSaving(false);
-  }
-
-  return (
-    <div className="adm-form-row" style={{ marginTop: '0.5rem' }}>
-      <label className="ek-label" style={{ flex: 1 }}>
-        Nuevo rol
-        <select
-          value={nuevoRol}
-          onChange={(e) => setNuevoRol(e.target.value as any)}
-          className="ek-input"
-        >
-          <option value="miembro">Miembro</option>
-          <option value="recepcionista">Recepción</option>
-          <option value="staff">Staff</option>
-          <option value="admin">Admin</option>
-        </select>
-      </label>
-      <button
-        onClick={handleSave}
-        disabled={saving || nuevoRol === rolActual}
-        className="ek-cta"
-        style={{ alignSelf: 'flex-end' }}
-      >
-        {saving ? <Spinner /> : needsConfirm && nuevoRol === 'admin' ? 'Confirmar admin' : 'Cambiar rol'}
-      </button>
-      {error && <p className="ek-error-text">{error}</p>}
-      {needsConfirm && nuevoRol === 'admin' && (
-        <p style={{ fontSize: '0.8125rem', color: 'var(--ek-danger)', flexBasis: '100%', marginTop: '0.5rem', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
-          <AlertTriangle size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
-          <span>Promover a admin da acceso TOTAL al negocio. Click &quot;Confirmar admin&quot; para proceder.</span>
-        </p>
-      )}
-    </div>
-  );
-}
-
 function AvatarUploadControl({ usuarioId, avatarUrl, onChanged }: {
   usuarioId: string;
   avatarUrl: string | null;
@@ -491,27 +410,24 @@ function AvatarUploadControl({ usuarioId, avatarUrl, onChanged }: {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
       {avatarUrl ? (
-        <img src={avatarUrl} alt="Avatar" style={{
-          width: '80px', height: '80px', borderRadius: '50%', objectFit: 'cover',
+        <img src={avatarUrl} alt="Foto del miembro" style={{
+          width: '88px', height: '88px', borderRadius: '50%', objectFit: 'cover',
           border: '1px solid var(--ek-line)'
         }} />
       ) : (
         <div style={{
-          width: '80px', height: '80px', borderRadius: '50%',
+          width: '88px', height: '88px', borderRadius: '50%',
           background: 'var(--ek-bg-elevated)',
           border: '2px dashed var(--ek-line-strong)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-          justifyContent: 'center', color: 'var(--ek-ink-faint)', gap: '2px'
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'var(--ek-ink-faint)'
         }}>
-          <User size={26} strokeWidth={1.5} aria-hidden="true" />
-          <span style={{ fontSize: '9px', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-            Sin foto
-          </span>
+          <User size={30} strokeWidth={1.5} aria-hidden="true" />
         </div>
       )}
-      <label className="ek-cta ek-cta--secondary" style={{ cursor: 'pointer' }}>
+      <label style={{ cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: 'var(--ek-mustard)' }}>
         {uploading ? 'Subiendo…' : avatarUrl ? 'Cambiar foto' : 'Subir foto'}
         <input
           type="file"
@@ -521,7 +437,7 @@ function AvatarUploadControl({ usuarioId, avatarUrl, onChanged }: {
           style={{ display: 'none' }}
         />
       </label>
-      {error && <p className="ek-error-text">{error}</p>}
+      {error && <p className="ek-error-text" style={{ fontSize: '11px', margin: 0 }}>{error}</p>}
     </div>
   );
 }
