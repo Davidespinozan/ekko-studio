@@ -368,6 +368,9 @@ export default function Signup() {
           marginTop: '4px',
           lineHeight: 1.5
         }}>
+          {plan.esPaquete
+            ? 'Es un pago único, sin mensualidad. '
+            : 'Es una membresía mensual: se cobra automáticamente cada mes. '}
           El pago es seguro vía Stripe. En tu primera visita en recepción tomamos tus datos y activamos tu plan.
         </p>
 
