@@ -2546,18 +2546,12 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-estudio-detalle { display: inline-flex; }
 
 @media (max-width: 600px) {
-  .ek-estudio-grid { grid-template-columns: 1fr; gap: 10px; }
-  .ek-estudio-card {
-    display: grid;
-    grid-template-columns: 112px 1fr;
-    align-items: stretch;
-    border-radius: 0;
-  }
-  .ek-estudio-media { aspect-ratio: auto; height: 100%; min-height: 112px; }
-  .ek-estudio-body { padding: 14px 16px; display: flex; flex-direction: column; justify-content: center; }
-  .ek-estudio-title { font-size: 18px !important; margin-bottom: 4px !important; }
-  /* el "ver detalle" sobra en la fila compacta — toda la fila es tappable */
-  .ek-estudio-detalle { display: none; }
+  /* En móvil los estudios son los protagonistas: card vertical con foto grande,
+     no una fila compacta con thumbnail. */
+  .ek-estudio-grid { grid-template-columns: 1fr; gap: 16px; }
+  .ek-estudio-media { aspect-ratio: 4 / 3; }
+  .ek-estudio-body { padding: 18px 20px; }
+  .ek-estudio-title { font-size: 22px !important; }
 }
 
 /* --- Precios / membresías --- */
