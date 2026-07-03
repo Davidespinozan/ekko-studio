@@ -116,7 +116,8 @@ export default function Landing() {
       descripcion: r.descripcion ?? '',
       estiloVisual: r.estilo_visual ?? '',
       equipoIncluido: r.equipo_incluido ?? [],
-      fotoUrl: r.foto_url ?? undefined
+      fotoUrl: r.foto_url ?? undefined,
+      esPro: (r.costo_creditos ?? 1) >= 2
     };
   };
 
@@ -341,6 +342,21 @@ export default function Landing() {
                 className="ek-estudio-card"
               >
                 <div className="ek-estudio-media">
+                  {s.esPro && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '12px',
+                      left: '12px',
+                      zIndex: 2,
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      background: 'var(--ek-mustard)',
+                      color: 'var(--ek-bg)',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      letterSpacing: '0.08em'
+                    }}>PRO</span>
+                  )}
                   {s.fotoUrl ? (
                     <img src={s.fotoUrl} alt={s.nombre} loading="lazy" decoding="async" />
                   ) : (

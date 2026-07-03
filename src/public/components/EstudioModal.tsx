@@ -11,6 +11,7 @@ export interface EstudioInfo {
   estiloVisual: string;
   equipoIncluido: string[];
   fotoUrl?: string;
+  esPro?: boolean;
 }
 
 interface Props {
@@ -132,10 +133,27 @@ export default function EstudioModal({ estudio, onClose, ctaTexto, ctaLink }: Pr
             </div>
           )}
 
+          {estudio.esPro && (
+            <span style={{
+              position: 'absolute',
+              top: '16px',
+              left: '16px',
+              zIndex: 2,
+              padding: '5px 11px',
+              borderRadius: '999px',
+              background: 'var(--ek-mustard)',
+              color: 'var(--ek-bg)',
+              fontSize: '11px',
+              fontWeight: 700,
+              letterSpacing: '0.08em'
+            }}>PRO</span>
+          )}
         </div>
 
         <div style={{ padding: 'clamp(16px, 5vw, 32px)' }}>
-          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>ESTUDIO</p>
+          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>
+            {estudio.esPro ? 'ESTUDIO PRO' : 'ESTUDIO'}
+          </p>
           <h2 style={{
             fontFamily: 'var(--ek-font-display)',
             fontSize: 'clamp(28px, 5vw, 40px)',
@@ -224,6 +242,18 @@ export default function EstudioModal({ estudio, onClose, ctaTexto, ctaLink }: Pr
           >
             {ctaTexto}
           </Link>
+
+          {estudio.esPro && (
+            <p style={{
+              fontSize: '12px',
+              color: 'var(--ek-ink-faint)',
+              textAlign: 'center',
+              margin: '12px 0 0',
+              lineHeight: 1.5
+            }}>
+              Estudio Pro: disponible con la membresía <strong style={{ color: 'var(--ek-ink-muted)' }}>Premium</strong> o con paquete de créditos (cuesta 2 créditos).
+            </p>
+          )}
         </div>
       </div>
     </div>
