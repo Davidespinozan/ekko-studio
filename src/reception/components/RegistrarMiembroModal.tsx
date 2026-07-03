@@ -5,8 +5,7 @@ import { useToast } from '@shared/hooks/useToast';
 import { activarMembresiaMostrador } from '@shared/lib/checkout';
 import { CopyButton } from '@shared/components/CopyButton';
 import { traducirErrorRegistro } from '../lib/traducirErrorRegistro';
-
-type Tier = '' | 'basica' | 'pro';
+import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
 
 interface Props {
   onClose: () => void;
@@ -32,7 +31,7 @@ interface MiembroCreado {
   nombre: string;
   email: string;
   password: string;
-  plan: Tier;
+  plan: string;
   /** true si se activó la membresía en el mismo registro (cobro en caja). */
   activada: boolean;
 }
@@ -56,7 +55,8 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
-  const [tier, setTier] = useState<Tier>('');
+  const [tier, setTier] = useState('');
+  const { planes } = usePlanesActivos();
   // Contraseña temporal autogenerada al montar (lazy init → estable).
   const [password, setPassword] = useState(() => generarPassword());
   const [submitting, setSubmitting] = useState(false);
@@ -269,13 +269,14 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
               <select
                 id="rm-plan"
                 value={tier}
-                onChange={(e) => setTier(e.target.value as Tier)}
+                onChange={(e) => setTier(e.target.value)}
                 className="ek-input"
                 disabled={submitting}
               >
                 <option value="">— Sin plan (activar después) —</option>
-                <option value="basica">Básica</option>
-                <option value="pro">Pro</option>
+                {planes.map((p) => (
+                  <option key={p.slug} value={p.slug}>{p.nombre}</option>
+                ))}
               </select>
               <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
                 {tier

@@ -20,7 +20,18 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@shared/lib/supabase', () => ({
-  supabase: { auth: { getSession: () => h.getSession() } }
+  supabase: {
+    auth: { getSession: () => h.getSession() },
+    // usePlanesActivos: from('tiers').select().eq().order() → planes activos.
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          order: () =>
+            Promise.resolve({ data: [{ slug: 'pro', nombre: 'Pro' }], error: null })
+        })
+      })
+    })
+  }
 }));
 vi.mock('@shared/hooks/useToast', () => ({ useToast: () => h.toast }));
 vi.mock('@shared/lib/checkout', () => ({
@@ -93,6 +104,8 @@ describe('RegistrarMiembroModal · wiring', () => {
     render(<RegistrarMiembroModal onClose={vi.fn()} onRegistrado={vi.fn()} />);
     fireEvent.change(screen.getByLabelText('Nombre completo'), { target: { value: 'Ana López' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ana@correo.com' } });
+    // El plan se carga async desde la BD: esperar la opción antes de elegirla.
+    await screen.findByRole('option', { name: 'Pro' });
     fireEvent.change(screen.getByLabelText(/Plan inicial/i), { target: { value: 'pro' } });
     fireEvent.click(screen.getByRole('button', { name: 'Registrar y activar' }));
 

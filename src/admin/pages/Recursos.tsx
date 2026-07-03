@@ -87,10 +87,7 @@ function useTiersDelTenant(): TierOption[] {
 
       if (error) {
         console.error('[useTiersDelTenant]', error);
-        setTiers([
-          { slug: 'basica', nombre: 'Básica' },
-          { slug: 'pro', nombre: 'Pro' }
-        ]);
+        setTiers([]);
       } else {
         setTiers(data ?? []);
       }

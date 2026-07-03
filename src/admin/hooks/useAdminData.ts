@@ -564,7 +564,8 @@ export interface CreateUserParams {
   nombre: string;
   telefono?: string;
   rol: 'miembro' | 'recepcionista' | 'staff' | 'admin';
-  membresia_tier?: 'basica' | 'pro' | null;
+  // slug de cualquier plan activo del tenant (no solo basica/pro).
+  membresia_tier?: string | null;
 }
 
 export interface CreateUserResponse {

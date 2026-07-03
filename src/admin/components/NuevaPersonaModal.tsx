@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { adminCreateUser } from '../hooks/useAdminData';
-
-type Tier = 'basica' | 'pro' | '';
+import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
 
 interface Props {
   onClose: () => void;
@@ -18,7 +17,8 @@ export function NuevaPersonaModal({ onClose, onCreated }: Props) {
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
   const [password, setPassword] = useState('');
-  const [tier, setTier] = useState<Tier>('');
+  const [tier, setTier] = useState('');
+  const { planes } = usePlanesActivos();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ email: string; password: string } | null>(null);
@@ -100,12 +100,13 @@ export function NuevaPersonaModal({ onClose, onCreated }: Props) {
             <select
               id="np-tier"
               value={tier}
-              onChange={(e) => setTier(e.target.value as Tier)}
+              onChange={(e) => setTier(e.target.value)}
               className="ek-input"
             >
               <option value="">— sin plan asignado —</option>
-              <option value="basica">Básica</option>
-              <option value="pro">Pro</option>
+              {planes.map((p) => (
+                <option key={p.slug} value={p.slug}>{p.nombre}</option>
+              ))}
             </select>
             <p className="ek-helper-text">
               Si no asignas plan, el miembro queda en pendiente_pago hasta cobrar.

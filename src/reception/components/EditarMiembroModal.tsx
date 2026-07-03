@@ -4,6 +4,7 @@ import { useToast } from '@shared/hooks/useToast';
 import { Spinner } from '@shared/components/Spinner';
 import { actualizarMiembro } from '../lib/accionesMiembro';
 import { MotivoField } from './MotivoField';
+import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
 
 export interface MiembroEditable {
   id: string;
@@ -24,12 +25,6 @@ const STATUS_OPCIONES = [
   { value: 'activo', label: 'Activo' },
   { value: 'suspendido', label: 'Suspendido' },
   { value: 'pendiente_pago', label: 'Pendiente de pago' }
-];
-
-const TIER_OPCIONES = [
-  { value: '', label: 'Sin plan' },
-  { value: 'basica', label: 'Básica' },
-  { value: 'pro', label: 'Pro' }
 ];
 
 // Motivos predefinidos para los cambios sensibles (Bloque A — gobernanza).
@@ -57,6 +52,7 @@ export function EditarMiembroModal({ miembro, onClose, onGuardado }: Props) {
   const [telefono, setTelefono] = useState(miembro.telefono ?? '');
   const [status, setStatus] = useState(miembro.status);
   const [tier, setTier] = useState(miembro.membresia_tier ?? '');
+  const { planes } = usePlanesActivos();
   const [motivo, setMotivo] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -145,7 +141,13 @@ export function EditarMiembroModal({ miembro, onClose, onGuardado }: Props) {
             <div className="ek-form-field">
               <label className="ek-label" htmlFor="em-tier">Plan</label>
               <select id="em-tier" className="ek-input" value={tier} onChange={(e) => setTier(e.target.value)}>
-                {TIER_OPCIONES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                <option value="">Sin plan</option>
+                {planes.map((p) => <option key={p.slug} value={p.slug}>{p.nombre}</option>)}
+                {/* Si el plan actual ya no existe en la lista, mostralo igual para
+                    no cambiarlo sin querer al guardar. */}
+                {tier && !planes.some((p) => p.slug === tier) && (
+                  <option value={tier}>{tier}</option>
+                )}
               </select>
             </div>
           </div>
