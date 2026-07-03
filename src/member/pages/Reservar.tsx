@@ -259,7 +259,7 @@ export default function Reservar() {
             <button
               type="button"
               onClick={() => navigate('/app/perfil')}
-              className="ek-cta"
+              className="ek-cta ek-cta--gold"
               style={{ padding: '8px 16px', fontSize: '13px', flexShrink: 0 }}
             >
               Ver planes
