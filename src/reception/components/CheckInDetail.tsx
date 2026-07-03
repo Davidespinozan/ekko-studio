@@ -96,7 +96,7 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMes
     hour: '2-digit', minute: '2-digit', hour12: false
   });
 
-  const tieneTier = miembro.membresia_tier === 'pro' || miembro.membresia_tier === 'basica';
+  const tieneTier = !!miembro.membresia_tier;
 
   return (
     <div className="rec-detail rec-detail--success">

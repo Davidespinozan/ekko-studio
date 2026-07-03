@@ -72,6 +72,7 @@ export function useResumenMiembro(
           .from('membresias')
           .select('status, creditos_restantes, periodo_actual_fin')
           .eq('usuario_id', usuarioId!)
+          .in('status', ['trialing', 'activa', 'past_due'])
           .order('created_at', { ascending: false })
           .limit(1),
         membresiaTier && tenantId

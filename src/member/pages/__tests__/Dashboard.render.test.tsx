@@ -10,7 +10,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('@shared/lib/supabase', () => {
   const builder: Record<string, unknown> = {};
-  for (const m of ['select', 'eq', 'gte', 'order', 'limit']) builder[m] = () => builder;
+  for (const m of ['select', 'eq', 'in', 'gte', 'order', 'limit']) builder[m] = () => builder;
   builder.then = (cb: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(cb);
   return { supabase: { from: () => builder } };
 });

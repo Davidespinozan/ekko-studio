@@ -41,6 +41,7 @@ export function useReportesCreditos() {
         .from('membresias')
         .select('creditos_restantes, tier:tiers(precio_centavos, clases_incluidas)')
         .eq('tenant_id', tenant.id)
+        .in('status', ['trialing', 'activa', 'past_due'])
         .not('creditos_restantes', 'is', null)
     ]);
 
