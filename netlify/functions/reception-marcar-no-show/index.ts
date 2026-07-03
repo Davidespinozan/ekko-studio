@@ -105,14 +105,17 @@ export const handler: Handler = async (event) => {
     if (miembroErr) return serverError(miembroErr.message);
     if (!miembro) return notFound('Miembro de la reserva no encontrado');
 
-    // Mismo cálculo que el cron: count+1 y bloqueo = max(actual, now+7d).
+    // Mismo cálculo que el cron: count+1; bloqueo 7d SOLO a partir de la 3ª falta.
+    const UMBRAL_BLOQUEO = 3;
     const countAntes = miembro.no_shows_count ?? 0;
     const countNuevo = countAntes + 1;
     const sieteDias = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const bloqueoNuevo =
-      miembro.bloqueado_hasta && new Date(miembro.bloqueado_hasta) > sieteDias
-        ? miembro.bloqueado_hasta
-        : sieteDias.toISOString();
+      countNuevo >= UMBRAL_BLOQUEO
+        ? (miembro.bloqueado_hasta && new Date(miembro.bloqueado_hasta) > sieteDias
+            ? miembro.bloqueado_hasta
+            : sieteDias.toISOString())
+        : (miembro.bloqueado_hasta ?? null);
 
     // 4. Aplicar: reserva → no_show, miembro → penalización.
     const { error: upReservaErr } = await supabaseAdmin

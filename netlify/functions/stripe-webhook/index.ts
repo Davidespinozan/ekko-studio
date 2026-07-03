@@ -27,6 +27,44 @@ import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo } from '../
  * un no-op (no rompe el deploy).
  */
 
+/**
+ * Suscripciones de Stripe vivas del socio DISTINTAS de la nueva. Se consulta
+ * ANTES de activar (activar_membresia cancela las filas), para poder cancelarlas
+ * luego en Stripe y evitar doble cobro tras un cambio de plan.
+ */
+async function subsAnterioresDelSocio(
+  admin: any,
+  usuarioId: string,
+  nuevaSubId: string | null | undefined
+): Promise<string[]> {
+  const { data } = await admin
+    .from('membresias')
+    .select('stripe_subscription_id')
+    .eq('usuario_id', usuarioId)
+    .in('status', ['trialing', 'activa', 'past_due'])
+    .not('stripe_subscription_id', 'is', null);
+  const rows = (data ?? []) as Array<{ stripe_subscription_id: string | null }>;
+  const ids = rows
+    .map((m) => m.stripe_subscription_id)
+    .filter((id): id is string => !!id && id !== nuevaSubId);
+  return [...new Set(ids)];
+}
+
+/** Cancela en Stripe cada suscripción anterior (best-effort; no rompe el webhook). */
+async function cancelarSubsAnteriores(
+  stripe: ReturnType<typeof getStripe>,
+  subIds: string[],
+  acctOpt: { stripeAccount: string } | undefined
+): Promise<void> {
+  for (const subId of subIds) {
+    try {
+      await stripe.subscriptions.cancel(subId, acctOpt);
+    } catch (e) {
+      console.error('[stripe-webhook] no se pudo cancelar sub anterior', subId, e instanceof Error ? e.message : e);
+    }
+  }
+}
+
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') return badRequest('Method not allowed');
 
@@ -92,6 +130,7 @@ export const handler: Handler = async (event) => {
         const sub = await stripe.subscriptions.retrieve(accion.subscription_id, acctOpt);
         periodoFin = periodoFinFromSubscription(sub);
       }
+      const subsPrevias = await subsAnterioresDelSocio(admin, accion.usuario_id, accion.subscription_id);
       const { error } = await admin.rpc('activar_membresia', {
         p_usuario_id: accion.usuario_id,
         p_tier_id: accion.tier_id,
@@ -101,6 +140,7 @@ export const handler: Handler = async (event) => {
       });
       if (error) throw new Error(`activar_membresia: ${error.message}`);
       usuarioIdPago = accion.usuario_id;
+      await cancelarSubsAnteriores(stripe, subsPrevias, acctOpt);
     } else if (accion.kind === 'activar-sub') {
       // Suscripción in-app (Elements): leer metadata + periodo de la suscripción,
       // sobre la cuenta conectada (Connect).
@@ -109,6 +149,7 @@ export const handler: Handler = async (event) => {
       const tierId = sub.metadata?.tier_id;
       const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
       if (usuarioId && tierId && customerId) {
+        const subsPrevias = await subsAnterioresDelSocio(admin, usuarioId, accion.subscription_id);
         const { error } = await admin.rpc('activar_membresia', {
           p_usuario_id: usuarioId,
           p_tier_id: tierId,
@@ -118,6 +159,9 @@ export const handler: Handler = async (event) => {
         });
         if (error) throw new Error(`activar_membresia (sub): ${error.message}`);
         usuarioIdPago = usuarioId;
+        // #2: cancelar la(s) suscripción(es) anterior(es) en Stripe para que el
+        // miembro NO quede pagando dos mensualidades tras un cambio de plan.
+        await cancelarSubsAnteriores(stripe, subsPrevias, acctOpt);
       }
     } else if (accion.kind === 'sync') {
       const { error } = await admin.rpc('sync_membresia_stripe', {
