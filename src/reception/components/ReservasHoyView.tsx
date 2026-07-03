@@ -766,7 +766,7 @@ function ManualCheckInModal({
               <button
                 onClick={handleConfirm}
                 disabled={submitting}
-                className="ek-cta"
+                className="ek-cta ek-cta--gold"
                 style={{ flex: 1 }}
               >
                 {submitting ? 'Marcando…' : 'Marcar check-in'}

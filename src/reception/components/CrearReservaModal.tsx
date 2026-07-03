@@ -478,7 +478,7 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
                 type="button"
                 onClick={handleConfirmar}
                 disabled={submitting || !recursoSel || !slotSel}
-                className="ek-cta"
+                className="ek-cta ek-cta--gold"
                 style={{ flex: 1, minHeight: '44px', opacity: submitting || !slotSel ? 0.5 : 1 }}
               >
                 {esReprogramar

@@ -144,7 +144,7 @@ export function CameraModal({ onClose, onScan }: Props) {
                 <button
                   type="button"
                   onClick={reintentar}
-                  className="ek-cta"
+                  className="ek-cta ek-cta--gold"
                   style={{ minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                 >
                   <RefreshCw size={16} aria-hidden="true" />
