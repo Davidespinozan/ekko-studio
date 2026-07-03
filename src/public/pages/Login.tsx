@@ -87,11 +87,10 @@ export default function Login() {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      // El contenedor va DEBAJO del header, así que centrar lo empujaba muy
-      // abajo en móvil. Lo anclamos arriba con un margen cómodo.
+      // Anclado arriba, con el MISMO espacio que el header (1rem) para que el
+      // cuadro quede pegado al menú, no flotando muy abajo.
       justifyContent: 'flex-start',
-      padding: '24px 20px',
-      paddingTop: 'clamp(20px, 5vh, 52px)',
+      padding: '1rem 20px',
       paddingBottom: 'calc(48px + env(safe-area-inset-bottom, 0px))'
     }}>
       <div style={{ maxWidth: '400px', width: '100%' }}>
