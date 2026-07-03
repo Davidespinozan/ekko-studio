@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -24,14 +24,46 @@ interface Props {
  */
 export default function CardMenuDropdown({ items }: Props) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  // Posiciona el menú con coordenadas de viewport (fixed): así NINGÚN contenedor
+  // con overflow lo corta, y abre hacia arriba si no hay espacio abajo.
+  function abrir() {
+    const btn = btnRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const estAlto = items.length * 46 + 16;
+    const espacioAbajo = window.innerHeight - r.bottom;
+    const abrirArriba = espacioAbajo < estAlto + 12 && r.top > espacioAbajo;
+    setPos({
+      right: Math.max(8, window.innerWidth - r.right),
+      top: abrirArriba ? Math.max(8, r.top - estAlto - 4) : r.bottom + 4
+    });
+    setOpen(true);
+  }
+
+  // Cerrar al hacer scroll/resize (si no, el menú fixed quedaría "flotando").
+  useEffect(() => {
+    if (!open) return;
+    const cerrar = () => setOpen(false);
+    window.addEventListener('scroll', cerrar, true);
+    window.addEventListener('resize', cerrar);
+    return () => {
+      window.removeEventListener('scroll', cerrar, true);
+      window.removeEventListener('resize', cerrar);
+    };
+  }, [open]);
 
   return (
     <div style={{ position: 'relative' }} onClick={(e) => e.stopPropagation()}>
       <button
+        ref={btnRef}
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setOpen((v) => !v);
+          if (open) setOpen(false);
+          else abrir();
         }}
         className="ek-icon-btn"
         aria-label="Acciones"
@@ -40,7 +72,7 @@ export default function CardMenuDropdown({ items }: Props) {
       >
         <MoreHorizontal size={18} aria-hidden="true" />
       </button>
-      {open && (
+      {open && pos && (
         <>
           <div
             onClick={() => setOpen(false)}
@@ -49,14 +81,14 @@ export default function CardMenuDropdown({ items }: Props) {
           />
           <div
             style={{
-              position: 'absolute',
-              top: 'calc(100% + 4px)',
-              right: 0,
+              position: 'fixed',
+              top: pos.top,
+              right: pos.right,
               minWidth: '220px',
-              background: 'var(--ek-bg-soft)',
-              border: '0.5px solid var(--ek-line)',
+              background: 'var(--ek-bg-elevated)',
+              border: '0.5px solid var(--ek-line-strong)',
               borderRadius: '12px',
-              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
+              boxShadow: '0 12px 32px rgba(0, 0, 0, 0.55)',
               padding: '6px',
               zIndex: 50,
               animation: 'ek-fade-in 0.12s ease'
