@@ -66,9 +66,9 @@ export default function EstudioDetalle() {
     );
   }
 
-  const usuarioPuedeUsar = usuario?.membresia_tier
-    ? recurso.tiers_permitidos.includes(usuario.membresia_tier)
-    : false;
+  // Modelo de créditos plano: cualquier plan puede reservar cualquier estudio.
+  // El freno es solo "tener plan"; ver el estudio es libre.
+  const tienePlan = !!usuario?.membresia_tier;
   const tipoContenido = recurso.tipo_contenido ?? [];
   const equipo = recurso.equipo_incluido ?? [];
 
@@ -111,7 +111,6 @@ export default function EstudioDetalle() {
 
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: "8px" }}>ESTUDIO</p>
         <h1 style={{
           fontFamily: 'var(--ek-font-display)',
           fontSize: 'clamp(32px, 8vw, 48px)',
@@ -128,11 +127,22 @@ export default function EstudioDetalle() {
       </div>
 
       {tipoContenido.length > 0 && (
-        <div style={{ marginBottom: '32px' }}>
-          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>IDEAL PARA</p>
+        <div className="ek-card ek-card--cream" style={{ marginBottom: '32px' }}>
+          <p style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(10, 10, 10, 0.5)', margin: '0 0 10px' }}>
+            IDEAL PARA
+          </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {tipoContenido.map((tipo) => (
-              <span key={tipo} className="ek-badge ek-badge--neutral" style={{ padding: '8px 14px' }}>
+              <span key={tipo} style={{
+                padding: '6px 13px',
+                borderRadius: '999px',
+                background: 'rgba(10, 10, 10, 0.08)',
+                color: 'var(--ek-bg)',
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase'
+              }}>
                 {tipo}
               </span>
             ))}
@@ -202,10 +212,10 @@ export default function EstudioDetalle() {
       )}
 
       <div style={{ marginBottom: '24px' }}>
-        {usuarioPuedeUsar ? (
+        {tienePlan ? (
           <Link
             to={`/app/reservar?recurso=${recurso.slug}`}
-            className="ek-cta ek-cta--full"
+            className="ek-cta ek-cta--gold ek-cta--full"
             style={{ minHeight: '52px', fontSize: '15px' }}
           >
             Reservar este estudio <ArrowRight size={17} aria-hidden="true" />
@@ -217,13 +227,13 @@ export default function EstudioDetalle() {
             textAlign: 'center'
           }}>
             <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>
-              PLAN PRO REQUERIDO
+              NECESITAS UN PLAN
             </p>
             <p className="ek-body" style={{ marginBottom: '14px' }}>
-              Tu plan actual no incluye acceso a este estudio.
+              Necesitas un plan para reservar. Puedes explorar los estudios mientras tanto.
             </p>
-            <Link to="/app/perfil" className="ek-cta">
-              Ver mi plan
+            <Link to="/app/perfil" className="ek-cta ek-cta--gold">
+              Ver planes
             </Link>
           </div>
         )}
