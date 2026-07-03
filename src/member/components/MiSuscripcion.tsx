@@ -485,25 +485,22 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               {tiers.map((t) => {
                 const esActual = t.slug === tierSlug;
                 return (
-                  <div key={t.slug} className="ek-card ek-card--md" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                  <div key={t.slug} className="ek-card ek-card--md ek-card--cream" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                     <div style={{ minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
-                        <span style={{
-                          background: 'linear-gradient(160deg, #faf7ef 0%, #ece4d2 100%)',
-                          color: 'var(--ek-bg)',
-                          fontWeight: 700,
-                          fontSize: '11px',
-                          letterSpacing: '0.06em',
-                          textTransform: 'uppercase',
-                          padding: '4px 11px',
-                          borderRadius: '999px'
-                        }}>{t.nombre}</span>
-                        {esActual && <span className="ek-badge ek-badge--neutral">Actual</span>}
+                        <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(10, 10, 10, 0.6)' }}>
+                          {t.nombre}
+                        </span>
+                        {esActual && (
+                          <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ek-bg)', background: 'rgba(10, 10, 10, 0.1)', padding: '2px 8px', borderRadius: '999px' }}>
+                            Actual
+                          </span>
+                        )}
                       </div>
-                      <p style={{ margin: 0, fontWeight: 600 }}>
-                        {formatearPesos(t.precio_centavos)}<span style={{ color: 'var(--ek-ink-muted)', fontWeight: 500, fontSize: '13px' }}>{sufijoPrecio(t)}</span>
+                      <p style={{ margin: 0, fontWeight: 700, color: 'var(--ek-bg)' }}>
+                        {formatearPesos(t.precio_centavos)}<span style={{ color: 'rgba(10, 10, 10, 0.55)', fontWeight: 500, fontSize: '13px' }}>{sufijoPrecio(t)}</span>
                       </p>
-                      <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'var(--ek-ink-faint)' }}>{detallePlan(t)}</p>
+                      <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'rgba(10, 10, 10, 0.55)' }}>{detallePlan(t)}</p>
                     </div>
                     {!esActual && (
                       <button
