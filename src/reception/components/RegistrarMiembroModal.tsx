@@ -281,7 +281,7 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
               <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
                 {tier
                   ? 'Se activa la membresía al registrar (confirmas el cobro en caja).'
-                  : 'Sin plan queda pendiente de pago; lo activás luego desde su perfil.'}
+                  : 'Sin plan queda pendiente de pago; lo activas luego desde su perfil.'}
               </p>
             </div>
 
@@ -339,7 +339,7 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
               <button
                 type="submit"
                 disabled={!canSubmit}
-                className={tier ? 'ek-cta ek-cta--gold' : 'ek-cta'}
+                className="ek-cta ek-cta--gold"
                 style={{ flex: 1, minHeight: '44px', opacity: canSubmit ? 1 : 0.5 }}
               >
                 {submitting ? 'Registrando…' : tier ? 'Registrar y activar' : 'Registrar miembro'}
@@ -466,7 +466,7 @@ function CredencialesView({
         >
           <AlertTriangle size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
           <span>
-            La cuenta queda <strong>PENDIENTE DE ACTIVACIÓN</strong> — asignás plan y activás desde su
+            La cuenta queda <strong>PENDIENTE DE ACTIVACIÓN</strong> — asignas plan y activas desde su
             perfil (cobro en caja). Mientras tanto el miembro no podrá reservar.
           </span>
         </div>
