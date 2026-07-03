@@ -31,7 +31,7 @@ export function useReportesEngagement() {
     const [activosRes, reservasRes] = await Promise.all([
       supabase
         .from('usuarios')
-        .select('id, nombre, email, created_at')
+        .select('id, nombre, email, telefono, created_at')
         .eq('tenant_id', tenant.id)
         .eq('rol', 'miembro')
         .eq('status', 'activo'),

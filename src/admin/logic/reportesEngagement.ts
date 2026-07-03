@@ -12,6 +12,7 @@ export interface MiembroLite {
   id: string;
   nombre: string | null;
   email: string | null;
+  telefono: string | null;
   created_at: string;
 }
 
@@ -26,6 +27,7 @@ export interface MiembroEnRiesgo {
   id: string;
   nombre: string | null;
   email: string | null;
+  telefono: string | null;
   ultimaActividad: string | null; // ISO de la última sesión asistida (null = nunca)
   diasSinVenir: number | null; // null = nunca vino
 }
@@ -115,6 +117,7 @@ export function calcularEngagement(
       id: m.id,
       nombre: m.nombre,
       email: m.email,
+      telefono: m.telefono,
       ultimaActividad: ultima != null ? new Date(ultima).toISOString() : null,
       diasSinVenir: ultima != null ? Math.floor((ahoraMs - ultima) / MS_DIA) : null
     });

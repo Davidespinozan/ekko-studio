@@ -8,6 +8,7 @@ const miembro = (id: string, over: Partial<MiembroLite> = {}): MiembroLite => ({
   id,
   nombre: `M${id}`,
   email: `${id}@ekko.mx`,
+  telefono: null,
   created_at: hace(200),
   ...over
 });

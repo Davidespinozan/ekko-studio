@@ -1,13 +1,14 @@
-import { AlertTriangle, AlertCircle, CheckCircle2, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, AlertCircle, CheckCircle2, MessageCircle, Mail, type LucideIcon } from 'lucide-react';
 import { useReportesEconomia } from '../hooks/useReportesEconomia';
 import { useReportesOcupacion } from '../hooks/useReportesOcupacion';
 import { useReportesEngagement } from '../hooks/useReportesEngagement';
 import { useReportesCreditos } from '../hooks/useReportesCreditos';
 import { InfoTooltip } from '@shared/components/InfoTooltip';
 import { generarResumen, type TonoResumen } from '../logic/reportesResumen';
+import { telWhatsAppMx, waLink } from '@shared/lib/whatsapp';
 import type { EconomiaResult } from '../logic/reportesEconomia';
 import type { OcupacionResult } from '../logic/reportesOcupacion';
-import type { EngagementResult } from '../logic/reportesEngagement';
+import type { EngagementResult, MiembroEnRiesgo } from '../logic/reportesEngagement';
 import type { CreditosResult } from '../logic/reportesCreditos';
 
 // ============================================================================
@@ -214,6 +215,49 @@ function BloqueEngagement({ data }: { data: EngagementResult }) {
   );
 }
 
+function primerNombre(n: string | null): string {
+  return (n ?? '').trim().split(/\s+/)[0] ?? '';
+}
+
+// Contacto directo del miembro en riesgo: WhatsApp (canal MX) con mensaje listo,
+// o email si no hay teléfono. Cierra el ciclo insight → acción.
+function ContactoRiesgo({ miembro }: { miembro: MiembroEnRiesgo }) {
+  const wa = telWhatsAppMx(miembro.telefono);
+  const nom = primerNombre(miembro.nombre);
+  const saludo = nom ? `¡Hola ${nom}!` : '¡Hola!';
+  const btn = {
+    padding: '6px 12px',
+    fontSize: '12px',
+    whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
+    gap: '5px'
+  };
+
+  if (wa) {
+    return (
+      <a
+        href={waLink(wa, `${saludo} Te extrañamos en el estudio 👋 ¿Te apartamos una sesión esta semana?`)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="ek-cta ek-cta--gold"
+        style={btn}
+      >
+        <MessageCircle size={13} aria-hidden="true" /> WhatsApp
+      </a>
+    );
+  }
+  if (miembro.email) {
+    const subject = encodeURIComponent('Te extrañamos en el estudio');
+    const body = encodeURIComponent(`${saludo} Te extrañamos por el estudio. ¿Te apartamos una sesión esta semana?`);
+    return (
+      <a href={`mailto:${miembro.email}?subject=${subject}&body=${body}`} className="ek-cta ek-cta--secondary" style={btn}>
+        <Mail size={13} aria-hidden="true" /> Email
+      </a>
+    );
+  }
+  return null;
+}
+
 function MiembrosEnRiesgo({ data }: { data: EngagementResult }) {
   const top = data.enRiesgo.slice(0, 12);
   return (
@@ -253,6 +297,7 @@ function MiembrosEnRiesgo({ data }: { data: EngagementResult }) {
               >
                 {m.diasSinVenir == null ? 'Nunca vino' : `${m.diasSinVenir} d sin venir`}
               </span>
+              <ContactoRiesgo miembro={m} />
             </div>
           ))}
         </div>
