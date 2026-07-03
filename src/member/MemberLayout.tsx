@@ -70,7 +70,7 @@ export default function MemberLayout() {
   }
 
   return (
-    <div className="ek-page" style={{ paddingBottom: '88px' /* espacio para bottom nav */ }}>
+    <div className="ek-page" style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' /* espacio para la píldora flotante */ }}>
       <DemoBanner vista="Miembro" />
       <header className="ek-header-glass">
         {tituloDeSeccion(location.pathname) ? (

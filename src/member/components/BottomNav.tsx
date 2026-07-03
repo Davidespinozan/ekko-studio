@@ -3,7 +3,7 @@ import { Home, Calendar, LayoutGrid, User, QrCode } from 'lucide-react';
 
 export function BottomNav() {
   return (
-    <nav className="ek-bottom-nav">
+    <nav className="ek-bottom-nav ek-bottom-nav--float">
       <div className="ek-bottom-nav-inner">
         <NavItem to="/app" end icon={<Home size={22} className="ek-bottom-nav-icon" />} label="Inicio" />
         <NavItem to="/app/estudios" icon={<LayoutGrid size={22} className="ek-bottom-nav-icon" />} label="Estudios" />
