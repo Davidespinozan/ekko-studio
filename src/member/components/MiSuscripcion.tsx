@@ -36,10 +36,13 @@ function formatearPesos(centavos: number): string {
 
 const STATUS_META: Record<string, { texto: string; clase: string }> = {
   activa: { texto: 'Activa', clase: 'ek-badge--success' },
+  activo: { texto: 'Activa', clase: 'ek-badge--success' },
   active: { texto: 'Activa', clase: 'ek-badge--success' },
   pendiente_pago: { texto: 'Pendiente de pago', clase: 'ek-badge--outline' },
   suspendida: { texto: 'Suspendida', clase: 'ek-badge--danger' },
-  cancelada: { texto: 'Cancelada', clase: 'ek-badge--danger' }
+  suspendido: { texto: 'Suspendida', clase: 'ek-badge--danger' },
+  cancelada: { texto: 'Cancelada', clase: 'ek-badge--danger' },
+  cancelado: { texto: 'Cancelada', clase: 'ek-badge--danger' }
 };
 
 interface Props {
@@ -257,15 +260,21 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '14px' }}>
-              {planActual && (
+            {planActual ? (
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '14px' }}>
                 <p style={{ fontFamily: 'var(--ek-font-display)', fontSize: '34px', fontWeight: 700, margin: 0, letterSpacing: '-0.03em' }}>
                   {formatearPesos(planActual.precio_centavos)}
                   <span style={{ fontSize: '14px', color: 'var(--ek-ink-muted)', fontWeight: 500 }}>{sufijoPrecio(planActual)}</span>
                 </p>
-              )}
-              <span className={`ek-badge ${statusMeta.clase}`}>{statusMeta.texto}</span>
-            </div>
+                <span className={`ek-badge ${statusMeta.clase}`}>{statusMeta.texto}</span>
+              </div>
+            ) : (
+              // Sin plan: NO mostrar "activo"/renovación/cancelar (eso es de una
+              // suscripción). Solo un aviso + el CTA para elegir uno.
+              <p className="ek-body-muted" style={{ margin: '0 0 16px' }}>
+                No tenés un plan activo. Elegí uno para empezar a reservar.
+              </p>
+            )}
             {planActual && (
               <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: '-8px 0 14px' }}>
                 {detallePlan(planActual)}
@@ -273,7 +282,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             )}
 
             {/* Saldo de créditos (solo planes por paquete) */}
-            {creditos !== null && (
+            {planActual && creditos !== null && (
               <div
                 style={{
                   display: 'flex',
@@ -310,7 +319,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             )}
 
             {/* Renovación / vencimiento del plan */}
-            {finPeriodo && (
+            {planActual && finPeriodo && (
               cancelaAlFin ? (
                 <p className="ek-helper-text" style={{ marginTop: 0, marginBottom: '12px', color: 'var(--ek-warning)' }}>
                   Tu plan se cancela el {finPeriodo}. Podés reactivarlo acá abajo.
@@ -332,11 +341,11 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             )}
 
             <button type="button" className="ek-cta ek-cta--full" onClick={() => setCambiarOpen(true)}>
-              Cambiar de plan <ArrowRight size={16} aria-hidden="true" />
+              {planActual ? 'Cambiar de plan' : 'Ver planes'} <ArrowRight size={16} aria-hidden="true" />
             </button>
 
             {/* Cancelar / reactivar — todo in-app, sin salir a Stripe */}
-            {tieneSuscripcion && (
+            {planActual && tieneSuscripcion && (
               cancelaAlFin ? (
                 <button
                   type="button"
