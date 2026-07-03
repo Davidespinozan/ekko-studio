@@ -21,6 +21,8 @@ export interface ResumenMiembro {
   tier: {
     nombre: string;
     tipo: string;
+    /** Invitados permitidos por sesión (reglas.max_invitados del plan). */
+    maxInvitados: number;
   } | null;
 }
 
@@ -75,7 +77,7 @@ export function useResumenMiembro(
         membresiaTier && tenantId
           ? supabase
               .from('tiers')
-              .select('nombre, tipo')
+              .select('nombre, tipo, reglas')
               .eq('tenant_id', tenantId)
               .eq('slug', membresiaTier)
               .maybeSingle()
@@ -85,7 +87,17 @@ export function useResumenMiembro(
       const mem = (memRes.data ?? [])[0] as
         | { status: string | null; creditos_restantes: number | null; periodo_actual_fin: string | null }
         | undefined;
-      const tier = (tierRes.data ?? null) as { nombre: string; tipo: string } | null;
+      const tierRaw = (tierRes.data ?? null) as
+        | { nombre: string; tipo: string; reglas: Record<string, unknown> | null }
+        | null;
+      const maxInv = tierRaw?.reglas?.max_invitados;
+      const tier = tierRaw
+        ? {
+            nombre: tierRaw.nombre,
+            tipo: tierRaw.tipo,
+            maxInvitados: typeof maxInv === 'number' && maxInv >= 0 ? maxInv : 0
+          }
+        : null;
 
       setResumen({
         proximasCount: proximasRes.count ?? 0,

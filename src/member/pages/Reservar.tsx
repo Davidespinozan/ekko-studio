@@ -69,8 +69,8 @@ export default function Reservar() {
   const [invitados, setInvitados] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
-  const maxInvitados = usuario?.membresia_tier === 'pro' ? 4 :
-                       usuario?.membresia_tier === 'basica' ? 2 : 0;
+  // Invitados permitidos: del plan del miembro (Admin → Planes → Máx. invitados).
+  const maxInvitados = resumen.tier?.maxInvitados ?? 0;
 
   // Motivo por el que NO se puede reservar (null = puede). Ver siempre se permite.
   const saldoInsuficiente =
