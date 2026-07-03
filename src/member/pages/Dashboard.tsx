@@ -192,7 +192,7 @@ export default function Dashboard() {
         <>
           <ProximaSesionHero reserva={proximaReserva ?? null} onCancelada={onReservaCancelada} />
           {proximaReserva && (
-            <div style={{ marginTop: '-14px', marginBottom: '16px', textAlign: 'right' }}>
+            <div style={{ marginTop: '-14px', marginBottom: '16px', textAlign: 'center' }}>
               <Link
                 to="/app/reservas"
                 style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--ek-mustard)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
