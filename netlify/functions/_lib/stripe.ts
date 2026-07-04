@@ -137,9 +137,11 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
       const inv = event.data.object as Stripe.Invoice & {
         subscription?: string | { id: string };
         billing_reason?: string;
+        // API 2025+: invoice.subscription se movió a parent.subscription_details.
+        parent?: { subscription_details?: { subscription?: string | { id: string } } };
       };
-      const subscription_id =
-        typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id;
+      const subRef = inv.subscription ?? inv.parent?.subscription_details?.subscription;
+      const subscription_id = typeof subRef === 'string' ? subRef : subRef?.id;
       if (!subscription_id) return { kind: 'ignore', reason: 'invoice_sin_suscripcion' };
       // 1ª factura de la suscripción (Elements) → ACTIVAR (crea la membresía).
       // Renovación → sync; payment_failed → past_due.
