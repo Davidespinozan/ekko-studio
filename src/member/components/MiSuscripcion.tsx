@@ -6,6 +6,7 @@ import { sufijoPrecio, detallePlan, esPlanPaquete } from '@shared/lib/planPresen
 import { obtenerBillingInfo, cancelarSuscripcion, cambiarPlanSuscripcion, type MetodoPago, type PagoHistorial } from '@shared/lib/checkout';
 import { TarjetaModal } from '@shared/components/TarjetaModal';
 import { PaymentModal } from '@shared/components/PaymentModal';
+import { PlanTipoToggle, type VistaPlan } from '@shared/components/PlanTipoToggle';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
 import { EmptyState } from '@shared/components/EmptyState';
@@ -62,6 +63,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const [membresia, setMembresia] = useState<MembresiaInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [cambiarOpen, setCambiarOpen] = useState(false);
+  const [vistaPlan, setVistaPlan] = useState<VistaPlan>('membresias');
   const currentSlug = tierSlug;
   const [gestionando, setGestionando] = useState(false);
   const [pagarTier, setPagarTier] = useState<TierInfo | null>(null);
@@ -158,6 +160,11 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   }, []);
 
   const planActual = tiers.find((t) => t.slug === currentSlug) ?? null;
+  // Selector Membresías · Paquetes en el modal de cambio (igual que la landing).
+  const planesMensuales = tiers.filter((t) => !esPlanPaquete(t));
+  const planesPaquetes = tiers.filter((t) => esPlanPaquete(t));
+  const hayAmbosTipos = planesMensuales.length > 0 && planesPaquetes.length > 0;
+  const planesVisibles = vistaPlan === 'paquetes' ? planesPaquetes : planesMensuales;
   const statusMeta = STATUS_META[status ?? ''] ?? { texto: status ?? '—', clase: 'ek-badge--neutral' };
   const tieneSuscripcion = !!membresia?.stripe_subscription_id;
   const creditos = membresia?.creditos_restantes ?? null; // null = plan mensual (ilimitado)
@@ -374,7 +381,11 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               )
             )}
 
-            <button type="button" className="ek-cta ek-cta--gold ek-cta--full" onClick={() => setCambiarOpen(true)}>
+            <button
+              type="button"
+              className="ek-cta ek-cta--gold ek-cta--full"
+              onClick={() => { setVistaPlan(planActual && esPlanPaquete(planActual) ? 'paquetes' : 'membresias'); setCambiarOpen(true); }}
+            >
               {planActual ? 'Cambiar de plan' : 'Ver planes'} <ArrowRight size={16} aria-hidden="true" />
             </button>
 
@@ -518,8 +529,14 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               Elige tu nuevo plan. Pagas de forma segura sin salir de la app.
             </p>
 
+            {hayAmbosTipos && (
+              <div style={{ marginBottom: '16px' }}>
+                <PlanTipoToggle value={vistaPlan} onChange={setVistaPlan} />
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {tiers.map((t) => {
+              {planesVisibles.map((t) => {
                 const esActual = t.slug === tierSlug;
                 return (
                   <div key={t.slug} className="ek-card ek-card--md ek-card--cream" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>

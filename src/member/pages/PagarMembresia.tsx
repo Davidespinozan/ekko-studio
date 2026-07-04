@@ -4,8 +4,9 @@ import { supabase } from '@shared/lib/supabase';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { parseBeneficios } from '@shared/lib/beneficios';
-import { sufijoPrecio } from '@shared/lib/planPresentacion';
+import { sufijoPrecio, esPlanPaquete } from '@shared/lib/planPresentacion';
 import { PaymentModal } from '@shared/components/PaymentModal';
+import { PlanTipoToggle, type VistaPlan } from '@shared/components/PlanTipoToggle';
 import { Spinner } from '@shared/components/Spinner';
 
 /**
@@ -36,6 +37,7 @@ export default function PagarMembresia() {
   const [pagado, setPagado] = useState(false);
   // null = usar el plan del signup; si el usuario elige otro, gana este.
   const [slugElegido, setSlugElegido] = useState<string | null>(null);
+  const [vistaPlan, setVistaPlan] = useState<VistaPlan>('membresias');
 
   useEffect(() => {
     let mounted = true;
@@ -65,6 +67,12 @@ export default function PagarMembresia() {
   const slug = slugElegido ?? usuario?.membresia_tier ?? tiers[0]?.slug ?? null;
   const tier = tiers.find((t) => t.slug === slug) ?? null;
   const esPaquete = tier?.tipo === 'creditos' || tier?.tipo === 'hibrido';
+
+  // Selector Membresías · Paquetes en el picker (igual que la landing).
+  const planesMensuales = tiers.filter((t) => !esPlanPaquete(t));
+  const planesPaquetes = tiers.filter((t) => esPlanPaquete(t));
+  const hayAmbosTipos = planesMensuales.length > 0 && planesPaquetes.length > 0;
+  const planesVisibles = vistaPlan === 'paquetes' ? planesPaquetes : planesMensuales;
 
   if (pagado) {
     return (
@@ -136,7 +144,7 @@ export default function PagarMembresia() {
           {tiers.length > 1 && (
             <button
               type="button"
-              onClick={() => setPickerOpen(true)}
+              onClick={() => { setVistaPlan(esPaquete ? 'paquetes' : 'membresias'); setPickerOpen(true); }}
               className="ek-cta ek-cta--secondary ek-cta--full"
               style={{ marginTop: '10px' }}
             >
@@ -162,8 +170,13 @@ export default function PagarMembresia() {
                     <X size={18} aria-hidden="true" />
                   </button>
                 </div>
+                {hayAmbosTipos && (
+                  <div style={{ marginBottom: '14px' }}>
+                    <PlanTipoToggle value={vistaPlan} onChange={setVistaPlan} />
+                  </div>
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {tiers.map((t) => {
+                  {planesVisibles.map((t) => {
                     const seleccionado = t.slug === slug;
                     return (
                       <button

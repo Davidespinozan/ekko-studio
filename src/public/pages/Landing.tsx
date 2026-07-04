@@ -9,6 +9,7 @@ import EstudioModal, { type EstudioInfo } from '../components/EstudioModal';
 import AppShowcase from '../components/AppShowcase';
 import { Reveal } from '../components/Reveal';
 import { MagneticButton } from '@shared/components/MagneticButton';
+import { PlanTipoToggle } from '@shared/components/PlanTipoToggle';
 import Footer from '../components/Footer';
 
 // Íconos de "Cómo funciona" por posición (el texto es editable; el ícono no).
@@ -443,26 +444,7 @@ export default function Landing() {
         {/* Toggle Membresías · Paquetes — solo si existen ambos tipos. Resuelve
             el "muchísimos cuadros": nunca se ven los dos grupos a la vez. */}
         {!tiersLoading && hayAmbosTipos && (
-          <div className="ek-plan-toggle" role="tablist" aria-label="Tipo de plan">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={vistaPlan === 'membresias'}
-              className={`ek-plan-toggle-btn ${vistaPlan === 'membresias' ? 'is-active' : ''}`}
-              onClick={() => setTipoPlanVista('membresias')}
-            >
-              Membresías mensuales
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={vistaPlan === 'paquetes'}
-              className={`ek-plan-toggle-btn ${vistaPlan === 'paquetes' ? 'is-active' : ''}`}
-              onClick={() => setTipoPlanVista('paquetes')}
-            >
-              Paquetes de créditos
-            </button>
-          </div>
+          <PlanTipoToggle value={vistaPlan} onChange={setTipoPlanVista} />
         )}
 
         {tiersLoading ? (
