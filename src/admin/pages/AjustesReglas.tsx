@@ -7,6 +7,7 @@ type ReglasDraft = {
   anticipacion_min_horas: number;
   duracion_default_min: number;
   max_sesiones_por_dia: number;
+  cancelacion_min_horas_antes: number;
   permitir_continuas: boolean;
   no_show_bloqueo_dias: number;
 };
@@ -15,6 +16,7 @@ const DEFAULT: ReglasDraft = {
   anticipacion_min_horas: 24,
   duracion_default_min: 60,
   max_sesiones_por_dia: 1,
+  cancelacion_min_horas_antes: 24,
   permitir_continuas: false,
   no_show_bloqueo_dias: 7
 };
@@ -32,6 +34,7 @@ function readDraft(config: Record<string, unknown> | null): ReglasDraft {
     anticipacion_min_horas: num(reserva.anticipacion_min_horas, DEFAULT.anticipacion_min_horas),
     duracion_default_min: num(reserva.duracion_default_min, DEFAULT.duracion_default_min),
     max_sesiones_por_dia: num(reserva.max_sesiones_por_dia, DEFAULT.max_sesiones_por_dia),
+    cancelacion_min_horas_antes: num(reserva.cancelacion_min_horas_antes, DEFAULT.cancelacion_min_horas_antes),
     permitir_continuas: Boolean(reserva.permitir_continuas ?? DEFAULT.permitir_continuas),
     no_show_bloqueo_dias: num(penalizaciones.no_show_bloqueo_dias, DEFAULT.no_show_bloqueo_dias)
   };
@@ -108,6 +111,10 @@ export default function AjustesReglas() {
       toast.error('El tope de sesiones por día no puede ser negativo.');
       return;
     }
+    if (!Number.isFinite(draft.cancelacion_min_horas_antes) || draft.cancelacion_min_horas_antes < 0) {
+      toast.error('La ventana de cancelación no puede ser negativa.');
+      return;
+    }
 
     // Merge no destructivo: solo escribimos los campos consumidos.
     // Los campos DEAD (cupos_por_recurso, etc) se preservan en BD.
@@ -120,6 +127,7 @@ export default function AjustesReglas() {
         anticipacion_min_horas: draft.anticipacion_min_horas,
         duracion_default_min: draft.duracion_default_min,
         max_sesiones_por_dia: draft.max_sesiones_por_dia,
+        cancelacion_min_horas_antes: draft.cancelacion_min_horas_antes,
         permitir_continuas: draft.permitir_continuas
       },
       penalizaciones: {
@@ -211,6 +219,21 @@ export default function AjustesReglas() {
             value={draft.max_sesiones_por_dia}
             onChange={(e) =>
               setDraft({ ...draft, max_sesiones_por_dia: parseInt(e.target.value) || 0 })
+            }
+            className="ek-input"
+          />
+        </FormField>
+
+        <FormField
+          label="Cancelación mínima antes de la sesión (horas)"
+          helper="Con cuánta anticipación puede el miembro cancelar SU reserva por su cuenta. Más tarde que eso, solo recepción puede cancelar. Ejemplo: 24. Pon 0 para permitir cancelar hasta el último minuto."
+        >
+          <input
+            type="number"
+            min={0}
+            value={draft.cancelacion_min_horas_antes}
+            onChange={(e) =>
+              setDraft({ ...draft, cancelacion_min_horas_antes: parseInt(e.target.value) || 0 })
             }
             className="ek-input"
           />

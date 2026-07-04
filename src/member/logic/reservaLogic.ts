@@ -254,6 +254,7 @@ export function traducirErrorRPC(message: string): string {
   if (message.includes('EKKO_SLOT_OCUPADO')) return 'Este horario acaba de ser tomado por otro miembro. Elige otro.';
   if (message.includes('EKKO_RESERVA_NO_EXISTE')) return 'La reserva no existe.';
   if (message.includes('EKKO_NO_AUTORIZADO')) return 'No puedes hacer esta acción.';
+  if (message.includes('EKKO_CANCELACION_TARDIA')) return 'Ya no puedes cancelar esta reserva por tu cuenta. Contacta a recepción.';
   if (message.includes('EKKO_RESERVA_NO_CANCELABLE')) return 'Esta reserva no se puede cancelar.';
   if (message.includes('EKKO_RESERVA_PASADA')) return 'No puedes cancelar una reserva que ya pasó.';
   if (message.includes('EKKO_FUERA_DE_HORARIO')) return 'Ese horario está fuera del horario del estudio.';
