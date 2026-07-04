@@ -4,6 +4,7 @@ import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
+import { backendPost } from '@shared/lib/backend';
 import { Spinner } from '@shared/components/Spinner';
 import { EmptyState } from '@shared/components/EmptyState';
 import { canModifyTeamMember, revokeTeamMember } from '../lib/crudHelpers';
@@ -149,6 +150,8 @@ export default function Equipo() {
         </button>
       </div>
 
+      <CuentasDemo />
+
       {isLoading ? (
         <Spinner label="Cargando…" />
       ) : (
@@ -257,6 +260,64 @@ export default function Equipo() {
         onCancel={() => setHardDelete(null)}
       />
     </div>
+  );
+}
+
+interface DemoResultado {
+  password: string;
+  cuentas: { email: string; rol: string; nombre: string }[];
+}
+
+/** Cuentas demo (una por rol) para que el dueño pruebe cada rol con auth real. */
+function CuentasDemo() {
+  const toast = useToast();
+  const [creando, setCreando] = useState(false);
+  const [res, setRes] = useState<DemoResultado | null>(null);
+
+  async function crear() {
+    setCreando(true);
+    try {
+      const r = await backendPost<DemoResultado & { success: boolean }>('admin-seed-demo', {});
+      setRes(r);
+      toast.success('Cuentas demo listas.');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudieron crear las cuentas demo.');
+    } finally {
+      setCreando(false);
+    }
+  }
+
+  const rolLabel: Record<string, string> = { miembro: 'Miembro', recepcionista: 'Recepción', staff: 'Staff' };
+
+  return (
+    <section className="ek-card" style={{ marginBottom: '28px' }}>
+      <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '6px' }}>CUENTAS DEMO</p>
+      <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: '0 0 14px', lineHeight: 1.5 }}>
+        Una cuenta por rol para que pruebes la app como cada uno (auth y datos reales, no un preview).
+        Ábrelas en una <strong>ventana privada u otro navegador</strong> para no cerrar tu sesión de admin.
+        El miembro demo ya tiene plan y ficha lista para probar reservas y check-in.
+      </p>
+      <button type="button" onClick={crear} disabled={creando} className="ek-cta ek-cta--secondary" style={{ width: 'auto' }}>
+        {creando ? <Spinner size={16} /> : res ? 'Regenerar cuentas demo' : 'Crear cuentas demo'}
+      </button>
+
+      {res && (
+        <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ fontSize: '13px', color: 'var(--ek-ink)' }}>
+            Contraseña (todas): <code style={{ fontFamily: 'var(--ek-font-mono)', color: 'var(--ek-mustard)' }}>{res.password}</code>
+          </div>
+          {res.cuentas.map((c) => (
+            <div key={c.email} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', padding: '8px 12px', background: 'var(--ek-bg-soft)', border: '0.5px solid var(--ek-line)', borderRadius: 'var(--ek-r-sm)' }}>
+              <span style={{ fontWeight: 700, color: 'var(--ek-mustard)', minWidth: '78px' }}>{rolLabel[c.rol] ?? c.rol}</span>
+              <span style={{ fontFamily: 'var(--ek-font-mono)', color: 'var(--ek-ink)' }}>{c.email}</span>
+            </div>
+          ))}
+          <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', margin: '4px 0 0' }}>
+            Entra en <strong>/login</strong> con cada correo + la contraseña. Bórralas o cámbiales la contraseña antes de abrir al público.
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 

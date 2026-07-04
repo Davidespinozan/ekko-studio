@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Home, User, ClipboardList, ChevronDown, ExternalLink, ArrowRight } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { ChevronDown, ArrowRight } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 
 const SIDEBAR_COLLAPSED_KEY = 'ekko-admin-sidebar-collapsed';
-const VER_COMO_LABEL = 'VER COMO…';
 
 function readCollapsed(): Set<string> {
   if (typeof localStorage === 'undefined') return new Set();
@@ -192,20 +190,6 @@ const SECTIONS: NavSection[] = [
   }
 ];
 
-interface VerComoLink {
-  label: string;
-  icon: LucideIcon;
-  href: string;
-}
-
-const VER_COMO_LINKS: VerComoLink[] = [
-  // Signup excluido a propósito (Sprint D-Polish): admin ya lo ve en el
-  // flow normal cuando un visitante hace click en una membresía desde Landing.
-  { label: 'Landing', icon: Home, href: '/?demo=admin-preview' },
-  { label: 'Miembro', icon: User, href: '/app?demo=admin-preview' },
-  { label: 'Recepción', icon: ClipboardList, href: '/recepcion?demo=admin-preview' }
-];
-
 interface Props {
   onNavigate?: () => void;
 }
@@ -361,37 +345,6 @@ export function Sidebar({ onNavigate }: Props = {}) {
           );
         })}
 
-        <div className="adm-sidebar-section">
-          <SectionToggle
-            label={VER_COMO_LABEL}
-            collapsed={collapsed.has(VER_COMO_LABEL)}
-            onToggle={() => toggleSection(VER_COMO_LABEL)}
-          />
-          {!collapsed.has(VER_COMO_LABEL) &&
-            VER_COMO_LINKS.map((link) => {
-              const LinkIcon = link.icon;
-              return (
-              <a
-                key={link.label}
-                href={link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Abre en nueva pestaña"
-                className="adm-sidebar-item"
-                style={{
-                  border: '0.5px solid var(--ek-line)',
-                  marginTop: '4px'
-                }}
-              >
-                <span className="adm-sidebar-item-icon" aria-hidden="true">
-                  <LinkIcon size={18} />
-                </span>
-                <span style={{ flex: 1 }}>{link.label}</span>
-                <ExternalLink size={13} aria-hidden="true" style={{ color: 'var(--ek-ink-faint)' }} />
-              </a>
-              );
-            })}
-        </div>
       </nav>
 
       <div className="adm-sidebar-footer">
