@@ -235,13 +235,35 @@ export default function EstudioModal({ estudio, onClose, ctaTexto, ctaLink }: Pr
             </p>
           </div>
 
-          <Link
-            to={ctaLink}
-            className="ek-cta ek-cta--gold ek-cta--full"
-            style={{ padding: '16px', fontSize: '15px', textAlign: 'center' }}
-          >
-            {ctaTexto}
-          </Link>
+          {ctaLink.startsWith('#') ? (
+            // Ancla del propio landing (ej. #membresias): cerrar el modal y
+            // bajar a la sección. Un <Link to="#..."> no scrollea de forma
+            // confiable y además dejaría el modal abierto encima.
+            <button
+              type="button"
+              className="ek-cta ek-cta--gold ek-cta--full"
+              style={{ padding: '16px', fontSize: '15px', textAlign: 'center' }}
+              onClick={() => {
+                const id = ctaLink.slice(1);
+                onClose();
+                // Esperar a que el modal se desmonte (y libere overflow:hidden)
+                // antes de scrollear.
+                setTimeout(() => {
+                  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
+              }}
+            >
+              {ctaTexto}
+            </button>
+          ) : (
+            <Link
+              to={ctaLink}
+              className="ek-cta ek-cta--gold ek-cta--full"
+              style={{ padding: '16px', fontSize: '15px', textAlign: 'center' }}
+            >
+              {ctaTexto}
+            </Link>
+          )}
 
           {estudio.esPro && (
             <p style={{

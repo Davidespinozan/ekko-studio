@@ -110,7 +110,7 @@ export const FAQ_DEFAULT: FaqConfig = {
 
 export const ESTUDIO_MODAL_DEFAULT: EstudioModalConfig = {
   cta_texto: 'Ver planes y reservar',
-  cta_link: '/signup'
+  cta_link: '#membresias'
 };
 
 // Encabezado de la sección de estudios. Default genérico (no atado a un número

@@ -107,9 +107,9 @@ describe('landingDefaults parsers', () => {
   });
 
   describe('parseEstudioModal', () => {
-    it('sin config → default (/signup, sin /mes)', () => {
+    it('sin config → default (#membresias, baja a la sección de planes)', () => {
       expect(parseEstudioModal(null)).toEqual(ESTUDIO_MODAL_DEFAULT);
-      expect(ESTUDIO_MODAL_DEFAULT.cta_link).toBe('/signup');
+      expect(ESTUDIO_MODAL_DEFAULT.cta_link).toBe('#membresias');
     });
     it('valores propios ganan', () => {
       const r = parseEstudioModal({ cta_texto: 'Reservar', cta_link: '#membresias' });
