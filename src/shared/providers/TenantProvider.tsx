@@ -52,7 +52,9 @@ export function TenantProvider({ children }: TenantProviderProps) {
         const slug = resolveTenantSlug();
         const { data, error: queryError } = await supabase
           .from('tenants')
-          .select('*')
+          // Columnas PÚBLICAS únicamente (el sitio se carga sin auth). Se evita
+          // 'select(*)' para no exponer stripe_account_id/stripe_* al rol anon.
+          .select('id, slug, nombre, config, branding, status, created_at, updated_at')
           .eq('slug', slug)
           .eq('status', 'activo')
           .maybeSingle();
@@ -76,7 +78,7 @@ export function TenantProvider({ children }: TenantProviderProps) {
           return;
         }
 
-        setTenant(data);
+        setTenant(data as Tenant);
         setIsLoading(false);
 
         // Branding tokens dinámicos están desactivados en Sprint C1.
