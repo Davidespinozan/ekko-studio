@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, UserPlus } from 'lucide-react';
 import { PlanChip } from '@shared/components/PlanChip';
+import { InvitadosModal } from './InvitadosModal';
 import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 
 interface MiembroData {
@@ -46,6 +47,7 @@ const AUTO_CLOSE_MS = 15_000;
 
 export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMessage, onClose }: Props) {
   const [secondsLeft, setSecondsLeft] = useState(Math.ceil(AUTO_CLOSE_MS / 1000));
+  const [invitadosOpen, setInvitadosOpen] = useState(false);
 
   // Feedback sonoro + táctil al abrir el detalle (1 vez)
   useEffect(() => {
@@ -54,6 +56,8 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMes
   }, [kind]);
 
   useEffect(() => {
+    // Pausa el auto-cierre mientras se registran invitados (flujo con foto).
+    if (invitadosOpen) return;
     const interval = setInterval(() => {
       setSecondsLeft((s) => Math.max(0, s - 1));
     }, 1000);
@@ -62,7 +66,7 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMes
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [onClose]);
+  }, [onClose, invitadosOpen]);
 
   if (kind === 'error') {
     return (
@@ -160,13 +164,29 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMes
       )}
 
       <div className="rec-detail-footer">
+        <button
+          type="button"
+          onClick={() => setInvitadosOpen(true)}
+          className="ek-cta ek-cta--secondary ek-cta--full"
+          style={{ marginBottom: '8px' }}
+        >
+          <UserPlus size={16} aria-hidden="true" /> Registrar invitados
+        </button>
         <button onClick={onClose} className="ek-cta ek-cta--full">
           Listo
         </button>
         <p style={{ fontSize: '0.75rem', color: 'rgba(245,241,232,0.4)', marginTop: '0.5rem' }}>
-          Cierra en {secondsLeft}s
+          {invitadosOpen ? 'En pausa mientras registras invitados' : `Cierra en ${secondsLeft}s`}
         </p>
       </div>
+
+      {invitadosOpen && (
+        <InvitadosModal
+          reservaId={reserva.id}
+          miembroNombre={miembro.nombre ?? miembro.email ?? '—'}
+          onClose={() => setInvitadosOpen(false)}
+        />
+      )}
     </div>
   );
 }
