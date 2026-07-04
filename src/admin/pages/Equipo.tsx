@@ -287,7 +287,7 @@ function CuentasDemo() {
     }
   }
 
-  const rolLabel: Record<string, string> = { miembro: 'Miembro', recepcionista: 'Recepción' };
+  const rolLabel: Record<string, string> = { miembro: 'Miembro', recepcionista: 'Recepción', admin: 'Admin' };
 
   return (
     <section className="ek-card" style={{ marginBottom: '28px' }}>

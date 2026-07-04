@@ -26,13 +26,14 @@ const DEMO_PASSWORD = 'DemoEkko2026';
 interface DemoDef {
   email: string;
   nombre: string;
-  rol: 'miembro' | 'recepcionista';
+  rol: 'miembro' | 'recepcionista' | 'admin';
 }
 
-// Roles reales: admin (el dueño), recepcionista y miembro. No hay 'staff'.
+// Roles reales: admin, recepcionista y miembro. No hay 'staff'.
 const DEMOS: DemoDef[] = [
   { email: 'demo-miembro@ekkostudio.app', nombre: 'Demo Miembro', rol: 'miembro' },
-  { email: 'demo-recepcion@ekkostudio.app', nombre: 'Demo Recepción', rol: 'recepcionista' }
+  { email: 'demo-recepcion@ekkostudio.app', nombre: 'Demo Recepción', rol: 'recepcionista' },
+  { email: 'demo-admin@ekkostudio.app', nombre: 'Demo Admin', rol: 'admin' }
 ];
 
 export const handler: Handler = async (event) => {
