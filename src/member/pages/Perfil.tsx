@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarClock, ArrowRight, LogOut } from 'lucide-react';
+import { CalendarClock, ArrowRight, LogOut, Pencil } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { MiSuscripcion } from '@member/components/MiSuscripcion';
+import { EditarPerfilModal } from '@member/components/EditarPerfilModal';
 import { ActivarAvisosPush } from '@member/components/ActivarAvisosPush';
 
 export default function Perfil() {
   const { authUser, usuario, signOut } = useAuth();
   const tenant = useTenant();
+  const [editarOpen, setEditarOpen] = useState(false);
 
   const nombreFormat = usuario?.nombre
     ?.toLowerCase()
@@ -54,7 +57,7 @@ export default function Perfil() {
               </div>
             )}
           </span>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <p style={{ margin: 0, fontFamily: 'var(--ek-font-display)', fontSize: '18px', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ek-bg)' }}>
               {nombreFormat || 'Tu cuenta'}
             </p>
@@ -63,6 +66,27 @@ export default function Perfil() {
               <p style={{ margin: '1px 0 0', fontSize: '13px', color: 'rgba(10, 10, 10, 0.6)' }}>{usuario.telefono}</p>
             )}
           </div>
+          <button
+            type="button"
+            onClick={() => setEditarOpen(true)}
+            aria-label="Editar perfil"
+            title="Editar perfil"
+            style={{
+              flexShrink: 0,
+              width: 38,
+              height: 38,
+              borderRadius: '50%',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(10, 10, 10, 0.06)',
+              border: '0.5px solid rgba(10, 10, 10, 0.12)',
+              color: 'var(--ek-bg)',
+              cursor: 'pointer'
+            }}
+          >
+            <Pencil size={16} aria-hidden="true" />
+          </button>
         </div>
 
         {/* Mi suscripción */}
@@ -101,6 +125,8 @@ export default function Perfil() {
           <LogOut size={16} aria-hidden="true" /> Cerrar sesión
         </button>
       </div>
+
+      {editarOpen && <EditarPerfilModal onClose={() => setEditarOpen(false)} />}
     </div>
   );
 }

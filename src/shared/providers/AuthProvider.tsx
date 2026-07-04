@@ -11,6 +11,8 @@ interface AuthContextValue {
   usuario: Usuario | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
+  /** Re-hidrata `usuario` desde la BD (tras editar el perfil, p. ej.). */
+  refreshUsuario: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -18,7 +20,8 @@ const AuthContext = createContext<AuthContextValue>({
   authUser: null,
   usuario: null,
   isLoading: true,
-  signOut: async () => {}
+  signOut: async () => {},
+  refreshUsuario: async () => {}
 });
 
 interface AuthProviderProps {
@@ -106,6 +109,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setSession(null);
   }
 
+  async function refreshUsuario() {
+    if (session?.user) await hydrateUsuario(session.user.id);
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -113,7 +120,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         authUser: session?.user ?? null,
         usuario,
         isLoading,
-        signOut
+        signOut,
+        refreshUsuario
       }}
     >
       {children}
