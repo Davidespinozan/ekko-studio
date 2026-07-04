@@ -8,6 +8,7 @@ type ReglasDraft = {
   duracion_default_min: number;
   max_sesiones_por_dia: number;
   cancelacion_min_horas_antes: number;
+  precio_invitado_extra: number; // en PESOS (se guarda en centavos)
   permitir_continuas: boolean;
   no_show_bloqueo_dias: number;
 };
@@ -17,6 +18,7 @@ const DEFAULT: ReglasDraft = {
   duracion_default_min: 60,
   max_sesiones_por_dia: 1,
   cancelacion_min_horas_antes: 24,
+  precio_invitado_extra: 0,
   permitir_continuas: false,
   no_show_bloqueo_dias: 7
 };
@@ -35,6 +37,7 @@ function readDraft(config: Record<string, unknown> | null): ReglasDraft {
     duracion_default_min: num(reserva.duracion_default_min, DEFAULT.duracion_default_min),
     max_sesiones_por_dia: num(reserva.max_sesiones_por_dia, DEFAULT.max_sesiones_por_dia),
     cancelacion_min_horas_antes: num(reserva.cancelacion_min_horas_antes, DEFAULT.cancelacion_min_horas_antes),
+    precio_invitado_extra: num(reserva.precio_invitado_extra_centavos, 0) / 100,
     permitir_continuas: Boolean(reserva.permitir_continuas ?? DEFAULT.permitir_continuas),
     no_show_bloqueo_dias: num(penalizaciones.no_show_bloqueo_dias, DEFAULT.no_show_bloqueo_dias)
   };
@@ -115,6 +118,10 @@ export default function AjustesReglas() {
       toast.error('La ventana de cancelación no puede ser negativa.');
       return;
     }
+    if (!Number.isFinite(draft.precio_invitado_extra) || draft.precio_invitado_extra < 0) {
+      toast.error('El precio por invitado extra no puede ser negativo.');
+      return;
+    }
 
     // Merge no destructivo: solo escribimos los campos consumidos.
     // Los campos DEAD (cupos_por_recurso, etc) se preservan en BD.
@@ -128,6 +135,7 @@ export default function AjustesReglas() {
         duracion_default_min: draft.duracion_default_min,
         max_sesiones_por_dia: draft.max_sesiones_por_dia,
         cancelacion_min_horas_antes: draft.cancelacion_min_horas_antes,
+        precio_invitado_extra_centavos: Math.round(draft.precio_invitado_extra * 100),
         permitir_continuas: draft.permitir_continuas
       },
       penalizaciones: {
@@ -247,6 +255,23 @@ export default function AjustesReglas() {
             description="Si está activado, los miembros pueden reservar dos sesiones seguidas. Si está desactivado, debe haber al menos un slot entre reservas del mismo miembro."
           />
         </div>
+      </Section>
+
+      <Section title="INVITADOS">
+        <FormField
+          label="Precio por invitado extra (pesos)"
+          helper="Cuánto cobra recepción por cada invitado que el miembro traiga ARRIBA del tope de su plan. Se cobra en caja al registrar al invitado. Pon 0 si no cobras extras."
+        >
+          <input
+            type="number"
+            min={0}
+            value={draft.precio_invitado_extra}
+            onChange={(e) =>
+              setDraft({ ...draft, precio_invitado_extra: parseInt(e.target.value) || 0 })
+            }
+            className="ek-input"
+          />
+        </FormField>
       </Section>
 
       <Section title="PENALIZACIONES">
