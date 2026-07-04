@@ -4,4 +4,4 @@ Disallow: /app
 Disallow: /admin
 Disallow: /recepcion
 
-Sitemap: https://ekko.studio/sitemap.xml
+Sitemap: https://ekkostudio.app/sitemap.xml
