@@ -67,6 +67,8 @@ export const handler: Handler = async (event) => {
       .from('membresias')
       .select('stripe_subscription_id, stripe_customer_id')
       .eq('usuario_id', socio.id)
+      .in('status', ['trialing', 'activa', 'past_due'])
+      .not('stripe_subscription_id', 'is', null)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();

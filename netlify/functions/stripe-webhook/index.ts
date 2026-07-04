@@ -164,10 +164,22 @@ export const handler: Handler = async (event) => {
         await cancelarSubsAnteriores(stripe, subsPrevias, acctOpt);
       }
     } else if (accion.kind === 'sync') {
+      // M5: las renovaciones (invoice.paid) llegan sin periodo_fin → leerlo de la
+      // suscripción para EXTENDER la vigencia (si no, el perfil queda con la fecha
+      // vieja aunque el cobro mensual haya entrado).
+      let periodoFin = accion.periodo_fin;
+      if (!periodoFin && accion.subscription_id) {
+        try {
+          const sub = await stripe.subscriptions.retrieve(accion.subscription_id, acctOpt);
+          periodoFin = periodoFinFromSubscription(sub);
+        } catch (e) {
+          console.error('[stripe-webhook] periodo_fin de la sub', accion.subscription_id, e instanceof Error ? e.message : e);
+        }
+      }
       const { error } = await admin.rpc('sync_membresia_stripe', {
         p_stripe_subscription_id: accion.subscription_id,
         p_estado: accion.estado,
-        p_periodo_fin: accion.periodo_fin,
+        p_periodo_fin: periodoFin,
         p_cancel_at_period_end: accion.cancel_at_period_end,
         p_event_at: accion.event_at
       });
