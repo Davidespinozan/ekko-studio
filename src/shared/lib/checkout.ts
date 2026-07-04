@@ -66,6 +66,8 @@ export interface PagoIntentResult {
   account?: string;
   modo?: 'suscripcion' | 'pago';
   reason?: string;
+  /** CustomerSession: hace que el PaymentElement muestre la tarjeta guardada. */
+  customerSessionClientSecret?: string | null;
 }
 
 export function crearPagoIntent(tierSlug: string): Promise<PagoIntentResult> {

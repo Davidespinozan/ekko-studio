@@ -45,6 +45,7 @@ interface Props {
 
 export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose, onPagado }: Props) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [customerSessionSecret, setCustomerSessionSecret] = useState<string | null>(null);
   const [account, setAccount] = useState<string | null>(null);
   const [estado, setEstado] = useState<'cargando' | 'listo' | 'pendiente' | 'error'>('cargando');
   const [msg, setMsg] = useState('');
@@ -62,6 +63,7 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose,
       .then((res) => {
         if (res.clientSecret && res.account) {
           setClientSecret(res.clientSecret);
+          setCustomerSessionSecret(res.customerSessionClientSecret ?? null);
           setAccount(res.account);
           setEstado('listo');
         } else if (res.reason === 'cobros_no_activos') {
@@ -114,7 +116,14 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose,
           </p>
         )}
         {estado === 'listo' && clientSecret && stripePromise && (
-          <Elements stripe={stripePromise} options={{ clientSecret, appearance }}>
+          <Elements
+            stripe={stripePromise}
+            options={{
+              clientSecret,
+              appearance,
+              ...(customerSessionSecret ? { customerSessionClientSecret: customerSessionSecret } : {})
+            }}
+          >
             <CheckoutForm onPagado={onPagado} />
           </Elements>
         )}

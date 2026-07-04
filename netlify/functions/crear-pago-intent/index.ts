@@ -92,6 +92,36 @@ export const handler: Handler = async (event) => {
       accountId
     );
 
+    // CustomerSession → el <PaymentElement> muestra la tarjeta guardada para
+    // pagar de un tap (recompra sin re-teclear). El filtro incluye 'unspecified'
+    // porque las tarjetas guardadas por la suscripción quedan con ese
+    // allow_redisplay y si no, no se listarían.
+    let customerSessionClientSecret: string | null = null;
+    try {
+      const cs = await stripe.customerSessions.create(
+        {
+          customer: customerId,
+          components: {
+            payment_element: {
+              enabled: true,
+              features: {
+                payment_method_redisplay: 'enabled',
+                payment_method_allow_redisplay_filters: ['always', 'limited', 'unspecified'],
+                payment_method_save: 'enabled',
+                payment_method_save_usage: 'off_session',
+                payment_method_remove: 'enabled'
+              }
+            }
+          }
+        },
+        opt
+      );
+      customerSessionClientSecret = cs.client_secret;
+    } catch (e) {
+      // Si falla, seguimos sin tarjeta guardada (formulario normal).
+      console.error('[crear-pago-intent] customerSession', e instanceof Error ? e.message : e);
+    }
+
     const currency = (tier.moneda || 'mxn').toLowerCase();
     const metadata = { app: 'ekko', usuario_id: socio.id, tier_id: tier.id };
     const esPaquete = tier.tipo === 'creditos' || tier.tipo === 'hibrido';
@@ -107,7 +137,7 @@ export const handler: Handler = async (event) => {
         },
         opt
       );
-      return ok({ clientSecret: intent.client_secret, account: accountId, modo: 'pago' });
+      return ok({ clientSecret: intent.client_secret, account: accountId, modo: 'pago', customerSessionClientSecret });
     }
 
     // Mensual: el precio recurrente debe existir EN la cuenta conectada.
@@ -142,7 +172,7 @@ export const handler: Handler = async (event) => {
     if (!clientSecret) return serverError('No se pudo iniciar el cobro de la suscripción');
 
     void optionalEnv; // (reservado para fee futuro)
-    return ok({ clientSecret, account: accountId, modo: 'suscripcion', subscriptionId: sub.id });
+    return ok({ clientSecret, account: accountId, modo: 'suscripcion', subscriptionId: sub.id, customerSessionClientSecret });
   } catch (err) {
     console.error('[crear-pago-intent]', err);
     return serverError(err instanceof Error ? err.message : 'Error inesperado');
