@@ -225,6 +225,17 @@ export const handler: Handler = async (event) => {
       const { data: pub } = supabaseAdmin.storage.from('avatars').getPublicUrl(path);
       patch.avatar_url = pub.publicUrl;
       cambios.push('foto');
+      // La foto es parte del gate de check-in (identidad_completa = foto + datos +
+      // INE). Se recalcula aquí para no dejar bloqueado a un miembro con ficha ya
+      // completa cuya foto se subió por este endpoint (antes solo lo recalculaba
+      // reception-datos-identidad, así que el orden de captura importaba).
+      const { data: dp } = await supabaseAdmin
+        .from('usuarios_datos_privados')
+        .select('fecha_nacimiento, domicilio, ine_foto_path')
+        .eq('usuario_id', target.id)
+        .maybeSingle();
+      patch.identidad_completa =
+        !!pub.publicUrl && !!dp?.fecha_nacimiento && !!dp?.domicilio && !!dp?.ine_foto_path;
       auditEntries.push({
         ...baseAudit,
         accion: 'avatar_change',
