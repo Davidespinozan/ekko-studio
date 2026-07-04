@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ArrowRight, Check, X, CalendarCheck, Clapperboard, FolderDown, ImageIcon } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
@@ -99,6 +99,12 @@ function formatearPesos(centavos: number): string {
 export default function Landing() {
   const [estudioAbierto, setEstudioAbierto] = useState<EstudioInfo | null>(null);
   const [tipoPlanVista, setTipoPlanVista] = useState<'membresias' | 'paquetes'>('membresias');
+  const estudiosRef = useRef<HTMLDivElement>(null);
+  const scrollEstudios = (dir: number) => {
+    const el = estudiosRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.8, 480), behavior: 'smooth' });
+  };
   const { estudios, isLoading: estudiosLoading } = useEstudiosPublicos();
   const { tiers, isLoading: tiersLoading } = useTiersPublicos();
   const { hero, cta_final, whatsappUrl, membresias, estudios: estudiosCopy, como_funciona, faq, estudio_modal } =
@@ -334,7 +340,8 @@ export default function Landing() {
             ))}
           </div>
         ) : (
-          <div className="ek-estudio-grid">
+          <div className="ek-estudio-scroller">
+          <div className="ek-estudio-grid" ref={estudiosRef}>
             {estudiosInfo.map((s) => (
               <button
                 key={s.slug}
@@ -395,6 +402,13 @@ export default function Landing() {
                 </div>
               </button>
             ))}
+          </div>
+          {estudiosInfo.length > 1 && (
+            <>
+              <button type="button" className="ek-estudio-nav ek-estudio-nav--prev" onClick={() => scrollEstudios(-1)} aria-label="Ver estudio anterior">‹</button>
+              <button type="button" className="ek-estudio-nav ek-estudio-nav--next" onClick={() => scrollEstudios(1)} aria-label="Ver siguiente estudio">›</button>
+            </>
+          )}
           </div>
         )}
       </section>

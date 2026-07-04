@@ -2616,13 +2616,22 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
    columnas horizontales más densas. "Menos es más".
    ============================================================================ */
 
-/* --- Estudios --- */
+/* --- Estudios: carrusel horizontal con snap (fotos grandes, protagonistas) --- */
+.ek-estudio-scroller { position: relative; }
 .ek-estudio-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  display: flex;
   gap: 20px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;              /* Firefox: sin barra */
 }
+.ek-estudio-grid::-webkit-scrollbar { display: none; }  /* WebKit: sin barra */
 .ek-estudio-card {
+  flex: 0 0 auto;
+  width: clamp(300px, 38vw, 460px);   /* grandes; deja asomar la siguiente */
+  scroll-snap-align: start;
   padding: 0;
   overflow: hidden;
   cursor: pointer;
@@ -2639,6 +2648,31 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   transform: translateY(-2px);
   box-shadow: 0 14px 30px rgba(229, 184, 41, 0.16);
 }
+/* Flechas de navegación (desktop; en móvil se usa swipe) */
+.ek-estudio-nav {
+  position: absolute;
+  top: 34%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 0.5px solid var(--ek-line);
+  background: rgba(10, 10, 10, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--ek-ink);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ek-estudio-nav:hover { background: var(--ek-mustard); color: var(--ek-bg); }
+.ek-estudio-nav--prev { left: 4px; }
+.ek-estudio-nav--next { right: 4px; }
 .ek-estudio-media {
   position: relative;
   overflow: hidden;
@@ -2654,10 +2688,10 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 }
 .ek-estudio-detalle { display: inline-flex; }
 
-@media (max-width: 600px) {
-  /* En móvil los estudios son los protagonistas: card vertical con foto grande,
-     no una fila compacta con thumbnail. */
-  .ek-estudio-grid { grid-template-columns: 1fr; gap: 16px; }
+@media (max-width: 700px) {
+  /* Móvil: swipe (sin flechas), tarjeta casi a lo ancho con peek de la siguiente. */
+  .ek-estudio-nav { display: none; }
+  .ek-estudio-card { width: 82vw; }
   .ek-estudio-media { aspect-ratio: 4 / 3; }
   .ek-estudio-body { padding: 18px 20px; }
   .ek-estudio-title { font-size: 22px !important; }
