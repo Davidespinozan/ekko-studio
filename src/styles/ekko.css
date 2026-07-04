@@ -2707,7 +2707,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   gap: 20px;
   justify-content: center;
 }
-.ek-pricing-card { padding: 32px; border-radius: var(--ek-r-landing); }
+.ek-pricing-card { padding: 32px; border-radius: var(--ek-r-landing); text-align: left; }
 .ek-pricing-price { font-size: 48px; }
 
 /* Toggle Membresías · Paquetes (elección explícita de tipo de plan) */

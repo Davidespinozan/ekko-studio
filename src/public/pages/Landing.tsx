@@ -418,7 +418,7 @@ export default function Landing() {
           MEMBRESÍAS
           ============================================================ */}
       <Reveal>
-      <section id="membresias" style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
+      <section id="membresias" style={{ padding: 'clamp(40px, 7vw, 64px) 0', textAlign: 'center' }}>
         {membresias.eyebrow && (
           <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>{membresias.eyebrow}</p>
         )}
