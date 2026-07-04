@@ -63,6 +63,7 @@ export default function Signup() {
 
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
+  const [emailConfirm, setEmailConfirm] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [acepto, setAcepto] = useState(false);
@@ -110,6 +111,10 @@ export default function Signup() {
     }
     if (!EMAIL_REGEX.test(emailNorm)) {
       setError('Ingresa un email válido.');
+      return;
+    }
+    if (emailNorm !== emailConfirm.trim().toLowerCase()) {
+      setError('Los emails no coinciden. Verifica que estén iguales.');
       return;
     }
     if (password.length < 8) {
@@ -270,6 +275,22 @@ export default function Signup() {
             disabled={isProcessing}
             autoComplete="email"
           />
+        </div>
+
+        <div className="ek-form-field">
+          <label className="ek-label" htmlFor="signup-email-confirm">Confirmar email</label>
+          <input
+            id="signup-email-confirm"
+            type="email"
+            className="ek-input"
+            value={emailConfirm}
+            onChange={(e) => setEmailConfirm(e.target.value)}
+            onPaste={(e) => e.preventDefault()}
+            required
+            disabled={isProcessing}
+            autoComplete="off"
+          />
+          <p className="ek-helper-text">Escríbelo de nuevo para confirmar (aquí llegan tus accesos y comprobantes).</p>
         </div>
 
         <div className="ek-form-field">
