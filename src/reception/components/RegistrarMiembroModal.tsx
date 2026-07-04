@@ -32,6 +32,7 @@ interface MiembroCreado {
   email: string;
   password: string;
   plan: string;
+  planNombre: string;
   /** true si se activó la membresía en el mismo registro (cobro en caja). */
   activada: boolean;
 }
@@ -145,7 +146,14 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
         }
       }
 
-      setCreado({ nombre: nombreNorm, email: emailNorm, password, plan: tier, activada });
+      setCreado({
+        nombre: nombreNorm,
+        email: emailNorm,
+        password,
+        plan: tier,
+        planNombre: planes.find((p) => p.slug === tier)?.nombre ?? tier,
+        activada
+      });
     } catch (err) {
       toast.error(traducirErrorRegistro(err instanceof Error ? err.message : ''));
       setSubmitting(false);
@@ -395,10 +403,10 @@ function CredencialesView({
           marginBottom: '8px'
         }}
       >
-        Entregá estas credenciales a {creado.nombre}
+        Entrega estas credenciales a {creado.nombre}
       </h3>
       <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '16px' }}>
-        Compartilas verbalmente o por WhatsApp. El cliente las usa para entrar a EKKO.
+        Compártelas verbalmente o por WhatsApp. El cliente las usa para entrar a EKKO.
       </p>
 
       <div
@@ -445,7 +453,7 @@ function CredencialesView({
         >
           <CheckCircle2 size={16} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
           <span>
-            Membresía <strong>{creado.plan === 'pro' ? 'Pro' : 'Básica'}</strong> activa — ya puede reservar.
+            Membresía <strong>{creado.planNombre}</strong> activa — ya puede reservar.
           </span>
         </div>
       ) : (

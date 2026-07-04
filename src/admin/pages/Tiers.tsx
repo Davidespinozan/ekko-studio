@@ -33,6 +33,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import CardMenuDropdown from '../components/CardMenuDropdown';
 import type { Database } from '@shared/types/database';
 import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
+import { esTierRecomendado } from '@shared/lib/planPresentacion';
 
 type Tier = Database['public']['Tables']['tiers']['Row'];
 
@@ -348,7 +349,9 @@ function TierRow({
   duplicating: boolean;
 }) {
   const memberCount = useMemberCount(t, tenantId);
-  const esPro = t.slug === 'pro';
+  // Destacado (dorado + estrella "RECOMENDADO") por el flag reglas.recomendado,
+  // no por un slug fijo (antes 'pro', ya inactivo → nunca se destacaba Premium).
+  const esPro = esTierRecomendado(t.reglas as Record<string, unknown> | null);
   const beneficios = parseBeneficios(t.beneficios);
   const compromiso = ((t.reglas as Record<string, unknown> | null)?.commitment_meses ?? null) as number | null;
 

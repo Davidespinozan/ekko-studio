@@ -53,7 +53,8 @@ const RESERVA = {
   slot_fin: PASADO,
   folio: 'EKK-000001'
 };
-const MIEMBRO = { id: 'm1', no_shows_count: 1, bloqueado_hasta: null };
+// no_shows_count: 2 → esta falta es la 3ª, que alcanza el umbral y bloquea.
+const MIEMBRO = { id: 'm1', no_shows_count: 2, bloqueado_hasta: null };
 
 function seq(...vals: unknown[]) {
   vals.forEach((v) => mockMaybeSingle.mockResolvedValueOnce({ data: v, error: null }));
@@ -71,7 +72,7 @@ describe('reception-marcar-no-show (Bloque D)', () => {
     mockUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
   });
 
-  it('reserva válida + motivo → marca no_show, penaliza y audita', async () => {
+  it('3ª falta → marca no_show, penaliza (bloquea) y audita', async () => {
     seq(CALLER, RESERVA, MIEMBRO);
     const res = await invocar(evento({ reserva_id: 'r1', motivo: 'Cliente no se presentó' }));
     expect(res.statusCode).toBe(200);
@@ -79,7 +80,7 @@ describe('reception-marcar-no-show (Bloque D)', () => {
     // 1ª update = reserva → no_show; 2ª = usuario → contador+bloqueo.
     expect((mockUpdate.mock.calls[0][0] as Record<string, unknown>).status).toBe('no_show');
     const upUser = mockUpdate.mock.calls[1][0] as Record<string, unknown>;
-    expect(upUser.no_shows_count).toBe(2); // 1 + 1
+    expect(upUser.no_shows_count).toBe(3); // 2 + 1 → alcanza el umbral
     expect(upUser.bloqueado_hasta).toBeTruthy();
 
     const audit = mockAuditInsert.mock.calls[0][0] as Record<string, unknown>;
@@ -88,6 +89,15 @@ describe('reception-marcar-no-show (Bloque D)', () => {
     expect(audit.target_id).toBe('m1');
     expect(audit.motivo).toBe('Cliente no se presentó');
     expect((audit.metadata as Record<string, unknown>).reserva_id).toBe('r1');
+  });
+
+  it('1ª/2ª falta → marca no_show y cuenta, pero NO bloquea (bajo umbral)', async () => {
+    seq(CALLER, RESERVA, { id: 'm1', no_shows_count: 0, bloqueado_hasta: null });
+    const res = await invocar(evento({ reserva_id: 'r1', motivo: 'Cliente no se presentó' }));
+    expect(res.statusCode).toBe(200);
+    const upUser = mockUpdate.mock.calls[1][0] as Record<string, unknown>;
+    expect(upUser.no_shows_count).toBe(1); // 0 + 1
+    expect(upUser.bloqueado_hasta).toBeFalsy(); // aún no llega a 3 → sin bloqueo
   });
 
   it('sin motivo → 400, sin update ni audit', async () => {

@@ -12,6 +12,16 @@ const mockUpsertSelect = vi.fn();
 const mockRpc = vi.fn();
 const mockDeleteEq = vi.fn().mockResolvedValue({ error: null });
 
+// Cadena de query encadenable + thenable (para .select().eq().in().not()… y
+// .maybeSingle()). Por defecto resuelve data vacía (sin subs previas ni emails).
+function makeChain(): Record<string, unknown> {
+  const c: Record<string, unknown> = {};
+  for (const m of ['select', 'eq', 'in', 'not', 'order', 'limit', 'gte']) c[m] = () => c;
+  c.maybeSingle = () => Promise.resolve({ data: null, error: null });
+  c.then = (cb: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(cb);
+  return c;
+}
+
 vi.mock('../../netlify/functions/_lib/stripe', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../netlify/functions/_lib/stripe')>()),
   getStripe: () => ({
@@ -25,7 +35,8 @@ vi.mock('@supabase/supabase-js', () => ({
     rpc: mockRpc,
     from: vi.fn(() => ({
       upsert: vi.fn(() => ({ select: mockUpsertSelect })),
-      delete: vi.fn(() => ({ eq: mockDeleteEq }))
+      delete: vi.fn(() => ({ eq: mockDeleteEq })),
+      select: vi.fn(() => makeChain())
     }))
   }))
 }));
