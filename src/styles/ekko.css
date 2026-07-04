@@ -542,6 +542,11 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 
   .ek-input {
     width: 100%;
+    /* box-sizing + min-width:0 evitan que inputs (sobre todo type=date en iOS,
+       con ancho intrínseco fijo) desborden su columna en móvil. */
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
     background: rgba(255, 255, 255, 0.03);
     color: var(--ek-ink);
     border: 0.5px solid var(--ek-line);
@@ -591,6 +596,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-width: 0;   /* permite encoger dentro de grid/flex (no desbordar en móvil) */
   }
 
   /* ============================================================================

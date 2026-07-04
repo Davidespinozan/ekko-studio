@@ -23,7 +23,12 @@ export function FilaReserva({
       style={{
         display: 'flex',
         alignItems: 'center',
+        // wrap + rowGap: en móvil, si el badge largo ("CANCELADA POR EL MIEMBRO")
+        // o las acciones no caben, bajan a otra línea en vez de desbordar la
+        // pantalla (lo que empujaba toda la página hacia la derecha).
+        flexWrap: 'wrap',
         gap: '10px',
+        rowGap: '6px',
         padding: '10px 14px',
         background: 'var(--ek-bg-soft)',
         border: '0.5px solid var(--ek-line)',
