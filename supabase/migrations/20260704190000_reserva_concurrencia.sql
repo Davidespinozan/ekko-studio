@@ -19,6 +19,25 @@
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 ALTER TABLE reservas DROP CONSTRAINT IF EXISTS reservas_no_overlap;
+
+-- Limpieza previa: si ya hay reservas solapadas (data creada por el bug que este
+-- constraint viene a cerrar), el ADD CONSTRAINT fallaría. Se conserva la reserva
+-- MÁS ANTIGUA de cada solape y se cancela la(s) posterior(es) del mismo estudio,
+-- para poder crear la red dura. (Pre-launch: son reservas de prueba.)
+UPDATE reservas r
+SET status = 'cancelada_admin',
+    cancelada_at = now(),
+    cancelada_motivo = 'Solape resuelto por el sistema (data previa al constraint anti-doble-reserva)'
+WHERE r.status IN ('confirmada', 'completada')
+  AND EXISTS (
+    SELECT 1 FROM reservas o
+    WHERE o.recurso_id = r.recurso_id
+      AND o.id <> r.id
+      AND o.status IN ('confirmada', 'completada')
+      AND tstzrange(o.slot_inicio, o.slot_fin) && tstzrange(r.slot_inicio, r.slot_fin)
+      AND (o.created_at < r.created_at OR (o.created_at = r.created_at AND o.id < r.id))
+  );
+
 ALTER TABLE reservas ADD CONSTRAINT reservas_no_overlap
   EXCLUDE USING gist (
     recurso_id WITH =,
