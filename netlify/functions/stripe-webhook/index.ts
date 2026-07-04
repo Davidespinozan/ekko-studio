@@ -121,12 +121,6 @@ export const handler: Handler = async (event) => {
     // usuario del pago (para payment_events): se captura en cada rama donde ya
     // lo conocemos; en renovaciones (sync) se resuelve por la suscripción.
     let usuarioIdPago: string | null = null;
-    // DEBUG temporal para diagnosticar la activación en live.
-    const debug: Record<string, unknown> = {
-      type: stripeEvent.type,
-      kind: accion.kind,
-      reason: (accion as { reason?: string }).reason
-    };
 
     if (accion.kind === 'activar') {
       // Mensual: leer la suscripción para el periodo_fin. Paquete (pago único):
@@ -154,7 +148,6 @@ export const handler: Handler = async (event) => {
       const usuarioId = sub.metadata?.usuario_id;
       const tierId = sub.metadata?.tier_id;
       const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
-      debug.subMeta = { usuarioId: usuarioId ?? null, tierId: tierId ?? null, customerId: customerId ?? null };
       if (usuarioId && tierId && customerId) {
         const subsPrevias = await subsAnterioresDelSocio(admin, usuarioId, accion.subscription_id);
         const { error } = await admin.rpc('activar_membresia', {
@@ -273,7 +266,7 @@ export const handler: Handler = async (event) => {
       }
     }
 
-    return ok({ received: true, debug: { ...debug, activated: usuarioIdPago } });
+    return ok({ received: true });
   } catch (err) {
     // Borrar el registro de idempotencia para que Stripe reintente y reprocese.
     await admin.from('stripe_webhook_events').delete().eq('id', stripeEvent.id);
