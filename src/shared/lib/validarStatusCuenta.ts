@@ -43,10 +43,11 @@ export function validarStatusCuenta(perfil: PerfilStatus): ResultadoValidacion {
       };
 
     case 'cancelado':
-      return {
-        permitido: false,
-        mensaje: 'Tu cuenta fue cancelada. Contacta al estudio si quieres reactivarla.'
-      };
+      // Su membresía terminó (canceló su suscripción). SÍ puede entrar para
+      // RECOMPRAR self-serve ("Ver planes"); no puede reservar hasta reactivar
+      // (el RPC de reserva exige status='activo'). Para bloquear de verdad a
+      // alguien, el admin usa 'suspendido'/'revocado'.
+      return { permitido: true };
 
     case 'pendiente_onboarding':
       return {

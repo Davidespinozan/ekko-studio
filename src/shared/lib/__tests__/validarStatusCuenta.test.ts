@@ -20,10 +20,9 @@ describe('validarStatusCuenta', () => {
     expect(r.mensaje).toMatch(/revocad/i);
   });
 
-  it('cancelado → bloqueado con mensaje', () => {
+  it('cancelado → permitido (puede entrar a recomprar self-serve)', () => {
     const r = validarStatusCuenta({ status: 'cancelado' });
-    expect(r.permitido).toBe(false);
-    expect(r.mensaje).toMatch(/cancelada/i);
+    expect(r.permitido).toBe(true);
   });
 
   it('pendiente_onboarding → bloqueado con mensaje', () => {
