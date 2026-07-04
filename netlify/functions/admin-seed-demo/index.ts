@@ -26,13 +26,13 @@ const DEMO_PASSWORD = 'DemoEkko2026';
 interface DemoDef {
   email: string;
   nombre: string;
-  rol: 'miembro' | 'recepcionista' | 'staff';
+  rol: 'miembro' | 'recepcionista';
 }
 
+// Roles reales: admin (el dueño), recepcionista y miembro. No hay 'staff'.
 const DEMOS: DemoDef[] = [
   { email: 'demo-miembro@ekkostudio.app', nombre: 'Demo Miembro', rol: 'miembro' },
-  { email: 'demo-recepcion@ekkostudio.app', nombre: 'Demo Recepción', rol: 'recepcionista' },
-  { email: 'demo-staff@ekkostudio.app', nombre: 'Demo Staff', rol: 'staff' }
+  { email: 'demo-recepcion@ekkostudio.app', nombre: 'Demo Recepción', rol: 'recepcionista' }
 ];
 
 export const handler: Handler = async (event) => {
@@ -65,6 +65,23 @@ export const handler: Handler = async (event) => {
     const tenantId = admin.tenant_id;
 
     const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+
+    // Limpieza: el rol 'staff' ya no existe. Si una corrida previa dejó un
+    // demo-staff a medias, se elimina (best-effort).
+    try {
+      const { data: staffViejo } = await db
+        .from('usuarios')
+        .select('auth_id')
+        .eq('email', 'demo-staff@ekkostudio.app')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      if (staffViejo?.auth_id) {
+        await db.from('usuarios').delete().eq('auth_id', staffViejo.auth_id);
+        await db.auth.admin.deleteUser(staffViejo.auth_id);
+      }
+    } catch (e) {
+      console.error('[admin-seed-demo] limpieza staff', e instanceof Error ? e.message : e);
+    }
 
     // Tier para el miembro demo (esencial; si no, cualquier plan activo).
     const { data: tierEsencial } = await db
