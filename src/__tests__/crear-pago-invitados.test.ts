@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockGetUser = vi.fn();
 const mockSocioMaybe = vi.fn();
 const mockReservaMaybe = vi.fn();
+const mockRecursoMaybe = vi.fn();
 const mockTenantMaybe = vi.fn();
 
 const mockPICreate = vi.fn();
@@ -23,6 +24,9 @@ vi.mock('@supabase/supabase-js', () => ({
       }
       if (table === 'reservas') {
         return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockReservaMaybe })) })) };
+      }
+      if (table === 'recursos') {
+        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockRecursoMaybe })) })) };
       }
       if (table === 'tenants') {
         return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockTenantMaybe })) })) };
@@ -60,7 +64,8 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
   mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-1' } }, error: null });
   mockSocioMaybe.mockResolvedValue({ data: { id: 'u1', tenant_id: 't1', rol: 'miembro', email: 'm@e.com' }, error: null });
-  mockReservaMaybe.mockResolvedValue({ data: { id: 'res_1', tenant_id: 't1', usuario_id: 'u1', status: 'confirmada' }, error: null });
+  mockReservaMaybe.mockResolvedValue({ data: { id: 'res_1', tenant_id: 't1', usuario_id: 'u1', status: 'confirmada', recurso_id: 'rec_1', invitados_extra_pagados: 0 }, error: null });
+  mockRecursoMaybe.mockResolvedValue({ data: { max_invitados_extra: 4 }, error: null });
   mockTenantMaybe.mockResolvedValue({ data: { config: { reserva: { precio_invitado_extra_centavos: 10000 } } }, error: null });
   mockCustomerSessionCreate.mockResolvedValue({ client_secret: 'cs_secret' });
   mockPICreate.mockResolvedValue({ client_secret: 'pi_secret' });
@@ -90,6 +95,21 @@ describe('crear-pago-invitados', () => {
   it('no miembro → 400', async () => {
     mockSocioMaybe.mockResolvedValue({ data: { id: 'u1', tenant_id: 't1', rol: 'recepcionista', email: null }, error: null });
     const res = await invocar({ reserva_id: 'res_1', cantidad: 2 });
+    expect(res.statusCode).toBe(400);
+    expect(mockPICreate).not.toHaveBeenCalled();
+  });
+
+  it('excede el tope del estudio (ya pagados + cantidad > max) → 400', async () => {
+    mockRecursoMaybe.mockResolvedValue({ data: { max_invitados_extra: 4 }, error: null });
+    mockReservaMaybe.mockResolvedValue({ data: { id: 'res_1', tenant_id: 't1', usuario_id: 'u1', status: 'confirmada', recurso_id: 'rec_1', invitados_extra_pagados: 3 }, error: null });
+    const res = await invocar({ reserva_id: 'res_1', cantidad: 2 }); // 3 + 2 > 4
+    expect(res.statusCode).toBe(400);
+    expect(mockPICreate).not.toHaveBeenCalled();
+  });
+
+  it('estudio no admite extras (max 0) → 400', async () => {
+    mockRecursoMaybe.mockResolvedValue({ data: { max_invitados_extra: 0 }, error: null });
+    const res = await invocar({ reserva_id: 'res_1', cantidad: 1 });
     expect(res.statusCode).toBe(400);
     expect(mockPICreate).not.toHaveBeenCalled();
   });

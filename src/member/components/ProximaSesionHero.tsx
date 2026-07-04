@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarClock, CalendarPlus } from 'lucide-react';
+import { ArrowRight, CalendarClock, CalendarPlus, UserPlus } from 'lucide-react';
 import { BotonCancelarReserva } from '@member/components/BotonCancelarReserva';
+import { PagarInvitadosExtra } from '@member/components/PagarInvitadosExtra';
+import { useTenant } from '@shared/hooks/useTenant';
 
 // ============================================================================
 // ProximaSesionHero — hero SIEMPRE visible en el inicio del miembro (es lo que
@@ -18,7 +21,8 @@ interface ReservaHero {
   id: string;
   slot_inicio: string;
   folio: string;
-  recurso: { nombre: string | null } | null;
+  invitados_extra_pagados?: number | null;
+  recurso: { nombre: string | null; max_invitados_extra?: number | null } | null;
 }
 
 interface Props {
@@ -34,7 +38,13 @@ function formatearFecha(iso: string): string {
 }
 
 export function ProximaSesionHero({ reserva, onCancelada }: Props) {
+  const tenant = useTenant();
   const nombre = reserva?.recurso?.nombre ?? 'Estudio';
+  const [invitadosOpen, setInvitadosOpen] = useState(false);
+
+  const precioExtraCentavos = Number((tenant.config as Record<string, any>)?.reserva?.precio_invitado_extra_centavos) || 0;
+  const restanteExtra = (reserva?.recurso?.max_invitados_extra ?? 0) - (reserva?.invitados_extra_pagados ?? 0);
+  const puedeExtras = !!reserva && precioExtraCentavos > 0 && restanteExtra > 0;
 
   return (
     <div className="ek-hero-foto ek-lift" style={{ marginBottom: '24px', background: 'var(--ek-bg-elevated)' }}>
@@ -55,6 +65,15 @@ export function ProximaSesionHero({ reserva, onCancelada }: Props) {
                 reserva={{ id: reserva.id, slot_inicio: reserva.slot_inicio, folio: reserva.folio, recurso_nombre: nombre }}
                 onCancelada={onCancelada}
               />
+              {puedeExtras && (
+                <button
+                  type="button"
+                  onClick={() => setInvitadosOpen(true)}
+                  className="ek-cta ek-cta--secondary"
+                >
+                  <UserPlus size={15} aria-hidden="true" /> Invitados extra
+                </button>
+              )}
             </div>
           </>
         ) : (
@@ -70,6 +89,16 @@ export function ProximaSesionHero({ reserva, onCancelada }: Props) {
           </>
         )}
       </div>
+
+      {invitadosOpen && reserva && (
+        <PagarInvitadosExtra
+          reservaId={reserva.id}
+          precioExtraCentavos={precioExtraCentavos}
+          maxCantidad={restanteExtra}
+          onClose={() => setInvitadosOpen(false)}
+          onPagado={() => setInvitadosOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -14,7 +14,7 @@ type Recurso = Database['public']['Tables']['recursos']['Row'];
 type Reserva = Database['public']['Tables']['reservas']['Row'];
 
 interface ReservaConRecurso extends Reserva {
-  recurso: Pick<Recurso, 'id' | 'slug' | 'nombre' | 'foto_url'> | null;
+  recurso: Pick<Recurso, 'id' | 'slug' | 'nombre' | 'foto_url' | 'max_invitados_extra'> | null;
 }
 
 // ============================================================================
@@ -38,7 +38,7 @@ export function useProximasReservas(usuarioId: string | undefined) {
     setError(false);
     const { data, error: queryError } = await supabase
       .from('reservas')
-      .select('*, recurso:recursos(id, nombre, slug, foto_url)')
+      .select('*, recurso:recursos(id, nombre, slug, foto_url, max_invitados_extra)')
       .eq('usuario_id', usuarioId)
       .eq('status', 'confirmada')
       .gte('slot_inicio', new Date().toISOString())

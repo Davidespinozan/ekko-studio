@@ -441,6 +441,7 @@ export type Database = {
           fuera_de_servicio_motivo: string | null
           horarios: Json
           id: string
+          max_invitados_extra: number
           nombre: string
           orden: number
           slug: string
@@ -466,6 +467,7 @@ export type Database = {
           fuera_de_servicio_motivo?: string | null
           horarios?: Json
           id?: string
+          max_invitados_extra?: number
           nombre: string
           orden?: number
           slug: string
@@ -491,6 +493,7 @@ export type Database = {
           fuera_de_servicio_motivo?: string | null
           horarios?: Json
           id?: string
+          max_invitados_extra?: number
           nombre?: string
           orden?: number
           slug?: string
@@ -525,6 +528,7 @@ export type Database = {
           folio: string
           id: string
           invitados_count: number
+          invitados_extra_pagados: number
           notas: string | null
           observaciones: string | null
           qr_token_hash: string | null
@@ -550,6 +554,7 @@ export type Database = {
           folio: string
           id?: string
           invitados_count?: number
+          invitados_extra_pagados?: number
           notas?: string | null
           observaciones?: string | null
           qr_token_hash?: string | null
@@ -575,6 +580,7 @@ export type Database = {
           folio?: string
           id?: string
           invitados_count?: number
+          invitados_extra_pagados?: number
           notas?: string | null
           observaciones?: string | null
           qr_token_hash?: string | null

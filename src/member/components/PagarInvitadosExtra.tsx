@@ -12,14 +12,15 @@ import { useToast } from '@shared/hooks/useToast';
 interface Props {
   reservaId: string;
   precioExtraCentavos: number;
+  /** Cuántos más puede pagar (tope del estudio − ya pagados). */
+  maxCantidad: number;
   onClose: () => void;
   onPagado: () => void;
 }
 
-const MAX_EXTRA = 10;
-
-export function PagarInvitadosExtra({ reservaId, precioExtraCentavos, onClose, onPagado }: Props) {
+export function PagarInvitadosExtra({ reservaId, precioExtraCentavos, maxCantidad, onClose, onPagado }: Props) {
   const toast = useToast();
+  const tope = Math.max(1, maxCantidad);
   const [cantidad, setCantidad] = useState(1);
   const [pagando, setPagando] = useState(false);
   const precioPesos = Math.round(precioExtraCentavos / 100);
@@ -65,8 +66,8 @@ export function PagarInvitadosExtra({ reservaId, precioExtraCentavos, onClose, o
           <span style={{ fontSize: '1.6rem', fontWeight: 700, minWidth: '48px', textAlign: 'center' }}>{cantidad}</span>
           <button
             type="button"
-            onClick={() => setCantidad(Math.min(MAX_EXTRA, cantidad + 1))}
-            disabled={cantidad === MAX_EXTRA}
+            onClick={() => setCantidad(Math.min(tope, cantidad + 1))}
+            disabled={cantidad >= tope}
             className="ek-cta ek-cta--secondary"
             style={{ minHeight: '44px', minWidth: '44px', padding: '0 0.75rem' }}
           >

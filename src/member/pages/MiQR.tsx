@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Loader2, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Loader2, RefreshCw, ArrowLeft, UserPlus } from 'lucide-react';
 import QRCodeStyling from 'qr-code-styling';
 import { supabase } from '@shared/lib/supabase';
 import { backendPost } from '@shared/lib/backend';
+import { useTenant } from '@shared/hooks/useTenant';
 import { formatHora } from '@member/logic/reservaLogic';
+import { PagarInvitadosExtra } from '@member/components/PagarInvitadosExtra';
 
 interface IssueResponse {
   qr_payload: string;
@@ -122,10 +124,12 @@ function QRError({ mensaje, onReintentar }: { mensaje: string; onReintentar: () 
 
 export default function MiQR() {
   const { reservaId } = useParams<{ reservaId: string }>();
+  const tenant = useTenant();
   const qrContainerRef = useRef<HTMLDivElement>(null);
   const qrInstance = useRef<QRCodeStyling | null>(null);
 
   const [reserva, setReserva] = useState<any>(null);
+  const [invitadosOpen, setInvitadosOpen] = useState(false);
   const [qrPayload, setQrPayload] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -147,7 +151,7 @@ export default function MiQR() {
       try {
         const { data: r } = await supabase
           .from('reservas')
-          .select('*, recurso:recursos(id, slug, nombre)')
+          .select('*, recurso:recursos(id, slug, nombre, max_invitados_extra)')
           .eq('id', reservaId!)
           .maybeSingle();
 
@@ -270,7 +274,34 @@ export default function MiQR() {
             </p>
           </div>
         )}
+
+        {/* Pagar invitados extra de ESTA reserva (Stripe, tarjeta guardada). */}
+        {(() => {
+          if (!reserva || reserva.status !== 'confirmada') return null;
+          const precioExtra = Number((tenant.config as Record<string, any>)?.reserva?.precio_invitado_extra_centavos) || 0;
+          const restante = (reserva.recurso?.max_invitados_extra ?? 0) - (reserva.invitados_extra_pagados ?? 0);
+          if (precioExtra <= 0 || restante <= 0) return null;
+          return (
+            <button
+              type="button"
+              onClick={() => setInvitadosOpen(true)}
+              className="ek-cta ek-cta--secondary ek-cta--full"
+            >
+              <UserPlus size={16} aria-hidden="true" /> Pagar invitados extra
+            </button>
+          );
+        })()}
       </div>
+
+      {invitadosOpen && reserva && (
+        <PagarInvitadosExtra
+          reservaId={reserva.id}
+          precioExtraCentavos={Number((tenant.config as Record<string, any>)?.reserva?.precio_invitado_extra_centavos) || 0}
+          maxCantidad={(reserva.recurso?.max_invitados_extra ?? 0) - (reserva.invitados_extra_pagados ?? 0)}
+          onClose={() => setInvitadosOpen(false)}
+          onPagado={() => { setInvitadosOpen(false); setReserva((prev: any) => prev ? { ...prev, invitados_extra_pagados: (prev.invitados_extra_pagados ?? 0) + 1 } : prev); }}
+        />
+      )}
     </div>
   );
 }

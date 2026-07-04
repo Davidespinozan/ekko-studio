@@ -75,10 +75,12 @@ export default function Reservar() {
 
   // Invitados permitidos: del plan del miembro (Admin → Planes → Máx. invitados).
   const maxInvitados = resumen.tier?.maxInvitados ?? 0;
-  // Precio de invitado extra (config del tenant). >0 habilita el cobro en la app.
+  // Precio de invitado extra (config del tenant) + tope por estudio (admin).
+  // Ambos >0 habilitan el cobro de extras en la app.
   const precioExtraCentavos = Number((tenant.config as Record<string, any>)?.reserva?.precio_invitado_extra_centavos) || 0;
   const precioExtraPesos = Math.round(precioExtraCentavos / 100);
-  const MAX_EXTRA = 10;
+  const maxExtraEstudio = recursoSel?.max_invitados_extra ?? 0;
+  const permiteExtras = precioExtraCentavos > 0 && maxExtraEstudio > 0;
 
   // Motivo por el que NO se puede reservar (null = puede). Ver siempre se permite.
   const saldoInsuficiente =
@@ -427,7 +429,7 @@ export default function Reservar() {
               )}
 
               {/* Invitados EXTRA (de pago): se cobran con Stripe en la app. */}
-              {precioExtraCentavos > 0 && (
+              {permiteExtras && (
                 <div className="ek-form-field" style={{ marginBottom: '1rem' }}>
                   <label className="ek-label">
                     Invitados extra (${precioExtraPesos.toLocaleString('es-MX')} c/u)
@@ -447,8 +449,8 @@ export default function Reservar() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => setInvitadosExtra(Math.min(MAX_EXTRA, invitadosExtra + 1))}
-                      disabled={invitadosExtra === MAX_EXTRA}
+                      onClick={() => setInvitadosExtra(Math.min(maxExtraEstudio, invitadosExtra + 1))}
+                      disabled={invitadosExtra === maxExtraEstudio}
                       className="ek-cta ek-cta--secondary"
                       style={{ minHeight: '44px', minWidth: '44px', padding: '0 0.75rem' }}
                     >

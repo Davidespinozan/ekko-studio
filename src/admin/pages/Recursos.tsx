@@ -581,6 +581,7 @@ function EditarRecursoModal({
     recurso?.capacidad_personas ?? 0
   );
   const [costoCreditos, setCostoCreditos] = useState<number>(recurso?.costo_creditos ?? 1);
+  const [maxInvitadosExtra, setMaxInvitadosExtra] = useState<number>(recurso?.max_invitados_extra ?? 4);
   const [tipoContenido, setTipoContenido] = useState<string[]>(recurso?.tipo_contenido ?? []);
   const [equipoIncluido, setEquipoIncluido] = useState<string[]>(recurso?.equipo_incluido ?? []);
   const [estiloVisual, setEstiloVisual] = useState<string>(recurso?.estilo_visual ?? '');
@@ -624,6 +625,7 @@ function EditarRecursoModal({
         foto_url: fotoUrl || null,
         capacidad_personas: capacidadPersonas || null,
         costo_creditos: Math.max(1, costoCreditos),
+        max_invitados_extra: Math.max(0, maxInvitadosExtra),
         tipo_contenido: tipoContenido,
         equipo_incluido: equipoIncluido,
         estilo_visual: estiloVisual || null
@@ -783,6 +785,23 @@ function EditarRecursoModal({
           <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
             Créditos que descuenta una reserva de este estudio (planes por paquete). Los planes
             mensuales ilimitados no se ven afectados. Default: 1.
+          </p>
+        </div>
+
+        <div className="ek-form-field" style={{ marginTop: '16px' }}>
+          <label className="ek-label">Máx. invitados extra</label>
+          <input
+            type="number"
+            min={0}
+            max={20}
+            value={maxInvitadosExtra}
+            onChange={(e) => setMaxInvitadosExtra(Math.max(0, parseInt(e.target.value) || 0))}
+            className="ek-input"
+            placeholder="4"
+          />
+          <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
+            Cuántos invitados extra (arriba del tope del plan) se pueden pagar en la app por reserva
+            de este estudio. 0 = no admite extras. Requiere fijar el precio en Ajustes.
           </p>
         </div>
 

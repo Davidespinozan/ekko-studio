@@ -63,7 +63,7 @@ export const handler: Handler = async (event) => {
     // La reserva debe ser del miembro y de su tenant.
     const { data: reserva } = await admin
       .from('reservas')
-      .select('id, tenant_id, usuario_id, status')
+      .select('id, tenant_id, usuario_id, status, recurso_id, invitados_extra_pagados')
       .eq('id', body.reserva_id)
       .maybeSingle();
     if (!reserva) return notFound('Reserva no encontrada');
@@ -72,6 +72,20 @@ export const handler: Handler = async (event) => {
     }
     if (reserva.status !== 'confirmada') {
       return badRequest('Solo puedes pagar invitados de una reserva vigente');
+    }
+
+    // Tope de invitados extra del estudio (fuente de verdad). No permitir pasar
+    // de max: ya pagados + esta compra ≤ max_invitados_extra.
+    const { data: recurso } = await admin
+      .from('recursos')
+      .select('max_invitados_extra')
+      .eq('id', reserva.recurso_id)
+      .maybeSingle();
+    const maxExtra = Number(recurso?.max_invitados_extra) || 0;
+    const yaPagados = Number(reserva.invitados_extra_pagados) || 0;
+    if (maxExtra <= 0) return badRequest('Este estudio no admite invitados extra');
+    if (yaPagados + cantidad > maxExtra) {
+      return badRequest(`Este estudio permite máximo ${maxExtra} invitados extra por reserva (ya pagaste ${yaPagados})`);
     }
 
     // Precio por invitado extra (config del tenant).

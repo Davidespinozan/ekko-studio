@@ -24,7 +24,7 @@ type Reserva = Database['public']['Tables']['reservas']['Row'];
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 
 interface ReservaConRecurso extends Reserva {
-  recurso: Pick<Recurso, 'nombre'> | null;
+  recurso: Pick<Recurso, 'nombre' | 'max_invitados_extra'> | null;
 }
 
 type Tab = 'proximas' | 'historial';
@@ -51,14 +51,14 @@ function useMisReservas(usuarioId: string | undefined) {
       const [proxRes, histRes] = await Promise.all([
         supabase
           .from('reservas')
-          .select('*, recurso:recursos(nombre)')
+          .select('*, recurso:recursos(nombre, max_invitados_extra)')
           .eq('usuario_id', usuarioId!)
           .eq('status', 'confirmada')
           .gte('slot_inicio', ahoraIso)
           .order('slot_inicio', { ascending: true }),
         supabase
           .from('reservas')
-          .select('*, recurso:recursos(nombre)')
+          .select('*, recurso:recursos(nombre, max_invitados_extra)')
           .eq('usuario_id', usuarioId!)
           .in('status', ESTADOS_RESERVA_HISTORICOS as unknown as string[])
           .order('slot_inicio', { ascending: false })
@@ -183,7 +183,8 @@ export default function MisReservas() {
                         </div>
                         <ArrowRight size={16} className="ek-quick-action-arrow" aria-hidden="true" />
                       </Link>
-                      {precioExtraCentavos > 0 && (
+                      {precioExtraCentavos > 0 &&
+                        (r.recurso?.max_invitados_extra ?? 0) - (r.invitados_extra_pagados ?? 0) > 0 && (
                         <button
                           type="button"
                           onClick={() => setInvitadosPara(r.id)}
@@ -250,14 +251,19 @@ export default function MisReservas() {
         </div>
       )}
 
-      {invitadosPara && (
-        <PagarInvitadosExtra
-          reservaId={invitadosPara}
-          precioExtraCentavos={precioExtraCentavos}
-          onClose={() => setInvitadosPara(null)}
-          onPagado={() => setInvitadosPara(null)}
-        />
-      )}
+      {invitadosPara && (() => {
+        const r = proximas.find((x) => x.id === invitadosPara);
+        const restante = (r?.recurso?.max_invitados_extra ?? 0) - (r?.invitados_extra_pagados ?? 0);
+        return (
+          <PagarInvitadosExtra
+            reservaId={invitadosPara}
+            precioExtraCentavos={precioExtraCentavos}
+            maxCantidad={restante}
+            onClose={() => setInvitadosPara(null)}
+            onPagado={() => setInvitadosPara(null)}
+          />
+        );
+      })()}
     </div>
   );
 }
