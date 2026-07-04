@@ -241,8 +241,9 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
   }
 
   return (
+    // Solo cierra con el botón ✕: un clic fuera no debe tirar la reserva a medio
+    // armar.
     <div
-      onClick={() => !submitting && onClose()}
       role="dialog"
       aria-modal="true"
       aria-label={esReprogramar ? 'Reprogramar reserva' : 'Crear reserva'}

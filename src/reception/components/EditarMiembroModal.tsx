@@ -98,7 +98,7 @@ export function EditarMiembroModal({ miembro, onClose, onGuardado }: Props) {
   }
 
   return (
-    <div className="ek-backdrop" onClick={() => !saving && onClose()} role="dialog" aria-modal="true">
+    <div className="ek-backdrop" role="dialog" aria-modal="true">
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={handleSubmit}

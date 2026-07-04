@@ -4,7 +4,7 @@ import { supabase } from '@shared/lib/supabase';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { parseBeneficios } from '@shared/lib/beneficios';
-import { sufijoPrecio, esPlanPaquete } from '@shared/lib/planPresentacion';
+import { sufijoPrecio, esPlanPaquete, detallePlan } from '@shared/lib/planPresentacion';
 import { PaymentModal } from '@shared/components/PaymentModal';
 import { PlanTipoToggle, type VistaPlan } from '@shared/components/PlanTipoToggle';
 import { Spinner } from '@shared/components/Spinner';
@@ -20,6 +20,8 @@ interface TierInfo {
   nombre: string;
   precio_centavos: number;
   tipo: string;
+  clases_incluidas: number | null;
+  duracion_dias: number | null;
   beneficios: string[];
 }
 
@@ -44,7 +46,7 @@ export default function PagarMembresia() {
     async function load() {
       const { data } = await supabase
         .from('tiers')
-        .select('slug, nombre, precio_centavos, tipo, beneficios')
+        .select('slug, nombre, precio_centavos, tipo, clases_incluidas, duracion_dias, beneficios')
         .eq('tenant_id', tenant.id)
         .eq('activo', true)
         .order('orden', { ascending: true });
@@ -55,6 +57,8 @@ export default function PagarMembresia() {
           nombre: d.nombre,
           precio_centavos: d.precio_centavos,
           tipo: d.tipo,
+          clases_incluidas: d.clases_incluidas,
+          duracion_dias: d.duracion_dias,
           beneficios: parseBeneficios(d.beneficios).filter((b) => b.incluido).map((b) => b.label).slice(0, 5)
         }))
       );
@@ -175,27 +179,42 @@ export default function PagarMembresia() {
                     <PlanTipoToggle value={vistaPlan} onChange={setVistaPlan} />
                   </div>
                 )}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {planesVisibles.map((t) => {
                     const seleccionado = t.slug === slug;
                     return (
-                      <button
+                      <div
                         key={t.slug}
-                        type="button"
-                        onClick={() => { setSlugElegido(t.slug); setPickerOpen(false); }}
                         className="ek-card ek-card--md ek-card--cream"
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', textAlign: 'left', cursor: 'pointer', border: seleccionado ? '1.5px solid var(--ek-mustard)' : undefined }}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', border: seleccionado ? '1.5px solid var(--ek-mustard)' : undefined }}
                       >
                         <div style={{ minWidth: 0 }}>
-                          <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(10, 10, 10, 0.6)' }}>{t.nombre}</span>
-                          <p style={{ margin: '2px 0 0', fontWeight: 700, color: 'var(--ek-bg)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'rgba(10, 10, 10, 0.6)' }}>{t.nombre}</span>
+                            {seleccionado && (
+                              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ek-bg)', background: 'rgba(10, 10, 10, 0.1)', padding: '2px 8px', borderRadius: '999px' }}>
+                                Elegido
+                              </span>
+                            )}
+                          </div>
+                          <p style={{ margin: 0, fontWeight: 700, color: 'var(--ek-bg)' }}>
                             {pesos(t.precio_centavos)}<span style={{ color: 'rgba(10, 10, 10, 0.55)', fontWeight: 500, fontSize: '13px' }}>{sufijoPrecio(t)}</span>
                           </p>
+                          <p style={{ margin: '2px 0 0', fontSize: '11px', color: 'rgba(10, 10, 10, 0.55)' }}>{detallePlan(t)}</p>
                         </div>
-                        {seleccionado
-                          ? <Check size={18} style={{ color: 'var(--ek-bg)', flexShrink: 0 }} aria-hidden="true" />
-                          : <ArrowRight size={16} style={{ color: 'var(--ek-bg)', flexShrink: 0 }} aria-hidden="true" />}
-                      </button>
+                        {seleccionado ? (
+                          <Check size={18} style={{ color: 'var(--ek-bg)', flexShrink: 0 }} aria-hidden="true" />
+                        ) : (
+                          <button
+                            type="button"
+                            className="ek-cta ek-cta--gold"
+                            style={{ padding: '10px 14px', fontSize: '13px', whiteSpace: 'nowrap', flexShrink: 0, gap: '6px' }}
+                            onClick={() => { setSlugElegido(t.slug); setPickerOpen(false); }}
+                          >
+                            Elegir este <ArrowRight size={15} aria-hidden="true" />
+                          </button>
+                        )}
+                      </div>
                     );
                   })}
                 </div>

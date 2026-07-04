@@ -161,8 +161,9 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
   }
 
   return (
+    // Solo cierra con el botón ✕: es un alta con varios datos, un clic fuera no
+    // debe perderlos.
     <div
-      onClick={() => !submitting && !creado && onClose()}
       role="dialog"
       aria-modal="true"
       aria-label="Registrar miembro"

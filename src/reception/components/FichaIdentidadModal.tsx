@@ -84,7 +84,7 @@ export function FichaIdentidadModal({ miembroId, miembroNombre, tieneFoto, onClo
   const inePreview = ineNueva?.preview ?? ineUrl;
 
   return (
-    <div className="ek-backdrop" onClick={() => !guardando && onClose()} role="dialog" aria-modal="true">
+    <div className="ek-backdrop" role="dialog" aria-modal="true">
       <div
         onClick={(e) => e.stopPropagation()}
         className="ek-card"

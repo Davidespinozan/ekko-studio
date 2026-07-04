@@ -93,7 +93,7 @@ export function FotoMiembroModal({ miembroId, miembroNombre, onClose, onActualiz
   }
 
   return (
-    <div className="ek-backdrop" onClick={() => !saving && onClose()} role="dialog" aria-modal="true">
+    <div className="ek-backdrop" role="dialog" aria-modal="true">
       <div
         onClick={(e) => e.stopPropagation()}
         className="ek-card"
