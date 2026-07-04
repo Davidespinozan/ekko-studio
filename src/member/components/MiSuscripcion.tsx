@@ -184,9 +184,13 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
       setConfirmarCambio(destino);
       return;
     }
-    // Mensual→mensual con suscripción al corriente → re-precio sin re-pedir
-    // tarjeta (cobra la guardada, proration al próximo período).
-    if (tieneSuscripcion && !pagoVencido && !esPlanPaquete(destino)) {
+    // Destino mensual → intentar re-precio sin re-pedir tarjeta (cobra la
+    // guardada, proration al próximo período). NO gateamos por `tieneSuscripcion`
+    // del front (se calcula de la fila más reciente y puede estar desfasada): el
+    // endpoint busca la suscripción activa real y responde 'sin_suscripcion' si
+    // de verdad no hay — ahí sí caemos al modal de pago. `past_due` va directo al
+    // modal (la tarjeta está fallando; hay que recolectarla).
+    if (!pagoVencido && !esPlanPaquete(destino)) {
       void hacerSwap(destino);
       return;
     }
