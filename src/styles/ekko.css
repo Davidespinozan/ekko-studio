@@ -2666,8 +2666,11 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 /* --- Precios / membresías --- */
 .ek-pricing-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  /* 2 columnas: 4 paquetes caen en 2×2 (no 3+1 huérfano) y 2 membresías en fila.
+     max-width para que las tarjetas no se estiren de más en pantallas anchas. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+  max-width: 840px;
 }
 .ek-pricing-card { padding: 32px; border-radius: var(--ek-r-landing); }
 .ek-pricing-price { font-size: 48px; }
