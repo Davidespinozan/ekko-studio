@@ -104,7 +104,9 @@ export const handler: Handler = async (event) => {
 
     return ok({ url: link.url });
   } catch (err) {
-    console.error('[connect-onboarding]', err instanceof Error ? err.message : err);
-    return serverError('No pudimos iniciar la activación de cobros');
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[connect-onboarding]', msg);
+    // DEBUG temporal: exponer el error real de Stripe para diagnosticar el live.
+    return serverError(`Activación falló: ${msg}`);
   }
 };
