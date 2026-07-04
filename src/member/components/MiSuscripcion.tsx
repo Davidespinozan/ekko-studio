@@ -3,7 +3,7 @@ import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Ticket, Cale
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
 import { sufijoPrecio, detallePlan, esPlanPaquete } from '@shared/lib/planPresentacion';
-import { obtenerBillingInfo, cancelarSuscripcion, type MetodoPago, type PagoHistorial } from '@shared/lib/checkout';
+import { obtenerBillingInfo, cancelarSuscripcion, cambiarPlanSuscripcion, type MetodoPago, type PagoHistorial } from '@shared/lib/checkout';
 import { TarjetaModal } from '@shared/components/TarjetaModal';
 import { PaymentModal } from '@shared/components/PaymentModal';
 import { useTenant } from '@shared/hooks/useTenant';
@@ -65,6 +65,8 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const currentSlug = tierSlug;
   const [gestionando, setGestionando] = useState(false);
   const [pagarTier, setPagarTier] = useState<TierInfo | null>(null);
+  // slug del plan en proceso de swap (cambio in-place con tarjeta guardada).
+  const [swapping, setSwapping] = useState<string | null>(null);
   const [tarjetaOpen, setTarjetaOpen] = useState(false);
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
   // Destino de un cambio créditos→mensual que perdería el saldo (aviso).
@@ -162,7 +164,8 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
     ? new Date(membresia.periodo_actual_fin).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })
     : null;
 
-  // Abre el modal de pago propio (Elements) para el plan elegido.
+  // Decide el flujo del cambio de plan: swap in-place (tarjeta guardada) cuando
+  // hay una suscripción vigente y el destino es mensual; si no, modal de pago.
   function cambiarPlan(destino: TierInfo) {
     // Aviso: pasar de un paquete con créditos restantes a un plan mensual
     // (ilimitado) descarta el saldo. Que sea una elección consciente.
@@ -171,11 +174,42 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
       setConfirmarCambio(destino);
       return;
     }
+    // Mensual→mensual con suscripción al corriente → re-precio sin re-pedir
+    // tarjeta (cobra la guardada, proration al próximo período).
+    if (tieneSuscripcion && !pagoVencido && !esPlanPaquete(destino)) {
+      void hacerSwap(destino);
+      return;
+    }
     setCambiarOpen(false);
     setPagarTier(destino);
   }
 
+  // Cambio in-place de la suscripción vigente usando la tarjeta guardada.
+  async function hacerSwap(destino: TierInfo) {
+    setSwapping(destino.slug);
+    try {
+      const res = await cambiarPlanSuscripcion(destino.slug);
+      // Sin suscripción/pasarela → caer al pago normal (PaymentModal).
+      if (res.reason) {
+        setCambiarOpen(false);
+        setPagarTier(destino);
+        return;
+      }
+      if (!res.success) throw new Error();
+      setCambiarOpen(false);
+      toast.success(`¡Listo! Cambiaste a ${destino.nombre}. El ajuste se refleja en tu próximo cobro.`);
+      // El tier cambió server-side; recargamos para reflejar el plan actual.
+      setTimeout(() => window.location.reload(), 1400);
+    } catch {
+      toast.error('No pudimos cambiar tu plan. Intenta de nuevo.');
+    } finally {
+      setSwapping(null);
+    }
+  }
+
   function procederCambio(destino: TierInfo) {
+    // Viene del aviso "pierdes tus créditos": es un miembro de PAQUETE (sin
+    // suscripción) pasando a mensual → siempre por el modal de pago.
     setConfirmarCambio(null);
     setCambiarOpen(false);
     setPagarTier(destino);
@@ -508,8 +542,13 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                         className="ek-cta ek-cta--gold"
                         style={{ padding: '10px 14px', fontSize: '13px', whiteSpace: 'nowrap', flexShrink: 0, gap: '6px' }}
                         onClick={() => cambiarPlan(t)}
+                        disabled={swapping !== null}
                       >
-                        Elegir este <ArrowRight size={15} aria-hidden="true" />
+                        {swapping === t.slug ? (
+                          <Spinner size={15} />
+                        ) : (
+                          <>Elegir este <ArrowRight size={15} aria-hidden="true" /></>
+                        )}
                       </button>
                     )}
                   </div>

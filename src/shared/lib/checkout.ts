@@ -73,6 +73,22 @@ export function crearPagoIntent(tierSlug: string): Promise<PagoIntentResult> {
 }
 
 /**
+ * Cambio de plan MENSUAL↔MENSUAL sin re-pedir tarjeta: re-precio de la suscripción
+ * vigente cobrando la tarjeta guardada (proration al próximo período). Si el miembro
+ * no tiene una suscripción activa (paquete/cancelado) o el destino es un paquete,
+ * devuelve `{ reason: 'sin_suscripcion' }` y el caller cae al PaymentModal normal.
+ */
+export interface SwapPlanResult {
+  success?: boolean;
+  tier?: string;
+  reason?: string;
+}
+
+export function cambiarPlanSuscripcion(tierSlug: string): Promise<SwapPlanResult> {
+  return backendPost<SwapPlanResult>('cambiar-plan-suscripcion', { tier: tierSlug });
+}
+
+/**
  * Tarjeta registrada + historial de cobros del miembro, leídos de Stripe sobre
  * la cuenta conectada del estudio (los miembros no pueden leer payment_events).
  */
