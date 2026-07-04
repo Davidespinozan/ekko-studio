@@ -3253,6 +3253,13 @@ select.ek-input option {
   border-radius: 30px;
   overflow: hidden;
 }
+/* Captura real que llena la pantalla del mockup. */
+.ek-phone-shot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .ek-phone--front {
   transform: translateY(14px);
 }

@@ -1,22 +1,17 @@
 import { Link } from 'react-router-dom';
-import {
-  Home,
-  CalendarDays,
-  Clapperboard,
-  User,
-  Clock,
-  Star,
-  ArrowRight,
-  Smartphone
-} from 'lucide-react';
+import { ArrowRight, Smartphone } from 'lucide-react';
 
 /**
  * Sección 2 de la landing — "Lleva tu estudio siempre contigo".
- * Showcase de la app del miembro con mockups de teléfono renderizados en CSS
- * (no imágenes): así no dependemos de capturas que se desactualizan y todo usa
- * los tokens de EKKO. EKKO es una PWA, por eso el encuadre es "se instala desde
- * el navegador" en vez de badges de App Store / Play Store (no hay apps nativas).
+ * Showcase de la app del miembro con dos mockups de teléfono que muestran
+ * capturas reales (Supabase Storage). EKKO es una PWA, por eso el encuadre es
+ * "se instala desde el navegador" en vez de badges de App Store / Play Store.
  */
+
+// Capturas reales de la app (Supabase Storage). Front = la de enfrente.
+const SHOT_FRONT = 'https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/1.webp';
+const SHOT_BACK = 'https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/2.webp';
+
 export default function AppShowcase() {
   return (
     <section className="ek-showcase" aria-labelledby="ek-showcase-title">
@@ -78,14 +73,14 @@ export default function AppShowcase() {
         <div className="ek-showcase-phones" aria-hidden="true">
           <div className="ek-showcase-glow" />
 
-          {/* Teléfono de atrás — "Reservar" */}
+          {/* Teléfono de atrás */}
           <PhoneFrame className="ek-phone--back">
-            <ScreenReservar />
+            <img className="ek-phone-shot" src={SHOT_BACK} alt="" loading="lazy" />
           </PhoneFrame>
 
-          {/* Teléfono de adelante — "Inicio" */}
+          {/* Teléfono de adelante */}
           <PhoneFrame className="ek-phone--front">
-            <ScreenInicio />
+            <img className="ek-phone-shot" src={SHOT_FRONT} alt="" loading="lazy" />
           </PhoneFrame>
         </div>
       </div>
@@ -99,111 +94,6 @@ function PhoneFrame({ className, children }: { className?: string; children: Rea
     <div className={`ek-phone ${className ?? ''}`}>
       <span className="ek-phone-notch" />
       <div className="ek-phone-screen">{children}</div>
-    </div>
-  );
-}
-
-/* ---------- Barra de estado ---------- */
-function StatusBar() {
-  return (
-    <div className="ek-mini-status">
-      <span>9:41</span>
-      <span style={{ display: 'inline-flex', gap: '3px', alignItems: 'center' }}>
-        <i className="ek-mini-dot" />
-        <i className="ek-mini-dot" />
-        <i className="ek-mini-dot" style={{ opacity: 0.4 }} />
-      </span>
-    </div>
-  );
-}
-
-/* ---------- Barra de navegación inferior ---------- */
-function BottomNav({ active }: { active: 'inicio' | 'reservar' }) {
-  const items = [
-    { key: 'inicio', Icon: Home, label: 'Inicio' },
-    { key: 'reservar', Icon: CalendarDays, label: 'Reservar' },
-    { key: 'agenda', Icon: Clapperboard, label: 'Agenda' },
-    { key: 'perfil', Icon: User, label: 'Perfil' }
-  ] as const;
-  return (
-    <div className="ek-mini-nav">
-      {items.map(({ key, Icon, label }) => (
-        <span key={key} className={`ek-mini-nav-item ${key === active ? 'is-active' : ''}`}>
-          <Icon size={16} aria-hidden="true" />
-          <i>{label}</i>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-/* ---------- Pantalla: Inicio ---------- */
-function ScreenInicio() {
-  return (
-    <div className="ek-mini-app">
-      <StatusBar />
-      <div className="ek-mini-body">
-        <p className="ek-mini-brand">EKKO</p>
-        <p className="ek-mini-greeting">Hola, creador</p>
-
-        <p className="ek-mini-eyebrow">PRÓXIMA RESERVA</p>
-        <div className="ek-mini-card ek-mini-card--hero">
-          <div className="ek-mini-row" style={{ justifyContent: 'space-between' }}>
-            <strong className="ek-mini-card-title">Estudio Black</strong>
-            <span className="ek-mini-badge">
-              <Star size={9} fill="currentColor" aria-hidden="true" /> PRO
-            </span>
-          </div>
-          <span className="ek-mini-when">
-            <Clock size={12} aria-hidden="true" /> Hoy · 16:00
-          </span>
-          <div className="ek-mini-progress"><i style={{ width: '64%' }} /></div>
-          <span className="ek-mini-foot">Faltan 2 h · equipo listo</span>
-        </div>
-
-        <p className="ek-mini-eyebrow">ESTA SEMANA</p>
-        {[
-          { d: 'Jue', e: 'Loft', h: '14:00' },
-          { d: 'Sáb', e: 'Set', h: '11:00' }
-        ].map((r) => (
-          <div key={r.d} className="ek-mini-card ek-mini-line">
-            <span className="ek-mini-day">{r.d}</span>
-            <span style={{ flex: 1 }}>Estudio {r.e}</span>
-            <span className="ek-mini-hour">{r.h}</span>
-          </div>
-        ))}
-      </div>
-      <BottomNav active="inicio" />
-    </div>
-  );
-}
-
-/* ---------- Pantalla: Reservar ---------- */
-function ScreenReservar() {
-  return (
-    <div className="ek-mini-app">
-      <StatusBar />
-      <div className="ek-mini-body">
-        <p className="ek-mini-greeting" style={{ marginTop: '2px' }}>Reservar</p>
-        <p className="ek-mini-eyebrow">ELIGE ESTUDIO</p>
-
-        <div className="ek-mini-card ek-mini-card--media">
-          <div className="ek-mini-thumb" />
-          <strong className="ek-mini-card-title">Estudio Loft</strong>
-          <span className="ek-mini-foot">Hasta 4 personas · Pódcast</span>
-          <div className="ek-mini-chips">
-            <span className="ek-mini-chip">12:00</span>
-            <span className="ek-mini-chip is-active">14:00</span>
-            <span className="ek-mini-chip">16:00</span>
-          </div>
-        </div>
-
-        <div className="ek-mini-card ek-mini-line">
-          <span style={{ flex: 1 }}>Estudio Set</span>
-          <span className="ek-mini-hour">3 horarios</span>
-        </div>
-      </div>
-      <BottomNav active="reservar" />
     </div>
   );
 }
