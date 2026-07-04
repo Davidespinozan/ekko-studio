@@ -2708,7 +2708,7 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
   justify-content: center;
 }
 .ek-pricing-card { padding: 32px; border-radius: var(--ek-r-landing); text-align: left; }
-.ek-pricing-price { font-size: 48px; }
+.ek-pricing-price { font-size: 48px; white-space: nowrap; }
 
 /* Toggle Membresías · Paquetes (elección explícita de tipo de plan) */
 .ek-plan-toggle {
@@ -2747,7 +2747,9 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 }
 
 @media (max-width: 720px) {
-  .ek-pricing-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  /* Una columna en móvil: tarjetas a lo ancho para que "$650 · 3 sesiones" no
+     parta la palabra "sesiones" a otra línea (pasaba en 2 columnas angostas). */
+  .ek-pricing-grid { grid-template-columns: 1fr; gap: 14px; }
   .ek-plan-toggle { display: flex; width: 100%; }
   .ek-plan-toggle-btn { flex: 1; padding: 9px 10px; font-size: 12.5px; }
   .ek-pricing-card { padding: 18px !important; }
