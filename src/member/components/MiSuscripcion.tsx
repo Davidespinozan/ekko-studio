@@ -132,17 +132,27 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
     (async () => {
       setBillingLoading(true);
       setBillingError(false);
-      try {
-        const info = await obtenerBillingInfo();
-        if (!mounted) return;
-        setPaymentMethod(info.paymentMethod);
-        setPagos(info.pagos ?? []);
-      } catch (e) {
-        if (!mounted) return;
-        console.error('[MiSuscripcion] billing-info', e);
-        setBillingError(true);
-      } finally {
-        if (mounted) setBillingLoading(false);
+      // Reintenta: la 1ª llamada tras inactividad puede caer por cold start de la
+      // Netlify Function → no mostramos error hasta agotar los reintentos.
+      const intentos = 3;
+      for (let i = 0; i < intentos && mounted; i++) {
+        try {
+          const info = await obtenerBillingInfo();
+          if (!mounted) return;
+          setPaymentMethod(info.paymentMethod);
+          setPagos(info.pagos ?? []);
+          setBillingLoading(false);
+          return;
+        } catch (e) {
+          if (i < intentos - 1) {
+            await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+            continue;
+          }
+          if (!mounted) return;
+          console.error('[MiSuscripcion] billing-info', e);
+          setBillingError(true);
+          setBillingLoading(false);
+        }
       }
     })();
     return () => { mounted = false; };
