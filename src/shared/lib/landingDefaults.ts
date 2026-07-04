@@ -91,27 +91,15 @@ export const FAQ_DEFAULT: FaqConfig = {
     },
     {
       q: '¿Qué incluye cada sesión?',
-      a: 'El estudio con todo el equipo profesional ya montado (cámaras, micrófonos, iluminación), espacio para tus invitados y tu material entregado en MP4 al terminar. Cada sesión es de hasta 60 minutos.'
-    },
-    {
-      q: '¿Cuántos invitados puedo llevar?',
-      a: 'Según tu plan puedes llevar de 2 a 4 invitados por sesión. El límite exacto lo ves en tu plan al momento de reservar.'
+      a: 'El estudio con todo el equipo profesional ya montado (cámaras, micrófonos, iluminación) y espacio para tus invitados. Cada sesión es de hasta 60 minutos y no necesitas traer nada de equipo: solo llegas con tu contenido.'
     },
     {
       q: '¿Cómo recibo mi material?',
       a: 'Te entregamos tu grabación en MP4 después de cada sesión. Los planes Premium además incluyen edición básica con IA y miniaturas para tus videos.'
     },
     {
-      q: '¿Necesito traer mi propio equipo?',
-      a: 'No. Cada estudio tiene su equipo profesional completo y listo para grabar. Solo llegas con tu contenido; nosotros te entregamos el material.'
-    },
-    {
-      q: '¿Puedo cancelar una reserva?',
-      a: 'Sí. Puedes cancelarla con anticipación a través de WhatsApp para evitar una amonestación por inasistencia.'
-    },
-    {
-      q: '¿Qué pasa si no llego a mi reserva?',
-      a: 'Las inasistencias sin aviso pueden bloquear tu cuenta temporalmente. Si avisas con anticipación, cancelas sin penalidad.'
+      q: '¿Qué pasa si cancelo o no llego?',
+      a: 'Puedes cancelar con anticipación por WhatsApp, sin penalidad. Si no llegas y no avisas, la sesión se considera consumida; las inasistencias repetidas pueden bloquear tu cuenta temporalmente.'
     },
     {
       q: '¿Cómo pago y qué compromisos hay?',
