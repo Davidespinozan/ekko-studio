@@ -2689,12 +2689,13 @@ button, a, input, select, textarea, .ek-card, .ek-stat-card {
 .ek-estudio-detalle { display: inline-flex; }
 
 @media (max-width: 700px) {
-  /* Móvil: swipe (sin flechas), tarjeta casi a lo ancho con peek de la siguiente. */
-  .ek-estudio-nav { display: none; }
+  /* Móvil: tarjeta casi a lo ancho con peek de la siguiente. Se mantienen las
+     flechas (círculos) para que se entienda que hay scroll, un poco más chicas. */
   .ek-estudio-card { width: 82vw; }
   .ek-estudio-media { aspect-ratio: 4 / 3; }
   .ek-estudio-body { padding: 18px 20px; }
   .ek-estudio-title { font-size: 22px !important; }
+  .ek-estudio-nav { width: 38px; height: 38px; font-size: 20px; }
 }
 
 /* --- Precios / membresías --- */
