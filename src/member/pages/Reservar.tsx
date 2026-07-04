@@ -6,6 +6,8 @@ import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
 import { celebrar } from '@shared/lib/celebrar';
+import { PaymentModal } from '@shared/components/PaymentModal';
+import { crearPagoInvitados } from '@shared/lib/checkout';
 import {
   useRecursosDelTenant,
   fetchReservasDelRecurso,
@@ -67,10 +69,16 @@ export default function Reservar() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [slotPendiente, setSlotPendiente] = useState<Slot | null>(null);
   const [invitados, setInvitados] = useState(0);
+  const [invitadosExtra, setInvitadosExtra] = useState(0);
+  const [pagarInvitados, setPagarInvitados] = useState<{ reservaId: string; cantidad: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Invitados permitidos: del plan del miembro (Admin → Planes → Máx. invitados).
   const maxInvitados = resumen.tier?.maxInvitados ?? 0;
+  // Precio de invitado extra (config del tenant). >0 habilita el cobro en la app.
+  const precioExtraCentavos = Number((tenant.config as Record<string, any>)?.reserva?.precio_invitado_extra_centavos) || 0;
+  const precioExtraPesos = Math.round(precioExtraCentavos / 100);
+  const MAX_EXTRA = 10;
 
   // Motivo por el que NO se puede reservar (null = puede). Ver siempre se permite.
   const saldoInsuficiente =
@@ -84,7 +92,7 @@ export default function Reservar() {
 
   // Resetear invitados cuando se abre/cierra el modal
   useEffect(() => {
-    if (!slotPendiente) setInvitados(0);
+    if (!slotPendiente) { setInvitados(0); setInvitadosExtra(0); }
   }, [slotPendiente]);
 
   // Auto-seleccionar el estudio del query param (?recurso=slug) o el primero.
@@ -128,8 +136,9 @@ export default function Reservar() {
   async function confirmarReserva() {
     if (!slotPendiente || !recursoSel) return;
     setSubmitting(true);
+    const extra = invitadosExtra;
     try {
-      await crearReserva({
+      const res = await crearReserva({
         recursoId: recursoSel.id,
         slotInicio: slotPendiente.inicio,
         duracionMin: config.duracion_default_min,
@@ -146,7 +155,13 @@ export default function Reservar() {
       const horaFmt = formatHora(slotPendiente.inicio);
       celebrar();
       toast.success(`Reserva confirmada · ${fechaFmt}, ${horaFmt}`);
-      navigate('/app');
+      // Si eligió invitados extra, abre el pago (Stripe). Si no, sigue al inicio.
+      const reservaId: string | undefined = (res as { reserva_id?: string })?.reserva_id;
+      if (extra > 0 && reservaId) {
+        setPagarInvitados({ reservaId, cantidad: extra });
+      } else {
+        navigate('/app');
+      }
     } catch (e) {
       const raw = e instanceof Error ? e.message : 'No se pudo crear la reserva';
       toast.error(raw + ' · Inténtalo otra vez');
@@ -406,7 +421,44 @@ export default function Reservar() {
                     </button>
                   </div>
                   <p className="ek-helper-text">
-                    Total de personas en la grabación: {1 + invitados}
+                    Total de personas en la grabación: {1 + invitados + invitadosExtra}
+                  </p>
+                </div>
+              )}
+
+              {/* Invitados EXTRA (de pago): se cobran con Stripe en la app. */}
+              {precioExtraCentavos > 0 && (
+                <div className="ek-form-field" style={{ marginBottom: '1rem' }}>
+                  <label className="ek-label">
+                    Invitados extra (${precioExtraPesos.toLocaleString('es-MX')} c/u)
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => setInvitadosExtra(Math.max(0, invitadosExtra - 1))}
+                      disabled={invitadosExtra === 0}
+                      className="ek-cta ek-cta--secondary"
+                      style={{ minHeight: '44px', minWidth: '44px', padding: '0 0.75rem' }}
+                    >
+                      −
+                    </button>
+                    <span style={{ fontSize: '1.5rem', fontWeight: 700, minWidth: '40px', textAlign: 'center' }}>
+                      {invitadosExtra}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setInvitadosExtra(Math.min(MAX_EXTRA, invitadosExtra + 1))}
+                      disabled={invitadosExtra === MAX_EXTRA}
+                      className="ek-cta ek-cta--secondary"
+                      style={{ minHeight: '44px', minWidth: '44px', padding: '0 0.75rem' }}
+                    >
+                      +
+                    </button>
+                  </div>
+                  <p className="ek-helper-text">
+                    {invitadosExtra > 0
+                      ? `Pagas $${(precioExtraPesos * invitadosExtra).toLocaleString('es-MX')} al confirmar (con tu tarjeta).`
+                      : 'Personas arriba de las incluidas en tu plan. Se pagan al confirmar.'}
                   </p>
                 </div>
               )}
@@ -433,6 +485,19 @@ export default function Reservar() {
           </div>
         )}
       </div>
+
+      {/* Pago de invitados extra (Stripe, tarjeta guardada) tras reservar. */}
+      {pagarInvitados && (
+        <PaymentModal
+          precio={precioExtraPesos * pagarInvitados.cantidad}
+          titulo="Invitados extra"
+          subtitulo={`${pagarInvitados.cantidad} ${pagarInvitados.cantidad === 1 ? 'invitado' : 'invitados'} × $${precioExtraPesos.toLocaleString('es-MX')} = $${(precioExtraPesos * pagarInvitados.cantidad).toLocaleString('es-MX')}`}
+          pedirNombre={false}
+          fetchIntent={() => crearPagoInvitados(pagarInvitados.reservaId, pagarInvitados.cantidad)}
+          onClose={() => { setPagarInvitados(null); navigate('/app'); }}
+          onPagado={() => { setPagarInvitados(null); toast.success('¡Invitados extra pagados!'); navigate('/app'); }}
+        />
+      )}
     </div>
   );
 }

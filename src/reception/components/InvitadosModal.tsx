@@ -20,8 +20,9 @@ function pesos(centavos: number): string {
 
 /**
  * Invitados de una reserva (recepción): registra nombre + foto de cada invitado.
- * Marca los que van arriba del tope del plan como "extra" (recepción los cobra
- * en caja) y muestra el total a cobrar. Pasa todo por reception-invitados.
+ * Muestra la cobertura (incluidos del plan + extras que el miembro pagó en la
+ * app) y cuántos quedan pendientes. Los extras NO se cobran en mostrador: el
+ * miembro los paga en su app (Stripe). Pasa todo por reception-invitados.
  */
 export function InvitadosModal({ reservaId, miembroNombre, onClose, onCambio }: Props) {
   const toast = useToast();
@@ -51,9 +52,10 @@ export function InvitadosModal({ reservaId, miembroNombre, onClose, onCambio }: 
     }
   }
 
-  const extras = data?.extras ?? 0;
+  const prepagados = data?.invitados_extra_pagados ?? 0;
+  const pendientes = data?.pendientes_pago ?? 0;
   const precioExtra = data?.precio_invitado_extra_centavos ?? 0;
-  const totalCobrar = extras * precioExtra;
+  const totalPendiente = pendientes * precioExtra;
 
   return (
     <div className="ek-backdrop" onClick={onClose} role="dialog" aria-modal="true">
@@ -82,17 +84,28 @@ export function InvitadosModal({ reservaId, miembroNombre, onClose, onCambio }: 
           />
         ) : (
           <>
-            {/* Resumen: incluidos vs extras a cobrar */}
+            {/* Resumen: cobertura (incluidos + pagados en la app) vs pendientes */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '13px', color: 'var(--ek-ink-muted)' }}>
-                <strong style={{ color: 'var(--ek-ink)' }}>{data?.total ?? 0}</strong> registrados · {data?.max_incluidos ?? 0} incluidos en el plan
+                <strong style={{ color: 'var(--ek-ink)' }}>{data?.total ?? 0}</strong> registrados · {data?.max_incluidos ?? 0} del plan{prepagados > 0 ? ` + ${prepagados} pagados` : ''}
               </span>
-              {extras > 0 && (
-                <span className="ek-badge" style={{ background: 'var(--ek-mustard-soft)', color: 'var(--ek-mustard)', fontWeight: 700, fontSize: '12px', padding: '4px 10px' }}>
-                  {extras} extra{extras > 1 ? 's' : ''}{precioExtra > 0 ? ` · cobra ${pesos(totalCobrar)}` : ''}
+              {pendientes > 0 ? (
+                <span className="ek-badge" style={{ background: 'var(--ek-warning-soft)', color: 'var(--ek-warning)', fontWeight: 700, fontSize: '12px', padding: '4px 10px' }}>
+                  {pendientes} sin pagar{precioExtra > 0 ? ` · ${pesos(totalPendiente)}` : ''}
                 </span>
-              )}
+              ) : (data?.total ?? 0) > 0 ? (
+                <span className="ek-badge" style={{ background: 'var(--ek-mustard-soft)', color: 'var(--ek-mustard)', fontWeight: 700, fontSize: '12px', padding: '4px 10px' }}>
+                  Todo cubierto
+                </span>
+              ) : null}
             </div>
+
+            {/* Los extras se pagan en la app del miembro (Stripe), no en mostrador. */}
+            {pendientes > 0 && (
+              <p style={{ fontSize: '12px', color: 'var(--ek-warning)', margin: '-6px 0 14px', lineHeight: 1.45 }}>
+                {pendientes} invitado{pendientes > 1 ? 's' : ''} arriba de lo cubierto. El miembro los paga desde su app (Mis reservas → Pagar invitados extra); al pagar, se marca como cubierto.
+              </p>
+            )}
 
             {(data?.invitados.length ?? 0) === 0 ? (
               <p style={{ fontSize: '13px', color: 'var(--ek-ink-faint)', margin: '4px 0 16px' }}>

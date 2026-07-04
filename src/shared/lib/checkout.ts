@@ -91,6 +91,14 @@ export function cambiarPlanSuscripcion(tierSlug: string): Promise<SwapPlanResult
 }
 
 /**
+ * Pago in-app de N invitados EXTRA de una reserva (Stripe, tarjeta guardada).
+ * Devuelve el mismo shape que crearPagoIntent para reutilizar el modal de pago.
+ */
+export function crearPagoInvitados(reservaId: string, cantidad: number): Promise<PagoIntentResult> {
+  return backendPost<PagoIntentResult>('crear-pago-invitados', { reserva_id: reservaId, cantidad });
+}
+
+/**
  * Tarjeta registrada + historial de cobros del miembro, leídos de Stripe sobre
  * la cuenta conectada del estudio (los miembros no pueden leer payment_events).
  */

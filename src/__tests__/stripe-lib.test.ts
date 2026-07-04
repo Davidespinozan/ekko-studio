@@ -148,6 +148,26 @@ describe('clasificarEvento', () => {
     expect(r.kind).toBe('ignore');
   });
 
+  it('payment_intent.succeeded tipo=invitados_extra → invitados-extra con reserva y cantidad', () => {
+    const r = clasificarEvento(ev('payment_intent.succeeded', {
+      customer: 'cus_1',
+      metadata: { app: 'ekko', tipo: 'invitados_extra', reserva_id: 'res_1', cantidad: '3', usuario_id: 'u1' }
+    }));
+    expect(r.kind).toBe('invitados-extra');
+    if (r.kind === 'invitados-extra') {
+      expect(r.reserva_id).toBe('res_1');
+      expect(r.cantidad).toBe(3);
+      expect(r.usuario_id).toBe('u1');
+    }
+  });
+
+  it('invitados_extra sin reserva_id / cantidad inválida → ignore', () => {
+    const r = clasificarEvento(ev('payment_intent.succeeded', {
+      customer: 'cus_1', metadata: { tipo: 'invitados_extra', cantidad: '0' }
+    }));
+    expect(r.kind).toBe('ignore');
+  });
+
   it('evento no manejado → ignore', () => {
     const r = clasificarEvento(ev('customer.created', { id: 'cus_1' }));
     expect(r.kind).toBe('ignore');

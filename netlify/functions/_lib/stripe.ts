@@ -88,6 +88,15 @@ export type EventoClasificado =
       subscription_id: string;
       event_at: string;
     }
+  | {
+      // Invitados extra pagados en la app (pago único, no membresía): sumar los
+      // extras pagados a la reserva.
+      kind: 'invitados-extra';
+      reserva_id: string;
+      cantidad: number;
+      usuario_id: string | null;
+      event_at: string;
+    }
   | { kind: 'ignore'; reason: string };
 
 /**
@@ -159,9 +168,18 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
     }
 
     case 'payment_intent.succeeded': {
+      const pi = event.data.object as Stripe.PaymentIntent;
+      // Invitados extra pagados en la app (pago único, sin membresía).
+      if (pi.metadata?.tipo === 'invitados_extra') {
+        const reserva_id = pi.metadata?.reserva_id;
+        const cantidad = Number.parseInt(pi.metadata?.cantidad ?? '', 10);
+        if (!reserva_id || !Number.isInteger(cantidad) || cantidad <= 0) {
+          return { kind: 'ignore', reason: 'invitados_extra_sin_datos' };
+        }
+        return { kind: 'invitados-extra', reserva_id, cantidad, usuario_id: pi.metadata?.usuario_id ?? null, event_at };
+      }
       // Paquete pagado in-app (pago único con Elements). El metadata lo pusimos
       // en crear-pago-intent. (Los PI de suscripción no llevan este metadata.)
-      const pi = event.data.object as Stripe.PaymentIntent;
       const usuario_id = pi.metadata?.usuario_id;
       const tier_id = pi.metadata?.tier_id;
       const customer_id = typeof pi.customer === 'string' ? pi.customer : pi.customer?.id;

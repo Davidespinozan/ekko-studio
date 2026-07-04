@@ -77,11 +77,14 @@ export const handler: Handler = async (event) => {
     // Reserva del MISMO tenant (H3).
     const { data: reserva } = await admin
       .from('reservas')
-      .select('id, tenant_id, usuario_id')
+      .select('id, tenant_id, usuario_id, invitados_extra_pagados')
       .eq('id', body.reserva_id)
       .maybeSingle();
     if (!reserva) return notFound('Reserva no encontrada');
     if (reserva.tenant_id !== caller.tenant_id) return forbidden('Esa reserva es de otro estudio');
+
+    // Extras que el miembro ya pagó en la app (Stripe). Amplían la cobertura.
+    const prepagados = Number(reserva.invitados_extra_pagados) || 0;
 
     // Precio por invitado extra (config del tenant) + tope del plan del miembro.
     const { data: tenant } = await admin.from('tenants').select('config').eq('id', caller.tenant_id).maybeSingle();
@@ -120,13 +123,19 @@ export const handler: Handler = async (event) => {
           return { id: r.id, nombre: r.nombre, es_extra: r.es_extra, foto_url, created_at: r.created_at };
         })
       );
-      const extras = invitados.filter((i) => i.es_extra).length;
+      const total = invitados.length;
+      const cubiertos = maxIncluidos + prepagados;
+      // Arriba del plan (info) y lo que falta pagar (el miembro lo paga en su app).
+      const extras = Math.max(0, total - maxIncluidos);
+      const pendientes_pago = Math.max(0, total - cubiertos);
       return ok({
         invitados,
         max_incluidos: maxIncluidos,
+        invitados_extra_pagados: prepagados,
         precio_invitado_extra_centavos: precioExtra,
         extras,
-        total: invitados.length
+        pendientes_pago,
+        total
       });
     }
 

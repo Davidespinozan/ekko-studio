@@ -13,8 +13,12 @@ export interface Invitado {
 export interface InvitadosResp {
   invitados: Invitado[];
   max_incluidos: number;
+  /** Extras que el miembro ya pagó en la app (Stripe). Amplían la cobertura. */
+  invitados_extra_pagados: number;
   precio_invitado_extra_centavos: number;
   extras: number;
+  /** Personas arriba de la cobertura (incluidos + pagados): las paga el miembro en su app. */
+  pendientes_pago: number;
   total: number;
 }
 

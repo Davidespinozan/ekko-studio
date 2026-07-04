@@ -8,13 +8,16 @@ import {
   AlertTriangle,
   History,
   QrCode,
+  UserPlus,
   type LucideIcon
 } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
+import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ESTADOS_RESERVA_HISTORICOS } from '@shared/constants/reservaStatus';
 import { agruparPorDia } from '@member/logic/agruparReservas';
+import { PagarInvitadosExtra } from '@member/components/PagarInvitadosExtra';
 import type { Database } from '@shared/types/database';
 
 type Reserva = Database['public']['Tables']['reservas']['Row'];
@@ -99,8 +102,13 @@ function badgeParaReserva(status: string): { label: string; className: string; i
 
 export default function MisReservas() {
   const { usuario } = useAuth();
+  const tenant = useTenant();
   const { proximas, historial, isLoading } = useMisReservas(usuario?.id);
   const [tab, setTab] = useState<Tab>('proximas');
+  const [invitadosPara, setInvitadosPara] = useState<string | null>(null);
+
+  const cfgReserva = (tenant.config as Record<string, any>)?.reserva ?? {};
+  const precioExtraCentavos = Number(cfgReserva.precio_invitado_extra_centavos) || 0;
 
   const gruposProximas = agruparPorDia(proximas);
   const gruposHistorial = agruparPorDia(historial);
@@ -155,26 +163,37 @@ export default function MisReservas() {
                 <p className="ek-day-heading">{grupo.label}</p>
                 <div className="ek-stack-sm">
                   {grupo.items.map((r) => (
-                    <Link
-                      key={r.id}
-                      to={`/app/qr/${r.id}`}
-                      className="ek-card ek-card--md ek-card-interactive ek-lift"
-                      style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}
-                    >
-                      <span className="ek-empty-icon" style={{ width: 42, height: 42, margin: 0, flexShrink: 0 }}>
-                        <QrCode size={18} aria-hidden="true" />
-                      </span>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <p style={{ fontFamily: 'var(--ek-font-display)', fontSize: '15px', fontWeight: 600, letterSpacing: '-0.02em', margin: 0 }}>
-                          {r.recurso?.nombre ?? 'Estudio'}
-                        </p>
-                        <p className="ek-body-faint" style={{ marginTop: '2px' }}>
-                          {hora(r.slot_inicio)} · Folio{' '}
-                          <span style={{ fontFamily: 'var(--ek-font-mono)' }}>{r.folio}</span>
-                        </p>
-                      </div>
-                      <ArrowRight size={16} className="ek-quick-action-arrow" aria-hidden="true" />
-                    </Link>
+                    <div key={r.id} className="ek-stack-sm">
+                      <Link
+                        to={`/app/qr/${r.id}`}
+                        className="ek-card ek-card--md ek-card-interactive ek-lift"
+                        style={{ display: 'flex', alignItems: 'center', gap: '12px', textDecoration: 'none' }}
+                      >
+                        <span className="ek-empty-icon" style={{ width: 42, height: 42, margin: 0, flexShrink: 0 }}>
+                          <QrCode size={18} aria-hidden="true" />
+                        </span>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <p style={{ fontFamily: 'var(--ek-font-display)', fontSize: '15px', fontWeight: 600, letterSpacing: '-0.02em', margin: 0 }}>
+                            {r.recurso?.nombre ?? 'Estudio'}
+                          </p>
+                          <p className="ek-body-faint" style={{ marginTop: '2px' }}>
+                            {hora(r.slot_inicio)} · Folio{' '}
+                            <span style={{ fontFamily: 'var(--ek-font-mono)' }}>{r.folio}</span>
+                          </p>
+                        </div>
+                        <ArrowRight size={16} className="ek-quick-action-arrow" aria-hidden="true" />
+                      </Link>
+                      {precioExtraCentavos > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setInvitadosPara(r.id)}
+                          className="ek-cta ek-cta--secondary ek-cta--full"
+                          style={{ fontSize: '13px' }}
+                        >
+                          <UserPlus size={15} aria-hidden="true" /> Pagar invitados extra
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               </section>
@@ -229,6 +248,15 @@ export default function MisReservas() {
             </section>
           ))}
         </div>
+      )}
+
+      {invitadosPara && (
+        <PagarInvitadosExtra
+          reservaId={invitadosPara}
+          precioExtraCentavos={precioExtraCentavos}
+          onClose={() => setInvitadosPara(null)}
+          onPagado={() => setInvitadosPara(null)}
+        />
       )}
     </div>
   );

@@ -3,7 +3,7 @@ import { loadStripe, type Appearance } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { X, Lock } from 'lucide-react';
 import { Spinner } from '@shared/components/Spinner';
-import { crearPagoIntent } from '@shared/lib/checkout';
+import { crearPagoIntent, type PagoIntentResult } from '@shared/lib/checkout';
 import { useAuth } from '@shared/hooks/useAuth';
 
 /**
@@ -36,15 +36,23 @@ const appearance: Appearance = {
 };
 
 interface Props {
-  tierSlug: string;
-  tierNombre: string;
+  /** Plan a pagar (membresía). Omitir si se usa `fetchIntent` (p. ej. invitados). */
+  tierSlug?: string;
+  tierNombre?: string;
   precio: number;
   esPaquete?: boolean;
+  /** Overrides de presentación cuando no es una membresía. */
+  titulo?: string;
+  subtitulo?: string;
+  /** Pedir "Nombre en la tarjeta" (default true; los add-ons no lo necesitan). */
+  pedirNombre?: boolean;
+  /** Fuente del clientSecret; default: crearPagoIntent(tierSlug). */
+  fetchIntent?: () => Promise<PagoIntentResult>;
   onClose: () => void;
   onPagado: () => void;
 }
 
-export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose, onPagado }: Props) {
+export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, subtitulo, pedirNombre = true, fetchIntent, onClose, onPagado }: Props) {
   const { usuario } = useAuth();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [customerSessionSecret, setCustomerSessionSecret] = useState<string | null>(null);
@@ -61,7 +69,8 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose,
       setMsg('Los pagos online todavía no están configurados.');
       return;
     }
-    crearPagoIntent(tierSlug)
+    const obtener = fetchIntent ?? (() => crearPagoIntent(tierSlug ?? ''));
+    obtener()
       .then((res) => {
         if (res.clientSecret && res.account) {
           setClientSecret(res.clientSecret);
@@ -83,6 +92,9 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose,
         setEstado('error');
         setMsg(e instanceof Error ? e.message : 'No pudimos abrir el pago.');
       });
+    // El guard `fetched.current` asegura una sola llamada; no re-ejecutar por
+    // identidad de fetchIntent (viene inline del caller).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tierSlug]);
 
   // Stripe.js inicializado SOBRE la cuenta conectada (direct charges).
@@ -106,10 +118,10 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose,
           </button>
         </div>
         <h3 style={{ fontFamily: 'var(--ek-font-display)', fontSize: '20px', fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.02em' }}>
-          {tierNombre}
+          {titulo ?? tierNombre}
         </h3>
         <p className="ek-body-muted" style={{ margin: '0 0 18px', fontSize: '14px' }}>
-          ${precio.toLocaleString('es-MX')} {esPaquete ? '· pago único' : '/mes'}
+          {subtitulo ?? `$${precio.toLocaleString('es-MX')} ${esPaquete ? '· pago único' : '/mes'}`}
         </p>
 
         {estado === 'cargando' && <Spinner label="Preparando el pago…" />}
@@ -127,7 +139,7 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose,
               ...(customerSessionSecret ? { customerSessionClientSecret: customerSessionSecret } : {})
             }}
           >
-            <CheckoutForm onPagado={onPagado} nombreDefault={usuario?.nombre ?? ''} />
+            <CheckoutForm onPagado={onPagado} nombreDefault={usuario?.nombre ?? ''} pedirNombre={pedirNombre} />
           </Elements>
         )}
       </div>
@@ -135,7 +147,7 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose,
   );
 }
 
-function CheckoutForm({ onPagado, nombreDefault }: { onPagado: () => void; nombreDefault: string }) {
+function CheckoutForm({ onPagado, nombreDefault, pedirNombre }: { onPagado: () => void; nombreDefault: string; pedirNombre: boolean }) {
   const stripe = useStripe();
   const elements = useElements();
   const [procesando, setProcesando] = useState(false);
@@ -182,29 +194,31 @@ function CheckoutForm({ onPagado, nombreDefault }: { onPagado: () => void; nombr
 
   return (
     <form onSubmit={pagar}>
-      <label style={{ display: 'block', marginBottom: '12px' }}>
-        <span style={{ display: 'block', fontSize: '13px', color: '#888888', marginBottom: '6px' }}>
-          Nombre en la tarjeta
-        </span>
-        <input
-          type="text"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          autoComplete="cc-name"
-          placeholder="Como aparece en la tarjeta"
-          style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            padding: '12px 14px',
-            fontSize: '15px',
-            color: '#f5f1e8',
-            background: '#0a0a0a',
-            border: '0.5px solid rgba(245, 241, 232, 0.14)',
-            borderRadius: '13px',
-            outline: 'none'
-          }}
-        />
-      </label>
+      {pedirNombre && (
+        <label style={{ display: 'block', marginBottom: '12px' }}>
+          <span style={{ display: 'block', fontSize: '13px', color: '#888888', marginBottom: '6px' }}>
+            Nombre en la tarjeta
+          </span>
+          <input
+            type="text"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            autoComplete="cc-name"
+            placeholder="Como aparece en la tarjeta"
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              padding: '12px 14px',
+              fontSize: '15px',
+              color: '#f5f1e8',
+              background: '#0a0a0a',
+              border: '0.5px solid rgba(245, 241, 232, 0.14)',
+              borderRadius: '13px',
+              outline: 'none'
+            }}
+          />
+        </label>
+      )}
       <PaymentElement options={{ layout: 'tabs', fields: { billingDetails: { name: 'never' } } }} />
       {msg && <p style={{ color: 'var(--ek-danger)', fontSize: '13px', marginTop: '10px' }}>{msg}</p>}
       <button type="submit" className="ek-cta ek-cta--gold ek-cta--full" style={{ marginTop: '18px' }} disabled={!stripe || procesando}>

@@ -184,6 +184,14 @@ export const handler: Handler = async (event) => {
         p_event_at: accion.event_at
       });
       if (error) throw new Error(`sync_membresia_stripe: ${error.message}`);
+    } else if (accion.kind === 'invitados-extra') {
+      // Invitados extra pagados en la app → sumarlos a la reserva.
+      const { error } = await admin.rpc('registrar_invitados_extra_pagados', {
+        p_reserva_id: accion.reserva_id,
+        p_cantidad: accion.cantidad
+      });
+      if (error) throw new Error(`registrar_invitados_extra_pagados: ${error.message}`);
+      usuarioIdPago = accion.usuario_id;
     }
     // kind === 'ignore' → no-op (evento que no nos interesa).
 
