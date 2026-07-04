@@ -81,10 +81,10 @@ export function TarjetaModal({ onClose, onGuardada }: Props) {
     [account]
   );
 
+  // Solo cierra con el botón ✕ (un clic en el fondo perdía los datos).
   return (
-    <div className="ek-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="ek-backdrop" role="dialog" aria-modal="true">
       <div
-        onClick={(e) => e.stopPropagation()}
         className="ek-card"
         style={{ maxWidth: '440px', width: '100%', maxHeight: '92vh', overflowY: 'auto', animation: 'ek-scale-in 0.22s cubic-bezier(0.16,1,0.3,1)' }}
       >

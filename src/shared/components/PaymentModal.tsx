@@ -91,10 +91,11 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose,
     [account]
   );
 
+  // Sin cierre por clic en el fondo: en un pago un clic accidental perdía el
+  // progreso. Solo cierra con el botón ✕.
   return (
-    <div className="ek-backdrop" onClick={onClose} role="dialog" aria-modal="true">
+    <div className="ek-backdrop" role="dialog" aria-modal="true">
       <div
-        onClick={(e) => e.stopPropagation()}
         className="ek-card"
         style={{ maxWidth: '440px', width: '100%', maxHeight: '92vh', overflowY: 'auto', animation: 'ek-scale-in 0.22s cubic-bezier(0.16,1,0.3,1)' }}
       >
