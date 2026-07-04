@@ -4,6 +4,7 @@ import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-
 import { X, Lock } from 'lucide-react';
 import { Spinner } from '@shared/components/Spinner';
 import { crearPagoIntent } from '@shared/lib/checkout';
+import { useAuth } from '@shared/hooks/useAuth';
 
 /**
  * Modal de pago PROPIO de EKKO con Stripe Elements (<PaymentElement>) sobre la
@@ -44,6 +45,7 @@ interface Props {
 }
 
 export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose, onPagado }: Props) {
+  const { usuario } = useAuth();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [customerSessionSecret, setCustomerSessionSecret] = useState<string | null>(null);
   const [account, setAccount] = useState<string | null>(null);
@@ -124,7 +126,7 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose,
               ...(customerSessionSecret ? { customerSessionClientSecret: customerSessionSecret } : {})
             }}
           >
-            <CheckoutForm onPagado={onPagado} />
+            <CheckoutForm onPagado={onPagado} nombreDefault={usuario?.nombre ?? ''} />
           </Elements>
         )}
       </div>
@@ -132,11 +134,12 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, onClose,
   );
 }
 
-function CheckoutForm({ onPagado }: { onPagado: () => void }) {
+function CheckoutForm({ onPagado, nombreDefault }: { onPagado: () => void; nombreDefault: string }) {
   const stripe = useStripe();
   const elements = useElements();
   const [procesando, setProcesando] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [nombre, setNombre] = useState(nombreDefault);
   const submitting = useRef(false);
 
   async function pagar(e: React.FormEvent) {
@@ -151,9 +154,16 @@ function CheckoutForm({ onPagado }: { onPagado: () => void }) {
         setMsg(submitErr.message ?? 'Revisa los datos de la tarjeta.');
         return;
       }
+      // El nombre del titular lo recogemos nosotros (Stripe oculta el campo en
+      // tarjeta). Se adjunta a la tarjeta NUEVA vía payment_method_data; si el
+      // miembro elige una tarjeta GUARDADA, Stripe usa esa y este dato no aplica.
+      const nombreTrim = nombre.trim();
       const { error } = await stripe.confirmPayment({
         elements,
-        confirmParams: { return_url: `${window.location.origin}/app/perfil?suscripcion=ok` },
+        confirmParams: {
+          return_url: `${window.location.origin}/app/perfil?suscripcion=ok`,
+          ...(nombreTrim ? { payment_method_data: { billing_details: { name: nombreTrim } } } : {})
+        },
         redirect: 'if_required'
       });
       if (error) {
@@ -171,7 +181,30 @@ function CheckoutForm({ onPagado }: { onPagado: () => void }) {
 
   return (
     <form onSubmit={pagar}>
-      <PaymentElement options={{ layout: 'tabs' }} />
+      <label style={{ display: 'block', marginBottom: '12px' }}>
+        <span style={{ display: 'block', fontSize: '13px', color: '#888888', marginBottom: '6px' }}>
+          Nombre en la tarjeta
+        </span>
+        <input
+          type="text"
+          value={nombre}
+          onChange={(e) => setNombre(e.target.value)}
+          autoComplete="cc-name"
+          placeholder="Como aparece en la tarjeta"
+          style={{
+            width: '100%',
+            boxSizing: 'border-box',
+            padding: '12px 14px',
+            fontSize: '15px',
+            color: '#f5f1e8',
+            background: '#0a0a0a',
+            border: '0.5px solid rgba(245, 241, 232, 0.14)',
+            borderRadius: '13px',
+            outline: 'none'
+          }}
+        />
+      </label>
+      <PaymentElement options={{ layout: 'tabs', fields: { billingDetails: { name: 'never' } } }} />
       {msg && <p style={{ color: 'var(--ek-danger)', fontSize: '13px', marginTop: '10px' }}>{msg}</p>}
       <button type="submit" className="ek-cta ek-cta--gold ek-cta--full" style={{ marginTop: '18px' }} disabled={!stripe || procesando}>
         {procesando ? <Spinner size={16} /> : 'Pagar ahora'}
