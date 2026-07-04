@@ -164,7 +164,7 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
                 className="ek-label"
                 style={{ marginBottom: '8px' }}
               >
-                ¿Por qué cancelás? (opcional)
+                ¿Por qué cancelas? (opcional)
               </p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
                 {SUGERENCIAS.map((sug) => {

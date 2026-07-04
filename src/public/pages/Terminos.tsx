@@ -6,7 +6,7 @@ import { LegalDoc } from '../components/LegalDoc';
 // revísala con un abogado y agrega los datos fiscales del Estudio (razón social,
 // RFC, domicilio) si tu abogado lo pide. El contenido usa el nombre y el correo
 // del tenant automáticamente.
-const ACTUALIZADO = '2 de julio de 2026';
+const ACTUALIZADO = '4 de julio de 2026';
 
 export default function Terminos() {
   const tenant = useTenant();
@@ -20,14 +20,16 @@ export default function Terminos() {
         Estos Términos y Condiciones (los <strong>“Términos”</strong>) regulan el uso de los servicios de{' '}
         <strong>{est}</strong> (el <strong>“Estudio”</strong>, “nosotros”), incluyendo la renta de estudios de
         creación de contenido, las membresías y la aplicación de reservas. Al crear una cuenta, contratar una
-        membresía o usar nuestras instalaciones, aceptás estos Términos.
+        membresía o usar nuestras instalaciones, aceptas estos Términos.
       </p>
 
       <h2>1. El servicio</h2>
       <p>
         El Estudio ofrece espacios equipados para producción de contenido (foto, video, podcast y usos similares),
         reservables por bloques de tiempo a través de nuestra plataforma. El acceso está sujeto a contar con una
-        membresía o plan vigente y a cumplir con estos Términos.
+        membresía o plan vigente y a cumplir con estos Términos. Al finalizar cada sesión te entregamos tu material
+        grabado en formato MP4; algunos planes incluyen servicios adicionales (por ejemplo, edición básica y
+        miniaturas) que se detallan en el plan contratado.
       </p>
 
       <h2>2. Tu cuenta</h2>
@@ -40,7 +42,7 @@ export default function Terminos() {
       <h2>3. Membresías, planes y créditos</h2>
       <ul>
         <li><strong>Membresía mensual:</strong> otorga acceso recurrente según el plan contratado, con cobro periódico automático.</li>
-        <li><strong>Planes por créditos o paquetes:</strong> otorgan un número de sesiones que se consumen al reservar.</li>
+        <li><strong>Planes por créditos o paquetes:</strong> otorgan un número de sesiones que se consumen al reservar y tienen una vigencia; los créditos no usados antes de su vencimiento se pierden. Algunos estudios pueden consumir más de un crédito por sesión, según se indique en la plataforma.</li>
         <li><strong>Sin permanencia:</strong> las membresías mensuales son mes a mes; puedes cancelarlas cuando quieras, sin compromiso mínimo.</li>
       </ul>
       <p>Las características, precios y reglas de cada plan se muestran al momento de la contratación y pueden actualizarse hacia el futuro.</p>
@@ -68,8 +70,8 @@ export default function Terminos() {
       <ul>
         <li>Las reservas se hacen por bloques dentro del horario de cada estudio; cada bloque admite <strong>una sola reserva</strong>.</li>
         <li>Puedes cancelar o reprogramar una sesión con la anticipación indicada en la plataforma.</li>
-        <li>Si no te presentás a una sesión reservada (<strong>no-show</strong>) o cancelás fuera de tiempo, se considera consumida: se descuenta el crédito o se ocupa el cupo correspondiente.</li>
-        <li>El uso reiterado de no-shows puede derivar en la restricción temporal de nuevas reservas.</li>
+        <li>Si no te presentas a una sesión reservada (<strong>no-show</strong>) o cancelas fuera de tiempo, la sesión se considera consumida: se descuenta el crédito correspondiente o se pierde la sesión del período, según tu plan.</li>
+        <li>La acumulación de inasistencias puede derivar en la restricción temporal de nuevas reservas por un período determinado.</li>
       </ul>
 
       <h2>7. Verificación de identidad y acceso</h2>

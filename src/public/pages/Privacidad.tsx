@@ -5,7 +5,7 @@ import { LegalDoc } from '../components/LegalDoc';
 // NOTA (David): Aviso de Privacidad base conforme a la LFPDPPP (México). NO es
 // asesoría legal — revísalo con un abogado y agrega el domicilio del responsable
 // si tu abogado lo requiere. Usa el nombre y el correo del tenant automáticamente.
-const ACTUALIZADO = '2 de julio de 2026';
+const ACTUALIZADO = '4 de julio de 2026';
 
 export default function Privacidad() {
   const tenant = useTenant();
@@ -40,7 +40,7 @@ export default function Privacidad() {
       <h2>3. Datos sensibles</h2>
       <p>
         Para la verificación de identidad podemos tratar tu fotografía e identificación oficial. Al proporcionarlos y
-        aceptar este Aviso, otorgás tu consentimiento para su tratamiento con las finalidades aquí descritas. Estos
+        aceptar este Aviso, otorgas tu consentimiento para su tratamiento con las finalidades aquí descritas. Estos
         datos se resguardan con acceso restringido.
       </p>
 
@@ -85,7 +85,7 @@ export default function Privacidad() {
       </p>
       <p>
         Para ejercer estos derechos, envía tu solicitud a <a href={`mailto:${email}`}>{email}</a> indicando tu nombre,
-        el derecho que deseás ejercer y la información suficiente para atenderte. Responderemos en los plazos que marca
+        el derecho que deseas ejercer y la información suficiente para atenderte. Responderemos en los plazos que marca
         la Ley.
       </p>
 
