@@ -89,7 +89,7 @@ export default function Footer() {
             <img
               src={logoUrl}
               alt={tenant.nombre}
-              style={{ maxHeight: '36px', maxWidth: '180px', objectFit: 'contain', marginBottom: '12px' }}
+              style={{ maxHeight: '60px', maxWidth: '260px', objectFit: 'contain', marginBottom: '12px' }}
             />
           ) : (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '12px' }}>

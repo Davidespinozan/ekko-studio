@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ArrowRight, Check, X, CalendarCheck, Clapperboard, FolderDown, ImageIcon, Sparkles } from 'lucide-react';
+import { Star, ArrowRight, Check, X, CalendarCheck, Clapperboard, FolderDown, ImageIcon } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios } from '@shared/lib/beneficios';
 import { sufijoPrecioSesiones, esTierRecomendado, esPlanPaquete } from '@shared/lib/planPresentacion';
@@ -606,83 +606,59 @@ export default function Landing() {
           CTA + CONTACTO
           ============================================================ */}
       <Reveal>
-      <section id="contacto" style={{ padding: 'clamp(44px, 8vw, 72px) 0' }}>
+      <section id="contacto" style={{ padding: 'clamp(28px, 5vw, 48px) 0' }}>
         <div style={{
-          background:
-            'radial-gradient(ellipse 90% 70% at 50% 0%, rgba(229, 184, 41, 0.10), transparent 60%),' +
-            'linear-gradient(160deg, var(--ek-bg-elevated) 0%, var(--ek-bg-soft) 60%, var(--ek-bg) 100%)',
-          border: '0.5px solid var(--ek-mustard-dim)',
+          background: 'var(--ek-bg-elevated)',
+          border: '0.5px solid var(--ek-line)',
           borderRadius: 'var(--ek-r-landing)',
-          padding: 'clamp(40px, 7vw, 72px) clamp(24px, 5vw, 56px)',
-          textAlign: 'center',
-          position: 'relative',
-          overflow: 'hidden',
-          boxShadow: 'inset 0 1px 0 rgba(245, 241, 232, 0.06), 0 24px 60px rgba(0, 0, 0, 0.4)'
+          padding: 'clamp(32px, 5vw, 52px) clamp(24px, 5vw, 40px)',
+          textAlign: 'center'
         }}>
-          {/* glows en dos esquinas para profundidad */}
-          <div aria-hidden="true" style={{
-            position: 'absolute', top: '-120px', right: '-90px', width: '320px', height: '320px',
-            background: 'radial-gradient(circle, rgba(229, 184, 41, 0.14), transparent 70%)',
-            borderRadius: '50%', pointerEvents: 'none'
-          }} />
-          <div aria-hidden="true" style={{
-            position: 'absolute', bottom: '-140px', left: '-100px', width: '320px', height: '320px',
-            background: 'radial-gradient(circle, rgba(229, 184, 41, 0.07), transparent 70%)',
-            borderRadius: '50%', pointerEvents: 'none'
-          }} />
-
-          <div style={{ position: 'relative' }}>
-            <span className="ek-empty-icon" style={{ width: 56, height: 56, marginBottom: '20px' }}>
-              <Sparkles size={24} aria-hidden="true" />
-            </span>
-
-            {cta_final.eyebrow && (
-              <p className="ek-eyebrow ek-eyebrow--mustard" style={{
-                marginBottom: '16px', justifyContent: 'center', display: 'flex'
-              }}>
-                {cta_final.eyebrow}
-              </p>
-            )}
-            <h2 style={{
-              fontFamily: 'var(--ek-font-display)',
-              fontSize: 'clamp(30px, 5vw, 52px)',
-              fontWeight: 700,
-              letterSpacing: '-0.04em',
-              margin: '0 auto 16px',
-              maxWidth: '14ch',
-              lineHeight: 1.05
+          {cta_final.eyebrow && (
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{
+              marginBottom: '14px', justifyContent: 'center', display: 'flex'
             }}>
-              {cta_final.titulo}
-            </h2>
-            {cta_final.subtitulo && (
-              <p className="ek-body-muted" style={{ marginBottom: '32px', maxWidth: '480px', marginLeft: 'auto', marginRight: 'auto' }}>
-                {cta_final.subtitulo}
-              </p>
-            )}
-            {ctaWhatsappUrl ? (
-              <MagneticButton
-                href={ctaWhatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ek-cta ek-cta--gold"
-                style={{ padding: '16px 34px', fontSize: '15px', minHeight: '54px', gap: '8px' }}
-              >
-                {cta_final.cta_texto}
-                <ArrowRight size={18} aria-hidden="true" />
-              </MagneticButton>
-            ) : (
-              <span
-                style={{
-                  fontSize: '12px',
-                  color: 'var(--ek-ink-faint)',
-                  fontStyle: 'italic'
-                }}
-                title="Configura el WhatsApp en /admin/configuracion"
-              >
-                (Contacto sin configurar)
-              </span>
-            )}
-          </div>
+              {cta_final.eyebrow}
+            </p>
+          )}
+          <h2 style={{
+            fontFamily: 'var(--ek-font-display)',
+            fontSize: 'clamp(24px, 3.4vw, 38px)',
+            fontWeight: 700,
+            letterSpacing: '-0.03em',
+            margin: '0 auto 12px',
+            maxWidth: '18ch',
+            lineHeight: 1.1
+          }}>
+            {cta_final.titulo}
+          </h2>
+          {cta_final.subtitulo && (
+            <p className="ek-body-muted" style={{ marginBottom: '26px', maxWidth: '440px', marginLeft: 'auto', marginRight: 'auto' }}>
+              {cta_final.subtitulo}
+            </p>
+          )}
+          {ctaWhatsappUrl ? (
+            <MagneticButton
+              href={ctaWhatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ek-cta ek-cta--gold"
+              style={{ padding: '15px 30px', fontSize: '15px', minHeight: '52px' }}
+            >
+              {cta_final.cta_texto}
+            </MagneticButton>
+          ) : (
+            <span
+              style={{
+                fontSize: '12px',
+                color: 'var(--ek-ink-faint)',
+                fontStyle: 'italic'
+              }}
+              title="Configura el WhatsApp en /admin/configuracion"
+            >
+              (Contacto sin configurar)
+            </span>
+          )}
         </div>
       </section>
       </Reveal>
