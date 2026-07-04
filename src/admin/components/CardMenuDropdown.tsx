@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -72,7 +73,7 @@ export default function CardMenuDropdown({ items }: Props) {
       >
         <MoreHorizontal size={18} aria-hidden="true" />
       </button>
-      {open && pos && (
+      {open && pos && createPortal(
         <>
           <div
             onClick={() => setOpen(false)}
@@ -80,6 +81,7 @@ export default function CardMenuDropdown({ items }: Props) {
             aria-hidden="true"
           />
           <div
+            onClick={(e) => e.stopPropagation()}
             style={{
               position: 'fixed',
               top: pos.top,
@@ -143,7 +145,8 @@ export default function CardMenuDropdown({ items }: Props) {
               );
             })}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
