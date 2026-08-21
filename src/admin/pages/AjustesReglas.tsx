@@ -11,6 +11,7 @@ type ReglasDraft = {
   precio_invitado_extra: number; // en PESOS (se guarda en centavos)
   permitir_continuas: boolean;
   no_show_bloqueo_dias: number;
+  no_show_umbral: number;
 };
 
 const DEFAULT: ReglasDraft = {
@@ -20,7 +21,8 @@ const DEFAULT: ReglasDraft = {
   cancelacion_min_horas_antes: 24,
   precio_invitado_extra: 0,
   permitir_continuas: false,
-  no_show_bloqueo_dias: 7
+  no_show_bloqueo_dias: 7,
+  no_show_umbral: 3
 };
 
 function readDraft(config: Record<string, unknown> | null): ReglasDraft {
@@ -39,7 +41,8 @@ function readDraft(config: Record<string, unknown> | null): ReglasDraft {
     cancelacion_min_horas_antes: num(reserva.cancelacion_min_horas_antes, DEFAULT.cancelacion_min_horas_antes),
     precio_invitado_extra: num(reserva.precio_invitado_extra_centavos, 0) / 100,
     permitir_continuas: Boolean(reserva.permitir_continuas ?? DEFAULT.permitir_continuas),
-    no_show_bloqueo_dias: num(penalizaciones.no_show_bloqueo_dias, DEFAULT.no_show_bloqueo_dias)
+    no_show_bloqueo_dias: num(penalizaciones.no_show_bloqueo_dias, DEFAULT.no_show_bloqueo_dias),
+    no_show_umbral: Math.max(1, num(penalizaciones.no_show_umbral, DEFAULT.no_show_umbral))
   };
 }
 
@@ -140,7 +143,8 @@ export default function AjustesReglas() {
       },
       penalizaciones: {
         ...penalizaciones,
-        no_show_bloqueo_dias: draft.no_show_bloqueo_dias
+        no_show_bloqueo_dias: draft.no_show_bloqueo_dias,
+        no_show_umbral: draft.no_show_umbral
       }
     };
 
@@ -276,8 +280,22 @@ export default function AjustesReglas() {
 
       <Section title="PENALIZACIONES">
         <FormField
+          label="Faltas antes de bloquear"
+          helper="A partir de esta inasistencia (sin check-in) se bloquea al miembro. Cada falta se registra y se le avisa; el bloqueo aplica al llegar a este número."
+        >
+          <input
+            type="number"
+            min={1}
+            value={draft.no_show_umbral}
+            onChange={(e) =>
+              setDraft({ ...draft, no_show_umbral: Math.max(1, parseInt(e.target.value) || 1) })
+            }
+            className="ek-input"
+          />
+        </FormField>
+        <FormField
           label="Bloqueo por no llegar a la reserva (días)"
-          helper="Días que se bloquea un miembro si no asiste a una sesión reservada. Ejemplo: 7 días."
+          helper="Días que el miembro no puede reservar al alcanzar el número de faltas. 0 = solo registrar la falta, sin bloquear."
         >
           <input
             type="number"

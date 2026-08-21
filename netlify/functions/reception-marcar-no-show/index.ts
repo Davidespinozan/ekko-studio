@@ -11,6 +11,8 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
+import { enviarPushAUsuario } from '../_lib/push';
+import { leerPenalizacionConfig, calcularPenalizacionNoShow, mensajeNoShow } from '../_lib/noShow';
 
 /**
  * POST /reception-marcar-no-show
@@ -105,17 +107,23 @@ export const handler: Handler = async (event) => {
     if (miembroErr) return serverError(miembroErr.message);
     if (!miembro) return notFound('Miembro de la reserva no encontrado');
 
-    // Mismo cálculo que el cron: count+1; bloqueo 7d SOLO a partir de la 3ª falta.
-    const UMBRAL_BLOQUEO = 3;
+    // 3b. Reglas del tenant (Admin → Reglas → Penalizaciones). Mismo cálculo
+    //     que el cron `marcar_no_shows`: 0 días = solo registrar, sin bloquear.
+    const { data: tenantRow, error: tenantErr } = await supabaseAdmin
+      .from('tenants')
+      .select('config')
+      .eq('id', reserva.tenant_id)
+      .maybeSingle();
+    if (tenantErr) return serverError(tenantErr.message);
+    const cfg = leerPenalizacionConfig(tenantRow?.config ?? null);
     const countAntes = miembro.no_shows_count ?? 0;
-    const countNuevo = countAntes + 1;
-    const sieteDias = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const bloqueoNuevo =
-      countNuevo >= UMBRAL_BLOQUEO
-        ? (miembro.bloqueado_hasta && new Date(miembro.bloqueado_hasta) > sieteDias
-            ? miembro.bloqueado_hasta
-            : sieteDias.toISOString())
-        : (miembro.bloqueado_hasta ?? null);
+    const pen = calcularPenalizacionNoShow({
+      countAntes,
+      bloqueadoHasta: miembro.bloqueado_hasta ?? null,
+      cfg
+    });
+    const countNuevo = pen.countNuevo;
+    const bloqueoNuevo = pen.bloqueadoHasta;
 
     // 4. Aplicar: reserva → no_show, miembro → penalización.
     const { error: upReservaErr } = await supabaseAdmin
@@ -130,6 +138,29 @@ export const handler: Handler = async (event) => {
       .eq('id', miembro.id);
     if (upMiembroErr) return serverError(upMiembroErr.message);
 
+    // 4b. Avisar al miembro (in-app + push, best-effort): que se entere de la
+    //     falta y del bloqueo ahora, no cuando intente reservar.
+    try {
+      const aviso = mensajeNoShow({ folio: reserva.folio, resultado: pen, cfg });
+      const { error: notifErr } = await supabaseAdmin.from('notificaciones').insert({
+        tenant_id: reserva.tenant_id,
+        usuario_id: miembro.id,
+        tipo: 'no_show',
+        titulo: aviso.titulo,
+        mensaje: aviso.mensaje,
+        metadata: { reserva_id: reserva.id, folio: reserva.folio, bloqueado_hasta: bloqueoNuevo }
+      });
+      if (notifErr) console.error('[reception-marcar-no-show] notificación', notifErr.message);
+      await enviarPushAUsuario(supabaseAdmin, miembro.id, {
+        titulo: aviso.titulo,
+        mensaje: aviso.mensaje,
+        url: '/app/reservas',
+        tag: 'no_show'
+      });
+    } catch (e) {
+      console.error('[reception-marcar-no-show] aviso', e instanceof Error ? e.message : e);
+    }
+
     // 5. Auditoría inmutable (targeteada al usuario → visible en su historial).
     await writeAuditLog(supabaseAdmin, {
       tenant_id: reserva.tenant_id,
@@ -141,7 +172,7 @@ export const handler: Handler = async (event) => {
       antes: { reserva_status: 'confirmada', no_shows_count: countAntes, bloqueado_hasta: miembro.bloqueado_hasta },
       despues: { reserva_status: 'no_show', no_shows_count: countNuevo, bloqueado_hasta: bloqueoNuevo },
       motivo,
-      metadata: { reserva_id: reserva.id, folio: reserva.folio }
+      metadata: { reserva_id: reserva.id, folio: reserva.folio, umbral: cfg.umbral, bloqueo_dias: cfg.bloqueo_dias }
     });
 
     return ok({
