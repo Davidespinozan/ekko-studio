@@ -8,6 +8,7 @@ import { useReservasHoy, checkInManual, type ReservaConJoin } from '../hooks/use
 import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 import { MarcarNoShowModal, type ReservaInfo } from './MarcarNoShowModal';
 import { CorregirCheckinModal } from './CorregirCheckinModal';
+import { MarcarAsistioModal } from './MarcarAsistioModal';
 import { clasificarReservasHoy } from '../lib/clasificarReservasHoy';
 import { ZONA_ESTUDIO, hoyISOEnZona, sumarDiasISO, diasEntreISO, formatFechaEnZona, instanteDeFechaHoraEnZona } from '@shared/lib/timezone';
 
@@ -106,11 +107,19 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
   const [selected, setSelected] = useState<ReservaConJoin | null>(null);
   const [noShowTarget, setNoShowTarget] = useState<ReservaConJoin | null>(null);
   const [corregirTarget, setCorregirTarget] = useState<ReservaConJoin | null>(null);
+  const [asistioTarget, setAsistioTarget] = useState<ReservaConJoin | null>(null);
+
+  // Un no_show/cancelada cuya sesión YA empezó se puede corregir a "sí asistió"
+  // (el miembro vino y nadie le hizo check-in). Las futuras siguen sin acción.
+  const seleccionar = (r: ReservaConJoin) => {
+    if (esCorregibleAsistencia(r)) setAsistioTarget(r);
+    else setSelected(r);
+  };
   // Polling pausa si hay un modal de check-in abierto (manual local o
   // CheckInDetail a nivel Scanner) — evita reordenar la lista debajo.
   const { reservas, isLoading, refetch } = useReservasHoy(
     fechaSeleccionada,
-    !selected && !noShowTarget && !corregirTarget && !pausarPolling
+    !selected && !noShowTarget && !corregirTarget && !asistioTarget && !pausarPolling
   );
 
   // Búsqueda + debounce
@@ -449,7 +458,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {llegando.map((r) => (
-                  <ReservaCard key={r.id} reserva={r} onSelect={setSelected} highlight />
+                  <ReservaCard key={r.id} reserva={r} onSelect={seleccionar} highlight />
                 ))}
               </div>
             )}
@@ -466,7 +475,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {resto.map((r) => (
-                  <ReservaCard key={r.id} reserva={r} onSelect={setSelected} />
+                  <ReservaCard key={r.id} reserva={r} onSelect={seleccionar} />
                 ))}
               </div>
             )}
@@ -484,7 +493,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {faltantes.map((r) => (
                   <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <ReservaCard reserva={r} onSelect={setSelected} />
+                    <ReservaCard reserva={r} onSelect={seleccionar} />
                     <button
                       type="button"
                       onClick={() => setNoShowTarget(r)}
@@ -532,7 +541,23 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
           onDone={() => void refetch()}
         />
       )}
+
+      {asistioTarget && (
+        <MarcarAsistioModal
+          reserva={{ ...toReservaInfo(asistioTarget), status: asistioTarget.status }}
+          onClose={() => setAsistioTarget(null)}
+          onDone={() => void refetch()}
+        />
+      )}
     </div>
+  );
+}
+
+/** ¿Se puede marcar "sí asistió"? no_show/cancelada con sesión ya iniciada. */
+function esCorregibleAsistencia(r: Pick<ReservaConJoin, 'status' | 'slot_inicio'>): boolean {
+  return (
+    (r.status === 'no_show' || r.status === 'cancelada' || r.status === 'cancelada_admin') &&
+    new Date(r.slot_inicio).getTime() <= Date.now()
   );
 }
 
@@ -578,12 +603,12 @@ function ReservaCard({
     capitalizarNombre(reserva.usuario?.nombre) || reserva.usuario?.email || '—';
 
   const tier = reserva.usuario?.membresia_tier;
-  // Disabled si está cancelada (cualquier tipo) o no-show. completada permite
-  // abrir el modal (muestra "ya hizo check-in").
+  // Disabled solo si está cancelada/no-show y la sesión aún NO empieza. Una ya
+  // iniciada se puede abrir para corregir la asistencia ("sí asistió").
+  // completada permite abrir el modal (muestra "ya hizo check-in").
   const disabled =
-    reserva.status === 'cancelada' ||
-    reserva.status === 'cancelada_admin' ||
-    reserva.status === 'no_show';
+    (reserva.status === 'cancelada' || reserva.status === 'cancelada_admin' || reserva.status === 'no_show') &&
+    !esCorregibleAsistencia(reserva);
 
   return (
     <button

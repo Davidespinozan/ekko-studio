@@ -26,6 +26,17 @@ export function corregirCheckin(reserva_id: string, motivo: string): Promise<Cor
   return backendPost<CorregirResult>('reception-corregir-checkin', { reserva_id, motivo });
 }
 
+export interface AsistioResult {
+  success: boolean;
+  status: string;
+  penalizacion: { no_shows_count: number; bloqueado_hasta: string | null } | null;
+}
+
+/** "Sí asistió": corrige un no_show/cancelada ya iniciada → completada (revierte la falta). */
+export function marcarAsistio(reserva_id: string, motivo: string): Promise<AsistioResult> {
+  return backendPost<AsistioResult>('reception-marcar-asistio', { reserva_id, motivo });
+}
+
 // Motivos predefinidos (Bloque D). David puede ajustarlos.
 export const MOTIVOS_NO_SHOW = [
   'Cliente no se presentó',
@@ -37,4 +48,10 @@ export const MOTIVOS_CORREGIR_CHECKIN = [
   'Check-in al miembro equivocado',
   'El miembro no llegó a presentarse físicamente',
   'Error operativo de recepción'
+];
+
+export const MOTIVOS_ASISTIO = [
+  'Sí vino, no le hicieron check-in',
+  'El cron lo marcó no-show por error',
+  'Cancelación por error, el miembro sí usó la sesión'
 ];
