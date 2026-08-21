@@ -492,7 +492,7 @@ function BloqueEconomia({ data }: { data: EconomiaResult }) {
   return (
     <>
       <div className="adm-metricas-grid">
-        <KpiCard label="MRR · ingreso recurrente" valor={pesos(data.mrrCentavos)} nota="membresías activas × precio mensual" ayuda={AYUDA.mrr} />
+        <KpiCard label="MRR · ingreso recurrente" valor={pesos(data.mrrCentavos)} nota={`membresías mensuales activas × precio${data.paquetesActivos ? ` · ${data.paquetesActivos} paquete${data.paquetesActivos === 1 ? '' : 's'} de créditos fuera del MRR` : ''}`} ayuda={AYUDA.mrr} />
         <KpiCard label="ARR · anualizado" valor={pesos(data.arrCentavos)} nota="MRR × 12" ayuda={AYUDA.arr} />
         <KpiCard label="ARPU · por miembro" valor={pesos(data.arpuCentavos)} nota={`${data.activosConPlan} ${data.activosConPlan === 1 ? 'miembro' : 'miembros'} con plan`} ayuda={AYUDA.arpu} />
         <KpiCard label="Churn mensual" valor={churnTexto} alerta={churnAlerta} nota="bajas de 90 días" ayuda={AYUDA.churn} />

@@ -14,6 +14,8 @@ export interface TierLite {
   precio_centavos: number;
   periodo: 'mensual' | 'anual';
   moneda: string;
+  /** 'tiempo' = recurrente (default). 'creditos'/'hibrido' = paquete de pago único. */
+  tipo?: 'tiempo' | 'creditos' | 'hibrido' | null;
 }
 
 export interface MembresiaLite {
@@ -38,11 +40,22 @@ export interface EconomiaResult {
   ltvCentavos: number | null;
   moneda: string;
   ingresoPorPlan: IngresoPorPlan[];
+  /** Paquetes de créditos vigentes: son ingreso de UNA vez, NO entran al MRR. */
+  paquetesActivos: number;
 }
 
 // Estados que SÍ generan ingreso recurrente hoy. past_due sigue contando: el
 // acceso sigue vivo y Stripe reintenta el cobro (no es una baja todavía).
 export const STATUS_FACTURABLE = new Set(['activa', 'trialing', 'past_due']);
+
+/**
+ * Solo los planes por tiempo son ingreso RECURRENTE. Un paquete de créditos
+ * (creditos/hibrido) se cobra una sola vez: sumarlo al MRR inflaba MRR, ARR,
+ * ARPU y LTV con cada paquete vigente. (Lección de SALA, 4ef2d4b.)
+ */
+export function esRecurrente(t: Pick<TierLite, 'tipo'>): boolean {
+  return (t.tipo ?? 'tiempo') === 'tiempo';
+}
 
 /** Precio mensualizado de un tier (los anuales se dividen entre 12). */
 export function mensualizar(t: Pick<TierLite, 'precio_centavos' | 'periodo'>): number {
@@ -65,11 +78,16 @@ export function calcularEconomia(
   const acumPorTier = new Map<string, { tier: TierLite; mrr: number; miembros: number }>();
   let mrrCentavos = 0;
   let activosConPlan = 0;
+  let paquetesActivos = 0;
 
   for (const m of membresiasActivas) {
     if (!STATUS_FACTURABLE.has(m.status)) continue;
     const tier = tierPorId.get(m.tier_id);
     if (!tier) continue;
+    if (!esRecurrente(tier)) {
+      paquetesActivos += 1;
+      continue;
+    }
     const mensual = mensualizar(tier);
     mrrCentavos += mensual;
     activosConPlan += 1;
@@ -120,6 +138,7 @@ export function calcularEconomia(
     vidaMediaMeses,
     ltvCentavos,
     moneda,
-    ingresoPorPlan
+    ingresoPorPlan,
+    paquetesActivos
   };
 }

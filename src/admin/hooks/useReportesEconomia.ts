@@ -28,7 +28,7 @@ export function useReportesEconomia() {
     const [tiersRes, membresiasRes, bajasRes] = await Promise.all([
       supabase
         .from('tiers')
-        .select('id, slug, nombre, precio_centavos, periodo, moneda')
+        .select('id, slug, nombre, precio_centavos, periodo, moneda, tipo')
         .eq('tenant_id', tenant.id),
       supabase
         .from('membresias')

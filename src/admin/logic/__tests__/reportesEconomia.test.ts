@@ -4,6 +4,8 @@ import { calcularEconomia, mensualizar, type TierLite } from '../reportesEconomi
 const BASICA: TierLite = { id: 't1', slug: 'basica', nombre: 'Básica', precio_centavos: 80000, periodo: 'mensual', moneda: 'MXN' };
 const PRO: TierLite = { id: 't2', slug: 'pro', nombre: 'Pro', precio_centavos: 150000, periodo: 'mensual', moneda: 'MXN' };
 const ANUAL: TierLite = { id: 't3', slug: 'anual', nombre: 'Anual', precio_centavos: 1200000, periodo: 'anual', moneda: 'MXN' };
+const PAQUETE: TierLite = { id: 't4', slug: 'creador', nombre: 'Creador (5 sesiones)', precio_centavos: 250000, periodo: 'mensual', moneda: 'MXN', tipo: 'creditos' };
+const HIBRIDO: TierLite = { id: 't5', slug: 'pro-pack', nombre: 'Pro pack', precio_centavos: 400000, periodo: 'mensual', moneda: 'MXN', tipo: 'hibrido' };
 
 describe('mensualizar', () => {
   it('mensual → tal cual', () => {
@@ -95,5 +97,25 @@ describe('calcularEconomia', () => {
       { slug: 'pro', nombre: 'Pro', mrrCentavos: 300000, miembros: 2 },
       { slug: 'basica', nombre: 'Básica', mrrCentavos: 80000, miembros: 1 }
     ]);
+  });
+
+  it('los paquetes de créditos (creditos/hibrido) NO entran al MRR ni al ARPU; se cuentan aparte', () => {
+    const r = calcularEconomia([BASICA, PAQUETE, HIBRIDO], [
+      { tier_id: 't1', status: 'activa' },
+      { tier_id: 't4', status: 'activa' },
+      { tier_id: 't5', status: 'activa' }
+    ], 0);
+    expect(r.mrrCentavos).toBe(80000);
+    expect(r.arrCentavos).toBe(80000 * 12);
+    expect(r.activosConPlan).toBe(1);
+    expect(r.arpuCentavos).toBe(80000);
+    expect(r.paquetesActivos).toBe(2);
+    expect(r.ingresoPorPlan.map((p) => p.slug)).toEqual(['basica']);
+  });
+
+  it('tier sin `tipo` (filas viejas) se trata como recurrente', () => {
+    const r = calcularEconomia([{ ...BASICA, tipo: undefined }], [{ tier_id: 't1', status: 'activa' }], 0);
+    expect(r.mrrCentavos).toBe(80000);
+    expect(r.paquetesActivos).toBe(0);
   });
 });

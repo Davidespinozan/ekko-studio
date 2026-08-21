@@ -7,7 +7,7 @@ import type { CreditosResult } from '../reportesCreditos';
 
 const eco = (o: Partial<EconomiaResult> = {}): EconomiaResult => ({
   mrrCentavos: 500000, arrCentavos: 6000000, arpuCentavos: 50000, activosConPlan: 10,
-  churnMensualPct: 3, vidaMediaMeses: 30, ltvCentavos: 1500000, moneda: 'mxn', ingresoPorPlan: [], ...o
+  churnMensualPct: 3, vidaMediaMeses: 30, ltvCentavos: 1500000, moneda: 'mxn', ingresoPorPlan: [], paquetesActivos: 0, ...o
 });
 const ocu = (o: Partial<OcupacionResult> = {}): OcupacionResult => ({
   dias: 90, ocupacionPct: 70, asistenciaPct: 95, totalReservas: 100, horasReservadas: 100,
