@@ -19,6 +19,7 @@ import {
   type FaqConfig,
   type EstudioModalConfig
 } from '@shared/lib/landingDefaults';
+import { ConfigLoadErrorBanner } from '../components/ConfigLoadErrorBanner';
 
 type HeroDraft = {
   eyebrow: string;
@@ -202,7 +203,7 @@ function Section({
 }
 
 export default function AjustesLanding() {
-  const { config, isLoading, isSaving, saveTopLevel } = useTenantConfigEditor();
+  const { config, isLoading, isSaving, loadError, reload, saveTopLevel } = useTenantConfigEditor();
   const toast = useToast();
   const [draft, setDraft] = useState<LandingDraft>(EMPTY);
   const [original, setOriginal] = useState<LandingDraft>(EMPTY);
@@ -294,6 +295,7 @@ export default function AjustesLanding() {
 
   return (
     <div className="adm-page">
+      {loadError && <ConfigLoadErrorBanner que="el contenido actual de la landing" onRetry={reload} />}
       <PageHeader
         title="Landing"
         subtitle="Edita el contenido que ven los visitantes en tu página pública."
@@ -690,7 +692,7 @@ export default function AjustesLanding() {
         <button
           type="button"
           onClick={handleSave}
-          disabled={!dirty || isSaving}
+          disabled={!dirty || isSaving || loadError}
           className="ek-cta"
           style={{ padding: '14px 28px', fontSize: '14px' }}
         >
@@ -699,7 +701,7 @@ export default function AjustesLanding() {
         <button
           type="button"
           onClick={handleDiscard}
-          disabled={!dirty || isSaving}
+          disabled={!dirty || isSaving || loadError}
           className="ek-cta ek-cta--secondary"
           style={{ padding: '14px 28px', fontSize: '14px' }}
         >

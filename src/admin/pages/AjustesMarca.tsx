@@ -3,6 +3,7 @@ import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
 import ImageUploader from '../components/ImageUploader';
+import { ConfigLoadErrorBanner } from '../components/ConfigLoadErrorBanner';
 
 type BrandingDraft = {
   logo_url_dark: string | null;
@@ -36,15 +37,20 @@ export default function AjustesMarca() {
   const [draft, setDraft] = useState<BrandingDraft>(EMPTY);
   const [originalJson, setOriginalJson] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const loadBranding = useCallback(async () => {
+    setLoadError(false);
     const { data, error } = await supabase
       .from('tenants')
       .select('branding')
       .eq('id', tenant.id)
       .single();
     if (error) {
+      // Si la carga falla, el draft queda vacío y Guardar lo escribiría encima
+      // del branding real. Se bloquea el guardado hasta recargar.
       console.error('[AjustesMarca]', error);
+      setLoadError(true);
       return;
     }
     const parsed = readBranding(data?.branding);
@@ -59,6 +65,10 @@ export default function AjustesMarca() {
   const dirty = JSON.stringify(draft) !== originalJson;
 
   async function handleSave() {
+    if (loadError) {
+      toast.error('No se pudo cargar la marca actual; recarga antes de guardar.');
+      return;
+    }
     setIsSaving(true);
 
     // Merge no destructivo con otras keys (color_primary, etc.)
@@ -88,6 +98,7 @@ export default function AjustesMarca() {
 
   return (
     <div className="adm-page">
+      {loadError && <ConfigLoadErrorBanner que="la marca actual" onRetry={loadBranding} />}
       <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '4px' }}>AJUSTES</p>
       <h1
         style={{
@@ -156,7 +167,7 @@ export default function AjustesMarca() {
         <button
           type="button"
           onClick={handleSave}
-          disabled={!dirty || isSaving}
+          disabled={!dirty || isSaving || loadError}
           className="ek-cta"
           style={{ padding: '14px 28px', fontSize: '14px' }}
         >

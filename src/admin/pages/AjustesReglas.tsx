@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTenantConfigEditor } from '../hooks/useTenantConfigEditor';
 import { useToast } from '@shared/hooks/useToast';
 import Toggle from '../components/Toggle';
+import { ConfigLoadErrorBanner } from '../components/ConfigLoadErrorBanner';
 
 type ReglasDraft = {
   anticipacion_min_horas: number;
@@ -90,7 +91,7 @@ function Section({
 }
 
 export default function AjustesReglas() {
-  const { config, isLoading, isSaving, saveTopLevel } = useTenantConfigEditor();
+  const { config, isLoading, isSaving, loadError, reload, saveTopLevel } = useTenantConfigEditor();
   const toast = useToast();
   const [draft, setDraft] = useState<ReglasDraft>(DEFAULT);
   const [originalJson, setOriginalJson] = useState('');
@@ -173,6 +174,7 @@ export default function AjustesReglas() {
 
   return (
     <div className="adm-page">
+      {loadError && <ConfigLoadErrorBanner que="las reglas actuales" onRetry={reload} />}
       <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '4px' }}>AJUSTES</p>
       <h1
         style={{
@@ -313,7 +315,7 @@ export default function AjustesReglas() {
         <button
           type="button"
           onClick={handleSave}
-          disabled={!dirty || isSaving}
+          disabled={!dirty || isSaving || loadError}
           className="ek-cta"
           style={{ padding: '14px 28px', fontSize: '14px' }}
         >
@@ -322,7 +324,7 @@ export default function AjustesReglas() {
         <button
           type="button"
           onClick={handleDiscard}
-          disabled={!dirty || isSaving}
+          disabled={!dirty || isSaving || loadError}
           className="ek-cta ek-cta--secondary"
           style={{ padding: '14px 28px', fontSize: '14px' }}
         >

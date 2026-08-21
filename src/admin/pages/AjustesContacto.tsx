@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTenantConfigEditor } from '../hooks/useTenantConfigEditor';
 import { useToast } from '@shared/hooks/useToast';
+import { ConfigLoadErrorBanner } from '../components/ConfigLoadErrorBanner';
 
 type ContactoDraft = {
   whatsapp_e164: string;
@@ -98,7 +99,7 @@ function Section({
 }
 
 export default function AjustesContacto() {
-  const { config, isLoading, isSaving, saveTopLevel } = useTenantConfigEditor();
+  const { config, isLoading, isSaving, loadError, reload, saveTopLevel } = useTenantConfigEditor();
   const toast = useToast();
   const [contacto, setContacto] = useState<ContactoDraft>({ whatsapp_e164: '', whatsapp_mensaje_default: '' });
   const [redes, setRedes] = useState<RedesDraft>({ instagram: '', tiktok: '', youtube: '', facebook: '' });
@@ -180,6 +181,7 @@ export default function AjustesContacto() {
 
   return (
     <div className="adm-page">
+      {loadError && <ConfigLoadErrorBanner que="el contacto actual" onRetry={reload} />}
       <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ marginBottom: '4px' }}>AJUSTES</p>
       <h1
         style={{
@@ -260,7 +262,7 @@ export default function AjustesContacto() {
         <button
           type="button"
           onClick={handleSave}
-          disabled={!dirty || isSaving}
+          disabled={!dirty || isSaving || loadError}
           className="ek-cta"
           style={{ padding: '14px 28px', fontSize: '14px' }}
         >
@@ -269,7 +271,7 @@ export default function AjustesContacto() {
         <button
           type="button"
           onClick={handleDiscard}
-          disabled={!dirty || isSaving}
+          disabled={!dirty || isSaving || loadError}
           className="ek-cta ek-cta--secondary"
           style={{ padding: '14px 28px', fontSize: '14px' }}
         >

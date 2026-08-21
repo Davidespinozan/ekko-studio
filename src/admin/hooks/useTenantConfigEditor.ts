@@ -16,9 +16,11 @@ export function useTenantConfigEditor() {
   const [config, setConfig] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(false);
     const { data, error } = await supabase
       .from('tenants')
       .select('config')
@@ -26,8 +28,12 @@ export function useTenantConfigEditor() {
       .single();
 
     if (error) {
+      // NUNCA caer a {}: saveTopLevel haría { ...{}, ...patch } y borraría el
+      // resto del config (contacto, landing, reglas…) al guardar cualquier
+      // página. Con config=null el guardado queda bloqueado hasta recargar.
       console.error('[useTenantConfigEditor]', error);
-      setConfig({});
+      setConfig(null);
+      setLoadError(true);
     } else {
       setConfig((data?.config as Record<string, unknown>) ?? {});
     }
@@ -44,7 +50,7 @@ export function useTenantConfigEditor() {
    */
   const saveTopLevel = useCallback(
     async (patch: Record<string, unknown>) => {
-      if (!config) return { error: 'Config no cargada' };
+      if (!config) return { error: 'No se pudo cargar la configuración actual; recarga antes de guardar para no perder datos.' };
       setIsSaving(true);
       const next = { ...config, ...patch };
       const { error } = await supabase
@@ -59,5 +65,5 @@ export function useTenantConfigEditor() {
     [config, tenant.id]
   );
 
-  return { config, isLoading, isSaving, saveTopLevel, reload: load };
+  return { config, isLoading, isSaving, loadError, saveTopLevel, reload: load };
 }
