@@ -88,6 +88,14 @@ BEGIN
                AND has_function_privilege('service_role', 'marcar_no_shows()', 'EXECUTE')
           THEN '✅ PASS' ELSE '❌ FAIL — permisos incorrectos' END);
 
+  -- H7 — expirar_membresias_vencidas NO ejecutable por authenticated (2026-08-21)
+  INSERT INTO _sec_fix_resultado (area, caso, resultado) VALUES
+    ('H7', 'expirar_membresias_vencidas solo ejecutable por service_role',
+     CASE WHEN NOT has_function_privilege('authenticated', 'expirar_membresias_vencidas()', 'EXECUTE')
+               AND NOT has_function_privilege('anon', 'expirar_membresias_vencidas()', 'EXECUTE')
+               AND has_function_privilege('service_role', 'expirar_membresias_vencidas()', 'EXECUTE')
+          THEN '✅ PASS' ELSE '❌ FAIL — permisos incorrectos' END);
+
   -- C2 — el trigger protector existe sobre usuarios
   SELECT count(*) INTO v_count
   FROM pg_trigger WHERE tgname = 'trg_proteger_columnas_usuarios';
