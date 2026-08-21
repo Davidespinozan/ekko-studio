@@ -8,6 +8,7 @@ import { useReservasHoy, checkInManual, type ReservaConJoin } from '../hooks/use
 import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 import { MarcarNoShowModal, type ReservaInfo } from './MarcarNoShowModal';
 import { CorregirCheckinModal } from './CorregirCheckinModal';
+import { clasificarReservasHoy } from '../lib/clasificarReservasHoy';
 
 interface Props {
   onManualCheckInSuccess?: (data: any) => void;
@@ -196,29 +197,12 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
     return result;
   }, [reservas, recursoFiltrado, busquedaDebounced]);
 
-  const { llegando, resto, faltantes } = useMemo(() => {
-    const now = Date.now();
-    const llegando: ReservaConJoin[] = [];
-    const resto: ReservaConJoin[] = [];
-    const faltantes: ReservaConJoin[] = [];
-    reservasFiltradas.forEach((r) => {
-      const inicio = new Date(r.slot_inicio).getTime();
-      const fin = new Date(r.slot_fin).getTime();
-      const enVentana =
-        now >= inicio - 15 * 60_000 && (now <= fin || now <= inicio + 15 * 60_000);
-      // "Llegando ahora" solo aplica si la fecha vista es hoy.
-      if (esHoy && enVentana) {
-        llegando.push(r);
-      } else if (esHoy && r.status === 'confirmada' && fin < now) {
-        // Confirmada cuyo horario ya pasó sin check-in → faltante (candidata
-        // a no-show; el cron la resuelve, recepción NO la marca aquí — Bloque D).
-        faltantes.push(r);
-      } else {
-        resto.push(r);
-      }
-    });
-    return { llegando, resto, faltantes };
-  }, [reservasFiltradas, esHoy]);
+  // Bandas del día (lógica pura en lib/clasificarReservasHoy: solo CONFIRMADAS
+  // pueden estar "llegando"; canceladas/completadas/no_show salían como fantasmas).
+  const { llegando, resto, faltantes } = useMemo(
+    () => clasificarReservasHoy(reservasFiltradas, { esHoy }),
+    [reservasFiltradas, esHoy]
+  );
 
   // Ocupación del día (sobre la lista sin filtrar): sesiones activas + check-ins.
   const ocupacion = useMemo(() => {
