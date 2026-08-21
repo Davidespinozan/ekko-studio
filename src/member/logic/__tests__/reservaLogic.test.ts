@@ -237,4 +237,11 @@ describe('utilidades de fecha', () => {
     const d = new Date(2026, 4, 14, 23, 30);
     expect(formatDateISO(d)).toBe('2026-05-14');
   });
+
+  it('lista vacía = estudio abierto: entra con cualquier plan y también sin plan (regla de la base)', () => {
+    const abierto = { tiers_permitidos: [] as string[] };
+    expect(puedeReservarRecurso(abierto, 'esencial')).toBe(true);
+    expect(puedeReservarRecurso(abierto, 'premium')).toBe(true);
+    expect(puedeReservarRecurso(abierto, null)).toBe(true);
+  });
 });

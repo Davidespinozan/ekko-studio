@@ -459,7 +459,7 @@ function RecursoRow({
           {r.capacidad_personas ? ' personas' : ''}
         </p>
         <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '2px' }}>
-          Plan: {r.tiers_permitidos.join(', ') || '—'}
+          Plan: {r.tiers_permitidos.join(', ') || 'abierto a todos'}
         </p>
         {equipo && (
           <p
@@ -723,7 +723,8 @@ function EditarRecursoModal({
             onChange={setTiersPermitidos}
           />
           <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
-            Solo los miembros con estos planes podrán reservar este estudio.
+            Solo los miembros con estos planes podrán reservar este estudio. Sin ninguno
+            seleccionado, el estudio queda abierto a cualquier plan.
           </p>
         </div>
 

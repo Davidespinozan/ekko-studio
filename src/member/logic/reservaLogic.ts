@@ -171,7 +171,10 @@ export function puedeReservarRecurso(
   recurso: Pick<Recurso, 'tiers_permitidos'>,
   membresia_tier: string | null
 ): boolean {
-  if (!membresia_tier) return recurso.tiers_permitidos.length === 0;
+  // Misma regla que _recurso_permite_tier en la base: lista vacía = abierto a
+  // cualquier plan (incluso sin plan); con lista = solo esos planes.
+  if (recurso.tiers_permitidos.length === 0) return true;
+  if (!membresia_tier) return false;
   return recurso.tiers_permitidos.includes(membresia_tier);
 }
 
