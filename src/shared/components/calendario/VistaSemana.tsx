@@ -2,6 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { Spinner } from '@shared/components/Spinner';
 import { useReservasRango } from '@shared/hooks/useReservasRango';
+import {
+  hoyISOEnZona,
+  sumarDiasISO,
+  diaSemanaDeFechaISO,
+  rangoDiaEnZona,
+  fechaISOEnZona,
+  formatFechaEnZona,
+  formatHoraEnZona,
+  instanteDeFechaHoraEnZona
+} from '@shared/lib/timezone';
 
 /**
  * Vista Semana — grid de 7 columnas. Compartida por admin (Calendario) y
@@ -17,42 +27,26 @@ interface Props {
   vistaCompactaCta?: { label: string; onClick: () => void };
 }
 
-function formatHora(d: Date): string {
-  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+// Todo en fechas de calendario del ESTUDIO ('YYYY-MM-DD' en America/Mazatlan),
+// no en el reloj del navegador: el admin remoto veía la semana corrida.
+function lunesDeLaSemana(fechaISO: string): string {
+  const dow = diaSemanaDeFechaISO(fechaISO); // 0=dom … 6=sáb
+  const diff = dow === 0 ? -6 : 1 - dow; // la semana inicia en lunes
+  return sumarDiasISO(fechaISO, diff);
 }
 
-function startOfWeek(d: Date): Date {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day; // semana inicia en lunes
-  date.setDate(date.getDate() + diff);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function addDays(d: Date, n: number): Date {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-}
-
-function sameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+function etiquetaFecha(fechaISO: string, opts: Intl.DateTimeFormatOptions): string {
+  return formatFechaEnZona(instanteDeFechaHoraEnZona(fechaISO, '12:00'), opts);
 }
 
 export default function VistaSemana({ refreshTick, onVerDetalle, vistaCompactaCta }: Props) {
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const weekEnd = useMemo(() => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + 7);
-    return d;
-  }, [weekStart]);
+  const [weekStart, setWeekStart] = useState<string>(() => lunesDeLaSemana(hoyISOEnZona()));
+  const rango = useMemo(
+    () => ({ inicio: rangoDiaEnZona(weekStart).inicio, fin: rangoDiaEnZona(sumarDiasISO(weekStart, 7)).inicio }),
+    [weekStart]
+  );
 
-  const { reservas, isLoading, refetch } = useReservasRango(weekStart, weekEnd);
+  const { reservas, isLoading, refetch } = useReservasRango(rango.inicio, rango.fin);
 
   useEffect(() => {
     if (refreshTick > 0) void refetch();
@@ -60,15 +54,7 @@ export default function VistaSemana({ refreshTick, onVerDetalle, vistaCompactaCt
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTick]);
 
-  const days = useMemo(() => {
-    const arr: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(weekStart);
-      d.setDate(d.getDate() + i);
-      arr.push(d);
-    }
-    return arr;
-  }, [weekStart]);
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => sumarDiasISO(weekStart, i)), [weekStart]);
 
   return (
     <>
@@ -92,7 +78,7 @@ export default function VistaSemana({ refreshTick, onVerDetalle, vistaCompactaCt
       <div className="adm-cal-semana-desktop">
         <div className="adm-week-nav">
           <button
-            onClick={() => setWeekStart(addDays(weekStart, -7))}
+            onClick={() => setWeekStart(sumarDiasISO(weekStart, -7))}
             className="adm-link-btn"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
@@ -100,15 +86,11 @@ export default function VistaSemana({ refreshTick, onVerDetalle, vistaCompactaCt
             Semana anterior
           </button>
           <span className="adm-week-label">
-            {weekStart.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} —{' '}
-            {addDays(weekStart, 6).toLocaleDateString('es-MX', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric'
-            })}
+            {etiquetaFecha(weekStart, { day: 'numeric', month: 'short' })} —{' '}
+            {etiquetaFecha(sumarDiasISO(weekStart, 6), { day: 'numeric', month: 'short', year: 'numeric' })}
           </span>
           <button
-            onClick={() => setWeekStart(addDays(weekStart, 7))}
+            onClick={() => setWeekStart(sumarDiasISO(weekStart, 7))}
             className="adm-link-btn"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
           >
@@ -122,14 +104,14 @@ export default function VistaSemana({ refreshTick, onVerDetalle, vistaCompactaCt
         ) : (
           <div className="adm-cal-grid">
             {days.map((day) => {
-              const reservasDelDia = reservas.filter((r) => sameDay(new Date(r.slot_inicio), day));
+              const reservasDelDia = reservas.filter((r) => fechaISOEnZona(r.slot_inicio) === day);
               return (
-                <div key={day.toISOString()} className="adm-cal-day">
+                <div key={day} className="adm-cal-day">
                   <div className="adm-cal-day-header">
                     <p className="adm-cal-day-name">
-                      {day.toLocaleDateString('es-MX', { weekday: 'short' })}
+                      {etiquetaFecha(day, { weekday: 'short' })}
                     </p>
-                    <p className="adm-cal-day-num">{day.getDate()}</p>
+                    <p className="adm-cal-day-num">{Number(day.slice(8, 10))}</p>
                   </div>
                   <div className="adm-cal-events">
                     {reservasDelDia.length === 0 && <p className="adm-cal-empty">—</p>}
@@ -152,7 +134,7 @@ export default function VistaSemana({ refreshTick, onVerDetalle, vistaCompactaCt
                           padding: 0
                         }}
                       >
-                        <p className="adm-cal-event-time">{formatHora(new Date(r.slot_inicio))}</p>
+                        <p className="adm-cal-event-time">{formatHoraEnZona(r.slot_inicio)}</p>
                         <p className="adm-cal-event-recurso">{r.recurso?.nombre ?? '—'}</p>
                         <p className="adm-cal-event-usuario">
                           {r.usuario?.nombre ?? r.usuario?.email ?? '—'}

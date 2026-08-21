@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, CalendarOff } from 'lucide-react';
 import { useReservasRango } from '../../hooks/useAdminData';
 import { formatHora } from '@member/logic/reservaLogic';
 import { EmptyState } from '@shared/components/EmptyState';
+import { hoyISOEnZona, sumarDiasISO, rangoDiaEnZona, formatFechaEnZona, instanteDeFechaHoraEnZona } from '@shared/lib/timezone';
 
 interface Props {
   refreshTick: number;
@@ -17,10 +18,11 @@ interface Props {
  * viewports <768px. Cada card es tap target full-width ≥64px.
  */
 export default function VistaDia({ refreshTick, onVerDetalle }: Props) {
-  const [fecha, setFecha] = useState(() => startOfDay(new Date()));
+  // Día del ESTUDIO ('YYYY-MM-DD' en America/Mazatlan), no del navegador.
+  const [fecha, setFecha] = useState<string>(() => hoyISOEnZona());
 
-  const finDia = useMemo(() => addDays(fecha, 1), [fecha]);
-  const { reservas, isLoading, refetch } = useReservasRango(fecha, finDia);
+  const rango = useMemo(() => rangoDiaEnZona(fecha), [fecha]);
+  const { reservas, isLoading, refetch } = useReservasRango(rango.inicio, rango.fin);
 
   useEffect(() => {
     if (refreshTick > 0) void refetch();
@@ -34,7 +36,7 @@ export default function VistaDia({ refreshTick, onVerDetalle }: Props) {
       <div className="adm-dia-nav">
         <button
           type="button"
-          onClick={() => setFecha((f) => addDays(f, -1))}
+          onClick={() => setFecha((f) => sumarDiasISO(f, -1))}
           className="adm-dia-nav-btn"
           aria-label="Día anterior"
         >
@@ -46,7 +48,7 @@ export default function VistaDia({ refreshTick, onVerDetalle }: Props) {
         </div>
         <button
           type="button"
-          onClick={() => setFecha((f) => addDays(f, 1))}
+          onClick={() => setFecha((f) => sumarDiasISO(f, 1))}
           className="adm-dia-nav-btn"
           aria-label="Día siguiente"
         >
@@ -116,29 +118,12 @@ export default function VistaDia({ refreshTick, onVerDetalle }: Props) {
 // Helpers de fecha (locales — VistaDia es autosuficiente)
 // ============================================================================
 
-function startOfDay(d: Date): Date {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
+function esHoy(fechaISO: string): boolean {
+  return fechaISO === hoyISOEnZona();
 }
 
-function addDays(d: Date, n: number): Date {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-}
-
-function esHoy(d: Date): boolean {
-  const hoy = new Date();
-  return (
-    d.getFullYear() === hoy.getFullYear() &&
-    d.getMonth() === hoy.getMonth() &&
-    d.getDate() === hoy.getDate()
-  );
-}
-
-function formatFechaLarga(d: Date): string {
-  const s = d.toLocaleDateString('es-MX', {
+function formatFechaLarga(fechaISO: string): string {
+  const s = formatFechaEnZona(instanteDeFechaHoraEnZona(fechaISO, '12:00'), {
     weekday: 'long',
     day: 'numeric',
     month: 'long'

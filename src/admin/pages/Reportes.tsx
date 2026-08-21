@@ -3,6 +3,8 @@ import { useReportesEconomia } from '../hooks/useReportesEconomia';
 import { useReportesOcupacion } from '../hooks/useReportesOcupacion';
 import { useReportesEngagement } from '../hooks/useReportesEngagement';
 import { useReportesCreditos } from '../hooks/useReportesCreditos';
+import { useReportesCobrado } from '../hooks/useReportesCobrado';
+import type { CobradoResult } from '../logic/reportesCobrado';
 import { InfoTooltip } from '@shared/components/InfoTooltip';
 import { generarResumen, type TonoResumen } from '../logic/reportesResumen';
 import { telWhatsAppMx, waLink } from '@shared/lib/whatsapp';
@@ -51,7 +53,13 @@ const AYUDA = {
   valorPasivo:
     'El valor en pesos de esos créditos sin usar (saldo × precio por crédito de cada plan). Es tu pasivo real: dinero ya cobrado que representa servicio pendiente de entregar.',
   tasaUso:
-    'De todos los créditos vendidos, qué % ya se usaron. Bajo (menos de ~50%) significa que muchos pagan paquetes y no los agotan: fuga de valor y señal temprana de churn.'
+    'De todos los créditos vendidos, qué % ya se usaron. Bajo (menos de ~50%) significa que muchos pagan paquetes y no los agotan: fuga de valor y señal temprana de churn.',
+  cobrado:
+    'Dinero que Stripe cobró de verdad este mes (mensualidades, paquetes e invitados). A diferencia del MRR, esto ya entró. Los pagos en mostrador no pasan por aquí.',
+  fallidos:
+    'Cobros que la tarjeta rechazó en los últimos 30 días. Cada uno es un miembro en riesgo de perder acceso: Stripe reintenta, pero conviene pedirle que actualice su tarjeta.',
+  reembolsos:
+    'Dinero devuelto este mes desde Stripe. No se resta solo del cobrado: revisa si hay que ajustar créditos o la membresía del miembro.'
 } as const;
 
 export default function Reportes() {
@@ -59,6 +67,7 @@ export default function Reportes() {
   const ocupacion = useReportesOcupacion();
   const engagement = useReportesEngagement();
   const creditos = useReportesCreditos();
+  const cobrado = useReportesCobrado();
 
   return (
     <div className="adm-page">
@@ -110,6 +119,27 @@ export default function Reportes() {
           </div>
         ) : (
           <BloqueEconomia data={data} />
+        )}
+      </section>
+
+      <section>
+        <p className="ek-eyebrow" style={{ fontSize: '10px', margin: '0 0 12px' }}>
+          COBRADO · DINERO REAL (STRIPE)
+        </p>
+        {cobrado.isLoading ? (
+          <div className="adm-metricas-grid">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="ek-skeleton" style={{ height: '104px', borderRadius: 'var(--ek-r-card)' }} />
+            ))}
+          </div>
+        ) : cobrado.error || !cobrado.data ? (
+          <div className="ek-card" style={{ padding: '20px' }}>
+            <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', margin: 0 }}>
+              No pudimos cargar los cobros. Reintenta en un momento.
+            </p>
+          </div>
+        ) : (
+          <BloqueCobrado data={cobrado.data} />
         )}
       </section>
 
@@ -480,6 +510,22 @@ function ResumenEjecutivo({
         )}
       </div>
     </section>
+  );
+}
+
+function BloqueCobrado({ data }: { data: CobradoResult }) {
+  const variacion =
+    data.cobradoMesPorcentaje === null
+      ? 'sin mes anterior para comparar'
+      : `${data.cobradoMesPorcentaje >= 0 ? '+' : ''}${data.cobradoMesPorcentaje}% vs. mes anterior (${pesos(data.cobradoMesAnteriorCentavos)})`;
+  const desglose = data.porConcepto.map((c) => `${c.concepto}: ${pesos(c.centavos)}`).join(' · ');
+  return (
+    <div className="adm-metricas-grid" style={{ marginBottom: '24px' }}>
+      <KpiCard label="Cobrado este mes" valor={pesos(data.cobradoMesCentavos)} nota={desglose || variacion} ayuda={AYUDA.cobrado} />
+      <KpiCard label="Variación mensual" valor={data.cobradoMesPorcentaje === null ? '—' : `${data.cobradoMesPorcentaje >= 0 ? '+' : ''}${data.cobradoMesPorcentaje}%`} nota={variacion} alerta={(data.cobradoMesPorcentaje ?? 0) < -20} />
+      <KpiCard label="Cobros rechazados · 30 d" valor={String(data.cobrosFallidos30d)} nota={data.cobrosFallidos30d ? `${pesos(data.montoFallido30dCentavos)} sin cobrar` : 'ninguno'} alerta={data.cobrosFallidos30d > 0} ayuda={AYUDA.fallidos} />
+      <KpiCard label="Reembolsado este mes" valor={pesos(data.reembolsadoMesCentavos)} nota={data.reembolsadoMesCentavos ? 'revisa créditos/membresías' : 'sin reembolsos'} alerta={data.reembolsadoMesCentavos > 0} ayuda={AYUDA.reembolsos} />
+    </div>
   );
 }
 
