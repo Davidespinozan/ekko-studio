@@ -206,7 +206,7 @@ export default function CrearAccesoModal({ onClose, onSuccess }: Props) {
             </button>
           </div>
           <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
-            Mínimo 8 caracteres. Compártela con la persona; ella podrá cambiarla desde el login.
+            Mínimo 8 caracteres. Es temporal: al entrar, la app le pedirá cambiarla por una suya.
           </p>
         </div>
 

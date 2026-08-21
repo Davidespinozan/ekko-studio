@@ -6,6 +6,7 @@ import { useAdminGuard } from './hooks/useAdminGuard';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { BrandLogo } from '@shared/components/BrandLogo';
 import { Sidebar } from './components/Sidebar';
+import { CambiarPasswordGate } from '@shared/components/CambiarPasswordGate';
 
 const Dashboard = lazy(() => import('./pages/AdminDashboard'));
 const Reportes = lazy(() => import('./pages/Reportes'));
@@ -29,6 +30,7 @@ export default function AdminLayout() {
 
   return (
     <div className="adm-shell">
+      <CambiarPasswordGate />
       <div className="adm-sidebar-desktop">
         <Sidebar />
       </div>

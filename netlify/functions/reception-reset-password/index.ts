@@ -10,6 +10,7 @@ import { randomInt } from 'node:crypto';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
+import { avisarCambiarPassword } from '../_lib/acceso';
 
 /**
  * POST /reception-reset-password
@@ -93,6 +94,9 @@ export const handler: Handler = async (event) => {
       password: nuevaPassword
     });
     if (pwErr) return serverError(`No se pudo resetear la contraseña: ${pwErr.message}`);
+
+    // Clave temporal dictada en mostrador → la persona debe cambiarla al entrar.
+    await avisarCambiarPassword(supabaseAdmin, { tenant_id: target.tenant_id, usuario_id: target.id, origen: 'reset' });
 
     // Auditoría inmutable (audit_log) — NUNCA la contraseña ni antes/después.
     await writeAuditLog(supabaseAdmin, {

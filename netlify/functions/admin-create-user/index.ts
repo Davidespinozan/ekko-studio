@@ -10,6 +10,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
+import { avisarCambiarPassword } from '../_lib/acceso';
 
 /**
  * POST /admin-create-user
@@ -102,7 +103,7 @@ export const handler: Handler = async (event) => {
     //    Actualizar a los valores reales (rol + tier + status).
     const status = body.rol === 'miembro' ? 'pendiente_pago' : 'activo';
 
-    const { error: updateErr } = await supabaseAdmin
+    const { data: nuevoUsuario, error: updateErr } = await supabaseAdmin
       .from('usuarios')
       .update({
         rol: body.rol,
@@ -112,12 +113,19 @@ export const handler: Handler = async (event) => {
         telefono: body.telefono?.trim() || null,
         tenant_id: tenantId
       })
-      .eq('auth_id', newAuthUser.user.id);
+      .eq('auth_id', newAuthUser.user.id)
+      .select('id')
+      .maybeSingle();
 
     if (updateErr) {
       // Best-effort: limpiar el auth user creado
       await supabaseAdmin.auth.admin.deleteUser(newAuthUser.user.id);
       return serverError(`No se pudo asignar el rol: ${updateErr.message}`);
+    }
+
+    // La clave la puso el admin → la persona (miembro o staff) debe cambiarla al entrar.
+    if (nuevoUsuario?.id) {
+      await avisarCambiarPassword(supabaseAdmin, { tenant_id: tenantId, usuario_id: nuevoUsuario.id, origen: 'alta' });
     }
 
     return ok({

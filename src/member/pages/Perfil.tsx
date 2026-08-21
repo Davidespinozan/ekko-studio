@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarClock, ArrowRight, LogOut, Pencil } from 'lucide-react';
+import { CalendarClock, ArrowRight, LogOut, Pencil, KeyRound } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { MiSuscripcion } from '@member/components/MiSuscripcion';
 import { EditarPerfilModal } from '@member/components/EditarPerfilModal';
+import { CambiarPasswordModal } from '@member/components/CambiarPasswordModal';
 import { ActivarAvisosPush } from '@member/components/ActivarAvisosPush';
 
 export default function Perfil() {
   const { authUser, usuario, signOut } = useAuth();
   const tenant = useTenant();
   const [editarOpen, setEditarOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   const nombreFormat = usuario?.nombre
     ?.toLowerCase()
@@ -121,12 +123,32 @@ export default function Perfil() {
           <ArrowRight size={16} className="ek-quick-action-arrow" aria-hidden="true" />
         </Link>
 
+        {/* Seguridad de la cuenta: antes el miembro no tenía forma de cambiar su clave */}
+        <button
+          type="button"
+          onClick={() => setPasswordOpen(true)}
+          className="ek-card ek-card--md ek-card-interactive ek-lift"
+          style={{ display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left', width: '100%', cursor: 'pointer' }}
+        >
+          <span className="ek-empty-icon" style={{ width: 44, height: 44, margin: 0, flexShrink: 0 }}>
+            <KeyRound size={20} aria-hidden="true" />
+          </span>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p style={{ fontFamily: 'var(--ek-font-display)', fontSize: '15px', fontWeight: 600, letterSpacing: '-0.02em', margin: 0 }}>
+              Cambiar contraseña
+            </p>
+            <p className="ek-body-faint" style={{ marginTop: '2px' }}>Elige una clave que solo tú conozcas</p>
+          </div>
+          <ArrowRight size={16} className="ek-quick-action-arrow" aria-hidden="true" />
+        </button>
+
         <button onClick={signOut} className="ek-cta ek-cta--secondary ek-cta--full">
           <LogOut size={16} aria-hidden="true" /> Cerrar sesión
         </button>
       </div>
 
       {editarOpen && <EditarPerfilModal onClose={() => setEditarOpen(false)} />}
+      {passwordOpen && <CambiarPasswordModal onClose={() => setPasswordOpen(false)} />}
     </div>
   );
 }

@@ -142,8 +142,9 @@ export default function CredencialesCreadasModal({ isOpen, credenciales, onClose
         >
           <AlertTriangle size={15} aria-hidden="true" style={{ flexShrink: 0, marginTop: '1px' }} />
           <span>
-            Por seguridad, no podrás volver a ver esta contraseña. Si la persona la pierde,
-            puede recuperarla desde el login con &quot;Olvidé mi contraseña&quot;.
+            Por seguridad, no podrás volver a ver esta contraseña. Es temporal: al entrar, la app
+            le pedirá cambiarla por una suya. Si la pierde, puede pedir un enlace en &quot;¿Olvidaste tu
+            contraseña?&quot; del login o resetearla aquí.
           </span>
         </p>
 

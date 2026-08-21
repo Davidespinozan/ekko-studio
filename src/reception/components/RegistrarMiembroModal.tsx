@@ -331,7 +331,7 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
                 </button>
               </div>
               <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
-                Autogenerada. Se la das al cliente; podrá cambiarla desde el login.
+                Autogenerada y temporal. Se la das al cliente; al entrar la app le pedirá cambiarla por una suya.
               </p>
             </div>
 

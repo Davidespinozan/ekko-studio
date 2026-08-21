@@ -1,5 +1,5 @@
 import { useEffect, useState, FormEvent } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { Spinner } from '@shared/components/Spinner';
@@ -152,6 +152,13 @@ export default function Login() {
             >
               {isSubmitting ? <Spinner size={16} label="Iniciando sesión…" /> : 'Iniciar sesión'}
             </button>
+
+            <Link
+              to="/recuperar"
+              style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', textDecoration: 'underline', textAlign: 'center' }}
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
           </form>
         </div>
       </div>

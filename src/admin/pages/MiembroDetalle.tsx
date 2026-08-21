@@ -541,7 +541,7 @@ function ResetPasswordControl({ email }: { email: string }) {
     setError(null);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/login`
+        redirectTo: `${window.location.origin}/nueva-contrasena`
       });
       if (error) throw error;
       setSent(true);

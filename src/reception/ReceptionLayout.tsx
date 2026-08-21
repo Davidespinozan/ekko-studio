@@ -5,6 +5,7 @@ import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { DemoBanner } from '@shared/components/DemoBanner';
 import { BrandLogo } from '@shared/components/BrandLogo';
 import { ReceptionBottomNav } from './components/ReceptionBottomNav';
+import { CambiarPasswordGate } from '@shared/components/CambiarPasswordGate';
 
 /** Título de sección para el header (mismo patrón que miembro). */
 function tituloDeSeccion(path: string): string {
@@ -48,6 +49,7 @@ export default function ReceptionLayout() {
   return (
     <div className="rec-shell">
       <DemoBanner vista="Recepción" />
+      <CambiarPasswordGate />
 
       <header className="ek-header-glass">
         {location.pathname === '/recepcion' ? (

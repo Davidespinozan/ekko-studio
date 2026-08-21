@@ -10,6 +10,7 @@ const mockMaybeSingle = vi.fn();
 const mockUpdate = vi.fn();
 const mockAuditInsert = vi.fn();
 const mockUpdateUserById = vi.fn();
+const mockNotifInsert = vi.fn().mockResolvedValue({ error: null });
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
@@ -19,6 +20,7 @@ vi.mock('@supabase/supabase-js', () => ({
     },
     from: vi.fn((table: string) => {
       if (table === 'audit_log') return { insert: mockAuditInsert };
+      if (table === 'notificaciones') return { insert: mockNotifInsert };
       return {
         select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockMaybeSingle })) })),
         update: mockUpdate
@@ -119,5 +121,16 @@ describe('reception-reset-password · audit (Bloque A)', () => {
     const res = await invocar(evento({ usuario_id: 'm-1' }));
     expect(res.statusCode).toBe(400);
     expect(mockUpdateUserById).not.toHaveBeenCalled();
+  });
+
+  it('tras resetear deja el aviso cambiar_password al dueño de la cuenta (gate)', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: CALLER, error: null })
+      .mockResolvedValueOnce({ data: TARGET, error: null });
+    const res = await invocar(evento({ usuario_id: 'm-1' }));
+    expect(res.statusCode).toBe(200);
+    expect(mockNotifInsert).toHaveBeenCalledWith(expect.objectContaining({
+      usuario_id: 'm-1', tenant_id: 't1', tipo: 'cambiar_password'
+    }));
   });
 });

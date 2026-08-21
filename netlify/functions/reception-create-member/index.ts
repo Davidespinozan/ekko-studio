@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
+import { avisarCambiarPassword } from '../_lib/acceso';
 
 /**
  * POST /reception-create-member
@@ -128,6 +129,9 @@ export const handler: Handler = async (event) => {
       await supabaseAdmin.auth.admin.deleteUser(newAuthUser.user.id);
       return serverError(`No se pudo registrar el miembro: ${updateErr?.message ?? 'sin datos'}`);
     }
+
+    // La clave la dictó recepción → el miembro debe cambiarla al entrar (gate).
+    await avisarCambiarPassword(supabaseAdmin, { tenant_id: tenantId, usuario_id: nuevoMiembro.id, origen: 'alta' });
 
     // Auditoría inmutable: alta de miembro (Bloque A). No rompe la respuesta si falla.
     await writeAuditLog(supabaseAdmin, {

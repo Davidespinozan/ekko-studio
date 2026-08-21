@@ -11,6 +11,7 @@ const mockMaybeSingle = vi.fn();
 const mockCreateUser = vi.fn();
 const mockDeleteUser = vi.fn();
 const mockAuditInsert = vi.fn();
+const mockNotifInsert = vi.fn().mockResolvedValue({ error: null });
 // update().eq().select().maybeSingle() → devuelve el id del miembro creado.
 function updateReturn() {
   return {
@@ -31,6 +32,7 @@ vi.mock('@supabase/supabase-js', () => ({
     },
     from: vi.fn((table: string) => {
       if (table === 'audit_log') return { insert: mockAuditInsert };
+      if (table === 'notificaciones') return { insert: mockNotifInsert };
       return {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
