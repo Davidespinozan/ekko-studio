@@ -71,6 +71,12 @@ eventos se perderían en silencio). Eventos:
 `customer.subscription.deleted` (+ `checkout.session.completed` si se usa el
 Checkout como fallback). Su signing secret va en `STRIPE_CONNECT_WEBHOOK_SECRET`.
 
+**Con script (recomendado):** `STRIPE_SECRET_KEY=sk_test_… node scripts/stripe-setup-webhooks.mjs`
+crea/sincroniza el endpoint con la URL, los eventos y el flag de Connected
+accounts exactos, verifica que la URL no redirija, e imprime el `whsec_`. Para
+live: `… --live`. Diagnóstico de solo lectura: `node scripts/stripe-check.mjs`
+(webhook + cuentas conectadas de EKKO y quién paga sus fees).
+
 > La cuenta Stripe de la plataforma se comparte con SALA/HSC: el webhook descarta
 > (200) los eventos de cuentas conectadas que no sean de ningún estudio de EKKO y
 > los objetos con `metadata.app` distinto de `ekko`.
