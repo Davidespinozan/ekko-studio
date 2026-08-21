@@ -76,6 +76,7 @@ export type Database = {
       }
       membresias: {
         Row: {
+          aviso_vencimiento_at: string | null
           cancel_at_period_end: boolean
           cancelada_at: string | null
           cancelada_efectiva_at: string | null
@@ -97,6 +98,7 @@ export type Database = {
           usuario_id: string
         }
         Insert: {
+          aviso_vencimiento_at?: string | null
           cancel_at_period_end?: boolean
           cancelada_at?: string | null
           cancelada_efectiva_at?: string | null
@@ -118,6 +120,7 @@ export type Database = {
           usuario_id: string
         }
         Update: {
+          aviso_vencimiento_at?: string | null
           cancel_at_period_end?: boolean
           cancelada_at?: string | null
           cancelada_efectiva_at?: string | null
@@ -688,6 +691,7 @@ export type Database = {
       tiers: {
         Row: {
           activo: boolean
+          en_venta: boolean
           beneficios: Json
           clases_incluidas: number | null
           created_at: string
@@ -708,6 +712,7 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
+          en_venta?: boolean
           beneficios?: Json
           clases_incluidas?: number | null
           created_at?: string
@@ -728,6 +733,7 @@ export type Database = {
         }
         Update: {
           activo?: boolean
+          en_venta?: boolean
           beneficios?: Json
           clases_incluidas?: number | null
           created_at?: string
@@ -905,6 +911,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cumpleanos_proximos: {
+        Args: { p_dias?: number }
+        Returns: { usuario_id: string; nombre: string | null; avatar_url: string | null; dia: string; en_dias: number }[]
+      }
+      avisar_membresias_por_vencer: {
+        Args: { p_dias?: number }
+        Returns: { usuario_id: string; tenant_id: string; titulo: string; mensaje: string; membresia_id: string }[]
+      }
+      generar_felicitaciones_cumpleanos: {
+        Args: Record<PropertyKey, never>
+        Returns: { usuario_id: string; tenant_id: string; titulo: string; mensaje: string }[]
+      }
       cancelar_reserva_atomic: {
         Args: { p_motivo?: string; p_reserva_id: string }
         Returns: {

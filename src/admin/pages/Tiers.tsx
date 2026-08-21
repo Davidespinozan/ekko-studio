@@ -445,6 +445,11 @@ function TierRow({
             )}
           </ul>
         )}
+        {t.en_venta === false && (
+          <p style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--ek-mustard)', margin: '0 0 6px' }}>
+            NO EN VENTA · solo miembros actuales
+          </p>
+        )}
         <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: 0 }}>
           {memberCount === null
             ? <Spinner label="Cargando…" />
@@ -536,6 +541,8 @@ function EditarTierModal({
   );
   const [descripcion, setDescripcion] = useState(tier?.descripcion ?? '');
   const [activo, setActivo] = useState(tier?.activo ?? true);
+  // 'En venta' ≠ 'activo': retirar un plan de la venta sin tocar a quienes ya lo tienen.
+  const [enVenta, setEnVenta] = useState<boolean>(tier?.en_venta ?? true);
   // Destacado en el landing (tarjeta dorada + "RECOMENDADO"). Vive en reglas.
   const [recomendado, setRecomendado] = useState<boolean>(() => {
     const reglas = tier?.reglas as Record<string, unknown> | null;
@@ -623,6 +630,7 @@ function EditarTierModal({
         beneficios: beneficios as never,
         reglas: reglas as never,
         activo,
+        en_venta: enVenta,
         orden: existingSlugs.length + 1
       });
 
@@ -649,7 +657,8 @@ function EditarTierModal({
       stripe_price_id: stripePriceId.trim() || null,
       beneficios: beneficios as never,
       reglas: reglasNuevas as never,
-      activo
+      activo,
+      en_venta: enVenta
     });
 
     if (err) {
@@ -811,10 +820,19 @@ function EditarTierModal({
 
         <div className="ek-form-field" style={{ marginTop: '12px' }}>
           <Toggle
+            checked={enVenta}
+            onChange={setEnVenta}
+            label="En venta"
+            description="Se ofrece en la landing, el registro y la compra en la app. Apágalo para dejar de venderlo sin afectar a los miembros que ya lo tienen."
+          />
+        </div>
+
+        <div className="ek-form-field" style={{ marginTop: '12px' }}>
+          <Toggle
             checked={activo}
             onChange={setActivo}
             label="Plan activo"
-            description="Si está inactivo, no se puede asignar a nuevos miembros."
+            description="Si está inactivo, no se puede asignar a nuevos miembros ni reservar con él. Para 'ya no se vende', usa 'En venta'."
           />
         </div>
 

@@ -94,6 +94,50 @@ export function useMiembroDetalle(miembroId: string | undefined) {
   return { miembro, reservas, isLoading, refetch };
 }
 
+export interface MembresiaResumen {
+  usuario_id: string;
+  status: string;
+  periodo_actual_fin: string | null;
+  creditos_restantes: number | null;
+  tier: { slug: string; nombre: string; tipo: string | null } | null;
+}
+
+/**
+ * Membresías VIVAS del tenant, indexadas por usuario (una por miembro). Para la
+ * columna "Membresía" de la lista: vigente / por vencer / vencida por fecha /
+ * sin membresía — en vez del `membresia_tier` crudo de `usuarios`.
+ */
+export function useMembresiasVigentesPorUsuario() {
+  const tenant = useTenant();
+  const [porUsuario, setPorUsuario] = useState<Map<string, MembresiaResumen>>(new Map());
+  const [isLoading, setIsLoading] = useState(true);
+
+  const refetch = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('membresias')
+        .select('usuario_id, status, periodo_actual_fin, creditos_restantes, created_at, tier:tiers(slug, nombre, tipo)')
+        .eq('tenant_id', tenant.id)
+        .in('status', ['trialing', 'activa', 'past_due'])
+        .order('created_at', { ascending: false });
+      if (error) console.error('[useMembresiasVigentesPorUsuario]', error);
+      const map = new Map<string, MembresiaResumen>();
+      for (const m of (data ?? []) as unknown as MembresiaResumen[]) {
+        if (!map.has(m.usuario_id)) map.set(m.usuario_id, m); // la más reciente gana
+      }
+      setPorUsuario(map);
+    } catch (e) {
+      console.error('[useMembresiasVigentesPorUsuario]', e instanceof Error ? e.message : e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [tenant.id]);
+
+  useEffect(() => { refetch(); }, [refetch]);
+  return { porUsuario, isLoading, refetch };
+}
+
 export interface MembresiaActualAdmin {
   id: string;
   status: string;
@@ -237,7 +281,7 @@ export function useTiersAdmin() {
 
 export async function updateTier(
   tierId: string,
-  patch: Partial<Pick<Tier, 'nombre' | 'descripcion' | 'precio_centavos' | 'beneficios' | 'reglas' | 'activo' | 'orden' | 'slug' | 'tipo' | 'clases_incluidas' | 'duracion_dias' | 'stripe_price_id'>>
+  patch: Partial<Pick<Tier, 'nombre' | 'descripcion' | 'precio_centavos' | 'beneficios' | 'reglas' | 'activo' | 'en_venta' | 'orden' | 'slug' | 'tipo' | 'clases_incluidas' | 'duracion_dias' | 'stripe_price_id'>>
 ): Promise<{ error: string | null }> {
   const { error } = await supabase.from('tiers').update(patch).eq('id', tierId);
   return { error: error?.message ?? null };

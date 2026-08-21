@@ -94,6 +94,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           .select('slug, nombre, precio_centavos, beneficios, descripcion, tipo, clases_incluidas, duracion_dias')
           .eq('tenant_id', tenant.id)
           .eq('activo', true)
+          .eq('en_venta', true)
           // Mismo orden que el registro (PagarMembresia): mensuales primero,
           // luego paquetes. `orden` agrupa por modelo; precio desempata.
           .order('orden', { ascending: true })

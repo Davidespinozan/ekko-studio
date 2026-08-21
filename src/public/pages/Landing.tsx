@@ -79,6 +79,7 @@ function useTiersPublicos() {
         .from('tiers')
         .select('slug, nombre, precio_centavos, descripcion, beneficios, reglas, tipo, clases_incluidas, orden')
         .eq('activo', true)
+        .eq('en_venta', true)
         .order('orden', { ascending: true });
 
       if (!mounted) return;

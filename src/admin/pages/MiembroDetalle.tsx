@@ -4,6 +4,7 @@ import { ArrowLeft, Check, Send, ShieldCheck, ShieldAlert, User } from 'lucide-r
 import { useMiembroDetalle, updateMiembro, adminDeleteUser, useTiersAdmin, useMembresiaActualAdmin } from '../hooks/useAdminData';
 import { activarMembresiaMostrador } from '@shared/lib/checkout';
 import { MembresiaActualCard } from '../components/miembro/MembresiaActualCard';
+import { HistorialPagosMiembro } from '../components/miembro/HistorialPagosMiembro';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { formatHora } from '@member/logic/reservaLogic';
@@ -251,6 +252,14 @@ export default function MiembroDetalle() {
             {activando ? 'Activando…' : 'Activar membresía manualmente'}
           </button>
         </div>
+      </section>
+
+      <section className="adm-section">
+        <h2 className="ek-h3">Cobros</h2>
+        <p className="adm-body" style={{ marginBottom: '0.75rem', fontSize: '13px' }}>
+          Lo que Stripe cobró (o rechazó) a este miembro. Los pagos en mostrador no pasan por aquí.
+        </p>
+        <HistorialPagosMiembro usuarioId={miembro.id} />
       </section>
 
       <section className="adm-section">

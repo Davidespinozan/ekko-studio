@@ -41,6 +41,7 @@ function useTierPorSlug(slug: string) {
         .select('slug, nombre, precio_centavos, beneficios, tipo, clases_incluidas, duracion_dias')
         .eq('slug', slug)
         .eq('activo', true)
+        .eq('en_venta', true)
         .maybeSingle();
 
       if (!mounted) return;

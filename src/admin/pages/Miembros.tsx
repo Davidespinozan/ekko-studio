@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, ArrowRight } from 'lucide-react';
-import { useMiembros } from '../hooks/useAdminData';
+import { Users, ArrowRight, Download } from 'lucide-react';
+import { useMiembros, useMembresiasVigentesPorUsuario, type MembresiaResumen } from '../hooks/useAdminData';
+import { estadoMembresia, ESTADO_MEMBRESIA_LABEL, esPaqueteDeCreditos } from '@shared/lib/membresiaEstado';
+import { formatFechaEnZona } from '@shared/lib/timezone';
+import { exportarCsv } from '@shared/lib/exportarCsv';
 import { NuevaPersonaModal } from '../components/NuevaPersonaModal';
 import { Spinner } from '@shared/components/Spinner';
 import { EmptyState } from '@shared/components/EmptyState';
@@ -13,6 +16,26 @@ export default function Miembros() {
   // Fijamos rol='miembro' para excluir staff (admins, recepcionistas).
   // El equipo se gestiona desde /admin/equipo (Sprint Equipo).
   const { miembros, isLoading, refetch } = useMiembros({ search, status, rol: 'miembro' });
+  const { porUsuario } = useMembresiasVigentesPorUsuario();
+
+  const vigentes = miembros.filter((m) => {
+    const e = estadoMembresia(porUsuario.get(m.id) ?? null);
+    return e === 'vigente' || e === 'por_vencer' || e === 'pago_pendiente';
+  }).length;
+
+  function exportar() {
+    exportarCsv(`miembros-${new Date().toISOString().slice(0, 10)}`, miembros, [
+      { key: 'nombre', label: 'Nombre' },
+      { key: 'email', label: 'Email' },
+      { key: 'telefono', label: 'Teléfono' },
+      { key: 'membresia_tier', label: 'Plan asignado' },
+      { key: 'membresia', label: 'Membresía', valor: (m) => ESTADO_MEMBRESIA_LABEL[estadoMembresia(porUsuario.get(m.id) ?? null)].texto },
+      { key: 'vence', label: 'Vence / créditos', valor: (m) => detalleMembresia(porUsuario.get(m.id) ?? null) },
+      { key: 'status', label: 'Status de cuenta' },
+      { key: 'no_shows_count', label: 'Inasistencias' },
+      { key: 'created_at', label: 'Alta', valor: (m) => formatFechaEnZona(m.created_at, { year: 'numeric', month: '2-digit', day: '2-digit' }) }
+    ]);
+  }
 
   return (
     <div className="adm-page">
@@ -32,13 +55,25 @@ export default function Miembros() {
           {!isLoading && (
             <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '4px' }}>
               {miembros.length}{' '}
-              {miembros.length === 1 ? 'cliente' : 'clientes'}
+              {miembros.length === 1 ? 'cliente' : 'clientes'} · {vigentes} con membresía vigente
             </p>
           )}
         </div>
-        <button onClick={() => setShowNuevo(true)} className="ek-cta">
-          + Nuevo miembro
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={exportar}
+            disabled={miembros.length === 0}
+            className="ek-cta ek-cta--secondary"
+            title="Descargar la lista filtrada como CSV (Excel)"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Download size={15} aria-hidden="true" /> Exportar CSV
+          </button>
+          <button onClick={() => setShowNuevo(true)} className="ek-cta">
+            + Nuevo miembro
+          </button>
+        </div>
       </div>
 
       <div className="adm-filters">
@@ -118,6 +153,7 @@ export default function Miembros() {
                   >
                     {m.membresia_tier ?? 'sin plan'}
                   </span>
+                  <MembresiaCelda m={porUsuario.get(m.id) ?? null} />
                   <StatusBadge status={m.status} />
                 </div>
               </div>
@@ -134,6 +170,7 @@ export default function Miembros() {
                 <th>Nombre</th>
                 <th>Email</th>
                 <th>Plan</th>
+                <th>Membresía</th>
                 <th>Status</th>
                 <th>Alta</th>
                 <th></th>
@@ -145,6 +182,9 @@ export default function Miembros() {
                   <td>{m.nombre ?? '—'}</td>
                   <td style={{ color: 'var(--ek-ink-muted)' }}>{m.email}</td>
                   <td>{m.membresia_tier ?? '—'}</td>
+                  <td>
+                    <MembresiaCelda m={porUsuario.get(m.id) ?? null} />
+                  </td>
                   <td>
                     <StatusBadge status={m.status} />
                   </td>
@@ -201,6 +241,28 @@ function StatusBadge({ status }: { status: string }) {
         }}
       />
       {status.replace(/_/g, ' ')}
+    </span>
+  );
+}
+
+function detalleMembresia(m: MembresiaResumen | null): string {
+  if (!m) return '';
+  if (esPaqueteDeCreditos(m.tier?.tipo)) return `${m.creditos_restantes ?? 0} créditos`;
+  return m.periodo_actual_fin ? formatFechaEnZona(m.periodo_actual_fin, { day: 'numeric', month: 'short' }) : '';
+}
+
+/** Estado de la membresía derivado por fecha (no el status de la cuenta). */
+function MembresiaCelda({ m }: { m: MembresiaResumen | null }) {
+  const estado = estadoMembresia(m);
+  const { texto, color } = ESTADO_MEMBRESIA_LABEL[estado];
+  const detalle = detalleMembresia(m);
+  return (
+    <span
+      title={m?.tier?.nombre ? `${m.tier.nombre}${detalle ? ` · ${detalle}` : ''}` : undefined}
+      style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.2 }}
+    >
+      <span style={{ color, fontWeight: 700, fontSize: '11px', letterSpacing: '0.06em' }}>{texto}</span>
+      {detalle && <span style={{ fontSize: '11px', color: 'var(--ek-ink-faint)' }}>{detalle}</span>}
     </span>
   );
 }

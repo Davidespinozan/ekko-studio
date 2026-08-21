@@ -49,6 +49,7 @@ export default function PagarMembresia() {
         .select('slug, nombre, precio_centavos, tipo, clases_incluidas, duracion_dias, beneficios')
         .eq('tenant_id', tenant.id)
         .eq('activo', true)
+        .eq('en_venta', true)
         .order('orden', { ascending: true });
       if (!mounted) return;
       setTiers(
