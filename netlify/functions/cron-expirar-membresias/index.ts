@@ -4,11 +4,12 @@ if (!globalThis.WebSocket) {
 }
 
 import type { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada } from '../_lib/connectBilling';
+import { reportarErrorServidor, conMonitorCron } from '../_lib/sentry';
 
 /**
  * Cron: a diario, marca `expirada` las membresías de paquete (no-Stripe) cuyo
@@ -23,8 +24,49 @@ import { resolverCuentaConectada } from '../_lib/connectBilling';
  *
  * Programado en netlify.toml como [functions."cron-expirar-membresias"] schedule "0 7 * * *"
  * (7:00 UTC ≈ medianoche en Culiacán). service_role: opera cross-tenant sin sesión.
+ *
+ * Observabilidad (lección de SALA): los errores se reportan a Sentry (antes solo
+ * console.error en logs que nadie lee), el handler va envuelto en un Cron
+ * Monitor (si este cron no corre a su hora, Sentry avisa solo) y al final corre
+ * `chequeosDeFrescura` sobre los efectos de los OTROS crons.
  */
-export const handler: Handler = async () => {
+const CRON_EXPR = '0 7 * * *';
+
+/** Efectos de los otros crons que deberían estar frescos. Solo lee y reporta. */
+async function chequeosDeFrescura(supabase: SupabaseClient): Promise<void> {
+  // cron-no-shows (cada hora): una reserva confirmada cuya sesión terminó hace
+  // >36h ya debería estar completada o no_show.
+  const { count: sinProcesar } = await supabase
+    .from('reservas')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'confirmada')
+    .lt('slot_fin', new Date(Date.now() - 36 * 3600_000).toISOString());
+  if ((sinProcesar ?? 0) > 0) {
+    await reportarErrorServidor(
+      'salud-plataforma',
+      new Error(`cron-no-shows atrasado: ${sinProcesar} reservas pasadas siguen 'confirmada' tras 36h`),
+      { chequeo: 'reservas_sin_procesar' }
+    );
+  }
+
+  // Este mismo cron (diario): un paquete sin Stripe con periodo vencido hace >48h
+  // que siga 'activa' significa que la expiración no está corriendo bien.
+  const { count: vencidasActivas } = await supabase
+    .from('membresias')
+    .select('id', { count: 'exact', head: true })
+    .in('status', ['activa', 'trialing'])
+    .is('stripe_subscription_id', null)
+    .lt('periodo_actual_fin', new Date(Date.now() - 48 * 3600_000).toISOString());
+  if ((vencidasActivas ?? 0) > 0) {
+    await reportarErrorServidor(
+      'salud-plataforma',
+      new Error(`expirar_membresias atrasado: ${vencidasActivas} membresías vencidas hace >48h siguen activas`),
+      { chequeo: 'membresias_vencidas_activas' }
+    );
+  }
+}
+
+const run: Handler = async () => {
   try {
     const supabaseUrl = requireEnv('VITE_SUPABASE_URL');
     const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
@@ -36,19 +78,28 @@ export const handler: Handler = async () => {
     const { data, error } = await supabase.rpc('expirar_membresias_vencidas');
 
     if (error) {
-      console.error('[cron-expirar-membresias]', error);
+      await reportarErrorServidor('cron-expirar-membresias', new Error(error.message), { rpc: 'expirar_membresias_vencidas' });
       return serverError(error.message);
     }
 
     const subsCanceladas = await reconciliarSubsHuerfanas(supabase);
 
+    // Salud del resto de la plataforma (nunca tira el cron principal).
+    try {
+      await chequeosDeFrescura(supabase);
+    } catch (e) {
+      await reportarErrorServidor('salud-plataforma', e, { chequeo: 'chequeos_de_frescura' });
+    }
+
     console.log('[cron-expirar-membresias] OK', { expiradas: data, subsCanceladas });
     return ok({ expiradas: data, subsCanceladas });
   } catch (e) {
-    console.error('[cron-expirar-membresias] Error', e);
+    await reportarErrorServidor('cron-expirar-membresias', e);
     return serverError(e instanceof Error ? e.message : 'Unknown error');
   }
 };
+
+export const handler: Handler = conMonitorCron('cron-expirar-membresias', CRON_EXPR, run);
 
 /**
  * Cancela en Stripe las suscripciones de membresías dadas de baja (cancelada/
@@ -96,7 +147,7 @@ async function reconciliarSubsHuerfanas(supabase: any): Promise<number> {
         canceladas++;
       }
     } catch (e) {
-      console.error('[cron-expirar-membresias] reconciliar sub', m.stripe_subscription_id, e instanceof Error ? e.message : e);
+      await reportarErrorServidor('cron-expirar-membresias', e, { paso: 'reconciliar_sub', sub: m.stripe_subscription_id });
     }
   }
 

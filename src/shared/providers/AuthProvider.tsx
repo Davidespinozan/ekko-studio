@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@shared/lib/supabase';
 import type { Database } from '@shared/types/database';
+import { setSentryUser } from '@shared/lib/sentry';
 
 type Usuario = Database['public']['Tables']['usuarios']['Row'];
 
@@ -58,6 +59,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     setUsuario(data);
+    // Atar el usuario a los errores de Sentry (id + email): sin esto cada error
+    // llegaba anónimo y no se podía saber a quién le pasó.
+    setSentryUser(data?.id ?? null, data?.email ?? undefined);
   }
 
   useEffect(() => {
@@ -84,6 +88,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (event === 'SIGNED_OUT' || !newSession) {
           setUsuario(null);
+          setSentryUser(null);
           return;
         }
 

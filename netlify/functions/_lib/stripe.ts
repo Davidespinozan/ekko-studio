@@ -18,7 +18,11 @@ export function getStripe(): Stripe {
   if (_stripe) return _stripe;
   _stripe = new Stripe(requireEnv('STRIPE_SECRET_KEY'), {
     apiVersion: API_VERSION,
-    typescript: true
+    typescript: true,
+    // Un blip de red en un cobro/webhook no debe fallar a la primera (Stripe
+    // reintenta de forma segura con idempotency keys automáticas).
+    maxNetworkRetries: 2,
+    appInfo: { name: 'EKKO Studio', url: 'https://ekkostudio.app' }
   });
   return _stripe;
 }

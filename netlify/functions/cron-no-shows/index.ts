@@ -7,6 +7,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
+import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
  * Cron: cada hora, marca reservas no asistidas como no_show + bloquea usuario.
@@ -29,14 +30,14 @@ export const handler: Handler = async () => {
     const { data, error } = await supabase.rpc('marcar_no_shows');
 
     if (error) {
-      console.error('[cron-no-shows]', error);
+      await reportarErrorServidor('cron-no-shows', new Error(error.message), { rpc: 'marcar_no_shows' });
       return serverError(error.message);
     }
 
     console.log('[cron-no-shows] OK', data);
     return ok(data);
   } catch (e) {
-    console.error('[cron-no-shows] Error', e);
+    await reportarErrorServidor('cron-no-shows', e);
     return serverError(e instanceof Error ? e.message : 'Unknown error');
   }
 };

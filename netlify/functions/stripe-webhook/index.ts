@@ -10,6 +10,7 @@ import { ok, badRequest, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { getStripe, clasificarEvento, periodoFinFromSubscription, extraerMontoDeEvento } from '../_lib/stripe';
 import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo } from '../_lib/email';
+import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
  * POST /stripe-webhook — materializa los cambios de la suscripción del miembro.
@@ -309,7 +310,7 @@ export const handler: Handler = async (event) => {
   } catch (err) {
     // Borrar el registro de idempotencia para que Stripe reintente y reprocese.
     await admin.from('stripe_webhook_events').delete().eq('id', stripeEvent.id);
-    console.error('[stripe-webhook] procesamiento', err);
+    await reportarErrorServidor('stripe-webhook', err, { event_id: stripeEvent.id, type: stripeEvent.type, account: connectedAccount ?? null });
     return serverError(err instanceof Error ? err.message : 'webhook error');
   }
 };

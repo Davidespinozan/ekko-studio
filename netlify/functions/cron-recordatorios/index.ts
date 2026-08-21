@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { enviarPushAUsuario } from '../_lib/push';
+import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
  * Cron: recuerda a los miembros su reserva próxima (~1 hora antes).
@@ -27,7 +28,7 @@ export const handler: Handler = async () => {
 
     const { data, error } = await supabase.rpc('generar_recordatorios_reservas');
     if (error) {
-      console.error('[cron-recordatorios]', error);
+      await reportarErrorServidor('cron-recordatorios', new Error(error.message), { rpc: 'generar_recordatorios_reservas' });
       return serverError(error.message);
     }
 
@@ -52,7 +53,7 @@ export const handler: Handler = async () => {
     console.log('[cron-recordatorios] OK', { recordatorios: filas.length, pushEnviados });
     return ok({ recordatorios: filas.length, pushEnviados });
   } catch (e) {
-    console.error('[cron-recordatorios] Error', e);
+    await reportarErrorServidor('cron-recordatorios', e);
     return serverError(e instanceof Error ? e.message : 'Unknown error');
   }
 };
