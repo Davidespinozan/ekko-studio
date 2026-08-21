@@ -7,7 +7,6 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { enviarPushAUsuario } from '../_lib/push';
 import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
@@ -36,17 +35,10 @@ export const handler: Handler = async () => {
       return serverError(error.message);
     }
 
-    const filas = (data ?? []) as Array<{ usuario_id: string; titulo: string; mensaje: string }>;
-    let pushEnviados = 0;
-    for (const f of filas) {
-      const r = await enviarPushAUsuario(supabase, f.usuario_id, {
-        titulo: f.titulo,
-        mensaje: f.mensaje,
-        url: '/app/perfil',
-        tag: 'membresia_por_vencer'
-      });
-      pushEnviados += r.enviados;
-    }
+    // El push lo reparte cron-push (cada minuto) a partir de las filas que dejó la
+    // RPC en `notificaciones` (push_enviado_at IS NULL): un solo repartidor.
+    const filas = (data ?? []) as Array<{ usuario_id: string }>;
+    const pushEnviados = 0;
 
     console.log('[cron-membresias-por-vencer] OK', { avisados: filas.length, pushEnviados });
     return ok({ avisados: filas.length, pushEnviados });

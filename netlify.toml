@@ -61,3 +61,7 @@
 # Felicita por cumpleaños (≈9:00 Culiacán).
 [functions."cron-felicitaciones"]
   schedule = "0 16 * * *"
+
+# Reparte por push toda notificación pendiente (de cualquier origen).
+[functions."cron-push"]
+  schedule = "* * * * *"

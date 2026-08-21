@@ -148,7 +148,8 @@ export const handler: Handler = async (event) => {
         tipo: 'no_show',
         titulo: aviso.titulo,
         mensaje: aviso.mensaje,
-        metadata: { reserva_id: reserva.id, folio: reserva.folio, bloqueado_hasta: bloqueoNuevo }
+        metadata: { reserva_id: reserva.id, folio: reserva.folio, bloqueado_hasta: bloqueoNuevo },
+        push_enviado_at: new Date().toISOString() // el push sale aquí mismo (no lo repite cron-push)
       });
       if (notifErr) console.error('[reception-marcar-no-show] notificación', notifErr.message);
       await enviarPushAUsuario(supabaseAdmin, miembro.id, {

@@ -27,7 +27,8 @@ export async function avisarStaff(
       tipo: args.tipo,
       titulo: args.titulo,
       mensaje: args.mensaje,
-      metadata: args.metadata ?? null
+      metadata: args.metadata ?? null,
+      push_enviado_at: new Date().toISOString() // el push sale aquí mismo (no lo repite cron-push)
     }));
     const { error: insErr } = await admin.from('notificaciones').insert(filas);
     if (insErr) {

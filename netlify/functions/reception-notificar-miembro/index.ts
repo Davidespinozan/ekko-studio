@@ -86,7 +86,8 @@ export const handler: Handler = async (event) => {
       usuario_id: target.id,
       tipo: 'aviso_manual',
       titulo: 'Aviso del estudio',
-      mensaje
+      mensaje,
+      push_enviado_at: new Date().toISOString() // el push sale aquí mismo (no lo repite cron-push)
     });
     if (insErr) return serverError(insErr.message);
 

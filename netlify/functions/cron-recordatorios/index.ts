@@ -7,7 +7,6 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { enviarPushAUsuario } from '../_lib/push';
 import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
@@ -39,16 +38,9 @@ export const handler: Handler = async () => {
       reserva_id: string;
     }>;
 
-    let pushEnviados = 0;
-    for (const f of filas) {
-      const r = await enviarPushAUsuario(supabase, f.usuario_id, {
-        titulo: f.titulo,
-        mensaje: f.mensaje,
-        url: '/app',
-        tag: 'recordatorio_reserva'
-      });
-      pushEnviados += r.enviados;
-    }
+    // El push lo reparte cron-push (cada minuto) a partir de las filas que dejó
+    // la RPC en `notificaciones` (push_enviado_at IS NULL).
+    const pushEnviados = 0;
 
     console.log('[cron-recordatorios] OK', { recordatorios: filas.length, pushEnviados });
     return ok({ recordatorios: filas.length, pushEnviados });

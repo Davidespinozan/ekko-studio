@@ -267,6 +267,7 @@ export type Database = {
           leida_at: string | null
           mensaje: string
           metadata: Json | null
+          push_enviado_at: string | null
           tenant_id: string
           tipo: string
           titulo: string
@@ -279,6 +280,7 @@ export type Database = {
           leida_at?: string | null
           mensaje: string
           metadata?: Json | null
+          push_enviado_at?: string | null
           tenant_id: string
           tipo: string
           titulo: string
@@ -291,6 +293,7 @@ export type Database = {
           leida_at?: string | null
           mensaje?: string
           metadata?: Json | null
+          push_enviado_at?: string | null
           tenant_id?: string
           tipo?: string
           titulo?: string

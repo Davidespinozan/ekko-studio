@@ -152,7 +152,8 @@ export const handler: Handler = async (event) => {
         tipo: 'reserva_cancelada',
         titulo: 'Tu reserva fue cancelada',
         mensaje: `El estudio "${recurso.nombre}" quedó temporalmente fuera de servicio. Tu reserva del ${fechaLarga(r.slot_inicio)} fue cancelada. Volvé a reservar cuando esté disponible.`,
-        metadata: { reserva_id: r.id, motivo: 'recurso_fuera_servicio' }
+        metadata: { reserva_id: r.id, motivo: 'recurso_fuera_servicio' },
+        push_enviado_at: new Date().toISOString() // el push sale aquí mismo (no lo repite cron-push)
       }));
       const { error: notifErr } = await supabaseAdmin.from('notificaciones').insert(notifs);
       if (notifErr) console.error('[reception-recurso-servicio] notif', notifErr.message);
