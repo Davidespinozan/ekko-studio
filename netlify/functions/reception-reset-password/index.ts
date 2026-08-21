@@ -72,12 +72,20 @@ export const handler: Handler = async (event) => {
 
     const { data: target, error: targetErr } = await supabaseAdmin
       .from('usuarios')
-      .select('id, auth_id, tenant_id, email')
+      .select('id, auth_id, tenant_id, email, rol')
       .eq('id', usuario_id)
       .maybeSingle();
     if (targetErr) return serverError(targetErr.message);
     if (!target) return notFound('Miembro no encontrado');
     if (target.tenant_id !== caller.tenant_id) return forbidden('El miembro es de otro tenant');
+    if (!target.auth_id) return badRequest('Esta cuenta no tiene acceso creado todavía');
+
+    // Escalada: recepción solo resetea a MIEMBROS. Las claves del staff
+    // (admin/recepcionista) solo las resetea un admin. Sin este guard un
+    // recepcionista podía tomar la cuenta de un admin vía API.
+    if (target.rol !== 'miembro' && caller.rol !== 'admin') {
+      return forbidden('Solo un admin puede resetear la contraseña del equipo');
+    }
 
     const nuevaPassword = generarPassword();
 
