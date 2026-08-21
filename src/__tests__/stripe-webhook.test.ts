@@ -11,6 +11,10 @@ const mockSubRetrieve = vi.fn().mockResolvedValue({ current_period_end: 1_700_00
 const mockUpsertSelect = vi.fn();
 const mockRpc = vi.fn();
 const mockDeleteEq = vi.fn().mockResolvedValue({ error: null });
+// tenants: lookup por stripe_account_id (cuenta ajena) + update (account.updated)
+const mockTenantMaybeSingle = vi.fn();
+const mockTenantUpdateEq = vi.fn().mockResolvedValue({ error: null });
+const mockTenantUpdate = vi.fn(() => ({ eq: mockTenantUpdateEq }));
 
 // Cadena de query encadenable + thenable (para .select().eq().in().not()… y
 // .maybeSingle()). Por defecto resuelve data vacía (sin subs previas ni emails).
@@ -33,11 +37,18 @@ vi.mock('../../netlify/functions/_lib/stripe', async (importOriginal) => ({
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
     rpc: mockRpc,
-    from: vi.fn(() => ({
-      upsert: vi.fn(() => ({ select: mockUpsertSelect })),
-      delete: vi.fn(() => ({ eq: mockDeleteEq })),
-      select: vi.fn(() => makeChain())
-    }))
+    from: vi.fn((table: string) => {
+      if (table === 'tenants') {
+        const c = makeChain();
+        c.maybeSingle = () => mockTenantMaybeSingle();
+        return { select: () => c, update: mockTenantUpdate };
+      }
+      return {
+        upsert: vi.fn(() => ({ select: mockUpsertSelect })),
+        delete: vi.fn(() => ({ eq: mockDeleteEq })),
+        select: vi.fn(() => makeChain())
+      };
+    })
   }))
 }));
 
@@ -65,6 +76,7 @@ describe('stripe-webhook', () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
     mockRpc.mockResolvedValue({ data: {}, error: null });
     mockUpsertSelect.mockResolvedValue({ data: [{ id: 'evt_1' }], error: null }); // evento nuevo
+    mockTenantMaybeSingle.mockResolvedValue({ data: { id: 'tenant-1' }, error: null }); // cuenta conocida
   });
 
   it('sin secret → no-op', async () => {
@@ -149,5 +161,52 @@ describe('stripe-webhook', () => {
     const res = await invocar();
     expect(res.statusCode).toBe(500);
     expect(mockDeleteEq).toHaveBeenCalledWith('id', 'evt_1');
+  });
+
+  describe('Connect · cuenta compartida', () => {
+    const evConCuenta = (account: string) => ({
+      id: 'evt_1', type: 'customer.subscription.updated', created: 1700000000, account,
+      data: { object: { id: 'sub_1', status: 'past_due', cancel_at_period_end: false, metadata: { app: 'ekko' } } }
+    });
+
+    it('evento de una cuenta conectada de EKKO → se procesa sobre esa cuenta', async () => {
+      mockConstructEvent.mockReturnValue(evConCuenta('acct_ekko'));
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith('sync_membresia_stripe', expect.objectContaining({ p_stripe_subscription_id: 'sub_1' }));
+    });
+
+    it('evento de una cuenta que NO es de ningún estudio (gym de SALA) → 200 ignorado, sin RPC ni idempotencia', async () => {
+      mockTenantMaybeSingle.mockResolvedValue({ data: null, error: null });
+      mockConstructEvent.mockReturnValue(evConCuenta('acct_sala'));
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).ignored).toBe('cuenta_ajena');
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(mockUpsertSelect).not.toHaveBeenCalled();
+    });
+
+    it('objeto con metadata.app de otra app → 200 ignorado (app_ajena), sin RPC', async () => {
+      mockConstructEvent.mockReturnValue({
+        id: 'evt_1', type: 'payment_intent.succeeded', created: 1700000000,
+        data: { object: { id: 'pi_1', amount: 1000, customer: 'cus_1', metadata: { app: 'sala', usuario_id: 'u1', tier_id: 't1' } } }
+      });
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).ignored).toBe('app_ajena');
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it('account.updated → refresca stripe_charges_enabled/details_submitted del tenant', async () => {
+      mockConstructEvent.mockReturnValue({
+        id: 'evt_1', type: 'account.updated', created: 1700000000, account: 'acct_ekko',
+        data: { object: { id: 'acct_ekko', charges_enabled: true, details_submitted: true, payouts_enabled: true } }
+      });
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(mockTenantUpdate).toHaveBeenCalledWith({ stripe_charges_enabled: true, stripe_details_submitted: true });
+      expect(mockTenantUpdateEq).toHaveBeenCalledWith('stripe_account_id', 'acct_ekko');
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
   });
 });

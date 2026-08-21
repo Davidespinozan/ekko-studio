@@ -97,7 +97,28 @@ export type EventoClasificado =
       usuario_id: string | null;
       event_at: string;
     }
+  | {
+      // Connect: Stripe aprobó/cambió la cuenta conectada del estudio → refrescar
+      // los flags que gatean el cobro sin esperar a que alguien abra /admin/cobros.
+      kind: 'cuenta-conectada';
+      account_id: string;
+      charges_enabled: boolean;
+      details_submitted: boolean;
+      payouts_enabled: boolean;
+      event_at: string;
+    }
   | { kind: 'ignore'; reason: string };
+
+/**
+ * La cuenta Stripe de la plataforma se COMPARTE con otros productos (SALA, HSC).
+ * Todo lo que crea EKKO lleva `metadata.app = 'ekko'`; si un objeto trae otra
+ * app, el evento no es nuestro. (Sin metadata → se asume nuestro: las facturas
+ * de renovación no siempre arrastran el metadata de la suscripción.)
+ */
+export const APP_ID = 'ekko';
+export function esDeOtraApp(meta: { app?: string } | null | undefined): boolean {
+  return typeof meta?.app === 'string' && meta.app !== '' && meta.app !== APP_ID;
+}
 
 /**
  * Traduce un evento de Stripe a una acción interna, SIN llamar a Stripe.
@@ -110,6 +131,7 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
   switch (event.type) {
     case 'checkout.session.completed': {
       const s = event.data.object as Stripe.Checkout.Session;
+      if (esDeOtraApp(s.metadata)) return { kind: 'ignore', reason: 'app_ajena' };
       const usuario_id = s.metadata?.usuario_id;
       const tier_id = s.metadata?.tier_id;
       const subscription_id =
@@ -128,6 +150,7 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
     case 'customer.subscription.updated':
     case 'customer.subscription.deleted': {
       const sub = event.data.object as Stripe.Subscription;
+      if (esDeOtraApp(sub.metadata)) return { kind: 'ignore', reason: 'app_ajena' };
       const estado =
         event.type === 'customer.subscription.deleted' ? 'cancelada' : mapStripeStatus(sub.status);
       if (!estado) return { kind: 'ignore', reason: `status_transitorio:${sub.status}` };
@@ -147,8 +170,11 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
         subscription?: string | { id: string };
         billing_reason?: string;
         // API 2025+: invoice.subscription se movió a parent.subscription_details.
-        parent?: { subscription_details?: { subscription?: string | { id: string } } };
+        parent?: { subscription_details?: { subscription?: string | { id: string }; metadata?: { app?: string } } };
+        subscription_details?: { metadata?: { app?: string } };
       };
+      const metaSub = inv.parent?.subscription_details?.metadata ?? inv.subscription_details?.metadata;
+      if (esDeOtraApp(metaSub)) return { kind: 'ignore', reason: 'app_ajena' };
       const subRef = inv.subscription ?? inv.parent?.subscription_details?.subscription;
       const subscription_id = typeof subRef === 'string' ? subRef : subRef?.id;
       if (!subscription_id) return { kind: 'ignore', reason: 'invoice_sin_suscripcion' };
@@ -169,6 +195,7 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
 
     case 'payment_intent.succeeded': {
       const pi = event.data.object as Stripe.PaymentIntent;
+      if (esDeOtraApp(pi.metadata)) return { kind: 'ignore', reason: 'app_ajena' };
       // Invitados extra pagados en la app (pago único, sin membresía).
       if (pi.metadata?.tipo === 'invitados_extra') {
         const reserva_id = pi.metadata?.reserva_id;
@@ -187,6 +214,19 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
         return { kind: 'ignore', reason: 'payment_intent_sin_metadata' };
       }
       return { kind: 'activar', usuario_id, tier_id, subscription_id: null, customer_id, event_at };
+    }
+
+    case 'account.updated': {
+      const acct = event.data.object as Stripe.Account;
+      if (!acct.id) return { kind: 'ignore', reason: 'account_sin_id' };
+      return {
+        kind: 'cuenta-conectada',
+        account_id: acct.id,
+        charges_enabled: acct.charges_enabled === true,
+        details_submitted: acct.details_submitted === true,
+        payouts_enabled: acct.payouts_enabled === true,
+        event_at
+      };
     }
 
     default:

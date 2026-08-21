@@ -61,11 +61,19 @@ VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...   # front (pago in-app con Elements)
 ```
 (Ya existen `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.)
 
-Y en el dashboard de Stripe: apuntar el **webhook endpoint** a
-`/.netlify/functions/stripe-webhook` con los eventos:
-`payment_intent.succeeded`, `invoice.paid`, `invoice.payment_failed`,
-`customer.subscription.updated`, `customer.subscription.deleted`
-(+ `checkout.session.completed` si se usa el Checkout hosted como fallback).
+Y en el dashboard de Stripe: crear el **webhook endpoint** como endpoint de
+**Connect** ("Listen to events on Connected accounts") apuntando a
+`https://ekkostudio.app/.netlify/functions/stripe-webhook` — **el host apex, no
+`www.`**: `www.ekkostudio.app` redirige 308 y Stripe NO sigue redirects (todos los
+eventos se perderían en silencio). Eventos:
+`account.updated`, `payment_intent.succeeded`, `invoice.paid`,
+`invoice.payment_failed`, `customer.subscription.updated`,
+`customer.subscription.deleted` (+ `checkout.session.completed` si se usa el
+Checkout como fallback). Su signing secret va en `STRIPE_CONNECT_WEBHOOK_SECRET`.
+
+> La cuenta Stripe de la plataforma se comparte con SALA/HSC: el webhook descarta
+> (200) los eventos de cuentas conectadas que no sean de ningún estudio de EKKO y
+> los objetos con `metadata.app` distinto de `ekko`.
 
 > **Pago in-app (Elements):** el cobro ocurre en el modal propio de EKKO
 > (`PaymentModal` + `crear-pago-intent`), sin redirigir. Con Elements la

@@ -3,7 +3,8 @@ import {
   mapStripeStatus,
   periodoFinFromSubscription,
   clasificarEvento,
-  extraerMontoDeEvento
+  extraerMontoDeEvento,
+  esDeOtraApp
 } from '../../netlify/functions/_lib/stripe';
 
 /**
@@ -230,5 +231,63 @@ describe('extraerMontoDeEvento', () => {
 
   it('subscription.updated → null', () => {
     expect(extraerMontoDeEvento(ev('customer.subscription.updated', { id: 'sub_1' }))).toBeNull();
+  });
+});
+
+describe('cuenta Stripe compartida — filtro por metadata.app', () => {
+  it('esDeOtraApp: solo rechaza apps distintas; sin metadata se asume propia', () => {
+    expect(esDeOtraApp({ app: 'sala' })).toBe(true);
+    expect(esDeOtraApp({ app: 'ekko' })).toBe(false);
+    expect(esDeOtraApp({})).toBe(false);
+    expect(esDeOtraApp(null)).toBe(false);
+    expect(esDeOtraApp(undefined)).toBe(false);
+  });
+
+  it('checkout / subscription / payment_intent de otra app → ignore app_ajena', () => {
+    const casos = [
+      ev('checkout.session.completed', { mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', metadata: { app: 'sala', usuario_id: 'u1', tier_id: 't1' } }),
+      ev('customer.subscription.updated', { id: 'sub_1', status: 'active', metadata: { app: 'sala' } }),
+      ev('customer.subscription.deleted', { id: 'sub_1', status: 'canceled', metadata: { app: 'hsc' } }),
+      ev('payment_intent.succeeded', { customer: 'cus_1', metadata: { app: 'sala', usuario_id: 'u1', tier_id: 't1' } })
+    ];
+    for (const e of casos) {
+      expect(clasificarEvento(e)).toEqual({ kind: 'ignore', reason: 'app_ajena' });
+    }
+  });
+
+  it('invoice de otra app (metadata en parent.subscription_details) → ignore app_ajena', () => {
+    const r = clasificarEvento(ev('invoice.paid', {
+      billing_reason: 'subscription_cycle',
+      parent: { subscription_details: { subscription: 'sub_1', metadata: { app: 'sala' } } }
+    }));
+    expect(r).toEqual({ kind: 'ignore', reason: 'app_ajena' });
+  });
+
+  it('objetos con app=ekko o sin metadata se procesan normal', () => {
+    const propio = clasificarEvento(ev('customer.subscription.updated', { id: 'sub_1', status: 'active', metadata: { app: 'ekko' } }));
+    expect(propio.kind).toBe('sync');
+    const sinMeta = clasificarEvento(ev('invoice.paid', { subscription: 'sub_1', billing_reason: 'subscription_cycle' }));
+    expect(sinMeta.kind).toBe('sync');
+  });
+});
+
+describe('account.updated (Connect)', () => {
+  it('→ cuenta-conectada con los flags del gate de cobro', () => {
+    const r = clasificarEvento(ev('account.updated', {
+      id: 'acct_1', charges_enabled: true, details_submitted: true, payouts_enabled: false
+    }));
+    expect(r).toEqual({
+      kind: 'cuenta-conectada',
+      account_id: 'acct_1',
+      charges_enabled: true,
+      details_submitted: true,
+      payouts_enabled: false,
+      event_at: new Date(1_700_000_000 * 1000).toISOString()
+    });
+  });
+
+  it('flags ausentes → false (no se activa el cobro por accidente)', () => {
+    const r = clasificarEvento(ev('account.updated', { id: 'acct_1' }));
+    expect(r).toMatchObject({ kind: 'cuenta-conectada', charges_enabled: false, details_submitted: false });
   });
 });

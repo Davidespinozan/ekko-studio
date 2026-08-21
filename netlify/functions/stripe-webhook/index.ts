@@ -98,6 +98,24 @@ export const handler: Handler = async (event) => {
     { auth: { persistSession: false } }
   );
 
+  // ── Cuenta ajena: la cuenta Stripe de la plataforma se comparte con otros
+  //    productos (SALA, HSC). Un evento de una cuenta conectada que no es de
+  //    ningún estudio de EKKO se responde 200 y se descarta (antes caía en
+  //    activar_membresia con un usuario inexistente → 500 → reintentos).
+  const connectedAccount = (stripeEvent as unknown as { account?: string }).account;
+  if (connectedAccount) {
+    const { data: tenantDeCuenta, error: tenantErr } = await admin
+      .from('tenants')
+      .select('id')
+      .eq('stripe_account_id', connectedAccount)
+      .maybeSingle();
+    if (tenantErr) {
+      console.error('[stripe-webhook] lookup tenant por cuenta', tenantErr.message);
+      return serverError('No se pudo resolver la cuenta conectada');
+    }
+    if (!tenantDeCuenta) return ok({ received: true, ignored: 'cuenta_ajena' });
+  }
+
   // ── Idempotencia: insert-or-ignore por event.id ───────────────────────────
   const { data: inserted, error: insErr } = await admin
     .from('stripe_webhook_events')
@@ -111,13 +129,15 @@ export const handler: Handler = async (event) => {
     return ok({ received: true, duplicate: true });
   }
 
-  // Connect: los eventos de la cuenta conectada traen event.account. Las
-  // lecturas a Stripe (retrieve de la suscripción) deben ir sobre esa cuenta.
-  const connectedAccount = (stripeEvent as unknown as { account?: string }).account;
+  // Connect: las lecturas a Stripe (retrieve de la suscripción) deben ir sobre
+  // la cuenta conectada del evento.
   const acctOpt = connectedAccount ? { stripeAccount: connectedAccount } : undefined;
 
   try {
     const accion = clasificarEvento(stripeEvent);
+    if (accion.kind === 'ignore' && accion.reason === 'app_ajena') {
+      return ok({ received: true, ignored: 'app_ajena' });
+    }
     // usuario del pago (para payment_events): se captura en cada rama donde ya
     // lo conocemos; en renovaciones (sync) se resuelve por la suscripción.
     let usuarioIdPago: string | null = null;
@@ -184,6 +204,17 @@ export const handler: Handler = async (event) => {
         p_event_at: accion.event_at
       });
       if (error) throw new Error(`sync_membresia_stripe: ${error.message}`);
+    } else if (accion.kind === 'cuenta-conectada') {
+      // account.updated → refrescar el gate de cobro del estudio (antes solo lo
+      // hacía connect-status cuando el admin abría /admin/cobros).
+      const { error } = await admin
+        .from('tenants')
+        .update({
+          stripe_charges_enabled: accion.charges_enabled,
+          stripe_details_submitted: accion.details_submitted
+        })
+        .eq('stripe_account_id', accion.account_id);
+      if (error) throw new Error(`tenants.update (account.updated): ${error.message}`);
     } else if (accion.kind === 'invitados-extra') {
       // Invitados extra pagados en la app → sumarlos a la reserva.
       const { error } = await admin.rpc('registrar_invitados_extra_pagados', {
