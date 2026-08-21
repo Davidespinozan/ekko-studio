@@ -47,6 +47,6 @@ export default [
     }
   },
   {
-    ignores: ['dist/**', 'node_modules/**', '.netlify/**', 'playwright-report/**', 'test-results/**']
+    ignores: ['dist/**', 'node_modules/**', '.netlify/**', 'playwright-report/**', 'test-results/**', 'scripts/**']
   }
 ];
