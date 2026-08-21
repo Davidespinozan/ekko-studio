@@ -1,29 +1,8 @@
 import type { MembresiaActualAdmin } from '../../hooks/useAdminData';
+import { estadoMembresia as estadoDe, ESTADO_MEMBRESIA_LABEL as LABEL, esPaqueteDeCreditos } from '@shared/lib/membresiaEstado';
 
-/** Estado operativo de la membresía, derivado por FECHA y no solo por status. */
-export type EstadoMembresiaUI = 'vigente' | 'por_vencer' | 'vencida' | 'pago_pendiente' | 'sin_membresia';
-
-export function estadoMembresia(
-  m: Pick<MembresiaActualAdmin, 'status' | 'periodo_actual_fin'> | null,
-  ahora: Date = new Date()
-): EstadoMembresiaUI {
-  if (!m) return 'sin_membresia';
-  if (m.status === 'past_due') return 'pago_pendiente';
-  if (m.periodo_actual_fin) {
-    const fin = new Date(m.periodo_actual_fin).getTime();
-    if (fin < ahora.getTime()) return 'vencida';
-    if (fin - ahora.getTime() < 3 * 24 * 60 * 60 * 1000) return 'por_vencer';
-  }
-  return 'vigente';
-}
-
-const LABEL: Record<EstadoMembresiaUI, { texto: string; color: string }> = {
-  vigente: { texto: 'VIGENTE', color: 'var(--ek-success)' },
-  por_vencer: { texto: 'POR VENCER', color: 'var(--ek-mustard)' },
-  vencida: { texto: 'VENCIDA', color: 'var(--ek-danger)' },
-  pago_pendiente: { texto: 'PAGO PENDIENTE', color: 'var(--ek-danger)' },
-  sin_membresia: { texto: 'SIN MEMBRESÍA', color: 'var(--ek-ink-faint)' }
-};
+// Re-export: la lógica de estado vive en shared (la usan admin y recepción).
+export { estadoMembresia, type EstadoMembresiaUI } from '@shared/lib/membresiaEstado';
 
 interface Props {
   membresia: MembresiaActualAdmin | null;
@@ -41,9 +20,9 @@ interface Props {
 export function MembresiaActualCard({ membresia, isLoading, planAsignado }: Props) {
   if (isLoading) return <p className="adm-body" style={{ fontSize: '13px' }}>Cargando membresía…</p>;
 
-  const estado = estadoMembresia(membresia);
+  const estado = estadoDe(membresia);
   const { texto, color } = LABEL[estado];
-  const esPaquete = membresia?.tier?.tipo === 'creditos' || membresia?.tier?.tipo === 'hibrido';
+  const esPaquete = esPaqueteDeCreditos(membresia?.tier?.tipo);
   const desfase = membresia && planAsignado && membresia.tier?.slug !== planAsignado;
 
   return (

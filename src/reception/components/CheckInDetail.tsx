@@ -4,6 +4,7 @@ import { PlanChip } from '@shared/components/PlanChip';
 import { InvitadosModal } from './InvitadosModal';
 import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 import { ZONA_ESTUDIO } from '@shared/lib/timezone';
+import { VigenciaMembresia } from '@shared/components/VigenciaMembresia';
 
 interface MiembroData {
   id: string;
@@ -139,7 +140,12 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMes
           <p className="rec-detail-section-label">MEMBRESÍA</p>
           <div style={{ marginTop: '2px' }}>
             {tieneTier ? (
-              <PlanChip slug={miembro.membresia_tier} />
+              <>
+                <PlanChip slug={miembro.membresia_tier} />
+                <div style={{ marginTop: '4px' }}>
+                  <VigenciaMembresia usuarioId={miembro.id} variante="linea" />
+                </div>
+              </>
             ) : (
               <p
                 className="rec-detail-value"

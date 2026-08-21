@@ -89,7 +89,8 @@ export function generarSlotsDisponibles(
   config: TenantReservaConfig,
   reservasDelRecurso: Pick<Reserva, 'slot_inicio'>[],
   reservasDelUsuario: Pick<Reserva, 'slot_inicio'>[],
-  ahora: Date = new Date()
+  ahora: Date = new Date(),
+  opciones: { permitirEnCurso?: boolean } = {}
 ): Slot[] {
   const horarios = (recurso.horarios as unknown as HorarioBloque[]) ?? [];
   const diaSemana = diaNombreDeFechaISO(fechaISO);
@@ -122,10 +123,15 @@ export function generarSlotsDisponibles(
       let disponible = true;
       let razon: Slot['razon'] | undefined;
 
-      if (slotInicio < ahora) {
+      // Recepción (permitirEnCurso): una sesión que YA empezó pero no terminó
+      // sigue reservable — el walk-in que llega 10 min tarde a su hora. El
+      // backend de recepción no valida pasado/anticipación (D1) y el check-in
+      // manual acepta hasta slot_fin + 60 min.
+      const yaPaso = opciones.permitirEnCurso ? slotFin <= ahora : slotInicio < ahora;
+      if (yaPaso) {
         disponible = false;
         razon = 'pasado';
-      } else if (slotInicio < limiteAnticipacion) {
+      } else if (!opciones.permitirEnCurso && slotInicio < limiteAnticipacion) {
         disponible = false;
         razon = 'anticipacion_insuficiente';
       } else if (ocupados.has(slotInicioMs)) {

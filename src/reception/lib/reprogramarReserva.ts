@@ -23,7 +23,7 @@ export interface ReprogramarParams {
   reservaOriginalId: string;
   usuarioId: string;
   original: { recursoId: string; inicio: Date; fin: Date };
-  nuevo: { recursoId: string; slotInicio: Date; duracionMin: number; notas: string | null };
+  nuevo: { recursoId: string; slotInicio: Date; duracionMin: number; notas: string | null; invitados?: number };
 }
 
 export type ReprogramarResultado =
@@ -76,7 +76,8 @@ async function crearNueva(p: ReprogramarParams): Promise<string | null> {
     p_recurso_id: p.nuevo.recursoId,
     p_slot_inicio: p.nuevo.slotInicio.toISOString(),
     p_duracion_min: p.nuevo.duracionMin,
-    p_invitados: 0,
+    // Antes siempre 0: al reprogramar se PERDÍAN los invitados de la original.
+    p_invitados: p.nuevo.invitados ?? 0,
     p_notas: p.nuevo.notas
   });
   return error ? error.message : null;

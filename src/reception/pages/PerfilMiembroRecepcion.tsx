@@ -65,7 +65,7 @@ export default function PerfilMiembroRecepcion() {
     if (!id) return;
     const { data } = await supabase
       .from('reservas')
-      .select('id, slot_inicio, slot_fin, status, folio, recurso_id, recurso:recursos(nombre)')
+      .select('id, slot_inicio, slot_fin, status, folio, recurso_id, invitados_count, recurso:recursos(nombre)')
       .eq('usuario_id', id)
       .order('slot_inicio', { ascending: false })
       .limit(50);
@@ -267,7 +267,8 @@ export default function PerfilMiembroRecepcion() {
                     recurso_id: r.recurso_id,
                     recurso_nombre: r.recurso?.nombre ?? 'Estudio',
                     slot_inicio: r.slot_inicio,
-                    slot_fin: r.slot_fin
+                    slot_fin: r.slot_fin,
+                    invitados_count: r.invitados_count ?? 0
                   })
                 }
                 reprogramarBloqueado={miembro.status !== 'activo'}

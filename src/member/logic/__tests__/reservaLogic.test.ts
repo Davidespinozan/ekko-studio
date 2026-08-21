@@ -246,3 +246,20 @@ describe('utilidades de fecha', () => {
     expect(puedeReservarRecurso(abierto, null)).toBe(true);
   });
 });
+
+describe('generarSlotsDisponibles · permitirEnCurso (recepción, walk-in tarde)', () => {
+  it('sin la opción, un slot que ya empezó es "pasado"; con la opción sigue disponible hasta que termina', () => {
+    const recurso = makeRecurso();
+    const fecha = '2026-05-11'; // lunes, bloque 09:00–12:00
+    const ahora = instanteEnZona(2026, 4, 11, 9, 20); // 9:20: el slot de 9 ya empezó
+    const sinOpcion = generarSlotsDisponibles(recurso, fecha, { ...baseConfig, anticipacion_min_horas: 0 }, [], [], ahora);
+    expect(sinOpcion[0].razon).toBe('pasado');
+    const conOpcion = generarSlotsDisponibles(recurso, fecha, { ...baseConfig, anticipacion_min_horas: 0 }, [], [], ahora, { permitirEnCurso: true });
+    expect(conOpcion[0].disponible).toBe(true);
+    // Uno que ya TERMINÓ sigue sin estar disponible.
+    const masTarde = instanteEnZona(2026, 4, 11, 10, 5);
+    const tarde = generarSlotsDisponibles(recurso, fecha, { ...baseConfig, anticipacion_min_horas: 0 }, [], [], masTarde, { permitirEnCurso: true });
+    expect(tarde[0].razon).toBe('pasado');
+    expect(tarde[1].disponible).toBe(true);
+  });
+});

@@ -1,4 +1,5 @@
 import { PlanChip } from '@shared/components/PlanChip';
+import { VigenciaMembresia } from '@shared/components/VigenciaMembresia';
 import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
 import { statusMiembro } from '../../lib/miembroStatus';
 import { fechaCorta } from './perfilUtils';
@@ -27,7 +28,8 @@ export function DatosOperativosCard({ miembro }: { miembro: MiembroPerfil }) {
         label="Plan"
         valor={planVigente ? <PlanChip slug={miembro.membresia_tier} /> : <span style={{ color: 'var(--ek-ink-faint)' }}>Sin plan</span>}
       />
-      <Dato label="Estado" valor={<span style={{ color: st.color, fontWeight: 600 }}>{st.label}</span>} />
+      <Dato label="Membresía" valor={<VigenciaMembresia usuarioId={miembro.id} />} />
+      <Dato label="Cuenta" valor={<span style={{ color: st.color, fontWeight: 600 }}>{st.label}</span>} />
       <Dato label="Inasistencias" valor={String(miembro.no_shows_count ?? 0)} />
       <Dato label="Miembro desde" valor={fechaCorta(miembro.created_at)} />
     </div>

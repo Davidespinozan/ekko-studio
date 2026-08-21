@@ -18,7 +18,8 @@ import {
 import type { Database } from '@shared/types/database';
 import { traducirErrorReserva } from '../lib/traducirErrorReserva';
 import { reprogramarReserva } from '../lib/reprogramarReserva';
-import { rangoDiaEnZona } from '@shared/lib/timezone';
+import { rangoDiaEnZona, hoyISOEnZona } from '@shared/lib/timezone';
+import { checkInManual } from '../hooks/useReservasHoy';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 
@@ -35,6 +36,8 @@ export interface ReservaOriginal {
   recurso_nombre: string;
   slot_inicio: string; // ISO
   slot_fin: string; // ISO
+  /** Invitados de la reserva original: se conservan al reprogramar. */
+  invitados_count?: number;
 }
 
 interface Props {
@@ -115,6 +118,35 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
   const [slotSel, setSlotSel] = useState<Slot | null>(null);
   const [notas, setNotas] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Invitados del plan (tiers.reglas.max_invitados). Antes recepción mandaba
+  // siempre p_invitados: 0 y al reprogramar se perdían los de la original.
+  const [invitados, setInvitados] = useState(reprogramarDe?.invitados_count ?? 0);
+  const [maxInvitados, setMaxInvitados] = useState(0);
+  // Walk-in: reservar y hacer check-in en un paso (solo reservas de HOY).
+  const [hacerCheckin, setHacerCheckin] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!miembro.membresia_tier) return;
+      try {
+        const { data } = await supabase
+          .from('tiers')
+          .select('reglas')
+          .eq('tenant_id', tenant.id)
+          .eq('slug', miembro.membresia_tier)
+          .maybeSingle();
+        const raw = (data?.reglas as { max_invitados?: unknown } | null)?.max_invitados;
+        const n = Number(raw);
+        if (mounted) setMaxInvitados(Number.isFinite(n) && n > 0 ? Math.floor(n) : 0);
+      } catch {
+        if (mounted) setMaxInvitados(0);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [tenant.id, miembro.membresia_tier]);
 
   // Auto-seleccionar el recurso inicial. En modo reprogramar, el de la
   // reserva original (recepción puede cambiarlo).
@@ -151,8 +183,10 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
           resRecurso = quitarReservaPorSlot(resRecurso, reprogramarDe.slot_inicio);
         }
       }
+      // permitirEnCurso: el walk-in que llega 10 min tarde a su hora todavía
+      // puede reservar la sesión en curso (el backend de recepción lo acepta).
       setSlots(
-        generarSlotsDisponibles(recursoSel, fechaSel, config, resRecurso, resMiembro)
+        generarSlotsDisponibles(recursoSel, fechaSel, config, resRecurso, resMiembro, new Date(), { permitirEnCurso: true })
       );
       setLoadingSlots(false);
     });
@@ -189,7 +223,8 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
           recursoId: recursoSel.id,
           slotInicio: slotSel.inicio,
           duracionMin: config.duracion_default_min,
-          notas: notas.trim() || null
+          notas: notas.trim() || null,
+          invitados
         }
       });
 
@@ -216,15 +251,15 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
     // Cast a `any`: reservar_para_miembro_atomic es un RPC nuevo (RP-1) que
     // todavía no está en los tipos generados de Supabase. Mismo patrón que
     // `crearReserva` en useReservas.ts.
-    const { error } = await (supabase.rpc as unknown as (
+    const { data, error } = await (supabase.rpc as unknown as (
       fn: string,
       args: Record<string, unknown>
-    ) => Promise<{ error: { message: string } | null }>)('reservar_para_miembro_atomic', {
+    ) => Promise<{ data: { reserva_id?: string } | null; error: { message: string } | null }>)('reservar_para_miembro_atomic', {
       p_usuario_id: miembro.id,
       p_recurso_id: recursoSel.id,
       p_slot_inicio: slotSel.inicio.toISOString(),
       p_duracion_min: config.duracion_default_min,
-      p_invitados: 0,
+      p_invitados: invitados,
       p_notas: notas.trim() || null
     });
 
@@ -234,9 +269,21 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
       return;
     }
 
-    toast.success(
-      `Reserva creada para ${miembro.nombre} · ${formatHora(slotSel.inicio)}`
-    );
+    // Walk-in en un paso: la reserva ya existe; el check-in es best-effort y
+    // si falla (fuera de ventana, identidad incompleta…) se avisa sin deshacer
+    // la reserva — recepción puede hacer el check-in desde "Hoy".
+    if (hacerCheckin && data?.reserva_id) {
+      try {
+        await checkInManual(data.reserva_id, 'Walk-in: reserva y check-in en un paso');
+        toast.success(`Reserva creada y check-in hecho · ${miembro.nombre} · ${formatHora(slotSel.inicio)}`);
+      } catch (e) {
+        toast.warning(`Reserva creada, pero el check-in no se pudo hacer: ${e instanceof Error ? e.message : 'inténtalo desde Hoy'}`);
+      }
+    } else {
+      toast.success(
+        `Reserva creada para ${miembro.nombre} · ${formatHora(slotSel.inicio)}`
+      );
+    }
     onCreada();
     onClose();
   }
@@ -450,6 +497,54 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
                   );
                 })}
               </div>
+            )}
+
+            {/* Invitados (según el plan del miembro) */}
+            {maxInvitados > 0 && (
+              <div className="ek-form-field" style={{ marginTop: '16px' }}>
+                <label className="ek-label">Invitados ({invitados} de {maxInvitados})</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setInvitados((n) => Math.max(0, n - 1))}
+                    disabled={invitados === 0 || submitting}
+                    className="ek-icon-btn"
+                    aria-label="Quitar invitado"
+                  >
+                    −
+                  </button>
+                  <span style={{ fontFamily: 'var(--ek-font-mono)', fontSize: '16px', minWidth: '2ch', textAlign: 'center' }} aria-live="polite">
+                    {invitados}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setInvitados((n) => Math.min(maxInvitados, n + 1))}
+                    disabled={invitados >= maxInvitados || submitting}
+                    className="ek-icon-btn"
+                    aria-label="Agregar invitado"
+                  >
+                    +
+                  </button>
+                  <span className="ek-body-faint" style={{ fontSize: '12px' }}>
+                    Total en la sesión: {1 + invitados}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Walk-in: reservar + check-in en un paso (solo hoy) */}
+            {!esReprogramar && fechaSel === hoyISOEnZona() && (
+              <label
+                style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '16px', fontSize: '13px', cursor: 'pointer' }}
+              >
+                <input
+                  type="checkbox"
+                  checked={hacerCheckin}
+                  onChange={(e) => setHacerCheckin(e.target.checked)}
+                  disabled={submitting}
+                />
+                Hacer el check-in de una vez (el miembro ya está aquí)
+              </label>
             )}
 
             {/* Notas + confirmar */}

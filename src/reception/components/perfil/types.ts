@@ -22,5 +22,6 @@ export interface ReservaPerfil {
   status: string;
   folio: string;
   recurso_id: string;
+  invitados_count?: number | null;
   recurso: { nombre: string } | null;
 }
