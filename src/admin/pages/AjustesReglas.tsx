@@ -238,7 +238,7 @@ export default function AjustesReglas() {
 
         <FormField
           label="Cancelación mínima antes de la sesión (horas)"
-          helper="Con cuánta anticipación puede el miembro cancelar SU reserva por su cuenta. Más tarde que eso, solo recepción puede cancelar. Ejemplo: 24. Pon 0 para permitir cancelar hasta el último minuto."
+          helper="Con cuánta anticipación puede el miembro cancelar SU reserva por su cuenta (ejemplo: 24). Más tarde que eso, solo recepción puede cancelar y el crédito de esa sesión se pierde; si cancela el estudio, siempre se devuelve. 0 = sin ventana (cancela y recupera el crédito hasta el último minuto)."
         >
           <input
             type="number"
