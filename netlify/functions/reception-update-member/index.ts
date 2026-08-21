@@ -40,7 +40,9 @@ import { writeAuditLog, type AuditEntry } from '../_lib/auditLog';
  */
 
 const STATUS_PERMITIDOS = ['activo', 'suspendido', 'pendiente_pago'] as const;
-const TIERS_PERMITIDOS = ['basica', 'pro'] as const;
+// El plan se valida contra `tiers` del tenant (activo=true), NO contra una lista
+// fija: la lista vieja ['basica','pro'] dejó a recepción/admin sin poder asignar
+// ningún plan real (starter/creador/pro-pack/esencial/premium…).
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface Body {
@@ -154,12 +156,21 @@ export const handler: Handler = async (event) => {
 
     const tierCambia =
       body.membresia_tier !== undefined && body.membresia_tier !== target.membresia_tier;
-    if (
-      tierCambia &&
-      body.membresia_tier !== null &&
-      !(TIERS_PERMITIDOS as readonly string[]).includes(body.membresia_tier as string)
-    ) {
-      return badRequest(`Plan no permitido: ${body.membresia_tier}`);
+    if (tierCambia && body.membresia_tier !== null) {
+      if (typeof body.membresia_tier !== 'string' || !body.membresia_tier.trim()) {
+        return badRequest('Plan inválido');
+      }
+      const { data: tierOk, error: tierErr } = await supabaseAdmin
+        .from('tiers')
+        .select('slug')
+        .eq('tenant_id', target.tenant_id)
+        .eq('slug', body.membresia_tier)
+        .eq('activo', true)
+        .maybeSingle();
+      if (tierErr) return serverError(tierErr.message);
+      if (!tierOk) {
+        return badRequest(`Plan no permitido: "${body.membresia_tier}" no existe o está inactivo en este estudio`);
+      }
     }
 
     const unblockAplica = Boolean(

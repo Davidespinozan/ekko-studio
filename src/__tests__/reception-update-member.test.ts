@@ -14,6 +14,7 @@ const mockMaybeSingle = vi.fn();
 const mockUpdate = vi.fn();
 const mockAuditInsert = vi.fn();
 const mockUpdateUserById = vi.fn();
+const mockTierMaybeSingle = vi.fn();
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
@@ -23,6 +24,12 @@ vi.mock('@supabase/supabase-js', () => ({
     },
     from: vi.fn((table: string) => {
       if (table === 'audit_log') return { insert: mockAuditInsert };
+      // tiers: select().eq().eq().eq().maybeSingle() (validación del plan contra la DB)
+      if (table === 'tiers') {
+        const chain: Record<string, unknown> = { maybeSingle: mockTierMaybeSingle };
+        chain.eq = vi.fn(() => chain);
+        return { select: vi.fn(() => chain) };
+      }
       // usuarios: soporta select().eq().maybeSingle() y update().eq()
       return {
         select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockMaybeSingle })) })),
@@ -95,6 +102,8 @@ describe('reception-update-member · gobernanza (Bloque A)', () => {
     mockUpdateUserById.mockResolvedValue({ error: null });
     mockAuditInsert.mockResolvedValue({ error: null });
     mockUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+    // Por defecto el plan pedido existe y está activo en el tenant.
+    mockTierMaybeSingle.mockResolvedValue({ data: { slug: 'pro' }, error: null });
   });
 
   it('cambio de status SIN motivo → 400, sin update ni audit', async () => {
@@ -169,5 +178,31 @@ describe('reception-update-member · gobernanza (Bloque A)', () => {
     });
     const res = await invocar(evento({ usuario_id: 'm-1', nombre: 'X' }));
     expect(res.statusCode).toBe(403);
+  });
+
+  it('cambio de tier CON motivo → valida el plan contra `tiers` del tenant (no una lista fija) y aplica', async () => {
+    setCallerTarget();
+    mockTierMaybeSingle.mockResolvedValueOnce({ data: { slug: 'creador' }, error: null });
+    const res = await invocar(evento({ usuario_id: 'm-1', membresia_tier: 'creador', motivo: 'Compró paquete' }));
+    expect(res.statusCode).toBe(200);
+    expect(mockTierMaybeSingle).toHaveBeenCalledTimes(1);
+    expect(patchEnviado().membresia_tier).toBe('creador');
+  });
+
+  it('tier inexistente/inactivo en el tenant → 400 sin update', async () => {
+    setCallerTarget();
+    mockTierMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+    const res = await invocar(evento({ usuario_id: 'm-1', membresia_tier: 'plan-fantasma', motivo: 'x'.repeat(5) }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/no existe o está inactivo/);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('quitar el plan (null) no consulta tiers', async () => {
+    setCallerTarget();
+    const res = await invocar(evento({ usuario_id: 'm-1', membresia_tier: null, motivo: 'Baja voluntaria' }));
+    expect(res.statusCode).toBe(200);
+    expect(mockTierMaybeSingle).not.toHaveBeenCalled();
+    expect(patchEnviado().membresia_tier).toBeNull();
   });
 });
