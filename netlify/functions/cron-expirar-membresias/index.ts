@@ -21,7 +21,7 @@ import { resolverCuentaConectada } from '../_lib/connectBilling';
  * auto-cancel del miembro. Guarda: NUNCA toca una sub aún ligada a una membresía
  * viva.
  *
- * Programado en netlify.toml como [[scheduled_functions]] con cron "0 7 * * *"
+ * Programado en netlify.toml como [functions."cron-expirar-membresias"] schedule "0 7 * * *"
  * (7:00 UTC ≈ medianoche en Culiacán). service_role: opera cross-tenant sin sesión.
  */
 export const handler: Handler = async () => {

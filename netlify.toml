@@ -37,14 +37,19 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(self), microphone=(), geolocation=()"
 
-[[scheduled_functions]]
-  name = "cron-no-shows"
-  cron = "0 * * * *"
+# ── Crons ────────────────────────────────────────────────────────────────────
+# OJO: la sintaxis de Netlify para funciones programadas es [functions."nombre"]
+# con `schedule`. El bloque [[scheduled_functions]] que había antes NO existe en
+# Netlify: lo ignoraba en silencio y ningún cron corrió jamás (lección de SALA:
+# 53 membresías vencidas seguían "activas"). Verificar tras el deploy que cada
+# función diga "Scheduled" en el panel de Netlify. Hay un test que falla si este
+# archivo vuelve a la sintaxis vieja (src/__tests__/netlify-crons.test.ts).
 
-[[scheduled_functions]]
-  name = "cron-recordatorios"
-  cron = "*/15 * * * *"
+[functions."cron-no-shows"]
+  schedule = "0 * * * *"
 
-[[scheduled_functions]]
-  name = "cron-expirar-membresias"
-  cron = "0 7 * * *"
+[functions."cron-recordatorios"]
+  schedule = "*/15 * * * *"
+
+[functions."cron-expirar-membresias"]
+  schedule = "0 7 * * *"

@@ -11,7 +11,7 @@ import { requireEnv } from '../_lib/env';
 /**
  * Cron: cada hora, marca reservas no asistidas como no_show + bloquea usuario.
  *
- * Programado en netlify.toml como [[scheduled_functions]] con cron "0 * * * *"
+ * Programado en netlify.toml como [functions."cron-no-shows"] schedule "0 * * * *"
  * (cada hora al minuto 0).
  *
  * Usa service_role porque debe poder modificar reservas y usuarios de cualquier

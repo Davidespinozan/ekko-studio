@@ -12,7 +12,7 @@ import { enviarPushAUsuario } from '../_lib/push';
 /**
  * Cron: recuerda a los miembros su reserva próxima (~1 hora antes).
  *
- * Programado en netlify.toml como [[scheduled_functions]] cada 15 minutos.
+ * Programado en netlify.toml como [functions."cron-recordatorios"] schedule cada 15 minutos.
  * Llama al RPC `generar_recordatorios_reservas`, que inserta la
  * notificación in-app (con dedupe por reserva) y devuelve las filas nuevas;
  * por cada una se dispara el push. Service_role: opera sin sesión, cross-tenant.
