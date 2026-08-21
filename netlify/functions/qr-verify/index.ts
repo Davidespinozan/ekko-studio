@@ -147,6 +147,7 @@ function translateError(code: string, fallback: string): string {
     EKKO_RESERVA_NO_SHOW: 'Reserva marcada como inasistencia',
     EKKO_DEMASIADO_TEMPRANO: 'Es muy temprano para el check-in',
     EKKO_DEMASIADO_TARDE: 'El check-in ya cerró',
+    EKKO_MEMBRESIA_NO_VIGENTE: 'Membresía no vigente: el miembro debe pasar a recepción a regularizar antes de entrar',
     EKKO_NO_AUTORIZADO: 'No autorizado',
     EKKO_QR_INVALIDO: 'QR inválido',
     EKKO_QR_EXPIRADO: 'QR expirado'

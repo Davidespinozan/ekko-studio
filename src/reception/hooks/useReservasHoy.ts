@@ -83,6 +83,7 @@ function translateError(code: string, fallback: string): string {
     EKKO_RESERVA_NO_SHOW: 'Reserva marcada como inasistencia',
     EKKO_DEMASIADO_TEMPRANO: 'Es muy temprano para el check-in',
     EKKO_DEMASIADO_TARDE: 'El check-in ya cerró',
+    EKKO_MEMBRESIA_NO_VIGENTE: 'La membresía del miembro no está vigente: cobra o activa antes de dejarlo pasar',
     EKKO_NO_AUTORIZADO: 'No autorizado'
   };
   return map[code] ?? fallback.replace(code + ':', '').trim();
