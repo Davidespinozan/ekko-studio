@@ -1,14 +1,15 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { ToastProvider } from '@shared/providers/ToastProvider';
 import ConexionBanner from '@shared/components/ConexionBanner';
 import PwaInstallBanner from '@shared/components/PwaInstallBanner';
+import { lazyConRecarga } from '@shared/lib/lazyConRecarga';
 
-const PublicLayout = lazy(() => import('@public/PublicLayout'));
-const MemberLayout = lazy(() => import('@member/MemberLayout'));
-const AdminLayout = lazy(() => import('@admin/AdminLayout'));
-const ReceptionLayout = lazy(() => import('@reception/ReceptionLayout'));
+const PublicLayout = lazyConRecarga(() => import('@public/PublicLayout'));
+const MemberLayout = lazyConRecarga(() => import('@member/MemberLayout'));
+const AdminLayout = lazyConRecarga(() => import('@admin/AdminLayout'));
+const ReceptionLayout = lazyConRecarga(() => import('@reception/ReceptionLayout'));
 
 export default function App() {
   return (

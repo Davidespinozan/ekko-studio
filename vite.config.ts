@@ -36,6 +36,9 @@ export default defineConfig(({ mode }) => {
           ]
         },
         workbox: {
+          // Borra los precaches de versiones anteriores al activar el SW nuevo:
+          // sin esto, tras varios deploys el dispositivo acumula caches viejos.
+          cleanupOutdatedCaches: true,
           // Inyecta los handlers de Web Push en el SW de Workbox (push-sw.js
           // vive en /public). Así el push convive con el caché sin un 2º SW.
           importScripts: ['push-sw.js'],
