@@ -157,11 +157,16 @@ corregir asistencia) · Sprint 4 parcial (`en_venta`, columna Membresía, histor
 de cobros, CSV, avisos por vencer, cumpleaños, campana staff, reembolsos, fee en
 Elements). Migraciones nuevas: `20260821100000` … `20260821180000` (9).
 
-**Pendiente (P1):** check-in que revalida mensuales vencidas/canceladas ·
-no-show/cancelación tardía consumen el cupo del día · pausar membresía
-(`pause_collection`) · `cron-push` central (hoy push por disparador) · reportes
-"cobrado real"/fallidos · `VistaSemana`/`VistaDia` en zona del estudio · E2E.md
-+ `RUN_E2E` · decisión de facturación SaaS y del `controller` de Connect.
+**Sprint 5 (hecho):** check-in revalida la membresía (QR bloquea, manual avisa) ·
+no-show/cancelación tardía consumen el cupo · pausar/reanudar membresía
+(Stripe `pause_collection` + estado `pausada`) · `cron-push` central
+(`push_enviado_at`) · Reportes "cobrado · dinero real" · calendario
+(`VistaSemana`/`VistaDia`) en zona del estudio · `E2E.md`. Migraciones
+`20260821190000` … `20260821210000` (3 más; 12 en total).
+
+**Pendiente:** activar `RUN_E2E` + staging para la Fase 2 de E2E · decisión de
+facturación SaaS (plataforma → estudios) · decisión del `controller` de Connect
+(reproducir en test mode con `err.raw`).
 
 ## 6b. Plan sugerido (original)
 

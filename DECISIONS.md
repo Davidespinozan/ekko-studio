@@ -263,3 +263,23 @@ test en `src/__tests__`.
   estudio desde la ficha.
 - **EKKO-029 — Fee de plataforma** (`EKKO_FEE_PERCENT`) aplica en todos los
   flujos de cobro (Checkout y Elements). Default 0.
+
+## Paridad con SALA — Sprint 5 (2026-08-21)
+
+- **EKKO-030 — La membresía se revalida en la puerta.** `_estado_membresia_checkin`
+  (si la sesión ya se pagó con créditos → `ok`). El QR bloquea
+  (`EKKO_MEMBRESIA_NO_VIGENTE`); el check-in manual no bloquea y devuelve
+  `membresia_estado` para que recepción decida.
+- **EKKO-031 — El tope diario cuenta no-show y cancelación tardía** (dentro de
+  `cancelacion_min_horas_antes`): faltar o cancelar tarde no libera el día.
+- **EKKO-032 — Estado `pausada`.** `staff_pausar_membresia` (rol + tenant +
+  aviso + audit) tras pausar la facturación en Stripe (`pause_collection`,
+  con rollback). La cuenta queda `suspendido` mientras dure.
+  `sync_membresia_stripe` deriva `pausada` de `pause_collection`.
+- **EKKO-033 — Push central.** `notificaciones.push_enviado_at` + `cron-push`
+  (cada minuto) reparte lo pendiente de cualquier origen. Las functions que
+  empujan inline marcan la fila al insertar; las RPC no empujan (lo hace el
+  cron). Reemplaza el cableado disparador por disparador de EKKO-008.
+- **EKKO-034 — Reportes "cobrado · dinero real"** desde `payment_events`
+  (mes actual vs. anterior, por concepto, reembolsos, cobros rechazados 30 d),
+  separado del MRR (ingreso contratado).
