@@ -53,3 +53,11 @@
 
 [functions."cron-expirar-membresias"]
   schedule = "0 7 * * *"
+
+# Avisa al miembro 3 días antes de que caduque su paquete / termine su plan (≈8:00 Culiacán).
+[functions."cron-membresias-por-vencer"]
+  schedule = "0 15 * * *"
+
+# Felicita por cumpleaños (≈9:00 Culiacán).
+[functions."cron-felicitaciones"]
+  schedule = "0 16 * * *"

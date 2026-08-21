@@ -1,4 +1,5 @@
 import { ReservasHoyView } from '../components/ReservasHoyView';
+import { CumpleanosCard } from '@shared/components/CumpleanosCard';
 
 /**
  * "Hoy" — panel del día de recepción (Bloque B/C). El check-in QR vive ahora
@@ -8,6 +9,7 @@ import { ReservasHoyView } from '../components/ReservasHoyView';
 export default function Hoy() {
   return (
     <div className="rec-main">
+      <CumpleanosCard dias={0} compacto />
       <ReservasHoyView />
     </div>
   );

@@ -8,6 +8,7 @@ import { useDashboardData, useDineroMetrics, type DashboardData } from '../hooks
 import CardMenuDropdown from '../components/CardMenuDropdown';
 import CancelarReservaModal, { type ReservaParaCancelar } from '../components/CancelarReservaModal';
 import { CentroPendientes } from '../components/CentroPendientes';
+import { CumpleanosCard } from '@shared/components/CumpleanosCard';
 
 function capitalizar(s: string | null | undefined): string {
   if (!s) return '';
@@ -94,6 +95,7 @@ export default function AdminDashboard() {
       </p>
 
       <CentroPendientes />
+      <CumpleanosCard />
       <SeccionHoy data={data} onCancelar={setCancelar} />
       <PulsoDelMes data={data} />
 
