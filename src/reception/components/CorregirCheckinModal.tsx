@@ -5,6 +5,7 @@ import { Spinner } from '@shared/components/Spinner';
 import { corregirCheckin, MOTIVOS_CORREGIR_CHECKIN } from '../lib/accionesReserva';
 import { MotivoField } from './MotivoField';
 import type { ReservaInfo } from './MarcarNoShowModal';
+import { ZONA_ESTUDIO } from '@shared/lib/timezone';
 
 interface Props {
   reserva: ReservaInfo;
@@ -13,7 +14,7 @@ interface Props {
 }
 
 function hora(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return new Date(iso).toLocaleTimeString('es-MX', { timeZone: ZONA_ESTUDIO, hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 /**

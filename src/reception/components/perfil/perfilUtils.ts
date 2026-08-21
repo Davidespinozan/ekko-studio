@@ -1,3 +1,4 @@
+import { ZONA_ESTUDIO } from '@shared/lib/timezone';
 // Helpers de formato del perfil de miembro (recepción).
 
 export function capitalizar(s: string | null | undefined): string {
@@ -11,7 +12,7 @@ export function capitalizar(s: string | null | undefined): string {
 }
 
 export function fechaHora(iso: string): string {
-  return new Date(iso).toLocaleString('es-MX', {
+  return new Date(iso).toLocaleString('es-MX', { timeZone: ZONA_ESTUDIO,
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
@@ -21,7 +22,7 @@ export function fechaHora(iso: string): string {
 }
 
 export function fechaCorta(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-MX', {
+  return new Date(iso).toLocaleDateString('es-MX', { timeZone: ZONA_ESTUDIO,
     day: 'numeric',
     month: 'long',
     year: 'numeric'

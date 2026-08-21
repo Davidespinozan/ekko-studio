@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, UserPlus } from 'lucide-react';
 import { PlanChip } from '@shared/components/PlanChip';
 import { InvitadosModal } from './InvitadosModal';
 import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
+import { ZONA_ESTUDIO } from '@shared/lib/timezone';
 
 interface MiembroData {
   id: string;
@@ -96,7 +97,7 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, errorMes
 
   if (!miembro || !recurso || !reserva) return null;
 
-  const hora = (iso: string) => new Date(iso).toLocaleTimeString('es-MX', {
+  const hora = (iso: string) => new Date(iso).toLocaleTimeString('es-MX', { timeZone: ZONA_ESTUDIO,
     hour: '2-digit', minute: '2-digit', hour12: false
   });
 

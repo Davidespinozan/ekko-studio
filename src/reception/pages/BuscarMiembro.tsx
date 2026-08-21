@@ -9,6 +9,7 @@ import { PlanChip } from '@shared/components/PlanChip';
 import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
 import { statusMiembro } from '../lib/miembroStatus';
 import { RegistrarMiembroModal } from '../components/RegistrarMiembroModal';
+import { ZONA_ESTUDIO } from '@shared/lib/timezone';
 
 interface MiembroResultado {
   id: string;
@@ -41,7 +42,7 @@ function norm(s: string): string {
 }
 
 function fechaCorta(iso: string): string {
-  return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
+  return new Date(iso).toLocaleDateString('es-MX', { timeZone: ZONA_ESTUDIO, day: 'numeric', month: 'short' });
 }
 
 /**

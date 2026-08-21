@@ -4,6 +4,7 @@ import { useToast } from '@shared/hooks/useToast';
 import { Spinner } from '@shared/components/Spinner';
 import { marcarNoShow, MOTIVOS_NO_SHOW } from '../lib/accionesReserva';
 import { MotivoField } from './MotivoField';
+import { ZONA_ESTUDIO } from '@shared/lib/timezone';
 
 export interface ReservaInfo {
   id: string;
@@ -20,7 +21,7 @@ interface Props {
 }
 
 function hora(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return new Date(iso).toLocaleTimeString('es-MX', { timeZone: ZONA_ESTUDIO, hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 /**

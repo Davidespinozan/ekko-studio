@@ -18,6 +18,7 @@ import {
 import type { Database } from '@shared/types/database';
 import { traducirErrorReserva } from '../lib/traducirErrorReserva';
 import { reprogramarReserva } from '../lib/reprogramarReserva';
+import { rangoDiaEnZona } from '@shared/lib/timezone';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 
@@ -132,8 +133,8 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
     setLoadingSlots(true);
     setSlotSel(null);
 
-    const fechaInicio = new Date(fechaSel + 'T00:00:00');
-    const fechaFin = new Date(fechaSel + 'T23:59:59');
+    // Día del ESTUDIO (no del navegador): [00:00, 24:00) en America/Mazatlan.
+    const { inicio: fechaInicio, fin: fechaFin } = rangoDiaEnZona(fechaSel);
 
     Promise.all([
       fetchReservasDelRecurso(recursoSel.id, fechaInicio, fechaFin),

@@ -23,6 +23,7 @@ import {
 } from '../logic/reservaLogic';
 import { useResumenMiembro } from '../hooks/useResumenMiembro';
 import type { Database } from '@shared/types/database';
+import { rangoDiaEnZona } from '@shared/lib/timezone';
 
 /** Créditos que descuenta reservar este estudio (default 1). */
 function costoCreditos(recurso: Recurso | null): number {
@@ -113,8 +114,8 @@ export default function Reservar() {
     let mounted = true;
     setLoadingSlots(true);
 
-    const fechaInicio = new Date(fechaSel + 'T00:00:00');
-    const fechaFin = new Date(fechaSel + 'T23:59:59');
+    // Día del ESTUDIO (no del navegador): [00:00, 24:00) en America/Mazatlan.
+    const { inicio: fechaInicio, fin: fechaFin } = rangoDiaEnZona(fechaSel);
 
     Promise.all([
       fetchReservasDelRecurso(recursoSel.id, fechaInicio, fechaFin),

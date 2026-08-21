@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { backendPost } from '@shared/lib/backend';
-import { inicioDeHoyEnZona, inicioDeMesEnZona } from '@shared/lib/timezone';
+import { inicioDeHoyEnZona, inicioDeMesEnZona, fechaISOEnZona } from '@shared/lib/timezone';
 import type { Database } from '@shared/types/database';
 
 type Usuario = Database['public']['Tables']['usuarios']['Row'];
@@ -489,13 +489,15 @@ export function useDashboardData() {
     }
 
     // Agrupar reservas por día (YYYY-MM-DD)
+    // Claves = día DEL ESTUDIO (antes: día UTC → una sesión a las 20:00 en
+    // Culiacán caía en el día siguiente de la gráfica).
     const conteoPorDia: Record<string, number> = {};
     for (let i = 0; i < 30; i++) {
       const d = new Date(hace30dias.getTime() + i * 24 * 60 * 60 * 1000);
-      conteoPorDia[d.toISOString().slice(0, 10)] = 0;
+      conteoPorDia[fechaISOEnZona(d)] = 0;
     }
     (reservas30d.data ?? []).forEach((r) => {
-      const k = String(r.slot_inicio).slice(0, 10);
+      const k = fechaISOEnZona(String(r.slot_inicio));
       if (k in conteoPorDia) conteoPorDia[k]++;
     });
     const reservasUltimos30Dias = Object.entries(conteoPorDia).map(([fecha, count]) => ({

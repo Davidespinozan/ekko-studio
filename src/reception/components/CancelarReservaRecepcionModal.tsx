@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { traducirErrorReserva } from '../lib/traducirErrorReserva';
+import { ZONA_ESTUDIO } from '@shared/lib/timezone';
 
 export interface ReservaParaCancelar {
   id: string;
@@ -17,7 +18,7 @@ interface Props {
 }
 
 function fechaHora(iso: string): string {
-  return new Date(iso).toLocaleString('es-MX', {
+  return new Date(iso).toLocaleString('es-MX', { timeZone: ZONA_ESTUDIO,
     weekday: 'long',
     day: 'numeric',
     month: 'long',

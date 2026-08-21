@@ -9,6 +9,7 @@ import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 import { MarcarNoShowModal, type ReservaInfo } from './MarcarNoShowModal';
 import { CorregirCheckinModal } from './CorregirCheckinModal';
 import { clasificarReservasHoy } from '../lib/clasificarReservasHoy';
+import { ZONA_ESTUDIO, hoyISOEnZona, sumarDiasISO, diasEntreISO, formatFechaEnZona, instanteDeFechaHoraEnZona } from '@shared/lib/timezone';
 
 interface Props {
   onManualCheckInSuccess?: (data: any) => void;
@@ -86,19 +87,12 @@ function capitalizarNombre(s: string | undefined | null): string {
     .join(' ');
 }
 
-function formatearDia(fecha: Date): string {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const target = new Date(fecha);
-  target.setHours(0, 0, 0, 0);
-
-  const diffDias = Math.round((target.getTime() - hoy.getTime()) / 86400000);
-
+function formatearDia(fechaISO: string): string {
+  const diffDias = diasEntreISO(hoyISOEnZona(), fechaISO);
   if (diffDias === 0) return 'Hoy';
   if (diffDias === 1) return 'Mañana';
   if (diffDias === -1) return 'Ayer';
-
-  return target.toLocaleDateString('es-MX', {
+  return formatFechaEnZona(instanteDeFechaHoraEnZona(fechaISO, '12:00'), {
     weekday: 'long',
     day: 'numeric',
     month: 'short'
@@ -107,11 +101,8 @@ function formatearDia(fecha: Date): string {
 
 export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false }: Props = {}) {
   const tenant = useTenant();
-  const [fechaSeleccionada, setFechaSeleccionada] = useState(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  });
+  // Día del ESTUDIO ('YYYY-MM-DD' en America/Mazatlan), no del navegador.
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(() => hoyISOEnZona());
   const [selected, setSelected] = useState<ReservaConJoin | null>(null);
   const [noShowTarget, setNoShowTarget] = useState<ReservaConJoin | null>(null);
   const [corregirTarget, setCorregirTarget] = useState<ReservaConJoin | null>(null);
@@ -166,14 +157,10 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
     };
   }, [tenant.id]);
 
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const esHoy = fechaSeleccionada.getTime() === hoy.getTime();
+  const esHoy = fechaSeleccionada === hoyISOEnZona();
 
   const cambiarDia = (delta: number) => {
-    const nueva = new Date(fechaSeleccionada);
-    nueva.setDate(nueva.getDate() + delta);
-    setFechaSeleccionada(nueva);
+    setFechaSeleccionada((f) => sumarDiasISO(f, delta));
   };
 
   // Filtros combinados (recurso + búsqueda)
@@ -581,7 +568,7 @@ function ReservaCard({
   onSelect: (r: ReservaConJoin) => void;
   highlight?: boolean;
 }) {
-  const hora = new Date(reserva.slot_inicio).toLocaleTimeString('es-MX', {
+  const hora = new Date(reserva.slot_inicio).toLocaleTimeString('es-MX', { timeZone: ZONA_ESTUDIO,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false
@@ -650,7 +637,7 @@ function ManualCheckInModal({
     }
   }
 
-  const hora = new Date(reserva.slot_inicio).toLocaleTimeString('es-MX', {
+  const hora = new Date(reserva.slot_inicio).toLocaleTimeString('es-MX', { timeZone: ZONA_ESTUDIO,
     hour: '2-digit',
     minute: '2-digit',
     hour12: false

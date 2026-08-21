@@ -8,6 +8,7 @@ import { Spinner } from '@shared/components/Spinner';
 import { EmptyState } from '@shared/components/EmptyState';
 import CardMenuDropdown from './CardMenuDropdown';
 import type { Database } from '@shared/types/database';
+import { ZONA_ESTUDIO, fechaISOEnZona, rangoDiaEnZona, inicioDeHoyEnZona } from '@shared/lib/timezone';
 
 type Recurso = Pick<Database['public']['Tables']['recursos']['Row'], 'id' | 'nombre'>;
 
@@ -36,13 +37,14 @@ function capitalizar(s: string | null | undefined): string {
     .join(' ');
 }
 
+/** 'YYYY-MM-DD' del día del ESTUDIO (antes: día UTC del navegador). */
 function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return fechaISOEnZona(d);
 }
 
+/** Inicio (00:00) de una fecha del input, como instante en la zona del estudio. */
 function parseInputDate(value: string): Date {
-  const [y, m, d] = value.split('-').map(Number);
-  return new Date(y, (m ?? 1) - 1, d ?? 1);
+  return rangoDiaEnZona(value).inicio;
 }
 
 interface Props {
@@ -62,11 +64,7 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
   const tenant = useTenant();
   const toast = useToast();
 
-  const hoy = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
+  const hoy = useMemo(() => inicioDeHoyEnZona(), []);
 
   const [desde, setDesde] = useState<string>(() => isoDate(hoy));
   const [hasta, setHasta] = useState<string>(() => {
@@ -121,10 +119,8 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
     }
     setIsLoading(true);
 
-    const desdeDate = parseInputDate(desde);
-    desdeDate.setHours(0, 0, 0, 0);
-    const hastaDate = parseInputDate(hasta);
-    hastaDate.setHours(23, 59, 59, 999);
+    const desdeDate = parseInputDate(desde); // 00:00 del estudio
+    const hastaDate = rangoDiaEnZona(hasta).fin; // exclusivo: cubre todo el día 'hasta'
 
     let query = supabase
       .from('reservas')
@@ -133,7 +129,7 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
       )
       .eq('tenant_id', tenant.id)
       .gte('slot_inicio', desdeDate.toISOString())
-      .lte('slot_inicio', hastaDate.toISOString())
+      .lt('slot_inicio', hastaDate.toISOString())
       .order('slot_inicio', { ascending: true })
       .limit(500);
 
@@ -513,10 +509,10 @@ function ReservaRow({
           background: 'var(--ek-bg-soft)'
         }}
       >
-        {fecha.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}
+        {fecha.toLocaleDateString('es-MX', { timeZone: ZONA_ESTUDIO, weekday: 'short', day: 'numeric', month: 'short' })}
       </span>
       <span style={{ color: 'var(--ek-ink)', fontWeight: 600 }}>
-        {fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })}
+        {fecha.toLocaleTimeString('es-MX', { timeZone: ZONA_ESTUDIO, hour: '2-digit', minute: '2-digit', hour12: true })}
       </span>
       <span
         style={{
@@ -592,9 +588,9 @@ function ReservaCardMobile({
     >
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--ek-ink-muted)' }}>
-          <span>{fecha.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+          <span>{fecha.toLocaleDateString('es-MX', { timeZone: ZONA_ESTUDIO, weekday: 'short', day: 'numeric', month: 'short' })}</span>
           <span style={{ color: 'var(--ek-ink)', fontWeight: 600 }}>
-            {fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })}
+            {fecha.toLocaleTimeString('es-MX', { timeZone: ZONA_ESTUDIO, hour: '2-digit', minute: '2-digit', hour12: true })}
           </span>
         </div>
         <p style={{ margin: '6px 0 0', fontSize: '15px', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

@@ -3,6 +3,7 @@ import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useVisibilityAwarePolling } from '@shared/hooks/useVisibilityAwarePolling';
 import type { Database } from '@shared/types/database';
+import { hoyISOEnZona, rangoDiaEnZona } from '@shared/lib/timezone';
 
 const POLLING_INTERVAL_MS = 30_000;
 
@@ -27,18 +28,17 @@ export interface ReservaConJoin extends Reserva {
  * check-in abierto: no queremos que un refetch reordene la lista debajo).
  * El fetch inicial y los refetch manuales siguen disponibles vía `refetch`.
  */
-export function useReservasHoy(fecha?: Date, pollingEnabled = true) {
+export function useReservasHoy(fechaISO?: string, pollingEnabled = true) {
   const tenant = useTenant();
   const [reservas, setReservas] = useState<ReservaConJoin[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Normalizar fecha a inicio del día (memoizar para evitar re-render infinito)
-  const fechaMs = (fecha ?? new Date()).setHours(0, 0, 0, 0);
+  // El día es del ESTUDIO ('YYYY-MM-DD' en America/Mazatlan), no del navegador:
+  // desde otra zona horaria "hoy" y sus límites se corrían.
+  const dia = fechaISO ?? hoyISOEnZona();
 
   const refetch = useCallback(async () => {
-    const inicio = new Date(fechaMs);
-    const fin = new Date(fechaMs);
-    fin.setDate(fin.getDate() + 1);
+    const { inicio, fin } = rangoDiaEnZona(dia);
 
     const { data, error } = await supabase
       .from('reservas')
@@ -55,7 +55,7 @@ export function useReservasHoy(fecha?: Date, pollingEnabled = true) {
     }
     setReservas((data ?? []) as unknown as ReservaConJoin[]);
     setIsLoading(false);
-  }, [tenant.id, fechaMs]);
+  }, [tenant.id, dia]);
 
   useVisibilityAwarePolling(refetch, POLLING_INTERVAL_MS, pollingEnabled);
 

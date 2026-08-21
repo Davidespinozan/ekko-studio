@@ -7,6 +7,16 @@
  */
 
 import type { Database } from '@shared/types/database';
+import {
+  partesEnZona,
+  fechaISOEnZona,
+  sumarDiasISO,
+  diasEntreISO,
+  diaSemanaDeFechaISO,
+  instanteDeFechaHoraEnZona,
+  formatHoraEnZona,
+  formatFechaEnZona
+} from '@shared/lib/timezone';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 type Reserva = Database['public']['Tables']['reservas']['Row'];
@@ -36,21 +46,25 @@ export interface TenantReservaConfig {
 const DIAS_ES = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'] as const;
 
 /**
- * Convierte el día de una fecha (0-6 con domingo=0) a nombre en español
- * sin tildes, matcheando lo que viene en recursos.horarios.
+ * Nombre en español (sin tildes, como recursos.horarios) del día en que cae un
+ * instante EN LA ZONA DEL ESTUDIO — no en la del navegador.
  */
 export function diaNombre(date: Date): string {
-  return DIAS_ES[date.getDay()];
+  return DIAS_ES[partesEnZona(date).dow];
+}
+
+/** Ídem para una fecha de calendario 'YYYY-MM-DD'. */
+export function diaNombreDeFechaISO(fechaISO: string): string {
+  return DIAS_ES[diaSemanaDeFechaISO(fechaISO)];
 }
 
 /**
- * Combina una fecha (YYYY-MM-DD) con una hora (HH:mm) en zona horaria local.
- * IMPORTANTE: crea Date en local time, no UTC.
+ * Combina una fecha (YYYY-MM-DD) con una hora de pared (HH:mm) DEL ESTUDIO y
+ * devuelve el instante UTC. Antes se construía en la zona del navegador: un
+ * miembro o el dueño desde otra zona veían los slots corridos.
  */
 export function combinarFechaHora(fechaISO: string, horaHHmm: string): Date {
-  const [y, m, d] = fechaISO.split('-').map(Number);
-  const [h, min] = horaHHmm.split(':').map(Number);
-  return new Date(y, m - 1, d, h, min, 0, 0);
+  return instanteDeFechaHoraEnZona(fechaISO, horaHHmm);
 }
 
 /**
@@ -78,8 +92,7 @@ export function generarSlotsDisponibles(
   ahora: Date = new Date()
 ): Slot[] {
   const horarios = (recurso.horarios as unknown as HorarioBloque[]) ?? [];
-  const fechaBase = new Date(fechaISO + 'T00:00:00');
-  const diaSemana = diaNombre(fechaBase);
+  const diaSemana = diaNombreDeFechaISO(fechaISO);
 
   // Encontrar bloques de horario para ese día
   const bloquesDia = horarios.filter((b) => b.dia === diaSemana);
@@ -146,16 +159,15 @@ export function generarFechasReservables(
   ahora: Date = new Date()
 ): { fechaISO: string; date: Date; label: string }[] {
   const fechas: { fechaISO: string; date: Date; label: string }[] = [];
-  const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  // "Hoy" es el día del ESTUDIO, no el del navegador.
+  const hoyISO = fechaISOEnZona(ahora);
 
   for (let i = 0; i < config.anticipacion_max_dias; i++) {
-    const d = new Date(hoy);
-    d.setDate(hoy.getDate() + i);
-    const fechaISO = formatDateISO(d);
+    const fechaISO = sumarDiasISO(hoyISO, i);
     fechas.push({
       fechaISO,
-      date: d,
-      label: formatDateLabel(d, ahora)
+      date: instanteDeFechaHoraEnZona(fechaISO),
+      label: formatDateLabelISO(fechaISO, hoyISO)
     });
   }
 
@@ -189,36 +201,27 @@ export function filtrarRecursosPorTier(
 }
 
 /**
- * Formato YYYY-MM-DD en local time (no UTC).
+ * Formato YYYY-MM-DD del día en que cae el instante EN LA ZONA DEL ESTUDIO.
  */
 export function formatDateISO(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return fechaISOEnZona(d);
 }
 
 /**
- * Label legible para selector de fecha.
+ * Label legible para selector de fecha ('Hoy', 'Mañana', 'Lunes 18 may').
  */
 export function formatDateLabel(d: Date, ahora: Date = new Date()): string {
-  const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-  const manana = new Date(hoy);
-  manana.setDate(hoy.getDate() + 1);
-
-  if (sameDay(d, hoy)) return 'Hoy';
-  if (sameDay(d, manana)) return 'Mañana';
-
-  const dia = DIAS_ES[d.getDay()];
-  const num = d.getDate();
-  const mes = d.toLocaleDateString('es-MX', { month: 'short' });
-  return `${capitalize(dia)} ${num} ${mes}`;
+  return formatDateLabelISO(fechaISOEnZona(d), fechaISOEnZona(ahora));
 }
 
-function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear()
-    && a.getMonth() === b.getMonth()
-    && a.getDate() === b.getDate();
+export function formatDateLabelISO(fechaISO: string, hoyISO: string): string {
+  const diff = diasEntreISO(hoyISO, fechaISO);
+  if (diff === 0) return 'Hoy';
+  if (diff === 1) return 'Mañana';
+  const dia = DIAS_ES[diaSemanaDeFechaISO(fechaISO)];
+  const num = Number(fechaISO.slice(8, 10));
+  const mes = formatFechaEnZona(instanteDeFechaHoraEnZona(fechaISO, '12:00'), { month: 'short' });
+  return `${capitalize(dia)} ${num} ${mes}`;
 }
 
 function capitalize(s: string): string {
@@ -226,10 +229,10 @@ function capitalize(s: string): string {
 }
 
 /**
- * Formato HH:mm para mostrar hora.
+ * Formato HH:mm (hora de pared del estudio).
  */
 export function formatHora(d: Date): string {
-  return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return formatHoraEnZona(d);
 }
 
 /**
