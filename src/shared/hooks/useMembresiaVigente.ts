@@ -33,7 +33,7 @@ export function useMembresiaVigente(usuarioId: string | null | undefined) {
         .from('membresias')
         .select('id, status, periodo_actual_fin, creditos_restantes, stripe_subscription_id, cancel_at_period_end, created_at, tier:tiers(slug, nombre, tipo)')
         .eq('usuario_id', usuarioId)
-        .in('status', ['trialing', 'activa', 'past_due'])
+        .in('status', ['trialing', 'activa', 'past_due', 'pausada'])
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();

@@ -119,7 +119,7 @@ export function useMembresiasVigentesPorUsuario() {
         .from('membresias')
         .select('usuario_id, status, periodo_actual_fin, creditos_restantes, created_at, tier:tiers(slug, nombre, tipo)')
         .eq('tenant_id', tenant.id)
-        .in('status', ['trialing', 'activa', 'past_due'])
+        .in('status', ['trialing', 'activa', 'past_due', 'pausada'])
         .order('created_at', { ascending: false });
       if (error) console.error('[useMembresiasVigentesPorUsuario]', error);
       const map = new Map<string, MembresiaResumen>();
@@ -165,7 +165,7 @@ export function useMembresiaActualAdmin(usuarioId: string | undefined) {
       .from('membresias')
       .select('id, status, periodo_actual_fin, creditos_restantes, stripe_subscription_id, cancel_at_period_end, created_at, tier:tiers(slug, nombre, tipo)')
       .eq('usuario_id', usuarioId)
-      .in('status', ['trialing', 'activa', 'past_due'])
+      .in('status', ['trialing', 'activa', 'past_due', 'pausada'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();

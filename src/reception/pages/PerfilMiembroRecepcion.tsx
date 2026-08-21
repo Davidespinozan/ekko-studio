@@ -28,6 +28,8 @@ import { FilaReserva } from '../components/perfil/FilaReserva';
 import { HistorialCambios } from '../components/perfil/HistorialCambios';
 import { nombreMostrado } from '../components/perfil/perfilUtils';
 import type { MiembroPerfil, ReservaPerfil } from '../components/perfil/types';
+import { useMembresiaVigente } from '@shared/hooks/useMembresiaVigente';
+import { PausarMembresiaModal } from '@shared/components/PausarMembresiaModal';
 
 /**
  * Perfil de miembro para recepción — hub de gestión (agenda, no-show, notas,
@@ -48,6 +50,8 @@ export default function PerfilMiembroRecepcion() {
   const [crearOpen, setCrearOpen] = useState(false);
   const [cancelarTarget, setCancelarTarget] = useState<ReservaParaCancelar | null>(null);
   const [reprogramarTarget, setReprogramarTarget] = useState<ReservaOriginal | null>(null);
+  const [pausaOpen, setPausaOpen] = useState<null | boolean>(null);
+  const { membresia: membresiaViva, refetch: recargarMembresia } = useMembresiaVigente(id);
   const [editarOpen, setEditarOpen] = useState(false);
   const [fotoOpen, setFotoOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -222,8 +226,22 @@ export default function PerfilMiembroRecepcion() {
           onFicha={() => setFichaOpen(true)}
           onReset={() => setResetOpen(true)}
           onAviso={() => setAvisoOpen(true)}
+          onPausar={membresiaViva ? () => setPausaOpen(membresiaViva.status !== 'pausada') : undefined}
+          pausada={membresiaViva?.status === 'pausada'}
         />
       </div>
+
+      {pausaOpen !== null && (
+        <PausarMembresiaModal
+          usuarioId={miembro.id}
+          nombre={miembro.nombre}
+          pausar={pausaOpen}
+          onClose={() => setPausaOpen(null)}
+          onDone={async () => {
+            await Promise.all([recargarPerfil(), recargarMembresia()]);
+          }}
+        />
+      )}
 
       {/* Reservas del miembro: crear + próximas + historial, en una card con
           subgrupos (como el admin), no sueltos en el fondo. */}

@@ -28,7 +28,7 @@ export function getStripe(): Stripe {
 }
 
 // ── Estado interno de la membresía (subconjunto del CHECK de la tabla) ───────
-export type EstadoMembresia = 'activa' | 'past_due' | 'cancelada';
+export type EstadoMembresia = 'activa' | 'past_due' | 'pausada' | 'cancelada';
 
 /**
  * Status de una suscripción de Stripe → estado interno.
@@ -167,8 +167,14 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
     case 'customer.subscription.deleted': {
       const sub = event.data.object as Stripe.Subscription;
       if (esDeOtraApp(sub.metadata)) return { kind: 'ignore', reason: 'app_ajena' };
+      // pause_collection (pausa de facturación) deja la sub 'active' en Stripe:
+      // sin esto un subscription.updated volvería a poner la membresía activa.
       const estado =
-        event.type === 'customer.subscription.deleted' ? 'cancelada' : mapStripeStatus(sub.status);
+        event.type === 'customer.subscription.deleted'
+          ? 'cancelada'
+          : sub.pause_collection
+            ? 'pausada'
+            : mapStripeStatus(sub.status);
       if (!estado) return { kind: 'ignore', reason: `status_transitorio:${sub.status}` };
       return {
         kind: 'sync',

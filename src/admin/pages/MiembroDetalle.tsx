@@ -5,6 +5,7 @@ import { useMiembroDetalle, updateMiembro, adminDeleteUser, useTiersAdmin, useMe
 import { activarMembresiaMostrador } from '@shared/lib/checkout';
 import { MembresiaActualCard } from '../components/miembro/MembresiaActualCard';
 import { HistorialPagosMiembro } from '../components/miembro/HistorialPagosMiembro';
+import { PausarMembresiaModal } from '@shared/components/PausarMembresiaModal';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { formatHora } from '@member/logic/reservaLogic';
@@ -28,6 +29,7 @@ export default function MiembroDetalle() {
   const [motivo, setMotivo] = useState('');
   const [activando, setActivando] = useState(false);
   const [confirmarPerderCreditos, setConfirmarPerderCreditos] = useState<number | null>(null);
+  const [pausaOpen, setPausaOpen] = useState<null | boolean>(null); // true = pausar, false = reanudar
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ status: string; membresia_tier: string }>({
@@ -251,6 +253,16 @@ export default function MiembroDetalle() {
           >
             {activando ? 'Activando…' : 'Activar membresía manualmente'}
           </button>
+          {membresia && membresia.status !== 'pausada' && (
+            <button onClick={() => setPausaOpen(true)} className="ek-cta ek-cta--secondary">
+              Pausar membresía
+            </button>
+          )}
+          {membresia && membresia.status === 'pausada' && (
+            <button onClick={() => setPausaOpen(false)} className="ek-cta ek-cta--secondary">
+              Reanudar membresía
+            </button>
+          )}
         </div>
       </section>
 
@@ -384,6 +396,17 @@ export default function MiembroDetalle() {
         />
       )}
 
+      {pausaOpen !== null && (
+        <PausarMembresiaModal
+          usuarioId={miembro.id}
+          nombre={miembro.nombre}
+          pausar={pausaOpen}
+          onClose={() => setPausaOpen(null)}
+          onDone={async () => {
+            await Promise.all([refetch(), refetchMembresia()]);
+          }}
+        />
+      )}
       <ConfirmDialog
         isOpen={confirmarPerderCreditos !== null}
         title="El miembro perdería sus créditos"

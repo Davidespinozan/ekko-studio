@@ -310,3 +310,14 @@ describe('charge.refunded (reembolsos)', () => {
     expect(extraerMontoDeEvento(ev('charge.refunded', { id: 'ch_2', amount_refunded: 0 }))).toBeNull();
   });
 });
+
+describe('pause_collection (membresía pausada)', () => {
+  it('subscription.updated con pause_collection → sync pausada aunque Stripe diga active', () => {
+    const r = clasificarEvento(ev('customer.subscription.updated', { id: 'sub_1', status: 'active', pause_collection: { behavior: 'void' }, metadata: { app: 'ekko' } }));
+    expect(r).toMatchObject({ kind: 'sync', estado: 'pausada' });
+  });
+  it('sin pause_collection → activa', () => {
+    const r = clasificarEvento(ev('customer.subscription.updated', { id: 'sub_1', status: 'active', pause_collection: null }));
+    expect(r).toMatchObject({ kind: 'sync', estado: 'activa' });
+  });
+});

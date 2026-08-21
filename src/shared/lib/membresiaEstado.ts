@@ -3,7 +3,7 @@
  * Lo usan la ficha admin, la ficha de recepción y el check-in: si el cron de
  * expiración se atrasa, el status de la fila miente pero la fecha no.
  */
-export type EstadoMembresiaUI = 'vigente' | 'por_vencer' | 'vencida' | 'pago_pendiente' | 'sin_membresia';
+export type EstadoMembresiaUI = 'vigente' | 'por_vencer' | 'vencida' | 'pago_pendiente' | 'pausada' | 'sin_membresia';
 
 export interface MembresiaParaEstado {
   status: string;
@@ -12,6 +12,7 @@ export interface MembresiaParaEstado {
 
 export function estadoMembresia(m: MembresiaParaEstado | null, ahora: Date = new Date()): EstadoMembresiaUI {
   if (!m) return 'sin_membresia';
+  if (m.status === 'pausada') return 'pausada';
   if (m.status === 'past_due') return 'pago_pendiente';
   if (m.periodo_actual_fin) {
     const fin = new Date(m.periodo_actual_fin).getTime();
@@ -26,6 +27,7 @@ export const ESTADO_MEMBRESIA_LABEL: Record<EstadoMembresiaUI, { texto: string; 
   por_vencer: { texto: 'POR VENCER', color: 'var(--ek-mustard)' },
   vencida: { texto: 'VENCIDA', color: 'var(--ek-danger)' },
   pago_pendiente: { texto: 'PAGO PENDIENTE', color: 'var(--ek-danger)' },
+  pausada: { texto: 'EN PAUSA', color: 'var(--ek-ink-muted)' },
   sin_membresia: { texto: 'SIN MEMBRESÍA', color: 'var(--ek-ink-faint)' }
 };
 
