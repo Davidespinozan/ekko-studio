@@ -11,6 +11,7 @@ import { requireEnv } from '../_lib/env';
 import { getStripe, clasificarEvento, periodoFinFromSubscription, extraerMontoDeEvento } from '../_lib/stripe';
 import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo } from '../_lib/email';
 import { reportarErrorServidor } from '../_lib/sentry';
+import { avisarStaff } from '../_lib/avisosStaff';
 
 /**
  * POST /stripe-webhook — materializa los cambios de la suscripción del miembro.
@@ -205,6 +206,32 @@ export const handler: Handler = async (event) => {
         p_event_at: accion.event_at
       });
       if (error) throw new Error(`sync_membresia_stripe: ${error.message}`);
+    } else if (accion.kind === 'reembolso') {
+      // Resolver al miembro por el cobro original (payment_events) y avisar al
+      // equipo: un reembolso hecho desde el dashboard de Stripe no revierte
+      // créditos ni membresía solo; alguien tiene que decidir.
+      if (accion.payment_intent_id) {
+        const { data: original } = await admin
+          .from('payment_events')
+          .select('usuario_id, tenant_id')
+          .eq('stripe_payment_intent_id', accion.payment_intent_id)
+          .eq('status', 'succeeded')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        usuarioIdPago = original?.usuario_id ?? null;
+        if (original?.tenant_id) {
+          await avisarStaff(admin, {
+            tenant_id: original.tenant_id,
+            tipo: 'reembolso',
+            titulo: 'Reembolso en Stripe',
+            mensaje: `Se reembolsaron ${(accion.amount_refunded / 100).toLocaleString('es-MX', { style: 'currency', currency: accion.currency.toUpperCase() })} de un cobro. Revisa si hay que ajustar créditos o la membresía del miembro.`,
+            metadata: { charge_id: accion.charge_id, payment_intent_id: accion.payment_intent_id, usuario_id: usuarioIdPago },
+            url: usuarioIdPago ? `/admin/miembros/${usuarioIdPago}` : '/admin/miembros',
+            soloAdmins: true
+          });
+        }
+      }
     } else if (accion.kind === 'cuenta-conectada') {
       // account.updated → refrescar el gate de cobro del estudio (antes solo lo
       // hacía connect-status cuando el admin abría /admin/cobros).
@@ -294,6 +321,17 @@ export const handler: Handler = async (event) => {
             let tpl: { subject: string; html: string } | null = null;
             if (monto.status === 'failed') {
               tpl = emailPagoFallido(base);
+              // El equipo también debe enterarse: dunning en mostrador.
+              if (tenantIdPago) {
+                await avisarStaff(admin, {
+                  tenant_id: tenantIdPago,
+                  tipo: 'cobro_rechazado',
+                  titulo: 'Cobro rechazado',
+                  mensaje: `La tarjeta de ${u?.nombre ?? email} rechazó el cobro de ${(monto.monto_centavos / 100).toLocaleString('es-MX', { style: 'currency', currency: monto.moneda.toUpperCase() })}. Stripe reintentará; si no, pídele que actualice su tarjeta.`,
+                  metadata: { usuario_id: usuarioIdPago, stripe_invoice_id: monto.stripe_invoice_id },
+                  url: `/admin/miembros/${usuarioIdPago}`
+                });
+              }
             } else if (monto.status === 'succeeded' && stripeEvent.type === 'invoice.paid') {
               const inv = stripeEvent.data.object as { billing_reason?: string };
               tpl = inv?.billing_reason === 'subscription_create' ? emailBienvenida(base) : emailRecibo(base);

@@ -125,6 +125,9 @@ export const handler: Handler = async (event) => {
     const currency = (tier.moneda || 'mxn').toLowerCase();
     const metadata = { app: 'ekko', usuario_id: socio.id, tier_id: tier.id };
     const esPaquete = tier.tipo === 'creditos' || tier.tipo === 'hibrido';
+    // Comisión de la plataforma (EKKO_FEE_PERCENT, default 0). Antes solo se
+    // aplicaba en el Checkout (fallback); los flujos Elements no cobraban fee.
+    const feePct = Number(optionalEnv('EKKO_FEE_PERCENT', '0')) || 0;
 
     if (esPaquete) {
       const intent = await stripe.paymentIntents.create(
@@ -133,7 +136,8 @@ export const handler: Handler = async (event) => {
           currency,
           customer: customerId,
           metadata,
-          automatic_payment_methods: { enabled: true }
+          automatic_payment_methods: { enabled: true },
+          ...(feePct > 0 ? { application_fee_amount: Math.round((tier.precio_centavos * feePct) / 100) } : {})
         },
         opt
       );
@@ -159,6 +163,7 @@ export const handler: Handler = async (event) => {
         payment_behavior: 'default_incomplete',
         payment_settings: { save_default_payment_method: 'on_subscription' },
         metadata,
+        ...(feePct > 0 ? { application_fee_percent: feePct } : {}),
         expand: ['latest_invoice.payment_intent', 'latest_invoice.confirmation_secret']
       },
       opt
@@ -171,7 +176,6 @@ export const handler: Handler = async (event) => {
     const clientSecret = inv?.confirmation_secret?.client_secret ?? inv?.payment_intent?.client_secret ?? null;
     if (!clientSecret) return serverError('No se pudo iniciar el cobro de la suscripción');
 
-    void optionalEnv; // (reservado para fee futuro)
     return ok({ clientSecret, account: accountId, modo: 'suscripcion', subscriptionId: sub.id, customerSessionClientSecret });
   } catch (err) {
     console.error('[crear-pago-intent]', err);

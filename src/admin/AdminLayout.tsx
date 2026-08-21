@@ -7,6 +7,7 @@ import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { BrandLogo } from '@shared/components/BrandLogo';
 import { Sidebar } from './components/Sidebar';
 import { CambiarPasswordGate } from '@shared/components/CambiarPasswordGate';
+import { NotificacionesBell } from '@member/components/NotificacionesBell';
 
 const Dashboard = lazy(() => import('./pages/AdminDashboard'));
 const Reportes = lazy(() => import('./pages/Reportes'));
@@ -70,7 +71,13 @@ export default function AdminLayout() {
             <Menu size={20} aria-hidden="true" />
           </button>
           <BrandLogo height={104} maxWidth={280} style={{ marginTop: '-18px', marginBottom: '-18px' }} />
+          <div style={{ position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)' }}>
+            <NotificacionesBell />
+          </div>
         </header>
+        <div className="adm-topbar-desktop-bell" style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 16px 0' }}>
+          <NotificacionesBell />
+        </div>
 
         <main className="adm-main">
           <Suspense fallback={<LoadingScreen />}>

@@ -102,6 +102,18 @@ export type EventoClasificado =
       event_at: string;
     }
   | {
+      // Reembolso (desde el dashboard Express del estudio o por API): registrar
+      // en payment_events y avisar al equipo. No revierte créditos/membresía
+      // automáticamente: el estudio decide (queda en el historial del miembro).
+      kind: 'reembolso';
+      charge_id: string;
+      payment_intent_id: string | null;
+      amount_refunded: number;
+      currency: string;
+      customer_id: string | null;
+      event_at: string;
+    }
+  | {
       // Connect: Stripe aprobó/cambió la cuenta conectada del estudio → refrescar
       // los flags que gatean el cobro sin esperar a que alguien abra /admin/cobros.
       kind: 'cuenta-conectada';
@@ -220,6 +232,21 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
       return { kind: 'activar', usuario_id, tier_id, subscription_id: null, customer_id, event_at };
     }
 
+    case 'charge.refunded': {
+      const ch = event.data.object as Stripe.Charge;
+      if (esDeOtraApp(ch.metadata)) return { kind: 'ignore', reason: 'app_ajena' };
+      if (!ch.id) return { kind: 'ignore', reason: 'charge_sin_id' };
+      return {
+        kind: 'reembolso',
+        charge_id: ch.id,
+        payment_intent_id: typeof ch.payment_intent === 'string' ? ch.payment_intent : ch.payment_intent?.id ?? null,
+        amount_refunded: ch.amount_refunded ?? 0,
+        currency: ch.currency ?? 'mxn',
+        customer_id: typeof ch.customer === 'string' ? ch.customer : ch.customer?.id ?? null,
+        event_at
+      };
+    }
+
     case 'account.updated': {
       const acct = event.data.object as Stripe.Account;
       if (!acct.id) return { kind: 'ignore', reason: 'account_sin_id' };
@@ -293,6 +320,23 @@ export function extraerMontoDeEvento(event: Stripe.Event): MontoEvento | null {
       stripe_subscription_id:
         typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id ?? null,
       stripe_customer_id: typeof inv.customer === 'string' ? inv.customer : inv.customer?.id ?? null
+    };
+  }
+
+  // Reembolso: se registra como `refunded` con el monto devuelto (positivo).
+  // Los ingresos leen status='succeeded', así que no se netea solo: el admin lo
+  // ve en el historial del miembro y en cobranza.
+  if (event.type === 'charge.refunded') {
+    const ch = event.data.object as Stripe.Charge;
+    if (typeof ch.amount_refunded !== 'number' || ch.amount_refunded <= 0) return null;
+    return {
+      monto_centavos: ch.amount_refunded,
+      moneda: ch.currency ?? 'mxn',
+      status: 'refunded',
+      stripe_invoice_id: (() => { const inv = (ch as unknown as { invoice?: string | { id?: string } | null }).invoice; return typeof inv === 'string' ? inv : inv?.id ?? null; })(),
+      stripe_payment_intent_id: typeof ch.payment_intent === 'string' ? ch.payment_intent : ch.payment_intent?.id ?? null,
+      stripe_subscription_id: null,
+      stripe_customer_id: typeof ch.customer === 'string' ? ch.customer : ch.customer?.id ?? null
     };
   }
 

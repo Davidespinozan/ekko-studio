@@ -6,6 +6,7 @@ import { DemoBanner } from '@shared/components/DemoBanner';
 import { BrandLogo } from '@shared/components/BrandLogo';
 import { ReceptionBottomNav } from './components/ReceptionBottomNav';
 import { CambiarPasswordGate } from '@shared/components/CambiarPasswordGate';
+import { NotificacionesBell } from '@member/components/NotificacionesBell';
 
 /** Título de sección para el header (mismo patrón que miembro). */
 function tituloDeSeccion(path: string): string {
@@ -56,7 +57,8 @@ export default function ReceptionLayout() {
           /* Home (Hoy): logo centrado (como el inicio del miembro), Salir a la derecha. */
           <div className="ek-header-inner ek-header-inner--centered">
             <BrandLogo height={104} maxWidth={280} style={{ marginTop: '-18px', marginBottom: '-18px' }} />
-            <div className="ek-header-bell-abs">
+            <div className="ek-header-bell-abs" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <NotificacionesBell />
               <button
                 onClick={signOut}
                 className="ek-icon-btn"
@@ -70,6 +72,7 @@ export default function ReceptionLayout() {
           <div className="ek-header-inner">
             <h1 className="ek-header-title">{tituloDeSeccion(location.pathname)}</h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+              <NotificacionesBell />
               <span
                 style={{
                   fontSize: '13px',

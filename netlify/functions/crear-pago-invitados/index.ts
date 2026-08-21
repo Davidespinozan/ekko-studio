@@ -7,7 +7,7 @@ if (!globalThis.WebSocket) {
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, notFound, serverError } from '../_lib/http';
-import { requireEnv } from '../_lib/env';
+import { requireEnv, optionalEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada, getOrCreateSocioCustomer } from '../_lib/connectBilling';
 
@@ -133,12 +133,14 @@ export const handler: Handler = async (event) => {
       console.error('[crear-pago-invitados] customerSession', e instanceof Error ? e.message : e);
     }
 
+    const feePct = Number(optionalEnv('EKKO_FEE_PERCENT', '0')) || 0;
     const intent = await stripe.paymentIntents.create(
       {
         amount: precioExtra * cantidad,
         currency: 'mxn',
         customer: customerId,
         automatic_payment_methods: { enabled: true },
+        ...(feePct > 0 ? { application_fee_amount: Math.round((precioExtra * cantidad * feePct) / 100) } : {}),
         metadata: {
           app: 'ekko',
           tipo: 'invitados_extra',

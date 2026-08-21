@@ -291,3 +291,22 @@ describe('account.updated (Connect)', () => {
     expect(r).toMatchObject({ kind: 'cuenta-conectada', charges_enabled: false, details_submitted: false });
   });
 });
+
+describe('charge.refunded (reembolsos)', () => {
+  it('clasifica como reembolso con el monto devuelto y el PI original', () => {
+    const r = clasificarEvento(ev('charge.refunded', {
+      id: 'ch_1', payment_intent: 'pi_1', amount_refunded: 85000, currency: 'mxn', customer: 'cus_1', metadata: { app: 'ekko' }
+    }));
+    expect(r).toMatchObject({ kind: 'reembolso', charge_id: 'ch_1', payment_intent_id: 'pi_1', amount_refunded: 85000, currency: 'mxn', customer_id: 'cus_1' });
+  });
+
+  it('de otra app → ignore', () => {
+    expect(clasificarEvento(ev('charge.refunded', { id: 'ch_1', metadata: { app: 'sala' } }))).toEqual({ kind: 'ignore', reason: 'app_ajena' });
+  });
+
+  it('extraerMontoDeEvento lo registra como refunded (positivo) y no como ingreso', () => {
+    const m = extraerMontoDeEvento(ev('charge.refunded', { id: 'ch_1', payment_intent: 'pi_1', amount_refunded: 85000, currency: 'mxn', customer: 'cus_1' }));
+    expect(m).toMatchObject({ status: 'refunded', monto_centavos: 85000, stripe_payment_intent_id: 'pi_1', stripe_customer_id: 'cus_1' });
+    expect(extraerMontoDeEvento(ev('charge.refunded', { id: 'ch_2', amount_refunded: 0 }))).toBeNull();
+  });
+});
