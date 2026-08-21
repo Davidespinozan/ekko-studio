@@ -35,6 +35,17 @@ ataque usa un valor genuinamente distinto del actual, cubre las 6 columnas + las
 2 vías legítimas (admin / service_role), y devuelve filas. Ningún cambio de
 trigger fue necesario.
 
+**Actualización 2026-08-21 (paridad con SALA, rama `sprint-0-hotfixes`):**
+cerrados **M3** (storage por tenant: `20260821140000_storage_scope_tenant.sql`),
+**L1** (`count_*` acotados al tenant: `20260821160000_count_oraculos_tenant.sql`)
+y dos hallazgos nuevos: **H7** `expirar_membresias_vencidas()` era ejecutable por
+`authenticated` (`20260821120000_revoke_expirar_membresias.sql`) y **H8**
+`tenants` exponía `stripe_*` a `authenticated` y permitía al admin actualizar el
+gate de cobro (`20260821150000_tenants_columnas_por_rol.sql`). Además
+`reception-reset-password` ya no deja a recepción resetear claves del staff.
+Checks: `supabase/tests/hardening_checks.sql` (P1 denylist de EXECUTE, P2
+columnas de `tenants`, P3 storage, P4 contratos de guards).
+
 **Pendiente operativo:** aplicar `20260521100000_sec_fix.sql`, correr
 `supabase/tests/sec_fix_checks.sql` (esperar todo ✅ PASS), confirmar
 `QR_JWT_SECRET` en Netlify prod. Los 8 MEDIUM + 6 LOW siguen como hardening

@@ -186,3 +186,43 @@ completo en `KERNEL.md`.
   reserva ~1h antes con dedupe por `reservas.recordatorio_enviado_at`). Patrones
   de HSC. Faltan VAPID keys + env + migraciones (ver `PUSH.md`). Pendiente: el
   cancel client-side no dispara push (ver `BACKLOG.md`).
+
+## Paridad con SALA — Sprint 0/1 (2026-08-21)
+
+Bugs y endurecimientos portados de SALA (ver `SALA_PARITY_AUDIT.md`, commits de
+la rama `sprint-0-hotfixes`). Cada uno deja un self-test en su migración o un
+test en `src/__tests__`.
+
+- **EKKO-012 — Crons con sintaxis real de Netlify.** `[[scheduled_functions]]`
+  no existe; los 3 crons no corrieron nunca. Declarados como
+  `[functions."cron-x"] schedule`; `netlify-crons.test.ts` falla si vuelve.
+- **EKKO-013 — El plan se valida contra `tiers` del estudio**, nunca contra una
+  lista fija (`reception-update-member`).
+- **EKKO-014 — Penalización por no-show obedece a la config.**
+  `config.penalizaciones.{no_show_bloqueo_dias (0 = solo registrar), no_show_umbral}`
+  la leen el cron (`marcar_no_shows`) y recepción vía `_lib/noShow.ts`; el miembro
+  recibe aviso in-app/push (`tipo='no_show'`).
+- **EKKO-015 — La devolución de créditos usa la ventana de CANCELACIÓN**
+  (`cancelacion_min_horas_antes`, 0 = sin ventana), igual que
+  `cancelar_reserva_atomic`. Sustituye la regla de EKKO-009 que usaba
+  `anticipacion_min_horas`.
+- **EKKO-016 — `tiers_permitidos` vacío = estudio abierto.** Gate único
+  `_recurso_permite_tier`; trigger en `recursos` exige slugs de planes activos del
+  tenant; archivar/renombrar un plan actualiza las listas. Front y base coinciden.
+- **EKKO-017 — Acceso:** `/recuperar` + `/nueva-contrasena`, "Cambiar contraseña"
+  en el perfil, y `CambiarPasswordGate` en los 3 layouts disparado por la
+  notificación `cambiar_password` que dejan alta/reset de staff. Las claves
+  temporales siguen siendo aleatorias (no `Cambiar123` como SALA: aquí hay
+  tarjeta y créditos). Recepción no puede resetear claves del staff.
+- **EKKO-018 — La ficha admin lee `membresias`** (`MembresiaActualCard`), cambia
+  el plan por `reception-update-member` (motivo + audit) y activa por el RPC
+  keystone `activar_membresia`. Cierra B3.
+- **EKKO-019 — Webhook de Connect en cuenta compartida:** descarta (200) eventos
+  de cuentas conectadas ajenas (`cuenta_ajena`) y objetos con `metadata.app ≠ 'ekko'`
+  (`app_ajena`); procesa `account.updated` para refrescar el gate de cobro.
+- **EKKO-020 — Privilegios:** `expirar_membresias_vencidas` solo `service_role`;
+  `tenants` con SELECT/UPDATE por columnas (stripe_* solo backend); storage de
+  escritura atado al tenant por path; `count_*` acotados con
+  `COALESCE(get_my_tenant_id(), param)`. Checks en
+  `supabase/tests/hardening_checks.sql`.
+- **EKKO-021 — Paquetes fuera del MRR** (`esRecurrente`); se cuentan aparte.

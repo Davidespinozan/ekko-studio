@@ -99,8 +99,9 @@ El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`
 
 ## 2. Deudas técnicas conocidas
 
-- [ ] **B3 — cambiar tier no activa la cuenta** (se cierra con el RPC de
-      activación de Pagos).
+- [x] **B3 — cambiar tier no activa la cuenta** — cerrado 2026-08-21: la ficha
+      admin lee `membresias`, cambia el plan por `reception-update-member` y activa
+      por `activar_membresia` (EKKO-018).
 - [ ] **D6 — reprogramar no atómico**: revisar si vale un RPC atómico (hoy
       maneja parciales con avisos, pero puede dejar al miembro sin reserva).
 - [ ] **Comentario obsoleto** en `PerfilMiembroRecepcion.tsx` ("READ-ONLY") — ya
