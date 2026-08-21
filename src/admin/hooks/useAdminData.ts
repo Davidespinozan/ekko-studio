@@ -94,6 +94,46 @@ export function useMiembroDetalle(miembroId: string | undefined) {
   return { miembro, reservas, isLoading, refetch };
 }
 
+export interface MembresiaActualAdmin {
+  id: string;
+  status: string;
+  periodo_actual_fin: string | null;
+  creditos_restantes: number | null;
+  stripe_subscription_id: string | null;
+  cancel_at_period_end: boolean | null;
+  created_at: string;
+  tier: { slug: string; nombre: string; tipo: string | null } | null;
+}
+
+/**
+ * Membresía VIGENTE del miembro leída de `membresias` (la fuente de verdad que
+ * usan recepción, reportes y el webhook), no de `usuarios.membresia_tier`.
+ * Devuelve null si no tiene ninguna viva (trialing/activa/past_due).
+ */
+export function useMembresiaActualAdmin(usuarioId: string | undefined) {
+  const [membresia, setMembresia] = useState<MembresiaActualAdmin | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const refetch = useCallback(async () => {
+    if (!usuarioId) return;
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from('membresias')
+      .select('id, status, periodo_actual_fin, creditos_restantes, stripe_subscription_id, cancel_at_period_end, created_at, tier:tiers(slug, nombre, tipo)')
+      .eq('usuario_id', usuarioId)
+      .in('status', ['trialing', 'activa', 'past_due'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) console.error('[useMembresiaActualAdmin]', error);
+    setMembresia((data as unknown as MembresiaActualAdmin | null) ?? null);
+    setIsLoading(false);
+  }, [usuarioId]);
+
+  useEffect(() => { refetch(); }, [refetch]);
+  return { membresia, isLoading, refetch };
+}
+
 /**
  * Actualizar campos arbitrarios de un miembro.
  * RLS valida que solo admin del tenant puede hacerlo.

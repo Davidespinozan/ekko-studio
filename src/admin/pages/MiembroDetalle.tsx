@@ -1,7 +1,9 @@
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { ArrowLeft, Check, Send, ShieldCheck, ShieldAlert, User } from 'lucide-react';
-import { useMiembroDetalle, updateMiembro, adminDeleteUser, useTiersAdmin } from '../hooks/useAdminData';
+import { useMiembroDetalle, updateMiembro, adminDeleteUser, useTiersAdmin, useMembresiaActualAdmin } from '../hooks/useAdminData';
+import { activarMembresiaMostrador } from '@shared/lib/checkout';
+import { MembresiaActualCard } from '../components/miembro/MembresiaActualCard';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { formatHora } from '@member/logic/reservaLogic';
@@ -20,7 +22,11 @@ export default function MiembroDetalle() {
   const toast = useToast();
   const { miembro, reservas, isLoading, refetch } = useMiembroDetalle(id);
   const { tiers } = useTiersAdmin();
+  const { membresia, isLoading: membresiaLoading, refetch: refetchMembresia } = useMembresiaActualAdmin(id);
   const { entries: auditEntries, isLoading: auditLoading, error: auditError } = useAuditLogDeUsuario(id);
+  const [motivo, setMotivo] = useState('');
+  const [activando, setActivando] = useState(false);
+  const [confirmarPerderCreditos, setConfirmarPerderCreditos] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<{ status: string; membresia_tier: string }>({
@@ -43,19 +49,69 @@ export default function MiembroDetalle() {
   if (isLoading) return <Spinner label="Cargando…" />;
   if (!miembro) return <p className="adm-body">Miembro no encontrado.</p>;
 
+  const tierCambia = (draft.membresia_tier || null) !== (miembro.membresia_tier ?? null);
+  const statusCambia = draft.status !== miembro.status;
+
   async function handleSave() {
     setSaving(true);
     setError(null);
-    const { error: err } = await updateMiembro(miembro!.id, {
-      status: draft.status as any,
-      membresia_tier: draft.membresia_tier || null
-    });
-    if (err) {
-      setError(err);
-    } else {
+    try {
+      // El plan asignado va por el camino GOBERNADO (reception-update-member):
+      // valida el tier contra los planes del estudio, exige motivo y audita.
+      // Antes se escribía usuarios.membresia_tier directo desde el navegador y
+      // la ficha divergía de recepción/reportes (B3).
+      if (tierCambia) {
+        if (motivo.trim().length < 3) {
+          setError('Escribe un motivo (mínimo 3 caracteres) para cambiar el plan.');
+          setSaving(false);
+          return;
+        }
+        await actualizarMiembro(miembro!.id, { membresia_tier: draft.membresia_tier || null, motivo: motivo.trim() });
+      }
+      if (statusCambia) {
+        const { error: err } = await updateMiembro(miembro!.id, { status: draft.status as any });
+        if (err) throw new Error(err);
+      }
+      setMotivo('');
       await refetch();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo guardar.');
     }
     setSaving(false);
+  }
+
+  // Activación manual (cortesía, transferencia, pago en mostrador): el MISMO RPC
+  // keystone que recepción y el webhook (activar_membresia). Avisa si se
+  // perderían créditos al pasar a un plan mensual.
+  async function activarMembresia() {
+    if (!miembro?.membresia_tier) {
+      setError('Asigna un plan (y guarda) antes de activar la membresía.');
+      return;
+    }
+    const saldo = membresia?.creditos_restantes ?? 0;
+    const destino = tiers.find((t) => t.slug === miembro.membresia_tier);
+    const destinoMensual = destino?.tipo !== 'creditos' && destino?.tipo !== 'hibrido';
+    if (saldo > 0 && destinoMensual) {
+      setConfirmarPerderCreditos(saldo);
+      return;
+    }
+    await activarConfirmado();
+  }
+
+  async function activarConfirmado() {
+    if (!miembro?.membresia_tier) return;
+    setConfirmarPerderCreditos(null);
+    setActivando(true);
+    setError(null);
+    try {
+      await activarMembresiaMostrador(miembro.id, miembro.membresia_tier);
+      toast.success('Membresía activada.');
+      await Promise.all([refetch(), refetchMembresia()]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo activar la membresía.');
+    } finally {
+      setActivando(false);
+    }
   }
 
   async function handleEliminar() {
@@ -129,10 +185,11 @@ export default function MiembroDetalle() {
       </section>
 
       <section className="adm-section">
-        <h2 className="ek-h3">Acciones</h2>
-        <div className="adm-form-row">
+        <h2 className="ek-h3">Membresía</h2>
+        <MembresiaActualCard membresia={membresia} isLoading={membresiaLoading} planAsignado={miembro.membresia_tier ?? null} />
+        <div className="adm-form-row" style={{ marginTop: '1rem' }}>
           <label className="ek-label">
-            Status
+            Status de la cuenta
             <select
               value={draft.status}
               onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value }))}
@@ -146,20 +203,17 @@ export default function MiembroDetalle() {
             </select>
           </label>
           <label className="ek-label">
-            Tier
+            Plan asignado
             <select
               value={draft.membresia_tier}
               onChange={(e) => setDraft((d) => ({ ...d, membresia_tier: e.target.value }))}
               className="ek-input"
             >
-              <option value="">— sin tier —</option>
+              <option value="">— sin plan —</option>
               {/* Solo planes ACTIVOS: no se puede asignar uno eliminado. */}
               {tiers.filter((t) => t.activo).map((t) => (
                 <option key={t.id} value={t.slug}>{t.nombre}</option>
               ))}
-              {/* Excepción: si el plan ACTUAL del miembro está eliminado, lo
-                  mostramos igual (marcado) para no cambiarlo en silencio al
-                  guardar — pero no ofrecemos los demás eliminados. */}
               {draft.membresia_tier && !tiers.some((t) => t.activo && t.slug === draft.membresia_tier) && (
                 <option value={draft.membresia_tier}>
                   {(tiers.find((t) => t.slug === draft.membresia_tier)?.nombre ?? draft.membresia_tier)} (eliminado)
@@ -168,10 +222,35 @@ export default function MiembroDetalle() {
             </select>
           </label>
         </div>
+        {tierCambia && (
+          <label className="ek-label" style={{ display: 'block', marginTop: '0.75rem' }}>
+            Motivo del cambio de plan
+            <input
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              className="ek-input"
+              placeholder="Ej. Cambió a Premium, pagó en mostrador"
+            />
+          </label>
+        )}
+        <p className="adm-body" style={{ marginTop: '0.75rem', fontSize: '13px' }}>
+          "Plan asignado" es el plan que el miembro debe pagar; la membresía queda <strong>vigente</strong> cuando
+          paga en la app (Stripe) o cuando la activas aquí manualmente (cortesía, transferencia, mostrador).
+        </p>
         {error && <p className="ek-error-text">{error}</p>}
-        <button onClick={handleSave} disabled={saving} className="ek-cta" style={{ marginTop: '1rem', alignSelf: 'flex-start' }}>
-          {saving ? 'Guardando…' : 'Guardar cambios'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '1rem' }}>
+          <button onClick={handleSave} disabled={saving || (!tierCambia && !statusCambia)} className="ek-cta">
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </button>
+          <button
+            onClick={activarMembresia}
+            disabled={activando || tierCambia || !miembro.membresia_tier}
+            className="ek-cta ek-cta--secondary"
+            title={tierCambia ? 'Guarda el plan primero' : undefined}
+          >
+            {activando ? 'Activando…' : 'Activar membresía manualmente'}
+          </button>
+        </div>
       </section>
 
       <section className="adm-section">
@@ -296,6 +375,15 @@ export default function MiembroDetalle() {
         />
       )}
 
+      <ConfirmDialog
+        isOpen={confirmarPerderCreditos !== null}
+        title="El miembro perdería sus créditos"
+        description={`Tiene ${confirmarPerderCreditos ?? 0} crédito(s) vigentes. Al activar un plan mensual, ese saldo se pierde. ¿Activar de todos modos?`}
+        confirmLabel="Activar y perder créditos"
+        variant="danger"
+        onConfirm={activarConfirmado}
+        onCancel={() => setConfirmarPerderCreditos(null)}
+      />
       <ConfirmDialog
         isOpen={eliminarOpen}
         title={`¿Eliminar a ${miembro.nombre ?? miembro.email}?`}
