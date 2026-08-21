@@ -226,3 +226,40 @@ test en `src/__tests__`.
   `COALESCE(get_my_tenant_id(), param)`. Checks en
   `supabase/tests/hardening_checks.sql`.
 - **EKKO-021 — Paquetes fuera del MRR** (`esRecurrente`); se cuentan aparte.
+
+## Paridad con SALA — Sprints 2/3/4 (2026-08-21)
+
+- **EKKO-022 — Plataforma:** `backend.ts` refresca el token si vence en <120 s
+  y reintenta UNA vez tras 401; PWA recarga sola al activarse un SW nuevo
+  (`controllerchange`, chequeo al volver a la pestaña y cada 2 min,
+  `vite:preloadError`, `lazyConRecarga`); Sentry en functions
+  (`_lib/sentry.ts`: `reportarErrorServidor`, `conMonitorCron`, centinela de
+  frescura en `cron-expirar-membresias`); `setSentryUser` al hidratar.
+- **EKKO-023 — Zona del estudio en la UI:** toda fecha de calendario se
+  calcula en `America/Mazatlan` (`timezone.ts`: `fechaISOEnZona`,
+  `rangoDiaEnZona`, `formatHoraEnZona`…). Recepción trabaja con el día ISO del
+  estudio; slots y labels salen de `reservaLogic` en esa zona. Pendiente:
+  `VistaSemana`/`VistaDia` del calendario.
+- **EKKO-024 — Recepción reserva al nivel del socio:**
+  `reservar_para_miembro_atomic` valida horario, `permitir_continuas`,
+  `FOR UPDATE`, traduce el constraint anti-solape y toma `max_invitados` de
+  `tiers.reglas`. Sigue **sin** anticipación mínima (D1) y sin tope diario.
+  `trg_anticipacion_maxima` valida `anticipacion_max_dias` en la base solo para
+  miembros. Recepción lee `membresias` (`membresias_read_staff`).
+- **EKKO-025 — Corregir asistencia:** `reception-marcar-asistio` pasa un
+  no_show/cancelada ya iniciada a `completada`, revierte la falta y levanta el
+  bloqueo si se debía a ella; los créditos no se re-cobran.
+- **EKKO-026 — `tiers.en_venta`** separa "se vende" de "está activo". La venta
+  (landing/signup/pago en la app) filtra `en_venta`; asignar desde staff sigue
+  por `activo`.
+- **EKKO-027 — Avisos:** `avisar_membresias_por_vencer` solo cuando el miembro
+  debe actuar (paquetes con caducidad, membresías de mostrador,
+  `cancel_at_period_end`), una vez por periodo; felicitación de cumpleaños
+  desde la ficha de identidad; `cumpleanos_proximos` para la card de staff.
+  Cobro rechazado y reembolso avisan al equipo (`_lib/avisosStaff.ts`) y la
+  campana vive en los 3 layouts.
+- **EKKO-028 — Reembolsos:** `charge.refunded` se registra como `refunded` en
+  `payment_events` y NO revierte créditos/membresía automáticamente: decide el
+  estudio desde la ficha.
+- **EKKO-029 — Fee de plataforma** (`EKKO_FEE_PERCENT`) aplica en todos los
+  flujos de cobro (Checkout y Elements). Default 0.
