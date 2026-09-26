@@ -4,6 +4,8 @@ import { ArrowRight, CalendarClock, CalendarPlus, UserPlus } from 'lucide-react'
 import { BotonCancelarReserva } from '@member/components/BotonCancelarReserva';
 import { PagarInvitadosExtra } from '@member/components/PagarInvitadosExtra';
 import { useTenant } from '@shared/hooks/useTenant';
+import { formatFechaEnZona, formatHoraEnZona } from '@shared/lib/timezone';
+import { sesionEnCurso } from '@member/logic/reservasVigentes';
 
 // ============================================================================
 // ProximaSesionHero — hero SIEMPRE visible en el inicio del miembro (es lo que
@@ -30,17 +32,17 @@ interface Props {
   onCancelada: () => void;
 }
 
+/** En la zona del ESTUDIO: la misma fecha y hora que ve recepción y que dice el QR. */
 function formatearFecha(iso: string): string {
-  const d = new Date(iso);
-  const fecha = d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
-  const hora = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
-  return `${fecha} · ${hora}`;
+  const fecha = formatFechaEnZona(iso, { weekday: 'long', day: 'numeric', month: 'long' });
+  return `${fecha} · ${formatHoraEnZona(iso)}`;
 }
 
 export function ProximaSesionHero({ reserva, onCancelada }: Props) {
   const tenant = useTenant();
   const nombre = reserva?.recurso?.nombre ?? 'Estudio';
   const [invitadosOpen, setInvitadosOpen] = useState(false);
+  const enCurso = !!reserva && sesionEnCurso(reserva.slot_inicio);
 
   const precioExtraCentavos = Number((tenant.config as Record<string, any>)?.reserva?.precio_invitado_extra_centavos) || 0;
   const restanteExtra = (reserva?.recurso?.max_invitados_extra ?? 0) - (reserva?.invitados_extra_pagados ?? 0);
@@ -54,17 +56,21 @@ export function ProximaSesionHero({ reserva, onCancelada }: Props) {
         {reserva ? (
           <>
             <p className="ek-eyebrow" style={{ marginBottom: '10px', display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'rgba(255,255,255,0.92)' }}>
-              <CalendarClock size={13} aria-hidden="true" /> {formatearFecha(reserva.slot_inicio)}
+              <CalendarClock size={13} aria-hidden="true" />{' '}
+              {enCurso ? `EN CURSO · empezó a las ${formatHoraEnZona(reserva.slot_inicio)}` : formatearFecha(reserva.slot_inicio)}
             </p>
             <h2 className="ek-display-lg" style={{ marginBottom: '22px', color: '#fff' }}>{nombre}</h2>
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
               <Link to={`/app/qr/${reserva.id}`} className="ek-cta ek-cta--gold">
                 Ver QR <ArrowRight size={16} aria-hidden="true" />
               </Link>
-              <BotonCancelarReserva
-                reserva={{ id: reserva.id, slot_inicio: reserva.slot_inicio, folio: reserva.folio, recurso_nombre: nombre }}
-                onCancelada={onCancelada}
-              />
+              {/* Una sesión que ya empezó no se cancela: solo queda enseñar el QR. */}
+              {!enCurso && (
+                <BotonCancelarReserva
+                  reserva={{ id: reserva.id, slot_inicio: reserva.slot_inicio, folio: reserva.folio, recurso_nombre: nombre, invitados_extra_pagados: reserva.invitados_extra_pagados }}
+                  onCancelada={onCancelada}
+                />
+              )}
               {puedeExtras && (
                 <button
                   type="button"

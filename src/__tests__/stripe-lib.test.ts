@@ -4,7 +4,8 @@ import {
   periodoFinFromSubscription,
   clasificarEvento,
   extraerMontoDeEvento,
-  esDeOtraApp
+  esDeOtraApp,
+  llavePrecio
 } from '../../netlify/functions/_lib/stripe';
 
 /**
@@ -319,5 +320,63 @@ describe('pause_collection (membresía pausada)', () => {
   it('sin pause_collection → activa', () => {
     const r = clasificarEvento(ev('customer.subscription.updated', { id: 'sub_1', status: 'active', pause_collection: null }));
     expect(r).toMatchObject({ kind: 'sync', estado: 'activa' });
+  });
+});
+
+describe('llavePrecio — idempotencyKey de prices.create', () => {
+  const base = { tierId: 'tier-1', accountId: 'acct_1', centavos: 85000, currency: 'mxn', nombre: 'Esencial' };
+
+  it('mismos parámetros → misma key (un doble clic no crea dos precios)', () => {
+    expect(llavePrecio(base)).toBe(llavePrecio({ ...base }));
+    expect(llavePrecio(base)).toBe(llavePrecio({ ...base, currency: 'MXN' }));
+  });
+
+  it('si el admin cambia el PRECIO o el NOMBRE, la key cambia (antes: 400 de Stripe durante 24 h)', () => {
+    expect(llavePrecio({ ...base, centavos: 90000 })).not.toBe(llavePrecio(base));
+    expect(llavePrecio({ ...base, nombre: 'Esencial Plus' })).not.toBe(llavePrecio(base));
+  });
+
+  it('otro plan u otra cuenta conectada → otra key', () => {
+    expect(llavePrecio({ ...base, tierId: 'tier-2' })).not.toBe(llavePrecio(base));
+    expect(llavePrecio({ ...base, accountId: 'acct_2' })).not.toBe(llavePrecio(base));
+  });
+
+  it('cabe en el límite de Stripe (255) y no filtra datos en claro', () => {
+    const k = llavePrecio(base);
+    expect(k).toMatch(/^ekko_price_[0-9a-f]{40}$/);
+    expect(k).not.toContain('Esencial');
+  });
+});
+
+describe('clasificarEvento — referencia del pago único (idempotencia de paquetes)', () => {
+  const meta = { usuario_id: 'u1', tier_id: 't1' };
+
+  it('Checkout mode payment y su PaymentIntent dan la MISMA referencia', () => {
+    const sesion = clasificarEvento({
+      type: 'checkout.session.completed', created: 1,
+      data: { object: { mode: 'payment', customer: 'cus_1', payment_intent: 'pi_1', metadata: meta } }
+    } as never);
+    const pi = clasificarEvento({
+      type: 'payment_intent.succeeded', created: 2,
+      data: { object: { id: 'pi_1', customer: 'cus_1', metadata: meta } }
+    } as never);
+    expect(sesion).toMatchObject({ kind: 'activar', referencia: 'pi_1' });
+    expect(pi).toMatchObject({ kind: 'activar', referencia: 'pi_1' });
+  });
+
+  it('payment_intent expandido (objeto) también', () => {
+    const sesion = clasificarEvento({
+      type: 'checkout.session.completed', created: 1,
+      data: { object: { mode: 'payment', customer: 'cus_1', payment_intent: { id: 'pi_7' }, metadata: meta } }
+    } as never);
+    expect(sesion).toMatchObject({ referencia: 'pi_7' });
+  });
+
+  it('Checkout mode subscription → sin referencia', () => {
+    const sesion = clasificarEvento({
+      type: 'checkout.session.completed', created: 1,
+      data: { object: { mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', payment_intent: null, metadata: meta } }
+    } as never);
+    expect(sesion).toMatchObject({ kind: 'activar', referencia: null });
   });
 });

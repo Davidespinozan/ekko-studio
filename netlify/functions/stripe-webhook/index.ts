@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { getStripe, clasificarEvento, periodoFinFromSubscription, extraerMontoDeEvento } from '../_lib/stripe';
-import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo } from '../_lib/email';
+import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo, emailPaqueteComprado } from '../_lib/email';
 import { reportarErrorServidor } from '../_lib/sentry';
 import { avisarStaff } from '../_lib/avisosStaff';
 
@@ -43,7 +43,9 @@ async function subsAnterioresDelSocio(
     .from('membresias')
     .select('stripe_subscription_id')
     .eq('usuario_id', usuarioId)
-    .in('status', ['trialing', 'activa', 'past_due'])
+    // 'pausada' incluida: si no, la sub en pausa sobrevive al cambio de plan y
+    // vuelve a cobrar el día que alguien la reanude.
+    .in('status', ['trialing', 'activa', 'past_due', 'pausada'])
     .not('stripe_subscription_id', 'is', null);
   const rows = (data ?? []) as Array<{ stripe_subscription_id: string | null }>;
   const ids = rows
@@ -65,6 +67,40 @@ async function cancelarSubsAnteriores(
       console.error('[stripe-webhook] no se pudo cancelar sub anterior', subId, e instanceof Error ? e.message : e);
     }
   }
+}
+
+/** Una function de Netlify vive ≤ 26 s: pasado un minuto sin `processed_at`, el intento anterior murió. */
+const HUERFANO_TRAS_MS = 60_000;
+
+/**
+ * El evento ya estaba registrado. Decide qué hacer con el reintento:
+ *  - 'procesado' → duplicado de verdad.
+ *  - 'en_curso'  → recibido hace instantes y aún sin terminar.
+ *  - 'reclamado' → quedó sin `processed_at` (la function murió a medias: timeout,
+ *    OOM…). Antes el reintento respondía "duplicate" y el evento se perdía.
+ *    Se reclama con un UPDATE condicionado al `received_at` leído, para que dos
+ *    reintentos simultáneos no lo procesen a la vez.
+ */
+async function reclamarEventoHuerfano(
+  admin: any,
+  eventId: string
+): Promise<'procesado' | 'en_curso' | 'reclamado'> {
+  const { data: fila } = await admin
+    .from('stripe_webhook_events')
+    .select('received_at, processed_at')
+    .eq('id', eventId)
+    .maybeSingle();
+  if (!fila || fila.processed_at) return 'procesado';
+  const recibido = new Date(fila.received_at as string).getTime();
+  if (Date.now() - recibido < HUERFANO_TRAS_MS) return 'en_curso';
+  const { data: tomado } = await admin
+    .from('stripe_webhook_events')
+    .update({ received_at: new Date().toISOString() })
+    .eq('id', eventId)
+    .eq('received_at', fila.received_at)
+    .is('processed_at', null)
+    .select('id');
+  return tomado && tomado.length > 0 ? 'reclamado' : 'en_curso';
 }
 
 export const handler: Handler = async (event) => {
@@ -128,7 +164,15 @@ export const handler: Handler = async (event) => {
     return serverError('No se pudo registrar el evento');
   }
   if (!inserted || inserted.length === 0) {
-    return ok({ received: true, duplicate: true });
+    // Ya existía. ¿Procesado, en curso, o huérfano de una function que murió?
+    const reclamo = await reclamarEventoHuerfano(admin, stripeEvent.id);
+    if (reclamo === 'procesado') return ok({ received: true, duplicate: true });
+    if (reclamo === 'en_curso') {
+      // Otro intento lo está procesando ahora mismo. 503 → Stripe reintenta más
+      // tarde: para entonces estará procesado (duplicate) o será reclamable.
+      return { statusCode: 503, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retry: 'en_curso' }) };
+    }
+    // 'reclamado' → seguir y procesarlo.
   }
 
   // Connect: las lecturas a Stripe (retrieve de la suscripción) deben ir sobre
@@ -143,6 +187,8 @@ export const handler: Handler = async (event) => {
     // usuario del pago (para payment_events): se captura en cada rama donde ya
     // lo conocemos; en renovaciones (sync) se resuelve por la suscripción.
     let usuarioIdPago: string | null = null;
+    // Paquete recién activado (pago único): para el correo de confirmación.
+    let paqueteActivado: { creditos: number | null; periodo_fin: string | null } | null = null;
 
     if (accion.kind === 'activar') {
       // Mensual: leer la suscripción para el periodo_fin. Paquete (pago único):
@@ -153,16 +199,26 @@ export const handler: Handler = async (event) => {
         periodoFin = periodoFinFromSubscription(sub);
       }
       const subsPrevias = await subsAnterioresDelSocio(admin, accion.usuario_id, accion.subscription_id);
-      const { error } = await admin.rpc('activar_membresia', {
+      const { data: activacion, error } = await admin.rpc('activar_membresia', {
         p_usuario_id: accion.usuario_id,
         p_tier_id: accion.tier_id,
         p_stripe_subscription_id: accion.subscription_id,
         p_stripe_customer_id: accion.customer_id,
-        p_periodo_fin: periodoFin
+        p_periodo_fin: periodoFin,
+        // Pago único: llave de idempotencia (la sesión de Checkout y su
+        // PaymentIntent llegan como dos eventos del MISMO pago).
+        p_referencia: accion.referencia
       });
       if (error) throw new Error(`activar_membresia: ${error.message}`);
       usuarioIdPago = accion.usuario_id;
-      await cancelarSubsAnteriores(stripe, subsPrevias, acctOpt);
+      const act = activacion as { idempotente?: boolean; creditos?: number | null; periodo_fin?: string | null } | null;
+      // Segundo evento del mismo pago → ya se activó y ya se avisó: nada más que hacer.
+      if (!act?.idempotente) {
+        if (!accion.subscription_id) {
+          paqueteActivado = { creditos: act?.creditos ?? null, periodo_fin: act?.periodo_fin ?? null };
+        }
+        await cancelarSubsAnteriores(stripe, subsPrevias, acctOpt);
+      }
     } else if (accion.kind === 'activar-sub') {
       // Suscripción in-app (Elements): leer metadata + periodo de la suscripción,
       // sobre la cuenta conectada (Connect).
@@ -198,7 +254,7 @@ export const handler: Handler = async (event) => {
           console.error('[stripe-webhook] periodo_fin de la sub', accion.subscription_id, e instanceof Error ? e.message : e);
         }
       }
-      const { error } = await admin.rpc('sync_membresia_stripe', {
+      const { data: sync, error } = await admin.rpc('sync_membresia_stripe', {
         p_stripe_subscription_id: accion.subscription_id,
         p_estado: accion.estado,
         p_periodo_fin: periodoFin,
@@ -206,6 +262,18 @@ export const handler: Handler = async (event) => {
         p_event_at: accion.event_at
       });
       if (error) throw new Error(`sync_membresia_stripe: ${error.message}`);
+      // El RPC no lanza cuando no encuentra la membresía: devuelve success:false.
+      // Antes pasaba en silencio — y es justo el síntoma de un cobro huérfano (un
+      // miembro borrado cuya suscripción sigue viva en Stripe). No se relanza:
+      // reintentar no la va a hacer aparecer; se reporta para que alguien mire.
+      const resSync = sync as { success?: boolean; reason?: string } | null;
+      if (resSync?.success === false) {
+        await reportarErrorServidor(
+          'stripe-webhook',
+          new Error(`sync_membresia_stripe: ${resSync.reason ?? 'sin_exito'} (${stripeEvent.type})`),
+          { event_id: stripeEvent.id, subscription_id: accion.subscription_id, estado: accion.estado }
+        );
+      }
     } else if (accion.kind === 'reembolso') {
       // Resolver al miembro por el cobro original (payment_events) y avisar al
       // equipo: un reembolso hecho desde el dashboard de Stripe no revierte
@@ -254,6 +322,14 @@ export const handler: Handler = async (event) => {
     }
     // kind === 'ignore' → no-op (evento que no nos interesa).
 
+    // La acción de DINERO terminó: se marca procesado AQUÍ, antes de la
+    // contabilidad y los avisos (best-effort). Si la function muere en un correo,
+    // el reintento no repite la acción (sumar invitados extra no es idempotente).
+    await admin
+      .from('stripe_webhook_events')
+      .update({ processed_at: new Date().toISOString() })
+      .eq('id', stripeEvent.id);
+
     // ── Registrar el evento de cobranza en payment_events (métricas del admin) ─
     // Cobros exitosos (invoice.paid / payment_intent.succeeded) Y fallidos
     // (invoice.payment_failed → status='failed'). Falla suave: si no se puede
@@ -301,9 +377,12 @@ export const handler: Handler = async (event) => {
           { onConflict: 'stripe_event_id', ignoreDuplicates: true }
         );
 
-        // ── Aviso por email al miembro (best-effort, no-op sin Resend) ────────
-        // Pago fallido → "actualizá tu tarjeta"; primer pago → bienvenida;
-        // renovación → recibo. Solo para facturas de suscripción.
+        // ── Avisos (best-effort) ─────────────────────────────────────────────
+        // Pago fallido → aviso IN-APP al miembro (cron-push lo lleva al teléfono)
+        // + aviso al equipo + email. Primer pago → bienvenida; renovación →
+        // recibo; paquete → confirmación con saldo y vigencia.
+        // El aviso in-app y el del equipo NO dependen de que haya email ni de que
+        // Resend esté configurado (antes iban anidados en `if (email)`).
         if (usuarioIdPago) {
           const { data: u } = await admin
             .from('usuarios')
@@ -311,6 +390,28 @@ export const handler: Handler = async (event) => {
             .eq('id', usuarioIdPago)
             .maybeSingle();
           const email = u?.email ?? null;
+          const dinero = (monto.monto_centavos / 100).toLocaleString('es-MX', { style: 'currency', currency: monto.moneda.toUpperCase() });
+
+          if (monto.status === 'failed' && tenantIdPago) {
+            await admin.from('notificaciones').insert({
+              tenant_id: tenantIdPago,
+              usuario_id: usuarioIdPago,
+              tipo: 'pago_rechazado',
+              titulo: 'No pudimos cobrar tu membresía',
+              mensaje: `Tu tarjeta rechazó el cobro de ${dinero}. Actualízala en tu perfil para no perder tu acceso.`,
+              metadata: { stripe_invoice_id: monto.stripe_invoice_id, url: '/app/perfil' }
+            });
+            // El equipo también debe enterarse: dunning en mostrador.
+            await avisarStaff(admin, {
+              tenant_id: tenantIdPago,
+              tipo: 'cobro_rechazado',
+              titulo: 'Cobro rechazado',
+              mensaje: `La tarjeta de ${u?.nombre ?? email ?? 'un miembro'} rechazó el cobro de ${dinero}. Stripe reintentará; si no, pídele que actualice su tarjeta.`,
+              metadata: { usuario_id: usuarioIdPago, stripe_invoice_id: monto.stripe_invoice_id },
+              url: `/admin/miembros/${usuarioIdPago}`
+            });
+          }
+
           if (email) {
             let estudio = 'EKKO Studio';
             if (tenantIdPago) {
@@ -321,20 +422,11 @@ export const handler: Handler = async (event) => {
             let tpl: { subject: string; html: string } | null = null;
             if (monto.status === 'failed') {
               tpl = emailPagoFallido(base);
-              // El equipo también debe enterarse: dunning en mostrador.
-              if (tenantIdPago) {
-                await avisarStaff(admin, {
-                  tenant_id: tenantIdPago,
-                  tipo: 'cobro_rechazado',
-                  titulo: 'Cobro rechazado',
-                  mensaje: `La tarjeta de ${u?.nombre ?? email} rechazó el cobro de ${(monto.monto_centavos / 100).toLocaleString('es-MX', { style: 'currency', currency: monto.moneda.toUpperCase() })}. Stripe reintentará; si no, pídele que actualice su tarjeta.`,
-                  metadata: { usuario_id: usuarioIdPago, stripe_invoice_id: monto.stripe_invoice_id },
-                  url: `/admin/miembros/${usuarioIdPago}`
-                });
-              }
             } else if (monto.status === 'succeeded' && stripeEvent.type === 'invoice.paid') {
               const inv = stripeEvent.data.object as { billing_reason?: string };
               tpl = inv?.billing_reason === 'subscription_create' ? emailBienvenida(base) : emailRecibo(base);
+            } else if (monto.status === 'succeeded' && paqueteActivado) {
+              tpl = emailPaqueteComprado({ ...base, creditos: paqueteActivado.creditos, venceEl: paqueteActivado.periodo_fin });
             }
             if (tpl) await enviarEmail({ to: email, subject: tpl.subject, html: tpl.html });
           }

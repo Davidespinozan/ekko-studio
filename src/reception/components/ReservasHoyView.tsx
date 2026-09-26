@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { X, CheckCircle2, Search, CalendarDays, UserX, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, CheckCircle2, Search, CalendarDays, UserX, RotateCcw, ChevronLeft, ChevronRight, CalendarX, ShieldAlert } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
+import { useToast } from '@shared/hooks/useToast';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { EmptyState } from '@shared/components/EmptyState';
 import { useReservasHoy, checkInManual, type ReservaConJoin } from '../hooks/useReservasHoy';
@@ -9,7 +10,10 @@ import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 import { MarcarNoShowModal, type ReservaInfo } from './MarcarNoShowModal';
 import { CorregirCheckinModal } from './CorregirCheckinModal';
 import { MarcarAsistioModal } from './MarcarAsistioModal';
+import { CancelarReservaRecepcionModal } from './CancelarReservaRecepcionModal';
+import { AvatarMiembro } from './AvatarMiembro';
 import { clasificarReservasHoy } from '../lib/clasificarReservasHoy';
+import { coincideBusqueda } from '../lib/buscarEnPadron';
 import { ZONA_ESTUDIO, hoyISOEnZona, sumarDiasISO, diasEntreISO, formatFechaEnZona, instanteDeFechaHoraEnZona } from '@shared/lib/timezone';
 
 interface Props {
@@ -25,13 +29,6 @@ interface RecursoOption {
 }
 
 const FILTRO_RECURSO_KEY = 'ekko-recepcion-filtro-recurso';
-
-function normalizar(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
-}
 
 /**
  * Etiquetas cortas para el badge de estado, en clave operativa de recepción.
@@ -102,12 +99,17 @@ function formatearDia(fechaISO: string): string {
 
 export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false }: Props = {}) {
   const tenant = useTenant();
+  const toast = useToast();
   // Día del ESTUDIO ('YYYY-MM-DD' en America/Mazatlan), no del navegador.
   const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(() => hoyISOEnZona());
   const [selected, setSelected] = useState<ReservaConJoin | null>(null);
   const [noShowTarget, setNoShowTarget] = useState<ReservaConJoin | null>(null);
   const [corregirTarget, setCorregirTarget] = useState<ReservaConJoin | null>(null);
   const [asistioTarget, setAsistioTarget] = useState<ReservaConJoin | null>(null);
+  const [cancelarTarget, setCancelarTarget] = useState<ReservaConJoin | null>(null);
+  // Check-in de UN toque desde "Llegando ahora" (R7): id en curso, para no
+  // disparar dos veces ni dejar el botón vivo mientras responde el RPC.
+  const [checkInRapidoId, setCheckInRapidoId] = useState<string | null>(null);
 
   // Un no_show/cancelada cuya sesión YA empezó se puede corregir a "sí asistió"
   // (el miembro vino y nadie le hizo check-in). Las futuras siguen sin acción.
@@ -119,8 +121,27 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
   // CheckInDetail a nivel Scanner) — evita reordenar la lista debajo.
   const { reservas, isLoading, refetch } = useReservasHoy(
     fechaSeleccionada,
-    !selected && !noShowTarget && !corregirTarget && !asistioTarget && !pausarPolling
+    !selected && !noShowTarget && !corregirTarget && !asistioTarget && !cancelarTarget && !pausarPolling
   );
+
+  // "Llegando ahora" → un toque y adentro. Mismo RPC que el modal (motivo
+  // vacío) y el mismo detalle después: el aviso de membresía vencida se pinta
+  // en CheckInDetail, así que el atajo no se salta nada.
+  async function checkInRapido(r: ReservaConJoin) {
+    if (checkInRapidoId) return;
+    setCheckInRapidoId(r.id);
+    try {
+      const data = await checkInManual(r.id);
+      playCheckInSuccess();
+      await refetch();
+      onManualCheckInSuccess?.(data);
+    } catch (e) {
+      playCheckInError();
+      toast.error(e instanceof Error ? e.message : 'No se pudo hacer el check-in');
+    } finally {
+      setCheckInRapidoId(null);
+    }
+  }
 
   // Búsqueda + debounce
   const [busqueda, setBusqueda] = useState('');
@@ -181,13 +202,14 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
     }
 
     if (busquedaDebounced) {
-      const q = normalizar(busquedaDebounced);
-      result = result.filter((r) => {
-        const nombre = normalizar(r.usuario?.nombre ?? '');
-        const email = normalizar(r.usuario?.email ?? '');
-        const folio = normalizar(r.folio ?? '');
-        return nombre.includes(q) || email.includes(q) || folio.includes(q);
-      });
+      // Nombre, email, folio o TELÉFONO (últimos dígitos): lo que dicta la gente
+      // en el mostrador. Misma lógica que el padrón (lib/buscarEnPadron).
+      result = result.filter((r) =>
+        coincideBusqueda(
+          { nombre: r.usuario?.nombre, email: r.usuario?.email, folio: r.folio, telefono: r.usuario?.telefono },
+          busquedaDebounced
+        )
+      );
     }
 
     return result;
@@ -289,7 +311,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
             type="search"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar nombre, email o folio…"
+            placeholder="Buscar nombre, teléfono, email o folio…"
             className="ek-input"
             style={{ paddingRight: busqueda ? '52px' : undefined, minHeight: '44px' }}
             aria-label="Buscar reserva"
@@ -458,7 +480,20 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {llegando.map((r) => (
-                  <ReservaCard key={r.id} reserva={r} onSelect={seleccionar} highlight />
+                  <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <ReservaCard reserva={r} onSelect={seleccionar} highlight />
+                    <button
+                      type="button"
+                      onClick={() => void checkInRapido(r)}
+                      disabled={checkInRapidoId !== null}
+                      className="ek-cta ek-cta--gold"
+                      style={{ minHeight: '44px', fontSize: '13px' }}
+                      aria-label={`Check-in de ${capitalizarNombre(r.usuario?.nombre) || r.usuario?.email || 'miembro'}`}
+                    >
+                      <CheckCircle2 size={15} aria-hidden="true" />{' '}
+                      {checkInRapidoId === r.id ? 'Marcando…' : 'Llegó · check-in'}
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -523,6 +558,27 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
             setCorregirTarget(selected);
             setSelected(null);
           }}
+          onNoShow={() => {
+            setNoShowTarget(selected);
+            setSelected(null);
+          }}
+          onCancelar={() => {
+            setCancelarTarget(selected);
+            setSelected(null);
+          }}
+        />
+      )}
+
+      {cancelarTarget && (
+        <CancelarReservaRecepcionModal
+          reserva={{
+            id: cancelarTarget.id,
+            slot_inicio: cancelarTarget.slot_inicio,
+            recurso_nombre: cancelarTarget.recurso?.nombre ?? 'Estudio'
+          }}
+          miembroNombre={toReservaInfo(cancelarTarget).miembro_nombre}
+          onClose={() => setCancelarTarget(null)}
+          onCancelada={() => void refetch()}
         />
       )}
 
@@ -603,6 +659,12 @@ function ReservaCard({
     capitalizarNombre(reserva.usuario?.nombre) || reserva.usuario?.email || '—';
 
   const tier = reserva.usuario?.membresia_tier;
+  // Ficha de identidad o contrato pendientes: recepción lo ve ANTES de que
+  // llegue y lo resuelve en la puerta, no cuando ya está grabando.
+  const fichaPendiente =
+    reserva.status === 'confirmada' &&
+    reserva.usuario != null &&
+    (reserva.usuario.identidad_completa === false || reserva.usuario.contrato_firmado === false);
   // Disabled solo si está cancelada/no-show y la sesión aún NO empieza. Una ya
   // iniciada se puede abrir para corregir la asistencia ("sí asistió").
   // completada permite abrir el modal (muestra "ya hizo check-in").
@@ -617,6 +679,7 @@ function ReservaCard({
       className={`rec-card ${highlight ? 'rec-card--highlight' : ''}`}
     >
       <div className="rec-card-hora">{hora}</div>
+      <AvatarMiembro nombre={nombreFormat} url={reserva.usuario?.avatar_url} />
 
       <div className="rec-card-info">
         <p className="rec-card-nombre">{nombreFormat}</p>
@@ -624,6 +687,11 @@ function ReservaCard({
           {reserva.recurso?.nombre ?? '—'}
           {tier && ` · ${tier}`}
         </p>
+        {fichaPendiente && (
+          <p className="rec-card-meta" style={{ color: 'var(--ek-warning)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+            <ShieldAlert size={11} aria-hidden="true" /> Ficha o contrato pendiente
+          </p>
+        )}
       </div>
 
       <StatusReservaBadge status={reserva.status} />
@@ -635,12 +703,18 @@ function ManualCheckInModal({
   reserva,
   onClose,
   onDone,
-  onCorregir
+  onCorregir,
+  onNoShow,
+  onCancelar
 }: {
   reserva: ReservaConJoin;
   onClose: () => void;
   onDone: (data: any) => Promise<void>;
   onCorregir?: () => void;
+  /** Dar por ausente una sesión que YA empezó, para liberar el estudio. */
+  onNoShow?: () => void;
+  /** Cancelar por el estudio una reserva que aún no empieza (R7). */
+  onCancelar?: () => void;
 }) {
   const [motivo, setMotivo] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -768,6 +842,37 @@ function ManualCheckInModal({
                 {submitting ? 'Marcando…' : 'Marcar check-in'}
               </button>
             </div>
+
+            {/* La sesión ya empezó y no llegó: darlo por ausente libera el estudio
+                para un walk-in. Antes había que esperar a que terminara la hora
+                (ni no-show ni cancelar eran posibles con el slot en curso). El
+                servidor exige que pase la tolerancia de llegada. */}
+            {onNoShow && reserva.status === 'confirmada' && new Date(reserva.slot_inicio).getTime() <= Date.now() && (
+              <button
+                type="button"
+                onClick={onNoShow}
+                disabled={submitting}
+                className="ek-cta ek-cta--secondary ek-cta--full"
+                style={{ marginTop: '10px', fontSize: '13px', color: 'var(--ek-ink-muted)' }}
+              >
+                <UserX size={14} aria-hidden="true" /> No llegó — liberar el estudio
+              </button>
+            )}
+
+            {/* Cancelar desde la tarjeta (R7): antes había que ir al perfil del
+                miembro. Solo una reserva confirmada que aún no empieza; el RPC la
+                deja como cancelada_admin y le avisa al miembro. */}
+            {onCancelar && reserva.status === 'confirmada' && new Date(reserva.slot_inicio).getTime() > Date.now() && (
+              <button
+                type="button"
+                onClick={onCancelar}
+                disabled={submitting}
+                className="ek-cta ek-cta--secondary ek-cta--full"
+                style={{ marginTop: '10px', fontSize: '13px', color: 'var(--ek-danger)' }}
+              >
+                <CalendarX size={14} aria-hidden="true" /> Cancelar la reserva
+              </button>
+            )}
           </>
         )}
       </div>

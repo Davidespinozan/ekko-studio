@@ -12,7 +12,16 @@ describe('construirPendientes', () => {
     const items = construirPendientes({ ...CERO, cobrosPendientes: 3 });
     expect(items).toHaveLength(1);
     expect(items[0].key).toBe('cobros');
-    expect(items[0].to).toBe('/admin/cobros');
+    // A la lista de QUIÉNES deben, no a /admin/cobros (esa es la conexión con Stripe).
+    expect(items[0].to).toBe('/admin/miembros?status=pendiente_pago');
+  });
+
+  it('cada pendiente lleva a la lista YA filtrada donde se resuelve', () => {
+    const items = construirPendientes({ cobrosPendientes: 1, identidadPendiente: 1, membresiasVencidas: 1, noShows7d: 1 });
+    const destino = Object.fromEntries(items.map((i) => [i.key, i.to]));
+    expect(destino.vencidas).toBe('/admin/miembros?filtro=vencidas');
+    expect(destino.identidad).toBe('/admin/miembros?filtro=identidad');
+    expect(destino.cobros).toBe('/admin/miembros?status=pendiente_pago');
   });
 
   it('ordena por severidad: danger antes que warn antes que neutral', () => {

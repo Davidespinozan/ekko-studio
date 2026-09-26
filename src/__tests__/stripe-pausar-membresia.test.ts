@@ -45,7 +45,7 @@ async function invocar(body: unknown) {
   return res as { statusCode: number; body: string };
 }
 
-const STAFF = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista' };
+const STAFF = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo' };
 
 describe('stripe-pausar-membresia', () => {
   beforeEach(() => {
@@ -61,7 +61,7 @@ describe('stripe-pausar-membresia', () => {
     mockPush.mockResolvedValue({ enviados: 1 });
   });
 
-  it('pausar con suscripción: Stripe pause_collection void → RPC → push', async () => {
+  it('pausar con suscripción: Stripe pause_collection void → RPC; el push lo reparte cron-push (no dos veces)', async () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: STAFF, error: null })
       .mockResolvedValueOnce({ data: { id: 'm1', tenant_id: 't1', stripe_subscription_id: 'sub_1', status: 'activa' }, error: null });
@@ -70,7 +70,8 @@ describe('stripe-pausar-membresia', () => {
     expect(mockSubUpdate).toHaveBeenCalledWith('sub_1', { pause_collection: { behavior: 'void' } }, { stripeAccount: 'acct_1' });
     expect(mockRpc).toHaveBeenCalledWith('staff_pausar_membresia', { p_usuario_id: 'u1', p_pausar: true, p_motivo: 'Viaje' });
     expect(JSON.parse(res.body).stripe_pausado).toBe(true);
-    expect(mockPush).toHaveBeenCalledTimes(1);
+    // La RPC deja el aviso en `notificaciones`; empujarlo también aquí lo duplicaba.
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it('reanudar: pause_collection null', async () => {

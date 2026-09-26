@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
+import { AgregarAlCalendario } from '@member/components/AgregarAlCalendario';
 import { Loader2, RefreshCw, ArrowLeft, UserPlus } from 'lucide-react';
 import QRCodeStyling from 'qr-code-styling';
 import { supabase } from '@shared/lib/supabase';
@@ -7,6 +8,7 @@ import { backendPost } from '@shared/lib/backend';
 import { useTenant } from '@shared/hooks/useTenant';
 import { formatHora } from '@member/logic/reservaLogic';
 import { PagarInvitadosExtra } from '@member/components/PagarInvitadosExtra';
+import { formatFechaEnZona } from '@shared/lib/timezone';
 
 interface IssueResponse {
   qr_payload: string;
@@ -124,6 +126,8 @@ function QRError({ mensaje, onReintentar }: { mensaje: string; onReintentar: () 
 
 export default function MiQR() {
   const { reservaId } = useParams<{ reservaId: string }>();
+  // ?nueva=1 → viene de confirmar la reserva en Reservar.
+  const recienReservada = useSearchParams()[0].get('nueva') === '1';
   const tenant = useTenant();
   const qrContainerRef = useRef<HTMLDivElement>(null);
   const qrInstance = useRef<QRCodeStyling | null>(null);
@@ -224,9 +228,7 @@ export default function MiQR() {
               </h1>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0, color: 'rgba(10, 10, 10, 0.72)', fontSize: '13px', lineHeight: 1.45, fontWeight: 600 }}>
-              {new Date(reserva.slot_inicio).toLocaleDateString('es-MX', {
-                weekday: 'short', day: 'numeric', month: 'short'
-              })}
+              {formatFechaEnZona(reserva.slot_inicio, { weekday: 'short', day: 'numeric', month: 'short' })}
               <br />
               {formatHora(new Date(reserva.slot_inicio))} – {formatHora(new Date(reserva.slot_fin))}
             </div>
@@ -273,6 +275,20 @@ export default function MiQR() {
               )}
             </p>
           </div>
+        )}
+
+        {reserva && reserva.status === 'confirmada' && (
+          <AgregarAlCalendario
+            destacado={recienReservada}
+            reserva={{
+              id: reserva.id,
+              folio: reserva.folio,
+              slot_inicio: reserva.slot_inicio,
+              slot_fin: reserva.slot_fin,
+              invitados_count: reserva.invitados_count,
+              recurso_nombre: reserva.recurso?.nombre ?? 'Estudio'
+            }}
+          />
         )}
 
         {/* Pagar invitados extra de ESTA reserva (Stripe, tarjeta guardada). */}

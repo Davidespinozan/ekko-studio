@@ -65,8 +65,10 @@ describe('debeCancelarPrimero', () => {
     expect(debeCancelarPrimero(original, { recursoId: 'rec-1', inicio: 1500, fin: 2500 })).toBe(true);
   });
 
-  it('solape en DISTINTO recurso → false (el RPC solo valida solape por recurso)', () => {
-    expect(debeCancelarPrimero(original, { recursoId: 'rec-2', inicio: 1500, fin: 2500 })).toBe(false);
+  it('solape en DISTINTO recurso → true: con "un solo set a la vez" la vieja bloquea todos los sets (EKKO_ESTUDIO_EN_USO)', () => {
+    expect(debeCancelarPrimero(original, { recursoId: 'rec-2', inicio: 1500, fin: 2500 })).toBe(true);
+    // Mover de set a la MISMA hora: el caso típico.
+    expect(debeCancelarPrimero(original, { recursoId: 'rec-2', inicio: 1000, fin: 2000 })).toBe(true);
   });
 });
 
@@ -77,10 +79,22 @@ describe('reprogramarReserva · no choca (crear → cancelar)', () => {
     const r = await reprogramarReserva(params());
 
     expect(r.estado).toBe('ok');
-    expect(h.rpc).toHaveBeenCalledTimes(2);
-    expect(h.rpc.mock.calls[0][0]).toBe('reservar_para_miembro_atomic');
-    expect(h.rpc.mock.calls[1][0]).toBe('cancelar_reserva_atomic');
+    expect(h.rpc.mock.calls.map((c) => c[0])).toEqual([
+      'reservar_para_miembro_atomic',
+      'cancelar_reserva_atomic',
+      // …y al final UN aviso de "cambio de horario" en vez del par agendada + cancelada.
+      'staff_avisar_reprogramacion'
+    ]);
     expect(h.rpc.mock.calls[1][1]).toMatchObject({ p_reserva_id: 'res-vieja' });
+    expect(h.rpc.mock.calls[2][1]).toEqual({ p_reserva_vieja: 'res-vieja' });
+  });
+
+  it('si el aviso de cambio de horario falla, la reprogramación SIGUE siendo un éxito', async () => {
+    h.rpc.mockImplementation((fn: string) =>
+      fn === 'staff_avisar_reprogramacion' ? Promise.reject(new Error('red caída')) : Promise.resolve({ error: null })
+    );
+    const r = await reprogramarReserva(params());
+    expect(r.estado).toBe('ok');
   });
 
   it('falla crear → NO toca la vieja, error_crear', async () => {

@@ -2,9 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, UserX, CalendarPlus } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
-import { useToast } from '@shared/hooks/useToast';
-import { activarMembresiaMostrador } from '@shared/lib/checkout';
-import ConfirmDialog from '@admin/components/ConfirmDialog';
 import { EmptyState } from '@shared/components/EmptyState';
 import { NotasMiembro } from '@shared/components/NotasMiembro';
 import { EnviarAvisoModal } from '@shared/components/EnviarAvisoModal';
@@ -21,6 +18,7 @@ import { DesbloquearModal } from '../components/DesbloquearModal';
 import { useAuditLogDeUsuario } from '../hooks/useAuditLogDeUsuario';
 import { PerfilHeader } from '../components/perfil/PerfilHeader';
 import { EstadoCuentaCard } from '../components/perfil/EstadoCuentaCard';
+import { MembresiaCard } from '../components/perfil/MembresiaCard';
 import { DatosOperativosCard } from '../components/perfil/DatosOperativosCard';
 import { AccionesCuenta } from '../components/perfil/AccionesCuenta';
 import { FichaIdentidadCard } from '../components/perfil/FichaIdentidadCard';
@@ -30,19 +28,29 @@ import { nombreMostrado } from '../components/perfil/perfilUtils';
 import type { MiembroPerfil, ReservaPerfil } from '../components/perfil/types';
 import { useMembresiaVigente } from '@shared/hooks/useMembresiaVigente';
 import { PausarMembresiaModal } from '@shared/components/PausarMembresiaModal';
+import { AsignarPlanModal } from '@shared/components/membresia/AsignarPlanModal';
+import { AjustarCreditosModal } from '@shared/components/membresia/AjustarCreditosModal';
+import { CancelarMembresiaModal } from '@shared/components/membresia/CancelarMembresiaModal';
+import type { AccionMembresia } from '@shared/lib/membresiaAcciones';
+import { MaterialReservaModal } from '@shared/components/material/MaterialReservaModal';
 
 /**
  * Perfil de miembro para recepción — hub de gestión (agenda, no-show, notas,
- * activar membresía, reprogramar). Orquesta datos + modales; la UI vive en
- * `components/perfil/`. NO reusa `MiembroDetalle` de admin (acciones peligrosas
+ * membresía, reprogramar). Orquesta datos + modales; la UI vive en
+ * `components/perfil/`.
+ *
+ * La membresía se carga UNA vez aquí (`useMembresiaVigente`) y baja a todas las
+ * tarjetas; tras cualquier acción `recargarTodo` refresca miembro + membresía +
+ * reservas + historial juntos. Antes cada tarjeta consultaba por su cuenta y la
+ * ficha quedaba vieja: recepción creía que la acción había fallado y la repetía. NO reusa `MiembroDetalle` de admin (acciones peligrosas
  * que recepción no debe tener) ni lee campos sensibles (R6).
  */
 export default function PerfilMiembroRecepcion() {
   const { id } = useParams<{ id: string }>();
-  const toast = useToast();
-  const [activando, setActivando] = useState(false);
-  // Saldo de créditos que se perdería si se activa un plan mensual (aviso).
-  const [confirmarPerderCreditos, setConfirmarPerderCreditos] = useState<number | null>(null);
+  // Modal de membresía abierto (asignar/renovar/cambiar · ajustar créditos · baja).
+  const [accionMembresia, setAccionMembresia] = useState<AccionMembresia | null>(null);
+  // Sesión cuyo material se está subiendo/entregando.
+  const [materialDe, setMaterialDe] = useState<ReservaPerfil | null>(null);
   const [miembro, setMiembro] = useState<MiembroPerfil | null>(null);
   const [reservas, setReservas] = useState<ReservaPerfil[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,7 +59,7 @@ export default function PerfilMiembroRecepcion() {
   const [cancelarTarget, setCancelarTarget] = useState<ReservaParaCancelar | null>(null);
   const [reprogramarTarget, setReprogramarTarget] = useState<ReservaOriginal | null>(null);
   const [pausaOpen, setPausaOpen] = useState<null | boolean>(null);
-  const { membresia: membresiaViva, refetch: recargarMembresia } = useMembresiaVigente(id);
+  const { membresia: membresiaViva, isLoading: membresiaCargando, refetch: recargarMembresia } = useMembresiaVigente(id);
   const [editarOpen, setEditarOpen] = useState(false);
   const [fotoOpen, setFotoOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -117,53 +125,16 @@ export default function PerfilMiembroRecepcion() {
     await recargarAudit();
   }, [recargarMiembro, recargarAudit]);
 
-  // Activación en mostrador (D4): recepción confirma el pago y activa vía el RPC
-  // keystone `activar_membresia` (cierra B3).
-  async function activarMembresia() {
-    if (!miembro) return;
-    if (!miembro.membresia_tier) {
-      toast.error('Asigná un plan primero en "Editar datos".');
-      return;
-    }
-    // Aviso: si el miembro tiene créditos y el plan a activar es mensual
-    // (ilimitado), esos créditos se perderían. Que sea consciente.
-    const [{ data: mem }, { data: tierDestino }] = await Promise.all([
-      supabase
-        .from('membresias')
-        .select('creditos_restantes')
-        .eq('usuario_id', miembro.id)
-        .in('status', ['trialing', 'activa', 'past_due'])
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from('tiers')
-        .select('tipo')
-        .eq('slug', miembro.membresia_tier)
-        .maybeSingle()
-    ]);
-    const saldo = mem?.creditos_restantes ?? 0;
-    const destinoMensual = tierDestino?.tipo !== 'creditos' && tierDestino?.tipo !== 'hibrido';
-    if (saldo > 0 && destinoMensual) {
-      setConfirmarPerderCreditos(saldo);
-      return;
-    }
-    await activarConfirmado();
-  }
+  // Tras una acción sobre la MEMBRESÍA cambia todo a la vez: plan y status de la
+  // cuenta, vigencia/créditos, historial de cambios y (baja/cambio) las reservas.
+  const recargarTodo = useCallback(async () => {
+    await Promise.all([recargarMiembro(), recargarMembresia(), recargarAudit(), recargarReservas()]);
+  }, [recargarMiembro, recargarMembresia, recargarAudit, recargarReservas]);
 
-  async function activarConfirmado() {
-    if (!miembro?.membresia_tier) return;
-    setConfirmarPerderCreditos(null);
-    setActivando(true);
-    try {
-      await activarMembresiaMostrador(miembro.id, miembro.membresia_tier);
-      toast.success('Membresía activada.');
-      await recargarPerfil();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'No se pudo activar la membresía.');
-    } finally {
-      setActivando(false);
-    }
+  function abrirAccionMembresia(a: AccionMembresia) {
+    if (a === 'pausar') setPausaOpen(true);
+    else if (a === 'reanudar') setPausaOpen(false);
+    else setAccionMembresia(a);
   }
 
   if (isLoading) {
@@ -203,14 +174,15 @@ export default function PerfilMiembroRecepcion() {
     <div className="rec-main">
       <PerfilHeader miembro={miembro} onFoto={() => setFotoOpen(true)} />
 
+      <MembresiaCard membresia={membresiaViva} cargando={membresiaCargando} onAccion={abrirAccionMembresia} />
+
       <EstadoCuentaCard
         miembro={miembro}
-        activando={activando}
-        onActivar={activarMembresia}
+        enPausa={membresiaViva?.status === 'pausada'}
         onDesbloquear={() => setDesbloquearOpen(true)}
       />
 
-      <DatosOperativosCard miembro={miembro} />
+      <DatosOperativosCard miembro={miembro} membresia={membresiaViva} />
 
       <FichaIdentidadCard
         identidadCompleta={miembro.identidad_completa}
@@ -226,8 +198,6 @@ export default function PerfilMiembroRecepcion() {
           onFicha={() => setFichaOpen(true)}
           onReset={() => setResetOpen(true)}
           onAviso={() => setAvisoOpen(true)}
-          onPausar={membresiaViva ? () => setPausaOpen(membresiaViva.status !== 'pausada') : undefined}
-          pausada={membresiaViva?.status === 'pausada'}
         />
       </div>
 
@@ -237,9 +207,41 @@ export default function PerfilMiembroRecepcion() {
           nombre={miembro.nombre}
           pausar={pausaOpen}
           onClose={() => setPausaOpen(null)}
-          onDone={async () => {
-            await Promise.all([recargarPerfil(), recargarMembresia()]);
-          }}
+          onDone={recargarTodo}
+        />
+      )}
+
+      {(accionMembresia === 'asignar' || accionMembresia === 'renovar' || accionMembresia === 'cambiar') && (
+        <AsignarPlanModal
+          usuarioId={miembro.id}
+          nombre={miembro.nombre}
+          modo={accionMembresia}
+          planActualSlug={membresiaViva?.tier?.slug ?? null}
+          onClose={() => setAccionMembresia(null)}
+          onDone={recargarTodo}
+        />
+      )}
+
+      {accionMembresia === 'ajustar_creditos' && membresiaViva && (
+        <AjustarCreditosModal
+          usuarioId={miembro.id}
+          nombre={miembro.nombre}
+          saldoActual={membresiaViva.creditos_restantes ?? 0}
+          onClose={() => setAccionMembresia(null)}
+          onDone={recargarTodo}
+        />
+      )}
+
+      {accionMembresia === 'dar_de_baja' && membresiaViva && (
+        <CancelarMembresiaModal
+          usuarioId={miembro.id}
+          nombre={miembro.nombre}
+          conSuscripcion={Boolean(membresiaViva.stripe_subscription_id)}
+          enPausa={membresiaViva.status === 'pausada'}
+          periodoFin={membresiaViva.periodo_actual_fin}
+          creditos={membresiaViva.creditos_restantes}
+          onClose={() => setAccionMembresia(null)}
+          onDone={recargarTodo}
         />
       )}
 
@@ -261,7 +263,7 @@ export default function PerfilMiembroRecepcion() {
         </button>
         {miembro.status !== 'activo' && (
           <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
-            El miembro no está activo — activa la cuenta en "Editar datos" para poder reservar.
+            La cuenta no está activa — revisa la tarjeta de Membresía arriba.
           </p>
         )}
 
@@ -302,7 +304,9 @@ export default function PerfilMiembroRecepcion() {
           {historial.length === 0 ? (
             <p className="ek-body-faint">Sin reservas anteriores.</p>
           ) : (
-            historial.slice(0, 15).map((r) => <FilaReserva key={r.id} reserva={r} historico />)
+            historial.slice(0, 15).map((r) => (
+              <FilaReserva key={r.id} reserva={r} historico onMaterial={() => setMaterialDe(r)} />
+            ))
           )}
         </div>
       </div>
@@ -316,6 +320,23 @@ export default function PerfilMiembroRecepcion() {
         <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>HISTORIAL DE CAMBIOS</p>
         <HistorialCambios entries={auditEntries} isLoading={auditLoading} error={auditError} />
       </div>
+
+      {materialDe && (
+        <MaterialReservaModal
+          reserva={{
+            id: materialDe.id,
+            usuario_id: miembro.id,
+            slot_inicio: materialDe.slot_inicio,
+            folio: materialDe.folio ?? null,
+            recurso_nombre: materialDe.recurso?.nombre ?? 'Estudio'
+          }}
+          miembroNombre={nombre}
+          onClose={() => {
+            setMaterialDe(null);
+            void recargarAudit();
+          }}
+        />
+      )}
 
       {crearOpen && (
         <CrearReservaModal
@@ -349,9 +370,7 @@ export default function PerfilMiembroRecepcion() {
             id: miembro.id,
             nombre: miembro.nombre,
             email: miembro.email,
-            telefono: miembro.telefono,
-            status: miembro.status,
-            membresia_tier: miembro.membresia_tier
+            telefono: miembro.telefono
           }}
           onClose={() => setEditarOpen(false)}
           onGuardado={recargarPerfil}
@@ -401,16 +420,6 @@ export default function PerfilMiembroRecepcion() {
         <EnviarAvisoModal miembroId={miembro.id} miembroNombre={nombre} onClose={() => setAvisoOpen(false)} />
       )}
 
-      <ConfirmDialog
-        isOpen={confirmarPerderCreditos !== null}
-        variant="warning"
-        title={`Le quedan ${confirmarPerderCreditos ?? 0} ${confirmarPerderCreditos === 1 ? 'crédito' : 'créditos'}`}
-        description="El plan a activar es mensual (acceso ilimitado), así que su saldo de créditos se perderá. ¿Activar de todos modos?"
-        confirmLabel="Activar igual"
-        cancelLabel="Cancelar"
-        onConfirm={activarConfirmado}
-        onCancel={() => setConfirmarPerderCreditos(null)}
-      />
     </div>
   );
 }

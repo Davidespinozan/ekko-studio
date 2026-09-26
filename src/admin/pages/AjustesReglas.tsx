@@ -11,6 +11,7 @@ type ReglasDraft = {
   cancelacion_min_horas_antes: number;
   precio_invitado_extra: number; // en PESOS (se guarda en centavos)
   permitir_continuas: boolean;
+  sets_exclusivos: boolean;
   no_show_bloqueo_dias: number;
   no_show_umbral: number;
 };
@@ -22,6 +23,7 @@ const DEFAULT: ReglasDraft = {
   cancelacion_min_horas_antes: 24,
   precio_invitado_extra: 0,
   permitir_continuas: false,
+  sets_exclusivos: false,
   no_show_bloqueo_dias: 7,
   no_show_umbral: 3
 };
@@ -42,6 +44,7 @@ function readDraft(config: Record<string, unknown> | null): ReglasDraft {
     cancelacion_min_horas_antes: num(reserva.cancelacion_min_horas_antes, DEFAULT.cancelacion_min_horas_antes),
     precio_invitado_extra: num(reserva.precio_invitado_extra_centavos, 0) / 100,
     permitir_continuas: Boolean(reserva.permitir_continuas ?? DEFAULT.permitir_continuas),
+    sets_exclusivos: Boolean(reserva.sets_exclusivos ?? DEFAULT.sets_exclusivos),
     no_show_bloqueo_dias: num(penalizaciones.no_show_bloqueo_dias, DEFAULT.no_show_bloqueo_dias),
     no_show_umbral: Math.max(1, num(penalizaciones.no_show_umbral, DEFAULT.no_show_umbral))
   };
@@ -140,7 +143,8 @@ export default function AjustesReglas() {
         max_sesiones_por_dia: draft.max_sesiones_por_dia,
         cancelacion_min_horas_antes: draft.cancelacion_min_horas_antes,
         precio_invitado_extra_centavos: Math.round(draft.precio_invitado_extra * 100),
-        permitir_continuas: draft.permitir_continuas
+        permitir_continuas: draft.permitir_continuas,
+        sets_exclusivos: draft.sets_exclusivos
       },
       penalizaciones: {
         ...penalizaciones,
@@ -259,6 +263,15 @@ export default function AjustesReglas() {
             onChange={(v) => setDraft({ ...draft, permitir_continuas: v })}
             label="Permitir reservas continuas"
             description="Si está activado, los miembros pueden reservar dos sesiones seguidas. Si está desactivado, debe haber al menos un slot entre reservas del mismo miembro."
+          />
+        </div>
+
+        <div style={{ marginTop: '14px' }}>
+          <Toggle
+            checked={draft.sets_exclusivos}
+            onChange={(v) => setDraft({ ...draft, sets_exclusivos: v })}
+            label="Un solo set a la vez"
+            description="Cuando alguien reserva un set, ese mismo horario queda bloqueado en TODOS los demás sets: nunca hay dos grabaciones simultáneas (evita que el sonido de un set se cuele en otro). Aplica a la app, a recepción y al panel. Las reservas que ya existían no se tocan."
           />
         </div>
       </Section>

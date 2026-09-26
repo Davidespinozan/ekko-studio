@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { avisarCambiarPassword } from '../_lib/acceso';
+import { esAdminActivo } from '../_lib/staff';
 
 /**
  * POST /admin-create-user
@@ -63,11 +64,11 @@ export const handler: Handler = async (event) => {
     // Verificar que es admin del tenant
     const { data: adminProfile } = await supabaseAsUser
       .from('usuarios')
-      .select('id, tenant_id, rol')
+      .select('id, tenant_id, rol, status')
       .eq('auth_id', authUser.id)
       .maybeSingle();
 
-    if (!adminProfile || adminProfile.rol !== 'admin') {
+    if (!esAdminActivo(adminProfile)) {
       return forbidden('Solo admin puede crear usuarios');
     }
 
@@ -117,16 +118,20 @@ export const handler: Handler = async (event) => {
       .select('id')
       .maybeSingle();
 
-    if (updateErr) {
-      // Best-effort: limpiar el auth user creado
+    // Sin fila final NO hay éxito: si el trigger de alta no insertó ni vinculó
+    // (correo ambiguo), quedaba una cuenta de Auth sin perfil y esta función
+    // respondía 200. Se limpia el auth user y se avisa (Fase 1 identidad).
+    if (updateErr || !nuevoUsuario?.id) {
       await supabaseAdmin.auth.admin.deleteUser(newAuthUser.user.id);
-      return serverError(`No se pudo asignar el rol: ${updateErr.message}`);
+      return serverError(
+        updateErr
+          ? `No se pudo asignar el rol: ${updateErr.message}`
+          : 'La cuenta de acceso se creó pero no quedó vinculada a ningún perfil; se revirtió. Revisa si ya existe alguien con ese correo.'
+      );
     }
 
     // La clave la puso el admin → la persona (miembro o staff) debe cambiarla al entrar.
-    if (nuevoUsuario?.id) {
-      await avisarCambiarPassword(supabaseAdmin, { tenant_id: tenantId, usuario_id: nuevoUsuario.id, origen: 'alta' });
-    }
+    await avisarCambiarPassword(supabaseAdmin, { tenant_id: tenantId, usuario_id: nuevoUsuario.id, origen: 'alta' });
 
     return ok({
       success: true,

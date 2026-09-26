@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Users, ArrowRight, Download } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Users, ArrowRight, Download, X } from 'lucide-react';
 import { useMiembros, useMembresiasVigentesPorUsuario, type MembresiaResumen } from '../hooks/useAdminData';
 import { estadoMembresia, ESTADO_MEMBRESIA_LABEL, esPaqueteDeCreditos } from '@shared/lib/membresiaEstado';
 import { formatFechaEnZona } from '@shared/lib/timezone';
@@ -10,13 +10,37 @@ import { Spinner } from '@shared/components/Spinner';
 import { EmptyState } from '@shared/components/EmptyState';
 
 export default function Miembros() {
+  // La lista se puede abrir ya filtrada (?status=… / ?filtro=vencidas|identidad): así
+  // el centro de pendientes del dashboard lleva a QUIÉNES son, no a una lista general.
+  const [params, setParams] = useSearchParams();
+  const filtro = params.get('filtro');
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<string>('');
+  const [status, setStatus] = useState<string>(params.get('status') ?? '');
   const [showNuevo, setShowNuevo] = useState(false);
   // Fijamos rol='miembro' para excluir staff (admins, recepcionistas).
   // El equipo se gestiona desde /admin/equipo (Sprint Equipo).
-  const { miembros, isLoading, refetch } = useMiembros({ search, status, rol: 'miembro' });
+  const { miembros: todos, isLoading, refetch } = useMiembros({ search, status, rol: 'miembro' });
   const { porUsuario } = useMembresiasVigentesPorUsuario();
+
+  const FILTROS: Record<string, { texto: string; pasa: (m: (typeof todos)[number]) => boolean }> = {
+    vencidas: {
+      texto: 'Membresía vencida',
+      pasa: (m) => estadoMembresia(porUsuario.get(m.id) ?? null) === 'vencida'
+    },
+    identidad: {
+      texto: 'Identidad por capturar',
+      pasa: (m) => m.status === 'activo' && !(m.identidad_completa && m.contrato_firmado)
+    }
+  };
+  const filtroActivo = filtro ? FILTROS[filtro] : undefined;
+  const miembros = filtroActivo ? todos.filter(filtroActivo.pasa) : todos;
+  const hayFiltros = Boolean(search || status || filtroActivo);
+
+  function limpiarFiltros() {
+    setSearch('');
+    setStatus('');
+    setParams({}, { replace: true });
+  }
 
   const vigentes = miembros.filter((m) => {
     const e = estadoMembresia(porUsuario.get(m.id) ?? null);
@@ -98,17 +122,41 @@ export default function Miembros() {
           <option value="suspendido">Suspendido</option>
           <option value="cancelado">Cancelado</option>
         </select>
+        {filtroActivo && (
+          <button
+            type="button"
+            className="ek-badge ek-badge--outline"
+            onClick={() => setParams({}, { replace: true })}
+            aria-label={`Quitar filtro: ${filtroActivo.texto}`}
+            style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+          >
+            {filtroActivo.texto} <X size={12} aria-hidden="true" />
+          </button>
+        )}
       </div>
 
       {isLoading ? (
         <Spinner label="Cargando…" />
       ) : miembros.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="Sin resultados."
-          hint="No hay miembros que coincidan con tu búsqueda."
-          tone="neutral"
-        />
+        hayFiltros ? (
+          <EmptyState
+            icon={Users}
+            title="Sin resultados"
+            hint="Ningún miembro coincide con la búsqueda o los filtros."
+            tone="neutral"
+            action={<button type="button" className="ek-cta ek-cta--secondary" onClick={limpiarFiltros}>Limpiar filtros</button>}
+          />
+        ) : (
+          // Base vacía ≠ búsqueda sin resultados: un estudio nuevo leía "no hay
+          // miembros que coincidan con tu búsqueda" sin haber buscado nada.
+          <EmptyState
+            icon={Users}
+            title="Todavía no hay miembros"
+            hint="Se registran solos desde la app, o los das de alta tú."
+            tone="neutral"
+            action={<button type="button" className="ek-cta ek-cta--gold" onClick={() => setShowNuevo(true)}>+ Nuevo miembro</button>}
+          />
+        )
       ) : (
         <>
         {/* Móvil: tarjetas apiladas (la tabla no entra en pantallas chicas). */}

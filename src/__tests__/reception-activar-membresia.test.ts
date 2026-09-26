@@ -41,8 +41,8 @@ async function invocar(event: AnyEvent) {
   return (await handler(event, {} as never, () => {})) as { statusCode: number; body: string };
 }
 
-const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista' };
-const TARGET = { id: 'm1', tenant_id: 't1', status: 'pendiente_pago', membresia_tier: 'pro' };
+const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo' };
+const TARGET = { id: 'm1', tenant_id: 't1', rol: 'miembro', status: 'pendiente_pago', membresia_tier: 'pro' };
 const TIER = { id: 'tier1', slug: 'pro' };
 
 describe('reception-activar-membresia (Pagos)', () => {
@@ -64,10 +64,43 @@ describe('reception-activar-membresia (Pagos)', () => {
 
     const res = await invocar(evento({ usuario_id: 'm1', tier: 'pro' }));
     expect(res.statusCode).toBe(200);
-    expect(mockRpc).toHaveBeenCalledWith('activar_membresia', { p_usuario_id: 'm1', p_tier_id: 'tier1' });
+    // Sin `confirmar_perdida: true` explícito, el servidor NO autoriza perder créditos.
+    expect(mockRpc).toHaveBeenCalledWith('activar_membresia', {
+      p_usuario_id: 'm1',
+      p_tier_id: 'tier1',
+      p_confirmar_perdida: false
+    });
     const audit = mockAuditInsert.mock.calls[0][0] as Record<string, unknown>;
     expect(audit.accion).toBe('membership_activated');
     expect(audit.target_id).toBe('m1');
+  });
+
+  it('el RPC rechaza por pérdida de créditos → 409 con el saldo en juego, sin auditar nada', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: CALLER, error: null }).mockResolvedValueOnce({ data: TARGET, error: null });
+    mockTierMaybe.mockResolvedValue({ data: TIER, error: null });
+    mockRpc.mockResolvedValueOnce({
+      data: null,
+      error: { message: 'EKKO_PERDERIA_CREDITOS: El miembro perdería 8 crédito(s) al cambiar a este plan' }
+    });
+
+    const res = await invocar(evento({ usuario_id: 'm1', tier: 'pro' }));
+
+    expect(res.statusCode).toBe(409);
+    expect(JSON.parse(res.body)).toMatchObject({ code: 'perderia_creditos', creditos: 8 });
+    expect(mockAuditInsert).not.toHaveBeenCalled();
+  });
+
+  it('con confirmar_perdida:true el servidor autoriza y lo deja en la bitácora', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: CALLER, error: null }).mockResolvedValueOnce({ data: TARGET, error: null });
+    mockTierMaybe.mockResolvedValue({ data: TIER, error: null });
+
+    const res = await invocar(evento({ usuario_id: 'm1', tier: 'pro', confirmar_perdida: true, motivo: 'Pidió pasar a mensual' }));
+
+    expect(res.statusCode).toBe(200);
+    expect(mockRpc).toHaveBeenCalledWith('activar_membresia', expect.objectContaining({ p_confirmar_perdida: true }));
+    const audit = mockAuditInsert.mock.calls[0][0] as Record<string, unknown>;
+    expect(audit.motivo).toBe('Pidió pasar a mensual');
+    expect(audit.metadata).toMatchObject({ perdida_de_creditos_confirmada: true });
   });
 
   it('sin tier → 400', async () => {

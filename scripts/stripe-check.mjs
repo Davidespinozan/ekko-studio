@@ -14,6 +14,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import Stripe from 'stripe';
+import { EVENTOS_WEBHOOK } from './stripe-eventos.mjs';
 
 // La cuenta de Stripe está COMPARTIDA con SALA/HSC: se filtra por host y por
 // metadata.app para no reportar falsos errores sobre endpoints ajenos.
@@ -21,15 +22,7 @@ const HOST = process.env.HOST || 'ekkostudio.app';
 const URL_WEBHOOK = `https://${HOST}/.netlify/functions/stripe-webhook`;
 
 // = case '...' de netlify/functions/_lib/stripe.ts → clasificarEvento
-const EVENTOS = [
-  'account.updated',
-  'checkout.session.completed',
-  'customer.subscription.updated',
-  'customer.subscription.deleted',
-  'invoice.paid',
-  'invoice.payment_failed',
-  'payment_intent.succeeded'
-];
+const EVENTOS = EVENTOS_WEBHOOK;
 
 const ok = (s) => `  ✔ ${s}`;
 const falta = (s) => `  ✖ ${s}`;

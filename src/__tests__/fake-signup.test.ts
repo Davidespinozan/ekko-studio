@@ -109,4 +109,12 @@ describe('fake-signup · SEC-FIX C1', () => {
     const res = await invocar(evento({ ...BODY_OK, tier: { hack: true } }));
     expect(res.statusCode).toBe(400);
   });
+
+  it('normaliza el correo en el servidor (trim + minúsculas) y recorta el nombre', async () => {
+    await invocar(evento({ nombre: '  Ana Núñez ', email: '  Ana.Nunez@EKKO.mx ', password: 'secreta123', tier: 'pro' }));
+    expect(mockCreateUser).toHaveBeenCalledTimes(1);
+    const arg = mockCreateUser.mock.calls[0][0] as { email: string; user_metadata: { nombre: string } };
+    expect(arg.email).toBe('ana.nunez@ekko.mx');
+    expect(arg.user_metadata.nombre).toBe('Ana Núñez');
+  });
 });

@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { createHash } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireEnv } from './env';
 
@@ -75,6 +76,13 @@ export type EventoClasificado =
       tier_id: string;
       subscription_id: string | null; // null en paquetes (pago único, sin suscripción)
       customer_id: string;
+      /**
+       * Id del PaymentIntent del pago único (null en suscripciones, que ya son
+       * idempotentes por subscription_id). En Checkout, la sesión y su PI llevan
+       * el mismo metadata y AMBOS eventos activan: sin esta llave el paquete se
+       * acreditaba dos veces.
+       */
+      referencia: string | null;
       event_at: string;
     }
   | {
@@ -160,7 +168,12 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
       if (!usuario_id || !tier_id || !customer_id) {
         return { kind: 'ignore', reason: 'faltan_datos_en_session' };
       }
-      return { kind: 'activar', usuario_id, tier_id, subscription_id, customer_id, event_at };
+      const pi = typeof s.payment_intent === 'string' ? s.payment_intent : s.payment_intent?.id ?? null;
+      return {
+        kind: 'activar', usuario_id, tier_id, subscription_id, customer_id,
+        referencia: s.mode === 'payment' ? pi : null,
+        event_at
+      };
     }
 
     case 'customer.subscription.updated':
@@ -235,7 +248,7 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
       if (!usuario_id || !tier_id || !customer_id) {
         return { kind: 'ignore', reason: 'payment_intent_sin_metadata' };
       }
-      return { kind: 'activar', usuario_id, tier_id, subscription_id: null, customer_id, event_at };
+      return { kind: 'activar', usuario_id, tier_id, subscription_id: null, customer_id, referencia: pi.id, event_at };
     }
 
     case 'charge.refunded': {
@@ -414,4 +427,26 @@ export async function getOrCreateCustomer(
     { idempotencyKey: `ekko_customer_${usuario.id}` }
   );
   return customer.id;
+}
+
+/**
+ * Idempotency key de `prices.create` para el precio recurrente de un plan.
+ *
+ * Stripe exige que una misma key se use SIEMPRE con los mismos parámetros: si el
+ * admin editaba el precio o el nombre del plan, la key vieja (que solo llevaba
+ * el id del plan) chocaba con los parámetros nuevos → 400 durante 24 h → nadie
+ * podía suscribirse a ese plan. La key ahora es un hash de TODO lo que se manda.
+ */
+export function llavePrecio(p: {
+  tierId: string;
+  accountId: string;
+  centavos: number;
+  currency: string;
+  nombre: string;
+}): string {
+  const huella = createHash('sha256')
+    .update(JSON.stringify([p.tierId, p.accountId, p.centavos, p.currency.toLowerCase(), p.nombre]))
+    .digest('hex')
+    .slice(0, 40);
+  return `ekko_price_${huella}`;
 }

@@ -267,75 +267,29 @@ export async function revokeTeamMember(
 export interface CancelarReservaParams {
   reservaId: string;
   motivo: string;
-  canceladoPorId: string;
-  notificarMiembro: boolean;
 }
 
+/**
+ * Cancela una reserva como ESTUDIO, por la RPC `cancelar_reserva_atomic` — la misma
+ * que usa recepción. Antes era un UPDATE directo desde el navegador: sin validar
+ * que siguiera `confirmada` (desde el dashboard se podía "cancelar" una sesión ya
+ * completada o un no-show y corromper la asistencia), sin rastro de quién fue, y
+ * con la fecha del aviso en la zona del navegador del admin.
+ * La RPC valida estado y tenant, avisa al miembro (app + push + correo) con la hora
+ * del estudio, devuelve el crédito, y el trigger de auditoría deja quién y por qué.
+ */
 export async function cancelarReserva(
   params: CancelarReservaParams
 ): Promise<{ error: string | null }> {
-  const { reservaId, motivo, canceladoPorId, notificarMiembro } = params;
-
-  const { data: reserva, error: fetchError } = await supabase
-    .from('reservas')
-    .select(
-      'id, tenant_id, slot_inicio, usuario_id, usuario:usuarios!reservas_usuario_id_fkey(id, nombre), recurso:recursos(nombre)'
-    )
-    .eq('id', reservaId)
-    .single();
-
-  if (fetchError || !reserva) {
-    return { error: 'Reserva no encontrada.' };
-  }
-
-  const { error: cancelError } = await supabase
-    .from('reservas')
-    .update({
-      status: 'cancelada_admin',
-      cancelada_at: new Date().toISOString(),
-      cancelada_motivo: motivo,
-      cancelada_por: canceladoPorId
-    } as never)
-    .eq('id', reservaId);
-
-  if (cancelError) {
-    return { error: cancelError.message };
-  }
-
-  if (notificarMiembro) {
-    const fecha = new Date(reserva.slot_inicio).toLocaleString('es-MX', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    const recursoNombre = (reserva as unknown as { recurso?: { nombre?: string } | null })
-      ?.recurso?.nombre ?? 'el estudio';
-
-    const usuarioId = (reserva as unknown as { usuario?: { id?: string } }).usuario?.id
-      ?? reserva.usuario_id;
-
-    await supabase.from('notificaciones').insert({
-      tenant_id: reserva.tenant_id,
-      usuario_id: usuarioId,
-      tipo: 'reserva_cancelada',
-      titulo: 'Tu reserva fue cancelada',
-      mensaje: `Tu reserva en ${recursoNombre} del ${fecha} fue cancelada por el estudio. Motivo: ${motivo}`,
-      metadata: {
-        reserva_id: reservaId,
-        recurso_nombre: recursoNombre,
-        fecha_original: reserva.slot_inicio,
-        motivo
-      }
-    });
-
-    await supabase
-      .from('reservas')
-      .update({ cancelacion_notificada_at: new Date().toISOString() } as never)
-      .eq('id', reservaId);
-  }
-
-  return { error: null };
+  const { error } = await supabase.rpc('cancelar_reserva_atomic', {
+    p_reserva_id: params.reservaId,
+    p_motivo: params.motivo
+  });
+  if (!error) return { error: null };
+  const m = error.message;
+  if (m.includes('EKKO_RESERVA_NO_CANCELABLE')) return { error: 'Esta reserva ya no está confirmada (se completó, se canceló o quedó como falta). Recarga la página.' };
+  if (m.includes('EKKO_RESERVA_PASADA')) return { error: 'La sesión ya empezó o ya pasó: no se cancela. Si no llegó, márcala como falta desde Recepción → Hoy.' };
+  if (m.includes('EKKO_RESERVA_NO_EXISTE')) return { error: 'Reserva no encontrada.' };
+  if (m.includes('EKKO_NO_AUTORIZADO') || m.includes('EKKO_TENANT_DIFERENTE')) return { error: 'No tienes permiso para cancelar esta reserva.' };
+  return { error: m.includes(': ') ? m.split(': ').slice(1).join(': ') : m };
 }

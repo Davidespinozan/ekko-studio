@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Download, X, Share } from 'lucide-react';
 
 /**
@@ -7,10 +8,72 @@ import { Download, X, Share } from 'lucide-react';
  *   - iOS Safari: no dispara ese evento → mostramos instrucciones manuales
  *     (Compartir → "Agregar a inicio").
  * No aparece si ya está instalada (display-mode standalone) o si el usuario lo
- * descartó antes (localStorage). Banner inferior, dismissible.
+ * descartó hace poco (localStorage). Banner inferior, dismissible.
+ *
+ * Es una INVITACIÓN, no puede estorbar. Antes se montaba global con z-index 250
+ * (por encima de los modales, z 100) y pegado al borde inferior: en la primera
+ * visita desde el teléfono tapaba "Confirmar" del sheet de reserva, la barra de
+ * navegación y el modal de pago; salía en login, en el checkout y hasta en
+ * /admin desde Chrome de escritorio; y un descarte era para siempre. Ahora:
+ *   · solo en la landing y en el inicio del miembro (`debeMostrarse`);
+ *   · solo en pantallas de teléfono/tablet;
+ *   · tras unos segundos, no encima de la primera impresión;
+ *   · por DEBAJO de cualquier modal y por encima de la barra de navegación;
+ *   · si se descarta, vuelve a invitar a los 90 días.
  */
 
 const DISMISS_KEY = 'ekko:pwa-install-dismissed';
+const REAPARECE_TRAS_MS = 90 * 24 * 60 * 60 * 1000;
+const RETRASO_MS = 4000;
+const ANCHO_MAX_MOVIL = 900;
+
+/** Rutas donde invitar tiene sentido: la landing y el inicio del miembro. */
+export function rutaAdmiteBanner(pathname: string): boolean {
+  return pathname === '/' || pathname === '/app' || pathname === '/app/';
+}
+
+/**
+ * ¿Se muestra? Pura, para poder probarla. `descartadoEn` es lo guardado en
+ * localStorage: un timestamp, o el '1' del formato viejo (descarte sin fecha:
+ * se respeta una vez y se migra a fecha).
+ */
+export function debeMostrarse(o: {
+  pathname: string;
+  anchoPantalla: number;
+  instalada: boolean;
+  descartadoEn: string | null;
+  ahora?: number;
+}): boolean {
+  if (o.instalada) return false;
+  if (!rutaAdmiteBanner(o.pathname)) return false;
+  if (o.anchoPantalla > ANCHO_MAX_MOVIL) return false;
+  if (o.descartadoEn) {
+    const t = Number(o.descartadoEn);
+    const cuando = Number.isFinite(t) && t > 1_000_000_000_000 ? t : null;
+    if (cuando === null) return false; // formato viejo: se respeta
+    if ((o.ahora ?? Date.now()) - cuando < REAPARECE_TRAS_MS) return false;
+  }
+  return true;
+}
+
+function leerDescarte(): string | null {
+  try {
+    const v = localStorage.getItem(DISMISS_KEY);
+    // Formato viejo ('1', sin fecha): cuenta desde hoy para que algún día vuelva.
+    if (v === '1') localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    return v;
+  } catch {
+    return null; // localStorage bloqueado (modo privado)
+  }
+}
+
+function guardarDescarte(): void {
+  try {
+    localStorage.setItem(DISMISS_KEY, String(Date.now()));
+  } catch {
+    /* noop */
+  }
+}
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -34,19 +97,20 @@ export default function PwaInstallBanner() {
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
   const [iosHelp, setIosHelp] = useState(false);
+  // `listo` = pasó el retraso inicial; `disponible` = hay forma de instalar.
+  const [listo, setListo] = useState(false);
+  const [descartado, setDescartado] = useState(false);
+  const { pathname } = useLocation();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (yaInstalada()) return;
-    try {
-      if (localStorage.getItem(DISMISS_KEY)) return;
-    } catch {
-      // localStorage bloqueado (modo privado) → seguimos, sin recordar el dismiss.
-    }
+
+    const t = window.setTimeout(() => setListo(true), RETRASO_MS);
 
     if (esIOS()) {
       setVisible(true); // iOS: instrucciones manuales, sin beforeinstallprompt
-      return;
+      return () => window.clearTimeout(t);
     }
 
     const onPrompt = (e: Event) => {
@@ -56,11 +120,12 @@ export default function PwaInstallBanner() {
     };
     const onInstalled = () => {
       setVisible(false);
-      try { localStorage.setItem(DISMISS_KEY, '1'); } catch { /* noop */ }
+      guardarDescarte();
     };
     window.addEventListener('beforeinstallprompt', onPrompt);
     window.addEventListener('appinstalled', onInstalled);
     return () => {
+      window.clearTimeout(t);
       window.removeEventListener('beforeinstallprompt', onPrompt);
       window.removeEventListener('appinstalled', onInstalled);
     };
@@ -68,7 +133,8 @@ export default function PwaInstallBanner() {
 
   function descartar() {
     setVisible(false);
-    try { localStorage.setItem(DISMISS_KEY, '1'); } catch { /* noop */ }
+    setDescartado(true);
+    guardarDescarte();
   }
 
   async function instalar() {
@@ -82,7 +148,19 @@ export default function PwaInstallBanner() {
     descartar();
   }
 
-  if (!visible) return null;
+  if (!visible || !listo || descartado) return null;
+  if (
+    !debeMostrarse({
+      pathname,
+      anchoPantalla: window.innerWidth,
+      instalada: yaInstalada(),
+      descartadoEn: leerDescarte()
+    })
+  ) {
+    return null;
+  }
+  // En la app del miembro hay una barra de navegación flotante abajo.
+  const sobreLaNav = pathname.startsWith('/app');
 
   return (
     <div
@@ -92,8 +170,10 @@ export default function PwaInstallBanner() {
         position: 'fixed',
         left: '12px',
         right: '12px',
-        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
-        zIndex: 250,
+        bottom: `calc(env(safe-area-inset-bottom, 0px) + ${sobreLaNav ? 96 : 12}px)`,
+        // Por debajo de los modales (.ek-backdrop / .ek-modal-backdrop = 100):
+        // nunca tapa un "Confirmar" ni un formulario de pago.
+        zIndex: 60,
         maxWidth: '460px',
         margin: '0 auto',
         background: 'var(--ek-bg-elevated)',
@@ -109,7 +189,7 @@ export default function PwaInstallBanner() {
         </span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: 0, fontWeight: 700, fontSize: '14px', fontFamily: 'var(--ek-font-display)', letterSpacing: '-0.01em' }}>
-            Instalá EKKO en tu teléfono
+            Instala EKKO en tu teléfono
           </p>
           <p className="ek-body-muted" style={{ margin: '3px 0 0', fontSize: '12.5px', lineHeight: 1.4 }}>
             Acceso directo desde tu pantalla de inicio. Funciona como app nativa.

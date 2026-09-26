@@ -13,7 +13,10 @@ type Recurso = Database['public']['Tables']['recursos']['Row'];
 
 export interface ReservaConJoin extends Reserva {
   recurso: Pick<Recurso, 'id' | 'slug' | 'nombre'> | null;
-  usuario: Pick<Usuario, 'id' | 'nombre' | 'email' | 'membresia_tier'> | null;
+  usuario: Pick<
+    Usuario,
+    'id' | 'nombre' | 'email' | 'membresia_tier' | 'telefono' | 'avatar_url' | 'identidad_completa' | 'contrato_firmado'
+  > | null;
 }
 
 /**
@@ -42,7 +45,7 @@ export function useReservasHoy(fechaISO?: string, pollingEnabled = true) {
 
     const { data, error } = await supabase
       .from('reservas')
-      .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)')
+      .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier, telefono, avatar_url, identidad_completa, contrato_firmado)')
       .eq('tenant_id', tenant.id)
       .gte('slot_inicio', inicio.toISOString())
       .lt('slot_inicio', fin.toISOString())

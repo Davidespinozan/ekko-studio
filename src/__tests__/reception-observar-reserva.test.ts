@@ -55,7 +55,7 @@ describe('reception-observar-reserva', () => {
   });
 
   it('reserva de otro tenant → 403', async () => {
-    mockCallerMaybe.mockResolvedValue({ data: { id: 'u1', tenant_id: 't1', rol: 'recepcionista' }, error: null });
+    mockCallerMaybe.mockResolvedValue({ data: { id: 'u1', tenant_id: 't1', rol: 'recepcionista', status: 'activo' }, error: null });
     mockReservaMaybe.mockResolvedValue({ data: { id: 'r1', tenant_id: 't2', usuario_id: 'm1', observaciones: null }, error: null });
     const res = await invocar({ reserva_id: 'r1', observaciones: 'x' });
     expect(res.statusCode).toBe(403);
@@ -63,7 +63,7 @@ describe('reception-observar-reserva', () => {
   });
 
   it('staff mismo tenant → guarda y audita', async () => {
-    mockCallerMaybe.mockResolvedValue({ data: { id: 'u1', tenant_id: 't1', rol: 'recepcionista' }, error: null });
+    mockCallerMaybe.mockResolvedValue({ data: { id: 'u1', tenant_id: 't1', rol: 'recepcionista', status: 'activo' }, error: null });
     mockReservaMaybe.mockResolvedValue({ data: { id: 'r1', tenant_id: 't1', usuario_id: 'm1', observaciones: null }, error: null });
     const res = await invocar({ reserva_id: 'r1', observaciones: '  Mal uso de equipo  ' });
     expect(res.statusCode).toBe(200);

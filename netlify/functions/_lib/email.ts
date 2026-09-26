@@ -35,6 +35,10 @@ export async function enviarEmail(payload: EmailPayload): Promise<EnvioResultado
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
+      // El correo es best-effort y se manda DENTRO del webhook de Stripe: un
+      // Resend colgado no puede comerse el tiempo de la function (si muere a
+      // medias, el reintento de Stripe choca con la idempotencia y se pierde).
+      signal: AbortSignal.timeout(5000),
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         from,
@@ -148,5 +152,92 @@ export function emailRecibo(opts: {
   return {
     subject: `Recibo de tu membresía — ${pesos(opts.montoCentavos, opts.moneda)}`,
     html: layout({ estudio: opts.estudio, preheader: 'Recibimos el pago de tu membresía.', cuerpo })
+  };
+}
+
+/**
+ * Confirmación de la compra de un PAQUETE de créditos (pago único). Antes no
+ * salía ningún correo: los de arriba solo se mandan en `invoice.paid`, y un
+ * paquete llega como `payment_intent.succeeded`. Dice lo que el miembro necesita
+ * saber y no ve en ningún otro lado: cuántos créditos tiene y hasta cuándo valen.
+ */
+export function emailPaqueteComprado(opts: {
+  estudio: string;
+  nombre: string | null;
+  montoCentavos: number;
+  moneda: string;
+  creditos: number | null;
+  /** ISO; null = los créditos no caducan. */
+  venceEl: string | null;
+  zona?: string;
+}): { subject: string; html: string } {
+  const hola = opts.nombre ? `Hola ${opts.nombre.split(' ')[0]},` : 'Hola,';
+  const url = `${APP_URL}/app/reservar`;
+  const saldo =
+    opts.creditos === null
+      ? ''
+      : `<p style="margin:0 0 14px;">Tu saldo es de <strong>${opts.creditos} crédito${opts.creditos === 1 ? '' : 's'}</strong>.</p>`;
+  const vigencia = opts.venceEl
+    ? `<p style="margin:0 0 14px;">Úsalos antes del <strong>${new Date(opts.venceEl).toLocaleDateString('es-MX', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        timeZone: opts.zona ?? 'America/Mazatlan'
+      })}</strong>: ese día vencen los que no hayas usado.</p>`
+    : `<p style="margin:0 0 14px;">Tus créditos no caducan.</p>`;
+  const cuerpo = `
+    <p style="margin:0 0 14px;">${hola}</p>
+    <p style="margin:0 0 14px;">Recibimos tu pago de <strong>${pesos(opts.montoCentavos, opts.moneda)}</strong> en <strong>${opts.estudio}</strong>. ¡Gracias!</p>
+    ${saldo}
+    ${vigencia}
+    <p style="margin:0 0 22px;">${boton(url, 'Reservar una sesión')}</p>`;
+  return {
+    subject: `Tu paquete en ${opts.estudio} está listo`,
+    html: layout({ estudio: opts.estudio, preheader: 'Recibimos tu pago. Tus créditos ya están disponibles.', cuerpo })
+  };
+}
+
+/**
+ * ¿Está configurado el envío? (`cron-email` NO marca nada como enviado mientras
+ * no lo esté: el día que se carguen las env, sale lo reciente en vez de perderse.)
+ */
+export function emailConfigurado(): boolean {
+  return Boolean(optionalEnv('RESEND_API_KEY') && optionalEnv('EKKO_EMAIL_FROM'));
+}
+
+function escaparHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Correo genérico de un aviso de la app (`notificaciones`): mismo título y mensaje
+ * que ve el miembro en la campana, con un botón a la pantalla que corresponde. Lo
+ * usa `cron-email` para que TODO aviso relevante llegue por los dos canales sin
+ * escribir una plantilla por tipo.
+ */
+export function emailAviso(opts: {
+  estudio: string;
+  nombre: string | null;
+  titulo: string;
+  mensaje: string;
+  /** Ruta de la app ('/app/qr/…') o URL absoluta. */
+  url?: string | null;
+  botonTexto?: string;
+  /** Texto extra bajo el botón (p. ej. dirección del estudio). */
+  pie?: string | null;
+}): { subject: string; html: string } {
+  const hola = opts.nombre ? `Hola ${escaparHtml(opts.nombre.split(' ')[0])},` : 'Hola,';
+  const href = opts.url ? (opts.url.startsWith('http') ? opts.url : `${APP_URL}${opts.url}`) : null;
+  const cuerpo = `
+    <p style="margin:0 0 14px;">${hola}</p>
+    <p style="margin:0 0 8px;font-size:17px;font-weight:700;">${escaparHtml(opts.titulo)}</p>
+    <p style="margin:0 0 22px;">${escaparHtml(opts.mensaje)}</p>
+    ${href ? `<p style="margin:0 0 22px;">${boton(href, opts.botonTexto ?? 'Abrir en la app')}</p>` : ''}
+    ${opts.pie ? `<p style="margin:0;color:#666;font-size:13px;">${escaparHtml(opts.pie)}</p>` : ''}`;
+  return {
+    subject: `${opts.titulo} · ${opts.estudio}`,
+    // El preheader también es HTML: se escapa igual que el cuerpo (el mensaje puede
+    // llevar un motivo escrito a mano por el staff).
+    html: layout({ estudio: escaparHtml(opts.estudio), preheader: escaparHtml(opts.mensaje.slice(0, 120)), cuerpo })
   };
 }

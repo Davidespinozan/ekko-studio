@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Ban, Trash2, UserPlus } from 'lucide-react';
+import { RefreshCw, Ban, Trash2, UserPlus, KeyRound } from 'lucide-react';
+import { ResetPasswordModal } from '@reception/components/ResetPasswordModal';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
@@ -49,6 +50,8 @@ export default function Equipo() {
   const [cambioRol, setCambioRol] = useState<{ usuario: Usuario; rol: RolStaff } | null>(null);
   const [revoke, setRevoke] = useState<RevokeState>(null);
   const [hardDelete, setHardDelete] = useState<Usuario | null>(null);
+  // Resetear la contraseña de alguien del equipo (el backend ya lo permite a un admin).
+  const [resetDe, setResetDe] = useState<Usuario | null>(null);
 
   const refetch = useCallback(async () => {
     setIsLoading(true);
@@ -166,6 +169,7 @@ export default function Equipo() {
                   onCambiarRol={() => setCambioRol({ usuario: u, rol: 'admin' })}
                   onRevoke={() => startRevoke(u)}
                   onHardDelete={() => setHardDelete(u)}
+                  onResetPassword={() => setResetDe(u)}
                 />
               ))}
             </Section>
@@ -181,6 +185,7 @@ export default function Equipo() {
                   onCambiarRol={() => setCambioRol({ usuario: u, rol: 'recepcionista' })}
                   onRevoke={() => startRevoke(u)}
                   onHardDelete={() => setHardDelete(u)}
+                  onResetPassword={() => setResetDe(u)}
                 />
               ))}
             </Section>
@@ -259,6 +264,14 @@ export default function Equipo() {
         onConfirm={handleHardDelete}
         onCancel={() => setHardDelete(null)}
       />
+
+      {resetDe && (
+        <ResetPasswordModal
+          miembroId={resetDe.id}
+          miembroNombre={capitalizar(resetDe.nombre) || resetDe.email}
+          onClose={() => setResetDe(null)}
+        />
+      )}
     </div>
   );
 }
@@ -340,13 +353,15 @@ function PersonaCard({
   currentUserId,
   onCambiarRol,
   onRevoke,
-  onHardDelete
+  onHardDelete,
+  onResetPassword
 }: {
   usuario: Usuario;
   currentUserId: string | undefined;
   onCambiarRol: () => void;
   onRevoke: () => void;
   onHardDelete: () => void;
+  onResetPassword: () => void;
 }) {
   const esYo = u.id === currentUserId;
   const nombre = capitalizar(u.nombre) || u.email;
@@ -402,6 +417,8 @@ function PersonaCard({
       <CardMenuDropdown
         items={[
           { label: 'Cambiar rol', icon: RefreshCw, onClick: onCambiarRol },
+          // Un recepcionista que olvida su clave ya no depende del correo de recuperación.
+          { label: 'Resetear contraseña', icon: KeyRound, onClick: onResetPassword },
           { label: 'Revocar acceso', icon: Ban, onClick: onRevoke, danger: true, divider: true },
           { label: 'Eliminar definitivamente', icon: Trash2, onClick: onHardDelete, danger: true }
         ]}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { ToastProvider } from '@shared/providers/ToastProvider';
 
@@ -13,7 +13,8 @@ import { ToastProvider } from '@shared/providers/ToastProvider';
 const hoisted = vi.hoisted(() => ({
   miembro: {} as Record<string, unknown>,
   reservas: [] as Record<string, unknown>[],
-  audit: [] as Record<string, unknown>[]
+  audit: [] as Record<string, unknown>[],
+  membresia: null as Record<string, unknown> | null
 }));
 
 const RESERVA_PROXIMA = {
@@ -37,6 +38,13 @@ vi.mock('@shared/lib/supabase', () => ({
             })
           })
         };
+      }
+      if (table === 'membresias') {
+        // useMembresiaVigente: select().eq().in().order().limit().maybeSingle()
+        const c: Record<string, unknown> = {};
+        for (const m of ['select', 'eq', 'in', 'order', 'limit']) c[m] = () => c;
+        c.maybeSingle = () => Promise.resolve({ data: hoisted.membresia, error: null });
+        return c;
       }
       if (table === 'audit_log') {
         return {
@@ -94,6 +102,7 @@ describe('PerfilMiembroRecepcion · gestión front-desk', () => {
     };
     hoisted.reservas = [];
     hoisted.audit = [];
+    hoisted.membresia = null;
   });
 
   it('muestra los datos del miembro', async () => {
@@ -142,5 +151,80 @@ describe('PerfilMiembroRecepcion · gestión front-desk', () => {
     renderPerfil();
     await screen.findByText('Ana López');
     expect(await screen.findByRole('button', { name: /reprogramar/i })).not.toBeDisabled();
+  });
+
+  /**
+   * La ficha decide por el estado de la MEMBRESÍA, no por `usuarios.status`. Antes:
+   * un miembro en pausa veía "Activar membresía" (→ segunda membresía) y a uno
+   * activo al que se le acabó el paquete no se le ofrecía nada.
+   */
+  describe('tarjeta de membresía', () => {
+    const futuro = '2099-01-01T00:00:00Z';
+    const paquete = {
+      id: 'mem-1', status: 'activa', periodo_actual_fin: futuro, creditos_restantes: 5,
+      stripe_subscription_id: null, cancel_at_period_end: false, created_at: '2026-01-01T00:00:00Z',
+      tier: { slug: 'pro-pack', nombre: 'Pro-pack', tipo: 'hibrido' }
+    };
+    const tarjeta = async () => within(await screen.findByTestId('membresia-card'));
+
+    it('sin membresía (aunque la cuenta esté "activo") → ofrece "Asignar plan"', async () => {
+      renderPerfil();
+      const t = await tarjeta();
+      expect(t.getByText('SIN MEMBRESÍA')).toBeInTheDocument();
+      expect(t.getByRole('button', { name: /asignar plan/i })).toBeInTheDocument();
+    });
+
+    it('paquete SIN créditos con la cuenta activa → "Renovar"', async () => {
+      hoisted.membresia = { ...paquete, creditos_restantes: 0 };
+      renderPerfil();
+      const t = await tarjeta();
+      expect(t.getByText('SIN CRÉDITOS')).toBeInTheDocument();
+      expect(t.getByRole('button', { name: /^renovar$/i })).toBeInTheDocument();
+    });
+
+    it('EN PAUSA (cuenta suspendida por la pausa) → "Reanudar", nunca "Asignar/Activar", y sin alarma de cuenta suspendida', async () => {
+      hoisted.miembro = { ...hoisted.miembro, status: 'suspendido' };
+      hoisted.membresia = { ...paquete, status: 'pausada' };
+      renderPerfil();
+      const t = await tarjeta();
+      expect(t.getByText('EN PAUSA')).toBeInTheDocument();
+      expect(t.getByRole('button', { name: /reanudar membresía/i })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /asignar plan|activar membres/i })).not.toBeInTheDocument();
+      expect(screen.queryByText(/Cuenta: Suspendido/)).not.toBeInTheDocument();
+    });
+
+    it('suspendido por la administración (sin pausa) → sí muestra el aviso de cuenta', async () => {
+      hoisted.miembro = { ...hoisted.miembro, status: 'suspendido' };
+      hoisted.membresia = paquete;
+      renderPerfil();
+      expect(await screen.findByText(/Cuenta: Suspendido/)).toBeInTheDocument();
+    });
+
+    it('paquete vigente → cambiar, pausar, ajustar créditos y dar de baja; muestra el saldo', async () => {
+      hoisted.membresia = paquete;
+      renderPerfil();
+      const t = await tarjeta();
+      expect(t.getByText(/5 créditos/)).toBeInTheDocument();
+      for (const nombre of [/cambiar plan/i, /^pausar$/i, /ajustar créditos/i, /dar de baja/i]) {
+        expect(t.getByRole('button', { name: nombre })).toBeInTheDocument();
+      }
+    });
+
+    it('"Ajustar créditos" abre el modal con el saldo actual', async () => {
+      hoisted.membresia = paquete;
+      renderPerfil();
+      fireEvent.click((await tarjeta()).getByRole('button', { name: /ajustar créditos/i }));
+      const modal = within(await screen.findByRole('dialog', { name: /ajustar créditos/i }));
+      expect(modal.getByText(/Saldo: 5 → 6/)).toBeInTheDocument();
+    });
+
+    it('"Dar de baja" sin suscripción de Stripe explica que la baja es inmediata y avisa de los créditos', async () => {
+      hoisted.membresia = paquete;
+      renderPerfil();
+      fireEvent.click((await tarjeta()).getByRole('button', { name: /dar de baja/i }));
+      const modal = within(await screen.findByRole('dialog', { name: /dar de baja/i }));
+      expect(modal.getByText(/la baja es inmediata/i)).toBeInTheDocument();
+      expect(modal.getByRole('alert')).toHaveTextContent(/5 créditos/);
+    });
   });
 });

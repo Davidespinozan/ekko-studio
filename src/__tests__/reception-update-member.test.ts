@@ -62,11 +62,12 @@ async function invocar(event: AnyEvent) {
   return res as { statusCode: number; body: string };
 }
 
-const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', nombre: 'Recep' };
+const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo', nombre: 'Recep' };
 const TARGET = {
   id: 'm-1',
   auth_id: 'auth-m1',
   tenant_id: 't1',
+  rol: 'miembro',
   nombre: 'Ana',
   email: 'ana@cravia.mx',
   telefono: '123',
@@ -126,17 +127,25 @@ describe('reception-update-member · gobernanza (Bloque A)', () => {
     expect(patch).not.toHaveProperty('notas_admin');
     const audit = auditDe('status_change');
     expect(audit).toBeDefined();
-    expect(audit?.antes).toEqual({ status: 'activo' });
-    expect(audit?.despues).toEqual({ status: 'suspendido' });
+    expect(audit?.antes).toEqual({ status: 'activo', sancionado: false });
+    expect(audit?.despues).toEqual({ status: 'suspendido', sancionado: true });
     expect(audit?.motivo).toBe('Cliente solicitó suspensión');
     expect(audit?.actor_usuario_id).toBe('u-recep');
   });
 
-  it('cambio de tier SIN motivo → 400', async () => {
+  it('membresia_tier en el body → 400 sin update (el plan se activa con cobro, no desde "Editar datos")', async () => {
     setCallerTarget();
-    const res = await invocar(evento({ usuario_id: 'm-1', membresia_tier: 'pro' }));
+    const res = await invocar(evento({ usuario_id: 'm-1', membresia_tier: 'pro', motivo: 'Compró paquete' }));
     expect(res.statusCode).toBe(400);
-    expect(mockAuditInsert).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockTierMaybeSingle).not.toHaveBeenCalled();
+  });
+
+  it('membresia_tier: null tampoco (quitar el plan a mano cancelaba la membresía local y no la de Stripe)', async () => {
+    setCallerTarget();
+    const res = await invocar(evento({ usuario_id: 'm-1', membresia_tier: null, motivo: 'Baja voluntaria' }));
+    expect(res.statusCode).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it('edición de contacto NO requiere motivo → 200 + audit contact_change', async () => {
@@ -180,29 +189,56 @@ describe('reception-update-member · gobernanza (Bloque A)', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('cambio de tier CON motivo → valida el plan contra `tiers` del tenant (no una lista fija) y aplica', async () => {
-    setCallerTarget();
-    mockTierMaybeSingle.mockResolvedValueOnce({ data: { slug: 'creador' }, error: null });
-    const res = await invocar(evento({ usuario_id: 'm-1', membresia_tier: 'creador', motivo: 'Compró paquete' }));
-    expect(res.statusCode).toBe(200);
-    expect(mockTierMaybeSingle).toHaveBeenCalledTimes(1);
-    expect(patchEnviado().membresia_tier).toBe('creador');
-  });
-
-  it('tier inexistente/inactivo en el tenant → 400 sin update', async () => {
-    setCallerTarget();
-    mockTierMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
-    const res = await invocar(evento({ usuario_id: 'm-1', membresia_tier: 'plan-fantasma', motivo: 'x'.repeat(5) }));
-    expect(res.statusCode).toBe(400);
-    expect(JSON.parse(res.body).error).toMatch(/no existe o está inactivo/);
+  it('un recepcionista REVOCADO no puede usar la función aunque conserve su sesión (403)', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { ...CALLER, status: 'revocado' },
+      error: null
+    });
+    const res = await invocar(evento({ usuario_id: 'm-1', nombre: 'X' }));
+    expect(res.statusCode).toBe(403);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it('quitar el plan (null) no consulta tiers', async () => {
-    setCallerTarget();
-    const res = await invocar(evento({ usuario_id: 'm-1', membresia_tier: null, motivo: 'Baja voluntaria' }));
+  it('escalada: un recepcionista NO puede cambiarle el email de acceso a un admin (403, sin tocar auth)', async () => {
+    setCallerTarget({ ...TARGET, id: 'a-1', auth_id: 'auth-admin', rol: 'admin', email: 'dueno@ekko.mx' });
+    const res = await invocar(evento({ usuario_id: 'a-1', email: 'atacante@evil.mx' }));
+    expect(res.statusCode).toBe(403);
+    expect(mockUpdateUserById).not.toHaveBeenCalled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('escalada: un recepcionista tampoco puede suspender a otro miembro del equipo (403)', async () => {
+    setCallerTarget({ ...TARGET, id: 'r-2', rol: 'recepcionista' });
+    const res = await invocar(evento({ usuario_id: 'r-2', status: 'suspendido', motivo: 'porque sí' }));
+    expect(res.statusCode).toBe(403);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('un admin SÍ puede editar una cuenta del equipo', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: { ...CALLER, id: 'u-admin', rol: 'admin' }, error: null });
+    mockMaybeSingle.mockResolvedValueOnce({ data: { ...TARGET, id: 'r-2', rol: 'recepcionista' }, error: null });
+    const res = await invocar(evento({ usuario_id: 'r-2', nombre: 'Nuevo Nombre' }));
     expect(res.statusCode).toBe(200);
-    expect(mockTierMaybeSingle).not.toHaveBeenCalled();
-    expect(patchEnviado().membresia_tier).toBeNull();
+  });
+
+
+  it('suspender desde el mostrador = sanción: fija sancionado_at + motivo en el MISMO update', async () => {
+    setCallerTarget();
+    const res = await invocar(evento({ usuario_id: 'm-1', status: 'suspendido', motivo: 'Daños al equipo' }));
+    expect(res.statusCode).toBe(200);
+    const patch = patchEnviado();
+    expect(patch.status).toBe('suspendido');
+    expect(typeof patch.sancionado_at).toBe('string');
+    expect(patch.sancion_motivo).toBe('Daños al equipo');
+    expect(auditDe('status_change')?.despues).toEqual({ status: 'suspendido', sancionado: true });
+  });
+
+  it('reactivar levanta la sanción: sancionado_at y motivo a NULL junto con status=activo', async () => {
+    setCallerTarget({ ...TARGET, status: 'suspendido', sancionado_at: '2026-09-01T00:00:00Z' });
+    const res = await invocar(evento({ usuario_id: 'm-1', status: 'activo', motivo: 'Pagó los daños' }));
+    expect(res.statusCode).toBe(200);
+    const patch = patchEnviado();
+    expect(patch).toMatchObject({ status: 'activo', sancionado_at: null, sancion_motivo: null });
+    expect(auditDe('status_change')?.antes).toEqual({ status: 'suspendido', sancionado: true });
   });
 });

@@ -41,7 +41,7 @@ async function invocar(event: AnyEvent) {
   return res as { statusCode: number; body: string };
 }
 
-const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista' };
+const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo' };
 const HOY_ISO = new Date().toISOString();
 const RESERVA = {
   id: 'r1',

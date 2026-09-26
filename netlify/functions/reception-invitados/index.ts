@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
+import { esStaffActivo } from '../_lib/staff';
 
 /**
  * /reception-invitados — invitados de una reserva (ficha por invitado + extras).
@@ -39,8 +40,6 @@ function extFromContentType(ct: string): string {
   return 'jpg';
 }
 
-const ROLES_OK = ['admin', 'recepcionista', 'staff'];
-
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') return badRequest('Method not allowed');
 
@@ -62,11 +61,11 @@ export const handler: Handler = async (event) => {
 
     const { data: caller } = await asUser
       .from('usuarios')
-      .select('id, tenant_id, rol')
+      .select('id, tenant_id, rol, status')
       .eq('auth_id', authUser.id)
       .maybeSingle();
-    if (!caller || !ROLES_OK.includes(caller.rol)) {
-      return forbidden('Solo recepción, staff o admin pueden hacer esto');
+    if (!esStaffActivo(caller)) {
+      return forbidden('Solo recepción o admin pueden hacer esto');
     }
 
     const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });

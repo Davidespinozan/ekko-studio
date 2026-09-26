@@ -12,6 +12,7 @@ import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/ht
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
 import { avisarCambiarPassword } from '../_lib/acceso';
+import { esStaffActivo } from '../_lib/staff';
 
 /**
  * POST /reception-create-member
@@ -70,11 +71,11 @@ export const handler: Handler = async (event) => {
     // Gate de rol: admin o recepcionista. (Recepción Plus.)
     const { data: callerProfile } = await supabaseAsUser
       .from('usuarios')
-      .select('id, tenant_id, rol')
+      .select('id, tenant_id, rol, status')
       .eq('auth_id', authUser.id)
       .maybeSingle();
 
-    if (!callerProfile || !['admin', 'recepcionista'].includes(callerProfile.rol)) {
+    if (!esStaffActivo(callerProfile)) {
       return forbidden('Solo recepción o admin pueden registrar miembros');
     }
 

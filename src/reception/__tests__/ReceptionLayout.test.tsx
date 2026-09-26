@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 
 /**
  * Bloque B/C: la navegación de recepción es un bottom-nav de 4 ítems
@@ -8,12 +8,17 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
  * /recepcion/miembros/:id sigue funcionando.
  */
 
+const auth = vi.hoisted(() => ({
+  usuario: { rol: 'recepcionista', status: 'activo', nombre: 'Recep Uno', email: 'recep@cravia.mx' },
+  signOut: vi.fn()
+}));
+
 vi.mock('@shared/hooks/useAuth', () => ({
   useAuth: () => ({
     authUser: { id: 'auth-1' },
-    usuario: { rol: 'recepcionista', nombre: 'Recep Uno', email: 'recep@cravia.mx' },
+    usuario: auth.usuario,
     isLoading: false,
-    signOut: vi.fn()
+    signOut: auth.signOut
   })
 }));
 vi.mock('@shared/components/DemoBanner', () => ({ DemoBanner: () => null }));
@@ -28,15 +33,49 @@ vi.mock('../pages/Checkin', () => ({ default: () => <div>CHECKIN_STUB</div> }));
 
 import ReceptionLayout from '../ReceptionLayout';
 
+function LoginStub() {
+  const { state } = useLocation();
+  return <div>LOGIN_STUB · {(state as { mensaje?: string } | null)?.mensaje}</div>;
+}
+
 function renderEn(ruta: string) {
   return render(
     <MemoryRouter initialEntries={[ruta]}>
       <Routes>
         <Route path="/recepcion/*" element={<ReceptionLayout />} />
+        <Route path="/login" element={<LoginStub />} />
       </Routes>
     </MemoryRouter>
   );
 }
+
+describe('ReceptionLayout · staff inactivo', () => {
+  const activo = { ...auth.usuario };
+  afterEach(() => {
+    auth.usuario = { ...activo };
+    auth.signOut.mockClear();
+  });
+
+  it('un recepcionista REVOCADO con la sesión abierta sale del mostrador: login con el motivo + signOut', async () => {
+    auth.usuario = { ...activo, status: 'revocado' };
+    renderEn('/recepcion');
+    expect(await screen.findByText(/LOGIN_STUB · Tu acceso fue revocado/)).toBeInTheDocument();
+    expect(screen.queryByText('HOY_STUB')).not.toBeInTheDocument();
+    expect(auth.signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('un admin suspendido tampoco entra a recepción', async () => {
+    auth.usuario = { ...activo, rol: 'admin', status: 'suspendido' };
+    renderEn('/recepcion');
+    expect(await screen.findByText(/LOGIN_STUB · Tu cuenta está suspendida/)).toBeInTheDocument();
+  });
+
+  it('el staff activo entra y NO se le cierra la sesión', async () => {
+    renderEn('/recepcion');
+    expect(await screen.findByText('HOY_STUB')).toBeInTheDocument();
+    expect(auth.signOut).not.toHaveBeenCalled();
+  });
+});
 
 describe('ReceptionLayout · bottom-nav 4 ítems', () => {
   it('muestra los 4 ítems del bottom-nav', async () => {

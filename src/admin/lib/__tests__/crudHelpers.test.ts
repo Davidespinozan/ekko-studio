@@ -12,7 +12,8 @@ import {
   generateUniqueSlug,
   canHardDeleteRecurso,
   canHardDeleteTier,
-  canModifyTeamMember
+  canModifyTeamMember,
+  cancelarReserva
 } from '../crudHelpers';
 
 describe('generateUniqueSlug', () => {
@@ -183,3 +184,32 @@ describe('canModifyTeamMember', () => {
     expect(result.reason).toContain('último administrador');
   });
 });
+
+/**
+ * El admin cancela por la RPC `cancelar_reserva_atomic`, no con un UPDATE directo:
+ * la RPC valida que siga confirmada, avisa al miembro, devuelve el crédito y deja
+ * rastro. Antes se podía "cancelar" una sesión completada desde el dashboard.
+ */
+describe('cancelarReserva (admin)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('pasa por la RPC con el motivo, y NO toca la tabla reservas', async () => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: {}, error: null } as never);
+    const r = await cancelarReserva({ reservaId: 'res-1', motivo: 'Falla eléctrica' });
+    expect(r).toEqual({ error: null });
+    expect(supabase.rpc).toHaveBeenCalledWith('cancelar_reserva_atomic', { p_reserva_id: 'res-1', p_motivo: 'Falla eléctrica' });
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['EKKO_RESERVA_NO_CANCELABLE: La reserva no está confirmada', /ya no está confirmada/],
+    ['EKKO_RESERVA_PASADA: No puedes cancelar una reserva que ya pasó', /márcala como falta/],
+    ['EKKO_TENANT_DIFERENTE: La reserva pertenece a otro estudio', /No tienes permiso/]
+  ])('rechazo de la RPC "%s" → mensaje humano', async (mensaje, esperado) => {
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: { message: mensaje } } as never);
+    const r = await cancelarReserva({ reservaId: 'res-1', motivo: 'x' });
+    expect(r.error).toMatch(esperado);
+    expect(r.error).not.toContain('EKKO_');
+  });
+});
+

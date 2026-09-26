@@ -6,7 +6,7 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, serverError } from '../_lib/http';
+import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv, optionalEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada, getOrCreateSocioCustomer } from '../_lib/connectBilling';
@@ -54,22 +54,33 @@ export const handler: Handler = async (event) => {
 
     const { data: socio } = await asUser
       .from('usuarios')
-      .select('id, tenant_id, rol, email')
+      .select('id, tenant_id, rol, email, status, sancionado_at')
       .eq('auth_id', authUser.id)
       .maybeSingle();
     if (!socio) return unauthorized('Sin perfil');
+    // Una sanción del estudio no se compra: el pago crearía la membresía y el
+    // trigger dejaría la cuenta suspendida de todos modos (Fase 1 identidad).
+    if (socio.sancionado_at || socio.status === 'revocado') {
+      return forbidden('Tu cuenta está suspendida por el estudio. Escríbenos para resolverlo antes de comprar un plan.');
+    }
     if (socio.rol !== 'miembro') return badRequest('Solo un miembro puede comprar membresía');
 
     const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
     const { data: tier } = await admin
       .from('tiers')
-      .select('id, slug, activo, tenant_id, nombre, precio_centavos, moneda, tipo')
+      .select('id, slug, activo, en_venta, tenant_id, nombre, precio_centavos, moneda, tipo')
       .eq('tenant_id', socio.tenant_id)
       .eq('slug', body.tier)
       .maybeSingle();
     if (!tier || tier.tenant_id !== socio.tenant_id || tier.activo !== true) {
       return badRequest('Plan inválido');
+    }
+    // `en_venta=false` = el estudio dejó de VENDER el plan (sus miembros actuales
+    // lo conservan). La landing y el perfil ya no lo muestran, pero sin este
+    // chequeo seguía siendo comprable llamando a la API con el slug.
+    if (tier.en_venta === false) {
+      return badRequest('Este plan ya no está a la venta');
     }
 
     if (!process.env.STRIPE_SECRET_KEY) {

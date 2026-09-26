@@ -88,6 +88,15 @@ function parseObject<T extends object>(value: unknown, fallback: T): T {
   return { ...fallback, ...(value as Partial<T>) };
 }
 
+/** URL de WhatsApp del estudio a partir de `tenant.config` (null si no hay número). Pura, para usar sin hook. */
+export function whatsappUrlDe(config: unknown, mensaje?: string): string | null {
+  const c = (config ?? {}) as Record<string, unknown>;
+  const contacto = parseObject(c.contacto, CONTACTO_DEFAULT);
+  if (!contacto.whatsapp_e164) return null;
+  const msg = encodeURIComponent(mensaje ?? contacto.whatsapp_mensaje_default);
+  return `https://wa.me/${contacto.whatsapp_e164}?text=${msg}`;
+}
+
 export function useLandingConfig() {
   const tenant = useTenant();
   const config = (tenant.config ?? {}) as Record<string, unknown>;
@@ -118,11 +127,7 @@ export function useLandingConfig() {
 
   // Helper: URL completa de WhatsApp con mensaje encoded.
   // Devuelve null si no hay número configurado → render condicional en el consumidor.
-  const whatsappUrl = (mensaje?: string): string | null => {
-    if (!contacto.whatsapp_e164) return null;
-    const msg = encodeURIComponent(mensaje ?? contacto.whatsapp_mensaje_default);
-    return `https://wa.me/${contacto.whatsapp_e164}?text=${msg}`;
-  };
+  const whatsappUrl = (mensaje?: string): string | null => whatsappUrlDe(tenant.config, mensaje);
 
   return {
     hero,

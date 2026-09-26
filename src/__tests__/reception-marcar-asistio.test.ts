@@ -35,7 +35,7 @@ async function invocar(event: AnyEvent) {
   return res as { statusCode: number; body: string };
 }
 
-const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista' };
+const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo' };
 const PASADO = '2020-01-01T10:00:00.000Z';
 const FUTURO = '2999-01-01T10:00:00.000Z';
 const DIA = 24 * 60 * 60 * 1000;

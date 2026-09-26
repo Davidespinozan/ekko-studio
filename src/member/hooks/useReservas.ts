@@ -3,7 +3,7 @@ import { supabase } from '@shared/lib/supabase';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import type { Database } from '@shared/types/database';
-import { traducirErrorRPC } from '@member/logic/reservaLogic';
+import { traducirErrorRPC, type IntervaloOcupado } from '@member/logic/reservaLogic';
 
 type Reserva = Database['public']['Tables']['reservas']['Row'];
 type Recurso = Database['public']['Tables']['recursos']['Row'];
@@ -145,18 +145,26 @@ export async function fetchReservasDelRecurso(
   recurso_id: string,
   fechaInicio: Date,
   fechaFin: Date
-): Promise<Pick<Reserva, 'slot_inicio'>[]> {
-  const { data, error } = await supabase
-    .from('reservas')
-    .select('slot_inicio')
-    .eq('recurso_id', recurso_id)
-    .in('status', ['confirmada', 'completada'])
-    .gte('slot_inicio', fechaInicio.toISOString())
-    .lt('slot_inicio', fechaFin.toISOString());
+): Promise<IntervaloOcupado[]> {
+  // Por la RPC `slots_ocupados`, NO leyendo `reservas`: la policy
+  // `reservas_read_self` solo deja ver las propias, así que un miembro veía LIBRE
+  // un horario que ya tenía otra persona y se enteraba al confirmar. La RPC
+  // devuelve solo intervalos (sin quién ni folio) e incluye los de los demás sets
+  // cuando el estudio graba un set a la vez (`reserva.sets_exclusivos`).
+  // Cast: la RPC es nueva y aún no está en los tipos generados de Supabase.
+  const { data, error } = await (supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>
+  ) => Promise<{ data: IntervaloOcupado[] | null; error: { message: string } | null }>)('slots_ocupados', {
+    p_recurso_id: recurso_id,
+    p_desde: fechaInicio.toISOString(),
+    p_hasta: fechaFin.toISOString()
+  });
 
   if (error) {
     console.error('[fetchReservasDelRecurso]', error);
-    return [];
+    // Se propaga: pintar TODO libre cuando falló la carga es peor que avisar.
+    throw new Error('No se pudo cargar la disponibilidad. Revisa tu conexión e inténtalo de nuevo.');
   }
   return data ?? [];
 }

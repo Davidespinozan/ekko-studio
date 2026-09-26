@@ -34,6 +34,7 @@ import CardMenuDropdown from '../components/CardMenuDropdown';
 import type { Database } from '@shared/types/database';
 import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
 import { esTierRecomendado } from '@shared/lib/planPresentacion';
+import { validarPlan } from '../logic/validarPlan';
 
 type Tier = Database['public']['Tables']['tiers']['Row'];
 
@@ -575,8 +576,13 @@ function EditarTierModal({
     setError(null);
 
     const precioCentavos = Math.round(parseFloat(precio) * 100);
-    if (!Number.isFinite(precioCentavos) || precioCentavos < 0) {
-      setError('Precio inválido.');
+    // Misma validación al crear y al editar (antes, editar no validaba el nombre
+    // y ninguno validaba la vigencia: un paquete de 0 días nace vencido).
+    const invalido = validarPlan({
+      nombre, precioCentavos, esPaquete, vence, clasesIncluidas, duracionDias
+    });
+    if (invalido) {
+      setError(invalido);
       setSaving(false);
       return;
     }
@@ -585,11 +591,6 @@ function EditarTierModal({
     const tipo = !esPaquete ? 'tiempo' : vence ? 'hibrido' : 'creditos';
     const clasesVal = esPaquete ? clasesIncluidas : null;
     const duracionVal = esPaquete ? (vence ? duracionDias : null) : null;
-    if (esPaquete && (!Number.isFinite(clasesIncluidas) || clasesIncluidas < 1)) {
-      setError('El paquete debe incluir al menos 1 sesión.');
-      setSaving(false);
-      return;
-    }
 
     if (esCreacion) {
       if (!slug.trim()) {

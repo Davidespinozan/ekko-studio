@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
+import { validarStatusStaff } from '@shared/lib/validarStatusCuenta';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { DemoBanner } from '@shared/components/DemoBanner';
 import { BrandLogo } from '@shared/components/BrandLogo';
@@ -36,13 +37,32 @@ function capitalizar(s: string | null | undefined): string {
 export default function ReceptionLayout() {
   const { authUser, usuario, isLoading, signOut } = useAuth();
   const location = useLocation();
+  const yaCerrado = useRef(false);
+
+  const esStaff = usuario?.rol === 'recepcionista' || usuario?.rol === 'admin';
+  // "Revocar acceso" solo cambia el status: Login valida al entrar, pero no a la
+  // sesión que ya estaba abierta. Aquí se saca del mostrador al staff inactivo.
+  const validacion = usuario && esStaff ? validarStatusStaff(usuario) : null;
+
+  const staffInactivo = !!validacion && !validacion.permitido;
+
+  useEffect(() => {
+    if (isLoading || !authUser || !staffInactivo) return;
+    if (yaCerrado.current) return;
+    yaCerrado.current = true;
+    // El Navigate de abajo ya llevó al login con el motivo; esto cierra la sesión.
+    void signOut();
+  }, [isLoading, authUser, staffInactivo, signOut]);
 
   if (isLoading) return <LoadingScreen />;
   if (!authUser) return <Navigate to="/login" state={{ from: location }} replace />;
   if (!usuario) return <LoadingScreen />;
 
-  if (usuario.rol !== 'recepcionista' && usuario.rol !== 'admin') {
+  if (!esStaff) {
     return <Navigate to="/app" replace />;
+  }
+  if (validacion && !validacion.permitido) {
+    return <Navigate to="/login" state={{ mensaje: validacion.mensaje }} replace />;
   }
 
   const nombre = capitalizar(usuario.nombre) || usuario.email;

@@ -28,8 +28,46 @@ interface Pago {
   monto_centavos: number;
   moneda: string;
   fecha: string;
-  status: string; // 'succeeded' | 'pending' | 'failed'
+  status: string; // 'succeeded' | 'pending' | 'failed' | 'refunded'
   descripcion: string;
+  /** Recibo de Stripe (hosted). null si el cargo no lo trae. */
+  receipt_url: string | null;
+  /** Centavos devueltos (parcial o total). 0 si no hubo reembolso. */
+  reembolsado_centavos: number;
+}
+
+/**
+ * Concepto legible del cargo (A11): el miembro veía "$850 · Pagado" sin saber
+ * si era la membresía, un paquete o los invitados extra. El cargo de un
+ * PaymentIntent hereda su metadata (tier_id / tipo); el de una suscripción
+ * viene por invoice, y ahí el plan está en la metadata de la suscripción.
+ */
+export function conceptoDeCargo(
+  ch: {
+    description?: string | null;
+    metadata?: Record<string, string> | null;
+    invoice?: unknown;
+  },
+  nombreTier: (id: string | undefined) => string | null
+): string {
+  const meta = ch.metadata ?? {};
+  if (meta.tipo === 'invitados_extra') {
+    const n = Number.parseInt(meta.cantidad ?? '', 10);
+    return Number.isFinite(n) && n > 0 ? `Invitados extra (${n})` : 'Invitados extra';
+  }
+  const inv = ch.invoice && typeof ch.invoice === 'object' ? (ch.invoice as Record<string, any>) : null;
+  const tierId: string | undefined =
+    meta.tier_id ??
+    inv?.parent?.subscription_details?.metadata?.tier_id ??
+    inv?.subscription_details?.metadata?.tier_id;
+  const nombre = nombreTier(tierId);
+  if (inv) {
+    const razon = inv.billing_reason as string | undefined;
+    const base = razon === 'subscription_cycle' ? 'Renovación de membresía' : razon === 'subscription_update' ? 'Cambio de plan' : 'Membresía';
+    return nombre ? `${base} · ${nombre}` : base;
+  }
+  if (nombre) return `Paquete · ${nombre}`;
+  return ch.description?.trim() || 'Cobro';
 }
 
 export const handler: Handler = async (event) => {
@@ -125,17 +163,31 @@ export const handler: Handler = async (event) => {
     // ── Historial: charges (cubre suscripción Y paquetes de una sola vez) ─────
     const pagos: Pago[] = [];
     try {
-      const charges = await stripe.charges.list({ customer: customerId, limit: 12 }, acctOpt);
+      // Nombres de los planes del estudio, para el concepto (tier_id → nombre).
+      const { data: tiers } = await admin.from('tiers').select('id, nombre').eq('tenant_id', socio.tenant_id);
+      const nombres = new Map<string, string>((tiers ?? []).map((t: { id: string; nombre: string }) => [t.id, t.nombre]));
+      const nombreTier = (id: string | undefined) => (id ? nombres.get(id) ?? null : null);
+
+      const charges = await stripe.charges.list(
+        { customer: customerId, limit: 12, expand: ['data.invoice'] },
+        acctOpt
+      );
       for (const ch of charges.data) {
         if (ch.amount == null) continue;
-        const status = ch.status === 'succeeded' ? 'succeeded' : ch.status === 'pending' ? 'pending' : 'failed';
+        const reembolsado = ch.amount_refunded ?? 0;
+        const status =
+          ch.refunded || (ch.status === 'succeeded' && reembolsado >= ch.amount)
+            ? 'refunded'
+            : ch.status === 'succeeded' ? 'succeeded' : ch.status === 'pending' ? 'pending' : 'failed';
         pagos.push({
           id: ch.id,
           monto_centavos: ch.amount,
           moneda: ch.currency ?? 'mxn',
           fecha: new Date(ch.created * 1000).toISOString(),
           status,
-          descripcion: ch.description ?? 'Cobro'
+          descripcion: conceptoDeCargo(ch as any, nombreTier),
+          receipt_url: ch.receipt_url ?? null,
+          reembolsado_centavos: reembolsado
         });
       }
     } catch (e) {

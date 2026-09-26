@@ -19,17 +19,22 @@ export function getFichaIdentidad(usuario_id: string): Promise<FichaIdentidad> {
   return backendGet<FichaIdentidad>('reception-datos-identidad', { usuario_id });
 }
 
+/**
+ * PATCH: solo los campos presentes se tocan; un campo ausente conserva su valor
+ * en el servidor. `null` es un borrado explícito (la UI no lo manda).
+ */
 export interface GuardarFichaInput {
   usuario_id: string;
   fecha_nacimiento?: string | null;
   domicilio?: string | null;
   ine_folio?: string | null;
   ine_foto?: { base64: string; contentType: string };
+  /** Solo true (firma). Quitar una firma no se hace por aquí. */
   contrato_firmado?: boolean;
 }
 
 export function guardarFichaIdentidad(
   input: GuardarFichaInput
-): Promise<{ success: boolean; identidad_completa: boolean; contrato_firmado: boolean }> {
+): Promise<{ success: boolean; identidad_completa: boolean; contrato_firmado: boolean; cambios?: string[]; aviso?: string }> {
   return backendPost('reception-datos-identidad', input);
 }

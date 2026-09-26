@@ -10,6 +10,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
+import { esAdminActivo } from '../_lib/staff';
 
 /**
  * POST /admin-update-role
@@ -53,11 +54,11 @@ export const handler: Handler = async (event) => {
 
     const { data: adminProfile } = await supabaseAsUser
       .from('usuarios')
-      .select('id, tenant_id, rol')
+      .select('id, tenant_id, rol, status')
       .eq('auth_id', authUser.id)
       .maybeSingle();
 
-    if (!adminProfile || adminProfile.rol !== 'admin') {
+    if (!esAdminActivo(adminProfile)) {
       return forbidden('Solo admin puede cambiar roles');
     }
 
@@ -67,7 +68,7 @@ export const handler: Handler = async (event) => {
     // Obtener usuario target
     const { data: target, error: targetErr } = await supabaseAdmin
       .from('usuarios')
-      .select('id, tenant_id, rol, email')
+      .select('id, tenant_id, rol, email, status')
       .eq('id', body.usuario_id)
       .maybeSingle();
 
@@ -75,6 +76,12 @@ export const handler: Handler = async (event) => {
 
     if (target.tenant_id !== adminProfile.tenant_id) {
       return forbidden('Usuario es de otro tenant');
+    }
+
+    // Un admin no se cambia el rol a sí mismo: un clic equivocado lo deja fuera
+    // del panel. Que lo haga otro admin.
+    if (target.id === adminProfile.id) {
+      return badRequest('No puedes cambiar tu propio rol. Pídeselo a otro admin.');
     }
 
     // Si demote de admin → otro rol, validar que NO sea el último admin
@@ -88,9 +95,19 @@ export const handler: Handler = async (event) => {
       }
     }
 
+    // Ascender a staff a un miembro que seguía en `pendiente_*` lo deja 'activo':
+    // los poderes de staff exigen status='activo' (20260920130000) y un
+    // recepcionista "pendiente de pago" no existe. Un revocado/suspendido NO se
+    // reactiva por cambiarle el rol.
+    const patch: { rol: string; status?: string } = { rol: body.rol };
+    const esStaff = body.rol === 'admin' || body.rol === 'recepcionista';
+    if (esStaff && ['pendiente_onboarding', 'pendiente_pago'].includes(target.status)) {
+      patch.status = 'activo';
+    }
+
     const { error: updateErr } = await supabaseAdmin
       .from('usuarios')
-      .update({ rol: body.rol })
+      .update(patch)
       .eq('id', body.usuario_id);
 
     if (updateErr) return serverError(updateErr.message);

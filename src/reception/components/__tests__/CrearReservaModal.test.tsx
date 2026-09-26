@@ -130,8 +130,10 @@ describe('CrearReservaModal · wiring', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reprogramar' }));
 
     // Orquesta los dos RPCs de RP-1: crear la nueva + cancelar la vieja.
-    await waitFor(() => expect(h.rpc).toHaveBeenCalledTimes(2));
+    // crear + cancelar + UN aviso de "cambio de horario" (en vez del par agendada/cancelada).
+    await waitFor(() => expect(h.rpc).toHaveBeenCalledTimes(3));
     const fns = h.rpc.mock.calls.map((c) => c[0]);
+    expect(fns).toContain('staff_avisar_reprogramacion');
     expect(fns).toContain('reservar_para_miembro_atomic');
     expect(fns).toContain('cancelar_reserva_atomic');
     await waitFor(() => expect(onCreada).toHaveBeenCalled());

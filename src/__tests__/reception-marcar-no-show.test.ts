@@ -48,7 +48,7 @@ async function invocar(event: AnyEvent) {
   return res as { statusCode: number; body: string };
 }
 
-const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista' };
+const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo' };
 const PASADO = '2020-01-01T10:00:00.000Z';
 const FUTURO = '2999-01-01T10:00:00.000Z';
 const RESERVA = {
@@ -57,6 +57,7 @@ const RESERVA = {
   usuario_id: 'm1',
   status: 'confirmada',
   check_in_at: null,
+  slot_inicio: '2020-01-01T09:00:00.000Z',
   slot_fin: PASADO,
   folio: 'EKK-000001'
 };
@@ -64,6 +65,7 @@ const RESERVA = {
 const MIEMBRO = { id: 'm1', no_shows_count: 2, bloqueado_hasta: null };
 // Config del tenant (Admin → Reglas → Penalizaciones). Sin config → 7 días / 3 faltas.
 const TENANT_DEFAULT = { config: {} };
+let reservaYaNoConfirmada = false;
 const DIA = 24 * 60 * 60 * 1000;
 
 function seq(...vals: unknown[]) {
@@ -81,7 +83,15 @@ describe('reception-marcar-no-show (Bloque D)', () => {
     mockAuditInsert.mockResolvedValue({ error: null });
     mockNotifInsert.mockResolvedValue({ error: null });
     mockPush.mockResolvedValue(true);
-    mockUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+    // update().eq()[.eq().select()] — awaitable en cualquier punto de la cadena.
+    mockUpdate.mockImplementation(() => {
+      const u: Record<string, unknown> = {};
+      u.eq = () => u;
+      u.select = () => Promise.resolve({ data: reservaYaNoConfirmada ? [] : [{ id: 'r1' }], error: null });
+      u.then = (cb: (v: unknown) => unknown) => Promise.resolve({ error: null }).then(cb);
+      return u;
+    });
+    reservaYaNoConfirmada = false;
   });
 
   it('3ª falta → marca no_show, penaliza (bloquea) y audita', async () => {
@@ -171,10 +181,46 @@ describe('reception-marcar-no-show (Bloque D)', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it('slot todavía no terminó → 400', async () => {
-    seq(CALLER, { ...RESERVA, slot_fin: FUTURO });
+  const haceMin = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+  const enMin = (min: number) => new Date(Date.now() + min * 60_000).toISOString();
+
+  it('la sesión todavía no empieza → 400', async () => {
+    seq(CALLER, { ...RESERVA, slot_inicio: FUTURO, slot_fin: FUTURO }, MIEMBRO, TENANT_DEFAULT);
     const res = await invocar(evento({ reserva_id: 'r1', motivo: 'Cliente no se presentó' }));
     expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/todavía no empieza/);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('empezó hace 5 min (dentro de la tolerancia de 15) → 400: aún puede llegar', async () => {
+    seq(CALLER, { ...RESERVA, slot_inicio: haceMin(5), slot_fin: enMin(55) }, MIEMBRO, TENANT_DEFAULT);
+    const res = await invocar(evento({ reserva_id: 'r1', motivo: 'Cliente no se presentó' }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/tolerancia de llegada \(15 min/);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('sesión EN CURSO y pasada la tolerancia → se marca la falta y el estudio queda libre', async () => {
+    seq(CALLER, { ...RESERVA, slot_inicio: haceMin(20), slot_fin: enMin(40) }, { ...MIEMBRO, no_shows_count: 0 }, TENANT_DEFAULT);
+    const res = await invocar(evento({ reserva_id: 'r1', motivo: 'No llegó; se libera para un walk-in' }));
+    expect(res.statusCode).toBe(200);
+    expect((mockUpdate.mock.calls[0][0] as Record<string, unknown>).status).toBe('no_show');
+  });
+
+  it('la tolerancia sale de la config del estudio (ventana_check_in_min: 30)', async () => {
+    seq(CALLER, { ...RESERVA, slot_inicio: haceMin(20), slot_fin: enMin(40) }, MIEMBRO, { config: { reserva: { ventana_check_in_min: 30 } } });
+    const res = await invocar(evento({ reserva_id: 'r1', motivo: 'Cliente no se presentó' }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/30 min/);
+  });
+
+  it('el cron (o un doble envío) ya la marcó: NO se penaliza dos veces', async () => {
+    seq(CALLER, RESERVA, MIEMBRO, TENANT_DEFAULT);
+    reservaYaNoConfirmada = true;
+    const res = await invocar(evento({ reserva_id: 'r1', motivo: 'Cliente no se presentó' }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/ya cambió de estado/);
+    expect(mockUpdate).toHaveBeenCalledTimes(1); // solo el intento sobre la reserva; al miembro no se le toca
   });
 
   it('cross-tenant → 403', async () => {

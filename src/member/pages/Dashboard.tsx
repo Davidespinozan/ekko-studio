@@ -9,6 +9,9 @@ import { ProximaSesionHero } from '@member/components/ProximaSesionHero';
 import { ResumenHome } from '@member/components/ResumenHome';
 import { useResumenMiembro } from '@member/hooks/useResumenMiembro';
 import { resumenCarnet } from '@member/logic/carnetMembresia';
+import { desdeReservasVigentesISO } from '@member/logic/reservasVigentes';
+import { formatFechaEnZona } from '@shared/lib/timezone';
+import { ContactoEstudio } from '@shared/components/ContactoEstudio';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 type Reserva = Database['public']['Tables']['reservas']['Row'];
@@ -41,7 +44,8 @@ export function useProximasReservas(usuarioId: string | undefined) {
       .select('*, recurso:recursos(id, nombre, slug, foto_url, max_invitados_extra)')
       .eq('usuario_id', usuarioId)
       .eq('status', 'confirmada')
-      .gte('slot_inicio', new Date().toISOString())
+      // Por slot_fin + gracia de check-in: la sesión en curso sigue siendo "la próxima".
+      .gte('slot_fin', desdeReservasVigentesISO())
       .order('slot_inicio', { ascending: true })
       .limit(5);
 
@@ -148,13 +152,12 @@ export default function Dashboard() {
           <p className="ek-body" style={{ marginTop: '8px' }}>
             Podrás reservar nuevamente el{' '}
             <strong>
-              {new Date(usuario!.bloqueado_hasta!).toLocaleDateString('es-MX', {
-                weekday: 'long', day: 'numeric', month: 'long'
-              })}
+              {formatFechaEnZona(usuario!.bloqueado_hasta!, { weekday: 'long', day: 'numeric', month: 'long' })}
             </strong>.
           </p>
           <p className="ek-body-faint" style={{ marginTop: '8px' }}>
-            Esto puede deberse a una inasistencia o suspensión. Contacta a EKKO si tienes dudas.
+            Esto puede deberse a una inasistencia o suspensión.{' '}
+            <ContactoEstudio enLinea etiqueta="Escríbenos si tienes dudas" mensaje="Hola, mi cuenta de EKKO tiene una restricción activa y quiero entender por qué." />
           </p>
         </div>
       )}

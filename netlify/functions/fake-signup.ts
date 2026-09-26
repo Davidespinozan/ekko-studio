@@ -45,7 +45,12 @@ export const handler: Handler = async (event) => {
   });
 
   try {
-    const { nombre, email, password, tier } = JSON.parse(event.body || '{}');
+    const cuerpo = JSON.parse(event.body || '{}');
+    // Normalización SERVER-SIDE (Fase 1 identidad): el cliente ya la hacía, pero
+    // esta función es pública y el correo es la clave de identidad.
+    const email = typeof cuerpo.email === 'string' ? cuerpo.email.trim().toLowerCase() : '';
+    const nombre = typeof cuerpo.nombre === 'string' ? cuerpo.nombre.trim() : '';
+    const { password, tier } = cuerpo;
 
     if (!nombre || !email || !password || !tier) {
       return {

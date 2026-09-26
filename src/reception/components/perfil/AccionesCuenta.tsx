@@ -1,15 +1,13 @@
-import { Pencil, Camera, KeyRound, Send, IdCard, PauseCircle, PlayCircle } from 'lucide-react';
+import { Pencil, Camera, KeyRound, Send, IdCard } from 'lucide-react';
 
-/** Acciones de cuenta (Recepción Plus): foto, datos, ficha/INE, credenciales, aviso. */
+/** Acciones de CUENTA (Recepción Plus): foto, datos, ficha/INE, credenciales, aviso. Lo del plan (pausar, cambiar, baja…) vive en MembresiaCard. */
 export function AccionesCuenta({
   tieneFoto,
   onEditar,
   onFoto,
   onFicha,
   onReset,
-  onAviso,
-  onPausar,
-  pausada
+  onAviso
 }: {
   tieneFoto: boolean;
   onEditar: () => void;
@@ -17,9 +15,6 @@ export function AccionesCuenta({
   onFicha: () => void;
   onReset: () => void;
   onAviso: () => void;
-  /** Pausar/reanudar la membresía (solo si tiene una viva o pausada). */
-  onPausar?: () => void;
-  pausada?: boolean;
 }) {
   return (
     <section>
@@ -40,12 +35,6 @@ export function AccionesCuenta({
         <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={onAviso}>
           <Send size={15} aria-hidden="true" /> Enviar aviso
         </button>
-        {onPausar && (
-          <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '46px' }} onClick={onPausar}>
-            {pausada ? <PlayCircle size={15} aria-hidden="true" /> : <PauseCircle size={15} aria-hidden="true" />}
-            {pausada ? ' Reanudar membresía' : ' Pausar membresía'}
-          </button>
-        )}
       </div>
     </section>
   );

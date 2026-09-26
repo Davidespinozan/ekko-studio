@@ -8,7 +8,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { getStripe } from '../_lib/stripe';
+import { getStripe, llavePrecio } from '../_lib/stripe';
 import { resolverCuentaConectada } from '../_lib/connectBilling';
 
 /**
@@ -66,12 +66,18 @@ export const handler: Handler = async (event) => {
 
     const { data: tier } = await admin
       .from('tiers')
-      .select('id, slug, activo, tenant_id, nombre, precio_centavos, moneda, tipo')
+      .select('id, slug, activo, en_venta, tenant_id, nombre, precio_centavos, moneda, tipo')
       .eq('tenant_id', socio.tenant_id)
       .eq('slug', body.tier)
       .maybeSingle();
     if (!tier || tier.tenant_id !== socio.tenant_id || tier.activo !== true) {
       return badRequest('Plan inválido');
+    }
+    // `en_venta=false` = el estudio dejó de VENDER el plan (sus miembros actuales
+    // lo conservan). La landing y el perfil ya no lo muestran, pero sin este
+    // chequeo seguía siendo comprable llamando a la API con el slug.
+    if (tier.en_venta === false) {
+      return badRequest('Este plan ya no está a la venta');
     }
     // El swap solo tiene sentido en planes mensuales (suscripción). Los paquetes
     // son pago único → deben ir por crear-pago-intent.
@@ -111,7 +117,7 @@ export const handler: Handler = async (event) => {
         recurring: { interval: 'month' },
         product_data: { name: tier.nombre }
       },
-      { ...opt, idempotencyKey: `ekko_price_${tier.id}_${tier.precio_centavos}_${accountId}` }
+      { ...opt, idempotencyKey: llavePrecio({ tierId: tier.id, accountId, centavos: tier.precio_centavos, currency, nombre: tier.nombre }) }
     );
 
     // Item vigente de la suscripción → cambiar su precio (proration al próximo

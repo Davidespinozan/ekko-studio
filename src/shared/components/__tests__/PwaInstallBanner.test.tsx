@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, screen, act, cleanup } from '@testing-library/react';
-import PwaInstallBanner from '../PwaInstallBanner';
+import { MemoryRouter } from 'react-router-dom';
+import PwaInstallBanner, { debeMostrarse, rutaAdmiteBanner } from '../PwaInstallBanner';
 
 /**
- * Banner de instalación PWA: aparece cuando el navegador ofrece instalar
- * (evento beforeinstallprompt), NO aparece si ya se descartó, y al descartarlo
- * recuerda la decisión en localStorage.
+ * Banner de instalación PWA: es una INVITACIÓN y no puede estorbar. Aparece
+ * cuando el navegador ofrece instalar (beforeinstallprompt), pero solo en la
+ * landing y en el inicio del miembro, solo en pantallas de teléfono, tras unos
+ * segundos, y por debajo de cualquier modal. Un descarte dura 90 días.
  */
 
 function mockMatchMedia(standalone: boolean) {
@@ -32,47 +34,116 @@ function fireBeforeInstallPrompt() {
   return e;
 }
 
+function montar(ruta = '/') {
+  return render(
+    <MemoryRouter initialEntries={[ruta]}>
+      <PwaInstallBanner />
+    </MemoryRouter>
+  );
+}
+const pasarRetraso = () => act(() => { vi.advanceTimersByTime(4100); });
+const ancho = (px: number) => Object.defineProperty(window, 'innerWidth', { value: px, configurable: true });
+
 beforeEach(() => {
+  vi.useFakeTimers();
   localStorage.clear();
   mockMatchMedia(false);
+  ancho(390);
   // Forzar rama no-iOS
   Object.defineProperty(window.navigator, 'userAgent', {
-    value: 'Mozilla/5.0 (Windows NT 10.0) Chrome/120', configurable: true
+    value: 'Mozilla/5.0 (Linux; Android 14) Chrome/120', configurable: true
   });
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe('PwaInstallBanner', () => {
   it('no muestra nada sin beforeinstallprompt', () => {
-    render(<PwaInstallBanner />);
+    montar();
+    pasarRetraso();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('aparece al beforeinstallprompt y ofrece instalar', () => {
-    render(<PwaInstallBanner />);
+  it('no salta encima de la primera impresión: espera unos segundos', () => {
+    montar();
     fireBeforeInstallPrompt();
-    expect(screen.getByText(/instalá ekko en tu teléfono/i)).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    pasarRetraso();
+    expect(screen.getByText(/instala ekko en tu teléfono/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Instalar' })).toBeInTheDocument();
   });
 
-  it('al descartar recuerda la decisión (no reaparece)', () => {
-    const { unmount } = render(<PwaInstallBanner />);
+  it('queda POR DEBAJO de los modales (backdrop = z 100) y, en /app, por encima de la barra de navegación', () => {
+    montar('/app');
     fireBeforeInstallPrompt();
+    pasarRetraso();
+    const banner = screen.getByRole('dialog');
+    expect(Number(banner.style.zIndex)).toBeLessThan(100);
+    expect(banner.style.bottom).toContain('96px');
+  });
+
+  it.each(['/login', '/signup', '/app/reservar', '/app/perfil', '/admin', '/recepcion'])(
+    'no aparece en %s (antes salía en todas partes, también sobre el pago)',
+    (ruta) => {
+      montar(ruta);
+      fireBeforeInstallPrompt();
+      pasarRetraso();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    }
+  );
+
+  it('no aparece en pantallas de escritorio', () => {
+    ancho(1440);
+    montar();
+    fireBeforeInstallPrompt();
+    pasarRetraso();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('al descartar guarda CUÁNDO (no un "1" eterno) y no reaparece', () => {
+    const { unmount } = montar();
+    fireBeforeInstallPrompt();
+    pasarRetraso();
     act(() => { screen.getByRole('button', { name: /ahora no/i }).click(); });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(localStorage.getItem('ekko:pwa-install-dismissed')).toBe('1');
+    expect(Number(localStorage.getItem('ekko:pwa-install-dismissed'))).toBeGreaterThan(1_000_000_000_000);
     unmount();
 
-    // Nuevo montaje: aunque llegue el evento, ya no aparece.
-    render(<PwaInstallBanner />);
+    montar();
     fireBeforeInstallPrompt();
+    pasarRetraso();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('no aparece si la app ya está instalada (standalone)', () => {
     mockMatchMedia(true);
-    render(<PwaInstallBanner />);
+    montar();
     fireBeforeInstallPrompt();
+    pasarRetraso();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('debeMostrarse', () => {
+  const base = { pathname: '/', anchoPantalla: 390, instalada: false, descartadoEn: null as string | null };
+  const DIA = 86_400_000;
+  const AHORA = 1_790_000_000_000;
+
+  it('landing e inicio del miembro: sí', () => {
+    expect(rutaAdmiteBanner('/')).toBe(true);
+    expect(rutaAdmiteBanner('/app')).toBe(true);
+    expect(rutaAdmiteBanner('/app/reservar')).toBe(false);
+    expect(debeMostrarse(base)).toBe(true);
+  });
+
+  it('descartado hace 10 días → no; hace 91 → vuelve a invitar', () => {
+    expect(debeMostrarse({ ...base, descartadoEn: String(AHORA - 10 * DIA), ahora: AHORA })).toBe(false);
+    expect(debeMostrarse({ ...base, descartadoEn: String(AHORA - 91 * DIA), ahora: AHORA })).toBe(true);
+  });
+
+  it('descarte en el formato viejo ("1", sin fecha): se respeta', () => {
+    expect(debeMostrarse({ ...base, descartadoEn: '1', ahora: AHORA })).toBe(false);
   });
 });

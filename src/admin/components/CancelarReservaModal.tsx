@@ -38,7 +38,6 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
   const toast = useToast();
 
   const [motivo, setMotivo] = useState('');
-  const [notificarMiembro, setNotificarMiembro] = useState(true);
   const [typed, setTyped] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,9 +70,7 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
 
     const { error: err } = await cancelarReserva({
       reservaId: reserva.id,
-      motivo: motivo.trim(),
-      canceladoPorId: usuario.id,
-      notificarMiembro
+      motivo: motivo.trim()
     });
 
     if (err) {
@@ -175,35 +172,9 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
           </p>
         </div>
 
-        <label
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '10px',
-            padding: '12px',
-            border: '0.5px solid var(--ek-line)',
-            borderRadius: 'var(--ek-r-md)',
-            background: 'var(--ek-bg-elevated)',
-            marginBottom: '20px',
-            cursor: 'pointer'
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={notificarMiembro}
-            onChange={(e) => setNotificarMiembro(e.target.checked)}
-            disabled={submitting}
-            style={{ marginTop: '3px', accentColor: 'var(--ek-mustard)' }}
-          />
-          <div>
-            <p style={{ fontSize: '14px', fontWeight: 500, margin: 0, marginBottom: '2px' }}>
-              Notificar al miembro
-            </p>
-            <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: 0 }}>
-              Aparecerá una notificación cuando entre a su app.
-            </p>
-          </div>
-        </label>
+        <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '0 0 20px', lineHeight: 1.45 }}>
+          Al miembro le llega el aviso por la app y por correo, con el motivo. Si usó créditos, se le devuelven.
+        </p>
 
         <div
           style={{

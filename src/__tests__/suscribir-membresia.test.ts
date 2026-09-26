@@ -62,10 +62,35 @@ describe('suscribir-membresia (Connect)', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('miembro SANCIONADO por el estudio → 403, sin tocar Stripe', async () => {
+    mockSocioMaybe.mockResolvedValue({ data: { ...SOCIO, status: 'suspendido', sancionado_at: '2026-09-01T00:00:00Z' }, error: null });
+    const res = await invocar({ tier: 'pro' });
+    expect(res.statusCode).toBe(403);
+    expect(mockSessionCreate).not.toHaveBeenCalled();
+    expect(mockGetOrCreate).not.toHaveBeenCalled();
+  });
+
+  it('un miembro en PAUSA (suspendido sin sanción) sí puede comprar', async () => {
+    mockSocioMaybe.mockResolvedValue({ data: { ...SOCIO, status: 'suspendido', sancionado_at: null }, error: null });
+    mockTierMaybe.mockResolvedValue({ data: TIER, error: null });
+    mockSessionCreate.mockResolvedValue({ client_secret: 'cs_1' });
+    const res = await invocar({ tier: 'pro' });
+    expect(res.statusCode).not.toBe(403);
+  });
+
   it('no-miembro → 400', async () => {
     mockSocioMaybe.mockResolvedValue({ data: { ...SOCIO, rol: 'recepcionista' }, error: null });
     const res = await invocar({ tier: 'pro' });
     expect(res.statusCode).toBe(400);
+  });
+
+  it('plan retirado de la venta (en_venta=false) → 400 aunque siga activo: no se compra por API', async () => {
+    mockSocioMaybe.mockResolvedValue({ data: SOCIO, error: null });
+    mockTierMaybe.mockResolvedValue({ data: { ...TIER, en_venta: false }, error: null });
+    const res = await invocar({ tier: 'pro' });
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/ya no está a la venta/);
+    expect(mockSessionCreate).not.toHaveBeenCalled();
   });
 
   it('sin Stripe → stripe_pendiente', async () => {

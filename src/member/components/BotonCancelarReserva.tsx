@@ -3,12 +3,15 @@ import { X } from 'lucide-react';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useReglaCancelacion, puedeCancelarReserva } from '@member/hooks/useReglaCancelacion';
 import { CancelarMiReservaModal } from './CancelarMiReservaModal';
+import { formatFechaHoraEnZona } from '@shared/lib/timezone';
 
 export interface ReservaCancelable {
   id: string;
   slot_inicio: string;
   folio: string;
   recurso_nombre: string;
+  /** Invitados extra ya cobrados: al cancelar hay que avisar que ese cobro no se devuelve solo (M16). */
+  invitados_extra_pagados?: number | null;
 }
 
 interface Props {
@@ -38,7 +41,9 @@ export function BotonCancelarReserva({ reserva, onCancelada }: Props) {
 
   if (!resultado.puede) {
     const whatsapp = getWhatsappNumber(tenant.config);
-    const mensaje = `Hola, necesito cancelar mi reserva del ${new Date(reserva.slot_inicio).toLocaleString('es-MX', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: false })} en ${reserva.recurso_nombre} (folio ${reserva.folio}).`;
+    // Hora del ESTUDIO: este texto lo lee recepción, que busca la reserva por esa hora.
+    const cuando = formatFechaHoraEnZona(reserva.slot_inicio, { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    const mensaje = `Hola, necesito cancelar mi reserva del ${cuando} en ${reserva.recurso_nombre} (folio ${reserva.folio}).`;
     const waUrl = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(mensaje)}` : null;
 
     return (
@@ -101,7 +106,8 @@ export function BotonCancelarReserva({ reserva, onCancelada }: Props) {
             id: reserva.id,
             slot_inicio: reserva.slot_inicio,
             recurso_nombre: reserva.recurso_nombre,
-            folio: reserva.folio
+            folio: reserva.folio,
+            invitados_extra_pagados: reserva.invitados_extra_pagados
           }}
           onClose={() => setModalOpen(false)}
           onCancelada={onCancelada}

@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { Sun, CloudSun, Moon, Eye, Ban, ArrowRight, ArrowUp, ArrowDown, PartyPopper } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
-import { useToast } from '@shared/hooks/useToast';
 import { useDashboardData, useDineroMetrics, type DashboardData } from '../hooks/useAdminData';
 import CardMenuDropdown from '../components/CardMenuDropdown';
 import CancelarReservaModal, { type ReservaParaCancelar } from '../components/CancelarReservaModal';
 import { CentroPendientes } from '../components/CentroPendientes';
 import { CumpleanosCard } from '@shared/components/CumpleanosCard';
+import { ActivarAvisosPush } from '@shared/components/ActivarAvisosPush';
+import DetalleReservaModal from '../components/DetalleReservaModal';
+import { formatFechaEnZona, formatHoraEnZona } from '@shared/lib/timezone';
 
 function capitalizar(s: string | null | undefined): string {
   if (!s) return '';
@@ -40,6 +42,7 @@ export default function AdminDashboard() {
   const { usuario } = useAuth();
   const { data, isLoading, error, refetch } = useDashboardData();
   const [cancelar, setCancelar] = useState<ReservaParaCancelar | null>(null);
+  const [detalleId, setDetalleId] = useState<string | null>(null);
 
   const saludo = saludoTiming();
   const SaludoIcon = saludo.icon;
@@ -94,10 +97,27 @@ export default function AdminDashboard() {
         <SaludoIcon size={15} aria-hidden="true" />
       </p>
 
+      {usuario && (
+        <ActivarAvisosPush
+          usuarioId={usuario.id}
+          tenantId={usuario.tenant_id}
+          descripcion="Entérate al momento de un cobro rechazado o un reembolso, aunque no tengas el panel abierto."
+          ocultarSiActivo
+        />
+      )}
       <CentroPendientes />
       <CumpleanosCard />
-      <SeccionHoy data={data} onCancelar={setCancelar} />
+      <SeccionHoy data={data} onCancelar={setCancelar} onVerDetalle={setDetalleId} />
       <PulsoDelMes data={data} />
+
+      <DetalleReservaModal
+        reservaId={detalleId}
+        onClose={() => setDetalleId(null)}
+        onCancelar={(info) => {
+          setDetalleId(null);
+          setCancelar(info);
+        }}
+      />
 
       {cancelar && (
         <CancelarReservaModal
@@ -118,18 +138,16 @@ export default function AdminDashboard() {
 
 function SeccionHoy({
   data,
-  onCancelar
+  onCancelar,
+  onVerDetalle
 }: {
   data: DashboardData;
   onCancelar: (r: ReservaParaCancelar) => void;
+  onVerDetalle: (reservaId: string) => void;
 }) {
-  const toast = useToast();
-  const hoy = new Date();
-  const fechaFmt = hoy.toLocaleDateString('es-MX', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long'
-  });
+  // "Hoy" es el día del ESTUDIO (las consultas ya lo usan): antes el encabezado y
+  // las horas salían en la zona del navegador de quien mira el panel.
+  const fechaFmt = formatFechaEnZona(new Date(), { weekday: 'long', day: 'numeric', month: 'long' });
 
   const top = data.reservasHoy.slice(0, 3);
   const total = data.reservasHoy.length;
@@ -164,12 +182,10 @@ function SeccionHoy({
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {top.map((r) => {
-              const fecha = new Date(r.slot_inicio);
-              const hora = fecha.toLocaleTimeString('es-MX', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false
-              });
+              const hora = formatHoraEnZona(r.slot_inicio);
+              // Solo se cancela lo que sigue confirmado y no ha empezado: ofrecerlo en una
+              // sesión completada o un no-show corrompía la asistencia.
+              const cancelable = r.status === 'confirmada' && new Date(r.slot_inicio).getTime() > Date.now();
               const nombre = capitalizar(r.usuario?.nombre) || r.usuario?.email || '—';
               const tier = r.usuario?.membresia_tier ?? null;
               const recursoNombre = r.recurso?.nombre ?? '—';
@@ -227,9 +243,9 @@ function SeccionHoy({
                       {
                         label: 'Ver detalle',
                         icon: Eye,
-                        onClick: () => toast.info('Detalle de reserva: pendiente Sprint Reservas.')
+                        onClick: () => onVerDetalle(r.id)
                       },
-                      {
+                      ...(!cancelable ? [] : [{
                         label: 'Cancelar reserva',
                         icon: Ban,
                         onClick: () =>
@@ -242,7 +258,7 @@ function SeccionHoy({
                           }),
                         danger: true,
                         divider: true
-                      }
+                      }])
                     ]}
                   />
                 </div>
@@ -446,10 +462,14 @@ function Grafica30Dias({ data }: { data: Array<{ fecha: string; count: number }>
               >
                 <title>
                   {d.count} {d.count === 1 ? 'reserva' : 'reservas'} ·{' '}
+                  {/* `d.fecha` es un día de calendario ('YYYY-MM-DD'): new Date() lo lee como
+                      medianoche UTC, y formatearlo en la zona local mostraba SIEMPRE el
+                      día anterior (en Mazatlán, UTC-7). */}
                   {new Date(d.fecha).toLocaleDateString('es-MX', {
                     weekday: 'short',
                     day: 'numeric',
-                    month: 'short'
+                    month: 'short',
+                    timeZone: 'UTC'
                   })}
                 </title>
               </rect>

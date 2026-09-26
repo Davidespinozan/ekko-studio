@@ -3,16 +3,12 @@ import { X } from 'lucide-react';
 import { useToast } from '@shared/hooks/useToast';
 import { Spinner } from '@shared/components/Spinner';
 import { actualizarMiembro } from '../lib/accionesMiembro';
-import { MotivoField } from './MotivoField';
-import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
 
 export interface MiembroEditable {
   id: string;
   nombre: string | null;
   email: string;
   telefono: string | null;
-  status: string;
-  membresia_tier: string | null;
 }
 
 interface Props {
@@ -21,68 +17,31 @@ interface Props {
   onGuardado: () => void;
 }
 
-const STATUS_OPCIONES = [
-  { value: 'activo', label: 'Activo' },
-  { value: 'suspendido', label: 'Suspendido' },
-  { value: 'pendiente_pago', label: 'Pendiente de pago' }
-];
-
-// Motivos predefinidos para los cambios sensibles (Bloque A — gobernanza).
-const MOTIVOS_STATUS = [
-  'Cliente activó/pagó plan',
-  'Cliente solicitó suspensión',
-  'No-show acumulado / cuenta de riesgo',
-  'Cuenta dada de baja por el cliente'
-];
-const MOTIVOS_TIER = [
-  'Cliente subió de plan',
-  'Cliente bajó de plan',
-  'Promoción / cortesía'
-];
-
 /**
- * Edición de la cuenta del miembro desde recepción: contacto + status + plan.
- * El email también cambia la cuenta de acceso (auth). Los cambios sensibles
- * (status/plan) exigen motivo y quedan registrados en audit_log (Bloque A).
+ * Edición de los DATOS DE CONTACTO del miembro desde recepción (nombre,
+ * teléfono, email). El email también cambia la cuenta de acceso (auth).
+ *
+ * Ya NO trae estado de cuenta ni plan (R5 de la paridad SALA): poner
+ * `status='activo'` o un plan a mano sin cobrar era la puerta trasera que la
+ * auditoría #1 cerró en admin (P0-7) y aquí seguía abierta. Cada una de esas
+ * acciones vive ahora en su tarjeta con su regla y su rastro: el plan se
+ * activa con dinero (`MembresiaCard`) y el estado de la cuenta se cambia con
+ * motivo (`EstadoCuentaCard`).
  */
 export function EditarMiembroModal({ miembro, onClose, onGuardado }: Props) {
   const toast = useToast();
   const [nombre, setNombre] = useState(miembro.nombre ?? '');
   const [email, setEmail] = useState(miembro.email);
   const [telefono, setTelefono] = useState(miembro.telefono ?? '');
-  const [status, setStatus] = useState(miembro.status);
-  const [tier, setTier] = useState(miembro.membresia_tier ?? '');
-  const { planes } = usePlanesActivos();
-  const [motivo, setMotivo] = useState('');
   const [saving, setSaving] = useState(false);
 
   const emailCambia = email.trim().toLowerCase() !== miembro.email.toLowerCase();
-  const statusCambia = status !== miembro.status;
-  const tierCambia = (tier === '' ? null : tier) !== (miembro.membresia_tier ?? null);
-  const requiereMotivo = statusCambia || tierCambia;
-
-  // Opciones de motivo según lo que cambió (status, tier o ambos).
-  const motivoOpciones = [
-    ...(statusCambia ? MOTIVOS_STATUS : []),
-    ...(tierCambia ? MOTIVOS_TIER : [])
-  ];
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (requiereMotivo && !motivo.trim()) {
-      toast.error('Indicá el motivo del cambio.');
-      return;
-    }
     setSaving(true);
     try {
-      const res = await actualizarMiembro(miembro.id, {
-        nombre,
-        telefono,
-        email,
-        status,
-        membresia_tier: tier === '' ? null : tier,
-        motivo: requiereMotivo ? motivo.trim() : undefined
-      });
+      const res = await actualizarMiembro(miembro.id, { nombre, telefono, email });
       if (res.sin_cambios) {
         toast.info('No había cambios para guardar.');
       } else {
@@ -106,7 +65,7 @@ export function EditarMiembroModal({ miembro, onClose, onGuardado }: Props) {
         style={{ maxWidth: '460px', width: '100%', maxHeight: '92vh', overflowY: 'auto', animation: 'ek-scale-in 0.22s cubic-bezier(0.16,1,0.3,1)' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-          <p className="ek-eyebrow ek-eyebrow--mustard">EDITAR MIEMBRO</p>
+          <p className="ek-eyebrow ek-eyebrow--mustard">EDITAR DATOS</p>
           <button type="button" className="ek-icon-btn ek-icon-btn--ghost ek-icon-btn--sm" aria-label="Cerrar" onClick={onClose}>
             <X size={18} aria-hidden="true" />
           </button>
@@ -130,35 +89,9 @@ export function EditarMiembroModal({ miembro, onClose, onGuardado }: Props) {
               </p>
             )}
           </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div className="ek-form-field">
-              <label className="ek-label" htmlFor="em-status">Estado</label>
-              <select id="em-status" className="ek-input" value={status} onChange={(e) => setStatus(e.target.value)}>
-                {STATUS_OPCIONES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-            <div className="ek-form-field">
-              <label className="ek-label" htmlFor="em-tier">Plan</label>
-              <select id="em-tier" className="ek-input" value={tier} onChange={(e) => setTier(e.target.value)}>
-                <option value="">Sin plan</option>
-                {planes.map((p) => <option key={p.slug} value={p.slug}>{p.nombre}</option>)}
-                {/* Si el plan actual ya no existe en la lista, mostralo igual para
-                    no cambiarlo sin querer al guardar. */}
-                {tier && !planes.some((p) => p.slug === tier) && (
-                  <option value={tier}>{tier}</option>
-                )}
-              </select>
-            </div>
-          </div>
-
-          {requiereMotivo && (
-            <MotivoField
-              opciones={motivoOpciones}
-              onChange={setMotivo}
-              idPrefix="em-motivo"
-            />
-          )}
+          <p className="ek-body-faint" style={{ margin: 0 }}>
+            El plan y el estado de la cuenta se cambian desde sus propias tarjetas en la ficha.
+          </p>
         </div>
 
         <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>

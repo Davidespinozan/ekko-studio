@@ -3,7 +3,9 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { Spinner } from '@shared/components/Spinner';
-import { validarStatusCuenta, traducirErrorAuth } from '@shared/lib/validarStatusCuenta';
+import { ContactoEstudio } from '@shared/components/ContactoEstudio';
+import { validarStatusSegunRol, traducirErrorAuth } from '@shared/lib/validarStatusCuenta';
+import { suspendidoPorPausa, MENSAJE_EN_PAUSA } from '@shared/lib/pausaMembresia';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -46,7 +48,7 @@ export default function Login() {
       // 2. Traer perfil + status ANTES de cualquier redirect.
       const { data: perfil, error: perfilError } = await supabase
         .from('usuarios')
-        .select('rol, status')
+        .select('id, rol, status')
         .eq('auth_id', authData.user.id)
         .maybeSingle();
 
@@ -59,14 +61,20 @@ export default function Login() {
 
       // 3. Validar status ANTES del redirect (evita el flash de /app).
       // Excepción: `pendiente_pago` entra a /app para pagar su membresía (self-serve).
-      if (perfil.status === 'pendiente_pago') {
+      // Solo MIEMBROS: un recepcionista/admin "pendiente de pago" no existe.
+      if (perfil.status === 'pendiente_pago' && perfil.rol === 'miembro') {
         navigate('/app', { replace: true });
         return;
       }
-      const validacion = validarStatusCuenta(perfil);
+      // Staff: solo `activo` entra al panel (un miembro `cancelado` sí entra, a recomprar).
+      const validacion = validarStatusSegunRol(perfil);
       if (!validacion.permitido) {
+        // Suspendido por una PAUSA (viaje, lesión) ≠ suspendido por el admin: se
+        // consulta antes de cerrar la sesión (después ya no podría leer sus filas).
+        const enPausa =
+          perfil.status === 'suspendido' && perfil.rol === 'miembro' && (await suspendidoPorPausa(perfil.id));
         await supabase.auth.signOut();
-        setError(validacion.mensaje ?? 'Tu cuenta no está activa.');
+        setError(enPausa ? MENSAJE_EN_PAUSA : validacion.mensaje ?? 'Tu cuenta no está activa.');
         setIsSubmitting(false);
         return;
       }
@@ -141,7 +149,16 @@ export default function Login() {
             {error && (
               <p className="ek-error-text" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
                 <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '1px' }} aria-hidden="true" />
-                <span>{error}</span>
+                <span>
+                  {error}
+                  {/* A12: si el mensaje manda a contactar al estudio, que haya cómo. */}
+                  {/contacta|escr[ií]bele|recepci[oó]n/i.test(error) && (
+                    <>
+                      {' '}
+                      <ContactoEstudio enLinea etiqueta="Escríbenos por WhatsApp" mensaje={`Hola, no puedo entrar a mi cuenta de EKKO (${email.trim() || 'sin email'}): ${error}`} />
+                    </>
+                  )}
+                </span>
               </p>
             )}
 

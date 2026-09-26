@@ -46,10 +46,10 @@ async function invocar(event: AnyEvent) {
   return res as { statusCode: number; body: string };
 }
 
-const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista' };
+const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo' };
 const TARGET = { id: 'm-1', auth_id: 'auth-m1', tenant_id: 't1', email: 'ana@cravia.mx', rol: 'miembro' };
-const ADMIN_CALLER = { id: 'u-admin', tenant_id: 't1', rol: 'admin' };
-const STAFF_TARGET = { id: 's-1', auth_id: 'auth-s1', tenant_id: 't1', email: 'jefe@cravia.mx', rol: 'admin' };
+const ADMIN_CALLER = { id: 'u-admin', tenant_id: 't1', rol: 'admin', status: 'activo' };
+const STAFF_TARGET = { id: 's-1', auth_id: 'auth-s1', tenant_id: 't1', email: 'jefe@cravia.mx', rol: 'admin', status: 'activo' };
 
 describe('reception-reset-password · audit (Bloque A)', () => {
   beforeEach(() => {

@@ -58,10 +58,11 @@ export function debeCancelarPrimero(
   nuevo: { recursoId: string; inicio: number; fin: number }
 ): boolean {
   const adyacente = contiguos(original.inicio, original.fin, nuevo.inicio, nuevo.fin);
-  const solapaMismoRecurso =
-    original.recursoId === nuevo.recursoId &&
-    solapan(original.inicio, original.fin, nuevo.inicio, nuevo.fin);
-  return adyacente || solapaMismoRecurso;
+  // Cualquier traslape, sea del set que sea: con "un solo set a la vez"
+  // (reserva.sets_exclusivos) la vieja también bloquea los demás sets a esa hora
+  // → EKKO_ESTUDIO_EN_USO. Cancelar primero es correcto en los dos modos.
+  const solapa = solapan(original.inicio, original.fin, nuevo.inicio, nuevo.fin);
+  return adyacente || solapa;
 }
 
 /** Llama `reservar_para_miembro_atomic`. Devuelve el mensaje de error crudo o null. */
@@ -90,6 +91,25 @@ async function cancelarVieja(reservaId: string): Promise<string | null> {
     p_motivo: 'Reprogramada por recepción'
   });
   return error ? error.message : null;
+}
+
+/**
+ * Deja UN aviso de "cambio de horario" en vez del par "te agendamos…" + "tu reserva
+ * fue cancelada por el estudio" (que leídos por separado parecen una cancelación).
+ * Best-effort: si falla, los dos avisos originales siguen ahí y la reprogramación
+ * ya quedó hecha — no se le reporta al usuario como error.
+ */
+async function avisarCambioDeHorario(reservaViejaId: string): Promise<void> {
+  try {
+    await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>
+    ) => Promise<{ error: { message: string } | null }>)('staff_avisar_reprogramacion', {
+      p_reserva_vieja: reservaViejaId
+    });
+  } catch {
+    /* best-effort */
+  }
 }
 
 export async function reprogramarReserva(p: ReprogramarParams): Promise<ReprogramarResultado> {
@@ -122,6 +142,7 @@ export async function reprogramarReserva(p: ReprogramarParams): Promise<Reprogra
           'El miembro quedó SIN reserva — reserva de nuevo.'
       };
     }
+    await avisarCambioDeHorario(p.reservaOriginalId);
     return { estado: 'ok', mensaje: 'Reserva reprogramada.' };
   }
 
@@ -142,5 +163,6 @@ export async function reprogramarReserva(p: ReprogramarParams): Promise<Reprogra
         'Cancela la reserva original manualmente desde el perfil.'
     };
   }
+  await avisarCambioDeHorario(p.reservaOriginalId);
   return { estado: 'ok', mensaje: 'Reserva reprogramada.' };
 }

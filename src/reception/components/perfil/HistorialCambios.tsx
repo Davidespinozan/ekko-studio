@@ -36,8 +36,37 @@ function describirCambio(e: AuditEntryUsuario): string {
       return 'Reseteó el acceso';
     case 'create_member':
       return 'Registró al miembro';
+    case 'membership_activated':
+      return `Activó el plan: ${planLabel(e.despues?.membresia_tier)}`;
+    case 'membresia_pausada':
+      return 'Pausó la membresía';
+    case 'membresia_reactivada':
+      return 'Reanudó la membresía';
+    case 'membresia_baja':
+      return e.despues?.cancel_at_period_end ? 'Dio de baja la membresía (no se renovará)' : 'Dio de baja la membresía';
+    case 'creditos_ajustados':
+      return `Ajustó créditos: ${valorTexto(e.antes?.creditos_restantes)} → ${valorTexto(e.despues?.creditos_restantes)}`;
+    case 'reserva_cancelada_por_estudio':
+      return 'Canceló una reserva del miembro';
+    case 'asistencia_correction':
+      return 'Corrigió una asistencia';
+    case 'ficha_identidad_actualizada':
+      return 'Actualizó la ficha de identidad';
+    case 'notification_sent':
+      return 'Le envió un aviso';
+    case 'invitado_agregado':
+      return 'Registró un invitado';
+    case 'invitado_eliminado':
+      return 'Quitó un invitado';
+    case 'material_subido':
+      return `Subió material: ${valorTexto(e.despues?.titulo)}`;
+    case 'material_retirado':
+      return `Retiró material: ${valorTexto(e.antes?.titulo)}`;
+    case 'reserva_observacion':
+      return 'Anotó una observación en una reserva';
     default:
-      return e.accion;
+      // Una acción nueva sin etiqueta: legible, nunca el identificador crudo.
+      return e.accion.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
   }
 }
 

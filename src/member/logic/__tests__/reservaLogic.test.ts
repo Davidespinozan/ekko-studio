@@ -57,6 +57,58 @@ function makeRecurso(overrides: Partial<Recurso> = {}): Recurso {
   };
 }
 
+/**
+ * La grilla recibe INTERVALOS de `slots_ocupados` (no filas de `reservas`, que por
+ * RLS un miembro no puede leer de otros) y decide por traslape.
+ */
+describe('generarSlotsDisponibles — intervalos ocupados y "un solo set a la vez"', () => {
+  const recurso = makeRecurso();
+  const ahora = instanteEnZona(2026, 4, 9, 8, 0); // sábado: todo el lunes 11 es reservable
+  const fecha = '2026-05-11';
+  const a = (hhmm: string) => combinarFechaHora(fecha, hhmm).toISOString();
+  const slotDe = (slots: ReturnType<typeof generarSlotsDisponibles>, hhmm: string) =>
+    slots.find((x) => x.inicio.getTime() === combinarFechaHora(fecha, hhmm).getTime())!;
+
+  it('OTRO set en uso de 10 a 11 → este set sale "otro_set" (no "ocupado") y no es reservable', () => {
+    const slots = generarSlotsDisponibles(
+      recurso, fecha, baseConfig,
+      [{ slot_inicio: a('10:00'), slot_fin: a('11:00'), mismo_set: false }],
+      [], ahora
+    );
+    expect(slotDe(slots, '10:00')).toMatchObject({ disponible: false, razon: 'otro_set' });
+    expect(slotDe(slots, '11:00').disponible).toBe(true);
+  });
+
+  it('si además ESTE set está ocupado, manda "ocupado"', () => {
+    const slots = generarSlotsDisponibles(
+      recurso, fecha, baseConfig,
+      [
+        { slot_inicio: a('10:00'), slot_fin: a('11:00'), mismo_set: false },
+        { slot_inicio: a('10:00'), slot_fin: a('11:00'), mismo_set: true }
+      ],
+      [], ahora
+    );
+    expect(slotDe(slots, '10:00').razon).toBe('ocupado');
+  });
+
+  it('una reserva de 2 h (recepción) bloquea LOS DOS slots de 1 h: es por traslape, no por hora de inicio', () => {
+    const slots = generarSlotsDisponibles(
+      recurso, fecha, baseConfig,
+      [{ slot_inicio: a('10:00'), slot_fin: a('12:00'), mismo_set: true }],
+      [], ahora
+    );
+    expect(slotDe(slots, '10:00').disponible).toBe(false);
+    expect(slotDe(slots, '11:00').disponible).toBe(false);
+    expect(slotDe(slots, '09:00').disponible).toBe(true);
+  });
+
+  it('compatibilidad: un intervalo sin slot_fin ni mismo_set se trata como 1 sesión de este set', () => {
+    const slots = generarSlotsDisponibles(recurso, fecha, baseConfig, [{ slot_inicio: a('10:00') }], [], ahora);
+    expect(slotDe(slots, '10:00')).toMatchObject({ disponible: false, razon: 'ocupado' });
+    expect(slotDe(slots, '11:00').disponible).toBe(true);
+  });
+});
+
 describe('generarSlotsDisponibles', () => {
   it('genera slots de 60 min en bloques separados de horario', () => {
     const recurso = makeRecurso();

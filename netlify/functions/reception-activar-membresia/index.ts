@@ -9,11 +9,19 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
+import { esStaffActivo, puedeOperarSobre } from '../_lib/staff';
 
 /**
  * POST /reception-activar-membresia
  * Auth: Bearer JWT de admin o recepcionista.
- * Body: { usuario_id, tier: <slug> }
+ * Body: { usuario_id, tier: <slug>, confirmar_perdida?: boolean, motivo?: string }
+ *
+ * `confirmar_perdida`: pasar a un plan SIN créditos quema el saldo del paquete
+ * que tenía el miembro. Sin `true` explícito el RPC rechaza
+ * (EKKO_PERDERIA_CREDITOS) y aquí se responde 409 con el saldo en juego, para que
+ * la UI pregunte. Antes la única barrera era un confirm() del front: por API (o
+ * con un saldo que el front no veía, p. ej. una membresía en pausa) se perdía
+ * sin aviso.
  *
  * Activación en MOSTRADOR (D4: self-serve + recepción). Recepción confirma el
  * pago en persona y activa la membresía del miembro vía el RPC keystone
@@ -29,6 +37,8 @@ import { writeAuditLog } from '../_lib/auditLog';
 interface Body {
   usuario_id?: string;
   tier?: string;
+  confirmar_perdida?: boolean;
+  motivo?: string;
 }
 
 export const handler: Handler = async (event) => {
@@ -56,10 +66,10 @@ export const handler: Handler = async (event) => {
 
     const { data: caller } = await supabaseAsUser
       .from('usuarios')
-      .select('id, tenant_id, rol')
+      .select('id, tenant_id, rol, status')
       .eq('auth_id', authUser.id)
       .maybeSingle();
-    if (!caller || !['admin', 'recepcionista'].includes(caller.rol)) {
+    if (!esStaffActivo(caller)) {
       return forbidden('Solo recepción o admin pueden hacer esto');
     }
 
@@ -70,13 +80,16 @@ export const handler: Handler = async (event) => {
     // Target del mismo tenant.
     const { data: target, error: targetErr } = await supabaseAdmin
       .from('usuarios')
-      .select('id, tenant_id, status, membresia_tier')
+      .select('id, tenant_id, rol, status, membresia_tier')
       .eq('id', body.usuario_id)
       .maybeSingle();
     if (targetErr) return serverError(targetErr.message);
     if (!target) return notFound('Miembro no encontrado');
     if (target.tenant_id !== caller.tenant_id) {
       return forbidden('El miembro pertenece a otro estudio');
+    }
+    if (!puedeOperarSobre(caller, target)) {
+      return forbidden('Solo un admin puede modificar las cuentas del equipo');
     }
 
     // Resolver el tier (slug → id) en el tenant.
@@ -93,9 +106,24 @@ export const handler: Handler = async (event) => {
     // Activar vía el RPC keystone (sin IDs de Stripe — pago en mostrador).
     const { data: result, error: rpcErr } = await supabaseAdmin.rpc('activar_membresia', {
       p_usuario_id: target.id,
-      p_tier_id: tier.id
+      p_tier_id: tier.id,
+      p_confirmar_perdida: body.confirmar_perdida === true
     });
-    if (rpcErr) return serverError(rpcErr.message);
+    if (rpcErr) {
+      if (rpcErr.message.includes('EKKO_PERDERIA_CREDITOS')) {
+        const creditos = Number.parseInt(rpcErr.message.match(/perdería (\d+)/)?.[1] ?? '', 10);
+        return {
+          statusCode: 409,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            error: `El miembro perdería ${Number.isFinite(creditos) ? creditos : 'sus'} crédito(s) al cambiar a este plan. Confirma para continuar.`,
+            code: 'perderia_creditos',
+            creditos: Number.isFinite(creditos) ? creditos : null
+          })
+        };
+      }
+      return serverError(rpcErr.message);
+    }
 
     await writeAuditLog(supabaseAdmin, {
       tenant_id: target.tenant_id,
@@ -106,7 +134,8 @@ export const handler: Handler = async (event) => {
       target_id: target.id,
       antes: { status: target.status, membresia_tier: target.membresia_tier },
       despues: { status: 'activo', membresia_tier: tier.slug },
-      metadata: { via: 'mostrador' }
+      motivo: typeof body.motivo === 'string' && body.motivo.trim() ? body.motivo.trim() : undefined,
+      metadata: { via: 'mostrador', perdida_de_creditos_confirmada: body.confirmar_perdida === true }
     });
 
     return ok({ success: true, result });

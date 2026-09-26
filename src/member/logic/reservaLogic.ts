@@ -25,7 +25,20 @@ export interface Slot {
   inicio: Date;
   fin: Date;
   disponible: boolean;
-  razon?: 'ocupado' | 'pasado' | 'anticipacion_insuficiente' | 'continuo' | 'fuera_horario';
+  /** 'otro_set' = el horario está libre en ESTE set, pero el estudio graba un set a la vez y hay otro en uso. */
+  razon?: 'ocupado' | 'otro_set' | 'pasado' | 'anticipacion_insuficiente' | 'continuo' | 'fuera_horario';
+}
+
+/**
+ * Un intervalo que bloquea el set que se está mirando (lo devuelve la RPC
+ * `slots_ocupados`). `mismo_set: false` = lo ocupa OTRO set y el estudio graba
+ * uno a la vez. `slot_fin`/`mismo_set` son opcionales para no romper a quien
+ * todavía pase solo `slot_inicio`.
+ */
+export interface IntervaloOcupado {
+  slot_inicio: string;
+  slot_fin?: string | null;
+  mismo_set?: boolean | null;
 }
 
 export interface HorarioBloque {
@@ -87,7 +100,7 @@ export function generarSlotsDisponibles(
   recurso: Recurso,
   fechaISO: string,
   config: TenantReservaConfig,
-  reservasDelRecurso: Pick<Reserva, 'slot_inicio'>[],
+  reservasDelRecurso: IntervaloOcupado[],
   reservasDelUsuario: Pick<Reserva, 'slot_inicio'>[],
   ahora: Date = new Date(),
   opciones: { permitirEnCurso?: boolean } = {}
@@ -104,8 +117,15 @@ export function generarSlotsDisponibles(
   const anticipacionMs = config.anticipacion_min_horas * 60 * 60 * 1000;
   const limiteAnticipacion = new Date(ahora.getTime() + anticipacionMs);
 
-  // Set de slots ocupados (timestamps ISO) para lookup O(1)
-  const ocupados = new Set(reservasDelRecurso.map((r) => new Date(r.slot_inicio).getTime()));
+  // Intervalos ocupados. Se compara por TRASLAPE, no por igualdad de hora de
+  // inicio: con "un solo set a la vez" el intervalo puede venir de OTRO set, y
+  // recepción puede haber reservado una duración distinta del default. Sin
+  // `slot_fin` (datos viejos) se asume la duración del estudio.
+  const ocupados = reservasDelRecurso.map((r) => {
+    const ini = new Date(r.slot_inicio).getTime();
+    const fin = r.slot_fin ? new Date(r.slot_fin).getTime() : ini + duracion * 60_000;
+    return { ini, fin, mismoSet: r.mismo_set !== false };
+  });
 
   // Set de slots del usuario (para detectar continuos si está prohibido)
   const slotsUsuario = new Set(reservasDelUsuario.map((r) => new Date(r.slot_inicio).getTime()));
@@ -134,9 +154,10 @@ export function generarSlotsDisponibles(
       } else if (!opciones.permitirEnCurso && slotInicio < limiteAnticipacion) {
         disponible = false;
         razon = 'anticipacion_insuficiente';
-      } else if (ocupados.has(slotInicioMs)) {
+      } else if (ocupados.some((o) => o.ini < slotFin.getTime() && o.fin > slotInicioMs)) {
         disponible = false;
-        razon = 'ocupado';
+        const choque = ocupados.filter((o) => o.ini < slotFin.getTime() && o.fin > slotInicioMs);
+        razon = choque.some((o) => o.mismoSet) ? 'ocupado' : 'otro_set';
       } else if (!config.permitir_continuas) {
         // Validar que el usuario no tenga reserva en slot adyacente (±duracion)
         const slotAnteriorMs = slotInicioMs - duracion * 60_000;
@@ -261,8 +282,11 @@ export function traducirErrorRPC(message: string): string {
   if (message.includes('EKKO_LIMITE_DIARIO')) return 'Alcanzaste el máximo de sesiones que puedes reservar ese día. Elige otro día.';
   if (message.includes('EKKO_IDENTIDAD_INCOMPLETA')) return 'Falta capturar la ficha de identidad (foto, datos, INE) antes de dar ingreso.';
   if (message.includes('EKKO_CONTRATO_PENDIENTE')) return 'El miembro debe firmar el contrato antes de dar ingreso.';
+  if (message.includes('EKKO_SIN_MEMBRESIA')) return 'No tienes un plan vigente. Elige un plan o paquete en tu perfil para reservar.';
+  if (message.includes('EKKO_DURACION_INVALIDA')) return 'La duración de la sesión no es válida para este estudio.';
   if (message.includes('EKKO_SIN_CREDITOS')) return 'No te quedan créditos. Compra un paquete para reservar.';
   if (message.includes('EKKO_MEMBRESIA_VENCIDA')) return 'Tu paquete venció. Renueva para seguir reservando.';
+  if (message.includes('EKKO_ESTUDIO_EN_USO')) return 'A esa hora ya hay una grabación en otro set. El estudio graba un set a la vez para cuidar el audio: elige otro horario.';
   if (message.includes('EKKO_SLOT_OCUPADO')) return 'Este horario acaba de ser tomado por otro miembro. Elige otro.';
   if (message.includes('EKKO_RESERVA_NO_EXISTE')) return 'La reserva no existe.';
   if (message.includes('EKKO_NO_AUTORIZADO')) return 'No puedes hacer esta acción.';

@@ -96,7 +96,7 @@ describe('reception-create-member · seguridad', () => {
 
   it('recepcionista SÍ puede registrar — crea con rol="miembro"', async () => {
     mockMaybeSingle.mockResolvedValue({
-      data: { id: 'u-recep', tenant_id: 'tenant-1', rol: 'recepcionista' },
+      data: { id: 'u-recep', tenant_id: 'tenant-1', rol: 'recepcionista', status: 'activo' },
       error: null
     });
     const res = await invocar(evento(BODY_OK));
@@ -110,7 +110,7 @@ describe('reception-create-member · seguridad', () => {
 
   it('admin también puede usar esta función', async () => {
     mockMaybeSingle.mockResolvedValue({
-      data: { id: 'u-admin', tenant_id: 'tenant-1', rol: 'admin' },
+      data: { id: 'u-admin', tenant_id: 'tenant-1', rol: 'admin', status: 'activo' },
       error: null
     });
     const res = await invocar(evento(BODY_OK));
@@ -119,7 +119,7 @@ describe('reception-create-member · seguridad', () => {
 
   it('rol="admin" en el body se IGNORA — siempre crea miembro', async () => {
     mockMaybeSingle.mockResolvedValue({
-      data: { id: 'u-recep', tenant_id: 'tenant-1', rol: 'recepcionista' },
+      data: { id: 'u-recep', tenant_id: 'tenant-1', rol: 'recepcionista', status: 'activo' },
       error: null
     });
     const res = await invocar(evento({ ...BODY_OK, rol: 'admin', tenant_id: 'otro-tenant' }));
@@ -137,7 +137,7 @@ describe('reception-create-member · seguridad', () => {
 
   it('escribe audit_log create_member (Bloque A)', async () => {
     mockMaybeSingle.mockResolvedValue({
-      data: { id: 'u-recep', tenant_id: 'tenant-1', rol: 'recepcionista' },
+      data: { id: 'u-recep', tenant_id: 'tenant-1', rol: 'recepcionista', status: 'activo' },
       error: null
     });
     const res = await invocar(evento(BODY_OK));

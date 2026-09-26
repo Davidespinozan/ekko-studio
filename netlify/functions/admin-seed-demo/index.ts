@@ -6,8 +6,10 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
+import { randomInt } from 'node:crypto';
 import { ok, unauthorized, forbidden, serverError, badRequest } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
+import { esAdminActivo } from '../_lib/staff';
 
 /**
  * POST /admin-seed-demo — crea/regenera las CUENTAS DEMO (una por rol) para que
@@ -18,10 +20,20 @@ import { requireEnv } from '../_lib/env';
  *                       probar reservas y check-in sin el gate).
  * - demo-recepcion@… → recepcionista activo.
  * - demo-staff@…     → staff activo.
- * Todas con la MISMA password demo. Devuelve las credenciales para mostrarlas.
+ * Todas con la MISMA password, generada AL AZAR en cada corrida y devuelta una
+ * sola vez para mostrarla. Nunca una constante: esta function crea un ADMIN real
+ * en el tenant de producción, y una clave fija en el repo era una puerta abierta
+ * para cualquiera que leyera el código (volver a correrla rota la clave).
  */
 
-const DEMO_PASSWORD = 'DemoEkko2026';
+// Sin caracteres ambiguos (0/O, 1/l/I): se dicta y se teclea.
+const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+
+export function generarPasswordDemo(len = 14): string {
+  let out = '';
+  for (let i = 0; i < len; i++) out += ALFABETO[randomInt(ALFABETO.length)];
+  return out;
+}
 
 interface DemoDef {
   email: string;
@@ -47,6 +59,7 @@ export const handler: Handler = async (event) => {
     const supabaseUrl = requireEnv('VITE_SUPABASE_URL');
     const anonKey = requireEnv('VITE_SUPABASE_ANON_KEY');
     const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+    const demoPassword = generarPasswordDemo();
 
     const asUser = createClient(supabaseUrl, anonKey, {
       global: { headers: { Authorization: `Bearer ${userToken}` } },
@@ -57,10 +70,10 @@ export const handler: Handler = async (event) => {
 
     const { data: admin } = await asUser
       .from('usuarios')
-      .select('tenant_id, rol')
+      .select('tenant_id, rol, status')
       .eq('auth_id', authUser.id)
       .maybeSingle();
-    if (!admin?.tenant_id || admin.rol !== 'admin') {
+    if (!admin?.tenant_id || !esAdminActivo(admin)) {
       return forbidden('Solo el admin puede crear cuentas demo');
     }
     const tenantId = admin.tenant_id;
@@ -113,14 +126,14 @@ export const handler: Handler = async (event) => {
       if (existente?.auth_id) {
         // Resetear password (idempotente).
         await db.auth.admin.updateUserById(existente.auth_id, {
-          password: DEMO_PASSWORD,
+          password: demoPassword,
           email_confirm: true
         });
         authId = existente.auth_id;
       } else {
         const { data: creado, error: crearErr } = await db.auth.admin.createUser({
           email: demo.email,
-          password: DEMO_PASSWORD,
+          password: demoPassword,
           email_confirm: true,
           user_metadata: { tenant_slug: 'ekko', nombre: demo.nombre }
         });
@@ -161,7 +174,7 @@ export const handler: Handler = async (event) => {
 
     return ok({
       success: true,
-      password: DEMO_PASSWORD,
+      password: demoPassword,
       cuentas: DEMOS.map((d) => ({ email: d.email, rol: d.rol, nombre: d.nombre }))
     });
   } catch (e) {

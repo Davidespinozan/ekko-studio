@@ -10,6 +10,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
+import { esAdminActivo } from '../_lib/staff';
 
 /**
  * POST /admin-delete-user
@@ -33,6 +34,15 @@ import { requireEnv } from '../_lib/env';
 
 interface DeleteUserRequest {
   usuario_id: string;
+}
+
+/** 409 con mensaje humano + datos para la UI. */
+function conflicto(error: string, extra: Record<string, unknown> = {}) {
+  return {
+    statusCode: 409,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ error, ...extra })
+  };
 }
 
 export const handler: Handler = async (event) => {
@@ -59,11 +69,11 @@ export const handler: Handler = async (event) => {
 
     const { data: adminProfile } = await supabaseAsUser
       .from('usuarios')
-      .select('id, tenant_id, rol')
+      .select('id, tenant_id, rol, status')
       .eq('auth_id', authUser.id)
       .maybeSingle();
 
-    if (!adminProfile || adminProfile.rol !== 'admin') {
+    if (!esAdminActivo(adminProfile)) {
       return forbidden('Solo admin puede eliminar usuarios');
     }
 
@@ -117,6 +127,61 @@ export const handler: Handler = async (event) => {
           reservas_count: reservasCount
         })
       };
+    }
+
+    // Pre-check: suscripción viva en Stripe. Borrar al miembro borra en cascada
+    // su fila de `membresias`, pero NO cancela nada en Stripe: la tarjeta se
+    // seguiría cobrando cada mes a una persona que ya no existe aquí (y el
+    // reconciliador del cron busca filas que ya no están). Primero la baja.
+    const { data: subViva } = await supabaseAdmin
+      .from('membresias')
+      .select('id')
+      .eq('usuario_id', target.id)
+      .in('status', ['trialing', 'activa', 'past_due', 'pausada'])
+      .not('stripe_subscription_id', 'is', null)
+      .limit(1)
+      .maybeSingle();
+    if (subViva) {
+      return conflicto(
+        'No se puede eliminar: tiene una suscripción activa en Stripe que se seguiría cobrando. Cancela primero su membresía.',
+        { suscripcion_viva: true }
+      );
+    }
+
+    // Pre-check: cobros registrados. `payment_events.usuario_id` quedaría en NULL
+    // y esos ingresos se volverían huérfanos en Reportes e imposibles de
+    // reembolsar con contexto. Una cuenta que pagó se revoca, no se borra.
+    const { count: pagosCount } = await supabaseAdmin
+      .from('payment_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('usuario_id', target.id);
+    if ((pagosCount ?? 0) > 0) {
+      return conflicto(
+        `No se puede eliminar: tiene ${pagosCount} ${pagosCount === 1 ? 'cobro registrado' : 'cobros registrados'}. Para quitarle el acceso usa "Revocar" o "Suspender"; su historial de pagos se conserva.`,
+        { pagos_count: pagosCount }
+      );
+    }
+
+    // Pre-check: huella como STAFF. Estas FKs no tienen ON DELETE y el borrado
+    // tronaba con "Database error deleting user" (check-ins que hizo,
+    // cancelaciones, notas, bitácora). Igual que arriba: al equipo se le revoca.
+    const huellas: Array<[string, string, string]> = [
+      ['reservas', 'check_in_by', 'check-ins registrados por esta persona'],
+      ['reservas', 'cancelada_por', 'cancelaciones hechas por esta persona'],
+      ['notas_miembro', 'autor_id', 'notas escritas por esta persona'],
+      ['audit_log', 'actor_usuario_id', 'acciones en la bitácora']
+    ];
+    for (const [tabla, columna, que] of huellas) {
+      const { count } = await supabaseAdmin
+        .from(tabla)
+        .select('id', { count: 'exact', head: true })
+        .eq(columna, target.id);
+      if ((count ?? 0) > 0) {
+        return conflicto(
+          `No se puede eliminar: hay ${count} ${que}. Usa "Revocar acceso": conserva el historial y le quita la entrada al panel.`,
+          { tabla, count }
+        );
+      }
     }
 
     if (!target.auth_id) {

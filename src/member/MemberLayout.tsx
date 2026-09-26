@@ -1,7 +1,8 @@
 import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { validarStatusCuenta } from '@shared/lib/validarStatusCuenta';
+import { MENSAJE_EN_PAUSA, suspendidoPorPausa } from '@shared/lib/pausaMembresia';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
 import { DemoBanner } from '@shared/components/DemoBanner';
 import { BrandLogo } from '@shared/components/BrandLogo';
@@ -16,6 +17,7 @@ const MisReservas = lazy(() => import('./pages/MisReservas'));
 const Perfil = lazy(() => import('./pages/Perfil'));
 const MiQR = lazy(() => import('./pages/MiQR'));
 const MiQRProxima = lazy(() => import('./pages/MiQRProxima'));
+const MiMaterial = lazy(() => import('./pages/MiMaterial'));
 const Estudios = lazy(() => import('./pages/Estudios'));
 const EstudioDetalle = lazy(() => import('./pages/EstudioDetalle'));
 
@@ -29,6 +31,7 @@ function tituloDeSeccion(path: string): string | null {
   if (path.startsWith('/app/reservar')) return 'Reservar';
   if (path.startsWith('/app/reservas')) return 'Mis reservas';
   if (path.startsWith('/app/perfil')) return 'Perfil';
+  if (path.startsWith('/app/material')) return 'Mi material';
   if (path.startsWith('/app/qr')) return 'Mi QR';
   return null;
 }
@@ -44,19 +47,34 @@ export default function MemberLayout() {
 
   // `pendiente_pago` NO se echa: puede pagar su membresía self-serve (abajo).
   const pendientePago = usuario?.status === 'pendiente_pago';
+  // Mensaje con el que se despide a la sesión que ya no puede seguir. Se
+  // resuelve ANTES de cerrar sesión: una pausa (viaje, lesión) deja la cuenta
+  // en `suspendido` igual que una sanción, y "Tu cuenta está suspendida" a
+  // quien pidió la pausa le suena a castigo (A8). Login ya lo distinguía; aquí
+  // faltaba para la sesión que seguía abierta cuando cambió el status.
+  const [mensajeSalida, setMensajeSalida] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
     if (!authUser || !usuario) return;
-    if (validarStatusCuenta(usuario).permitido) return;
+    const v = validarStatusCuenta(usuario);
+    if (v.permitido) return;
     if (pendientePago) return; // se queda para pagar
     if (yaCerrado.current) return;
     yaCerrado.current = true;
-    // signOut limpia la sesión; el Navigate de abajo redirige a /login
-    // con el mensaje claro (no flash, no deslogueo silencioso).
-    void signOut();
+    void (async () => {
+      // Con la sesión viva todavía puede leer sus membresías (RLS); después no.
+      const enPausa = usuario.status === 'suspendido' && (await suspendidoPorPausa(usuario.id));
+      setMensajeSalida(enPausa ? MENSAJE_EN_PAUSA : v.mensaje ?? 'Tu cuenta no está activa.');
+      // signOut limpia la sesión; el Navigate de abajo redirige a /login
+      // con el mensaje claro (no flash, no deslogueo silencioso).
+      await signOut();
+    })();
   }, [authUser, usuario, isLoading, signOut, pendientePago]);
 
+  // Va ANTES del chequeo de authUser: cuando signOut termina, authUser ya es
+  // null y el redirect genérico se comería el mensaje.
+  if (mensajeSalida) return <Navigate to="/login" state={{ mensaje: mensajeSalida }} replace />;
   if (isLoading) return <LoadingScreen />;
   if (!authUser) return <Navigate to="/login" state={{ from: location }} replace />;
   if (pendientePago) {
@@ -67,7 +85,8 @@ export default function MemberLayout() {
     );
   }
   if (usuario && validacion && !validacion.permitido) {
-    return <Navigate to="/login" state={{ mensaje: validacion.mensaje }} replace />;
+    // El efecto de arriba está resolviendo el mensaje (pausa vs. sanción).
+    return <LoadingScreen />;
   }
 
   return (
@@ -105,6 +124,7 @@ export default function MemberLayout() {
           {/* bookmarks viejos → nueva página de reservas */}
           <Route path="/historial" element={<Navigate to="/app/reservas" replace />} />
           <Route path="/perfil" element={<Perfil />} />
+          <Route path="/material" element={<MiMaterial />} />
           <Route path="/qr" element={<MiQRProxima />} />
           <Route path="/qr/:reservaId" element={<MiQR />} />
         </Routes>

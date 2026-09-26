@@ -11,6 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog, type AuditEntry } from '../_lib/auditLog';
+import { esStaffActivo, puedeOperarSobre } from '../_lib/staff';
 
 /**
  * POST /reception-update-member
@@ -19,14 +20,20 @@ import { writeAuditLog, type AuditEntry } from '../_lib/auditLog';
  *   usuario_id: string,
  *   nombre?, telefono?, email?,          // datos de contacto
  *   status?: 'activo' | 'suspendido' | 'pendiente_pago',
- *   membresia_tier?: 'basica' | 'pro' | null,
+ *   membresia_tier?: RECHAZADO (400). El plan se activa con cobro (activar_membresia);
+ *                    esta ruta no concede ni quita acceso comercial (Fase 1 identidad).
  *   unblock?: boolean,                    // bloqueado_hasta=null (NO resetea no_shows_count — B4)
  *   avatar?: { base64: string, contentType: string },
  *   motivo?: string                       // OBLIGATORIO si cambia status/tier/unblock
  * }
  *
+ * Sanción administrativa (Fase 1 identidad, 2026-09-25): `status='suspendido'`
+ * desde aquí es una SANCIÓN del estudio → fija usuarios.sancionado_at + motivo;
+ * mientras exista, ninguna activación/cobro/reanudación devuelve el acceso
+ * (trigger trg_sancion_manda). `activo` o `pendiente_pago` la levantan.
+ *
  * Front-desk: recepción atiende al cliente EN PERSONA y resuelve imprevistos
- * de su cuenta (foto, datos, desbloqueo, status, plan). El trigger SEC-FIX C2
+ * de su cuenta (foto, datos, desbloqueo, status). El trigger SEC-FIX C2
  * bloquea estos cambios desde el cliente; por eso pasan por esta función con
  * service_role (current_user='service_role' ⇒ el trigger no aplica).
  *
@@ -88,10 +95,10 @@ export const handler: Handler = async (event) => {
 
     const { data: caller } = await supabaseAsUser
       .from('usuarios')
-      .select('id, tenant_id, rol, nombre')
+      .select('id, tenant_id, rol, nombre, status')
       .eq('auth_id', authUser.id)
       .maybeSingle();
-    if (!caller || !['admin', 'recepcionista'].includes(caller.rol)) {
+    if (!esStaffActivo(caller)) {
       return forbidden('Solo recepción o admin pueden hacer esto');
     }
 
@@ -102,12 +109,18 @@ export const handler: Handler = async (event) => {
     // 2. Cargar al miembro target y validar que sea del MISMO tenant.
     const { data: target, error: targetErr } = await supabaseAdmin
       .from('usuarios')
-      .select('id, auth_id, tenant_id, nombre, email, telefono, status, membresia_tier, bloqueado_hasta, no_shows_count')
+      .select('id, auth_id, tenant_id, rol, nombre, email, telefono, status, membresia_tier, bloqueado_hasta, no_shows_count, sancionado_at')
       .eq('id', body.usuario_id)
       .maybeSingle();
     if (targetErr) return serverError(targetErr.message);
     if (!target) return notFound('Miembro no encontrado');
     if (target.tenant_id !== caller.tenant_id) return forbidden('El miembro es de otro tenant');
+    // Escalada: recepción solo edita a MIEMBROS. Sin este guard un recepcionista
+    // podía cambiarle el email de acceso a un admin (email_confirm: true) y
+    // quedarse con su cuenta vía /recuperar, o suspenderlo.
+    if (!puedeOperarSobre(caller, target)) {
+      return forbidden('Solo un admin puede modificar las cuentas del equipo');
+    }
 
     const patch: Record<string, unknown> = {};
     const cambios: string[] = [];
@@ -154,23 +167,10 @@ export const handler: Handler = async (event) => {
       return badRequest(`Status no permitido: ${statusNuevo}`);
     }
 
-    const tierCambia =
-      body.membresia_tier !== undefined && body.membresia_tier !== target.membresia_tier;
-    if (tierCambia && body.membresia_tier !== null) {
-      if (typeof body.membresia_tier !== 'string' || !body.membresia_tier.trim()) {
-        return badRequest('Plan inválido');
-      }
-      const { data: tierOk, error: tierErr } = await supabaseAdmin
-        .from('tiers')
-        .select('slug')
-        .eq('tenant_id', target.tenant_id)
-        .eq('slug', body.membresia_tier)
-        .eq('activo', true)
-        .maybeSingle();
-      if (tierErr) return serverError(tierErr.message);
-      if (!tierOk) {
-        return badRequest(`Plan no permitido: "${body.membresia_tier}" no existe o está inactivo en este estudio`);
-      }
+    // El plan NO se edita aquí: `membresia_tier` es una copia derivada de
+    // `membresias` y escribirla a mano concedía (o quitaba) acceso sin cobro.
+    if (body.membresia_tier !== undefined) {
+      return badRequest('El plan no se cambia desde "Editar datos": actívalo con cobro desde la tarjeta de membresía');
     }
 
     const unblockAplica = Boolean(
@@ -178,7 +178,7 @@ export const handler: Handler = async (event) => {
     );
 
     // --- Motivo obligatorio en acciones sensibles (status / tier / desbloqueo) ---
-    const requiereMotivo = statusNuevo !== null || tierCambia || unblockAplica;
+    const requiereMotivo = statusNuevo !== null || unblockAplica;
     if (requiereMotivo && motivo.length < 3) {
       return badRequest('Motivo obligatorio para esta acción');
     }
@@ -186,26 +186,18 @@ export const handler: Handler = async (event) => {
     // --- Status ---
     if (statusNuevo !== null) {
       patch.status = statusNuevo;
+      // Suspender desde el mostrador = SANCIÓN administrativa; activar o dejar
+      // pendiente de pago = levantarla. Va en el MISMO UPDATE: el trigger
+      // trg_sancion_manda fuerza `suspendido` mientras sancionado_at no sea NULL.
+      const sancionar = statusNuevo === 'suspendido';
+      patch.sancionado_at = sancionar ? new Date().toISOString() : null;
+      patch.sancion_motivo = sancionar ? motivo : null;
       cambios.push(`status→${statusNuevo}`);
       auditEntries.push({
         ...baseAudit,
         accion: 'status_change',
-        antes: { status: target.status },
-        despues: { status: statusNuevo },
-        motivo
-      });
-    }
-
-    // --- Tier (sensible / monetización) ---
-    if (tierCambia) {
-      const tierNuevo = (body.membresia_tier ?? null) as string | null;
-      patch.membresia_tier = tierNuevo;
-      cambios.push(`plan→${tierNuevo ?? 'sin plan'}`);
-      auditEntries.push({
-        ...baseAudit,
-        accion: 'tier_change',
-        antes: { membresia_tier: target.membresia_tier },
-        despues: { membresia_tier: tierNuevo },
+        antes: { status: target.status, sancionado: target.sancionado_at != null },
+        despues: { status: statusNuevo, sancionado: sancionar },
         motivo
       });
     }

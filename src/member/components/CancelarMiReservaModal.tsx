@@ -2,12 +2,15 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useToast } from '@shared/hooks/useToast';
 import { cancelarReserva } from '@member/hooks/useReservas';
+import { formatFechaHoraEnZona } from '@shared/lib/timezone';
+import { ContactoEstudio } from '@shared/components/ContactoEstudio';
 
 export interface ReservaParaCancelar {
   id: string;
   slot_inicio: string;
   recurso_nombre: string;
   folio: string;
+  invitados_extra_pagados?: number | null;
 }
 
 interface Props {
@@ -21,13 +24,14 @@ type Step = 'info' | 'confirm';
 const SUGERENCIAS = ['Cambio de planes', 'Salud', 'Trabajo', 'Otro'] as const;
 
 function formatearFecha(iso: string): string {
-  return new Date(iso).toLocaleString('es-MX', {
+  // Zona del ESTUDIO (la hora que el miembro eligió al reservar).
+  return formatFechaHoraEnZona(iso, {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false
+    hourCycle: 'h23'
   });
 }
 
@@ -53,6 +57,9 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
 
   const fechaFmt = formatearFecha(reserva.slot_inicio);
   const target = typeof document !== 'undefined' ? document.body : null;
+  // M16: los invitados extra se cobraron aparte y el sistema NO los reembolsa
+  // solo. Se avisa antes de confirmar y se da el canal para pedirlo.
+  const invitadosPagados = reserva.invitados_extra_pagados ?? 0;
 
   function handleChip(sug: string) {
     setChipActivo(sug);
@@ -248,6 +255,33 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
             >
               Al confirmar, esta reserva se cancelará y el horario quedará libre para otros miembros.
             </p>
+            {invitadosPagados > 0 && (
+              <div
+                role="note"
+                style={{
+                  background: 'var(--ek-warning-soft, var(--ek-bg-elevated))',
+                  border: '0.5px solid var(--ek-warning)',
+                  borderRadius: 'var(--ek-r-md)',
+                  padding: '10px 12px',
+                  marginBottom: '12px',
+                  fontSize: '13px',
+                  lineHeight: 1.5
+                }}
+              >
+                <p style={{ margin: 0, fontWeight: 600 }}>
+                  Esta reserva tiene {invitadosPagados} {invitadosPagados === 1 ? 'invitado extra pagado' : 'invitados extra pagados'}.
+                </p>
+                <p style={{ margin: '4px 0 0', color: 'var(--ek-ink-muted)' }}>
+                  Ese cobro no se devuelve automáticamente al cancelar.{' '}
+                  <ContactoEstudio
+                    enLinea
+                    etiqueta="Escríbele al estudio"
+                    mensaje={`Hola, voy a cancelar mi reserva del ${fechaFmt} (folio ${reserva.folio}) y tengo ${invitadosPagados} ${invitadosPagados === 1 ? 'invitado extra pagado' : 'invitados extra pagados'}. ¿Cómo procede el reembolso?`}
+                  />{' '}
+                  para acordar el reembolso.
+                </p>
+              </div>
+            )}
             {(motivo.trim() || chipActivo) && (
               <div
                 style={{

@@ -65,3 +65,13 @@
 # Reparte por push toda notificación pendiente (de cualquier origen).
 [functions."cron-push"]
   schedule = "* * * * *"
+
+# Manda por correo los avisos de la app que lo ameritan (confirmación de reserva,
+# cancelación, material disponible…). No-op mientras Resend no esté configurado.
+[functions."cron-email"]
+  schedule = "*/2 * * * *"
+
+# Libera el espacio de los archivos de material vencidos hace más de 7 días.
+# 10:30 UTC = 03:30 en Mazatlán.
+[functions."cron-material-vencido"]
+  schedule = "30 10 * * *"

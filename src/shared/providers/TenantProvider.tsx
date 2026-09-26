@@ -175,6 +175,15 @@ export function TenantProvider({ children }: TenantProviderProps) {
   );
 }
 
+/**
+ * Tenant o null si no hay proveedor / aún no cargó. Para componentes
+ * opcionales (un enlace de contacto) que no deben tumbar la pantalla ni
+ * obligar a cada test a montar el TenantProvider.
+ */
+export function useTenantOpcional(): Tenant | null {
+  return useContext(TenantContext).tenant;
+}
+
 export function useTenant(): Tenant {
   const { tenant } = useContext(TenantContext);
   if (!tenant) {

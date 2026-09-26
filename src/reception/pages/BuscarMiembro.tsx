@@ -9,6 +9,8 @@ import { PlanChip } from '@shared/components/PlanChip';
 import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
 import { statusMiembro } from '../lib/miembroStatus';
 import { RegistrarMiembroModal } from '../components/RegistrarMiembroModal';
+import { AvatarMiembro } from '../components/AvatarMiembro';
+import { coincideBusqueda, normalizarTexto } from '../lib/buscarEnPadron';
 import { ZONA_ESTUDIO } from '@shared/lib/timezone';
 
 interface MiembroResultado {
@@ -18,6 +20,8 @@ interface MiembroResultado {
   status: string;
   membresia_tier: string | null;
   bloqueado_hasta: string | null;
+  telefono: string | null;
+  avatar_url: string | null;
 }
 
 type Modo = 'buscar' | 'penalizados';
@@ -32,15 +36,6 @@ function capitalizar(s: string | null | undefined): string {
     .join(' ');
 }
 
-/** Normaliza para comparar: minúsculas + sin acentos. */
-function norm(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .trim();
-}
-
 function fechaCorta(iso: string): string {
   return new Date(iso).toLocaleDateString('es-MX', { timeZone: ZONA_ESTUDIO, day: 'numeric', month: 'short' });
 }
@@ -49,7 +44,8 @@ function fechaCorta(iso: string): string {
  * Búsqueda del padrón de miembros para recepción.
  * Trae los miembros del tenant una vez y filtra en cliente: así la búsqueda
  * es instantánea e INSENSIBLE a acentos y mayúsculas (José ↔ jose), que con
- * ilike de Postgres no se lograba.
+ * ilike de Postgres no se lograba. También por TELÉFONO (últimos dígitos):
+ * en mostrador es lo que la gente dicta (R7).
  *
  * Modo "Penalizados" (Bloque D): lista los miembros con bloqueo activo
  * (bloqueado_hasta > now). Tap → perfil, donde está el desbloqueo (Bloque A).
@@ -68,7 +64,7 @@ export default function BuscarMiembro() {
     setErrorCarga(false);
     const { data, error } = await supabase
       .from('usuarios')
-      .select('id, nombre, email, status, membresia_tier, bloqueado_hasta')
+      .select('id, nombre, email, status, membresia_tier, bloqueado_hasta, telefono, avatar_url')
       .eq('tenant_id', tenant.id)
       .eq('rol', 'miembro')
       .order('nombre', { ascending: true })
@@ -100,13 +96,11 @@ export default function BuscarMiembro() {
   const { planes } = usePlanesActivos();
   const planesActivos = useMemo(() => new Set(planes.map((p) => p.slug)), [planes]);
 
-  const q = norm(query);
+  const q = normalizarTexto(query);
   const buscando = q.length >= 2;
   // Por defecto se muestra TODO el padrón; al escribir se filtra.
   const resultados = useMemo(() => {
-    const base = buscando
-      ? todos.filter((m) => norm(m.nombre ?? '').includes(q) || norm(m.email).includes(q))
-      : todos;
+    const base = buscando ? todos.filter((m) => coincideBusqueda(m, q)) : todos;
     return base.slice(0, 100);
   }, [q, buscando, todos]);
 
@@ -151,7 +145,7 @@ export default function BuscarMiembro() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Nombre o email del miembro…"
+              placeholder="Nombre, teléfono o email…"
               className="ek-input"
               style={{ paddingRight: query ? '52px' : undefined, minHeight: '44px' }}
               aria-label="Buscar miembro"
@@ -259,6 +253,7 @@ function MiembroCard({ miembro, planesActivos, mostrarBloqueo }: { miembro: Miem
   const planVigente = miembro.membresia_tier && planesActivos?.has(miembro.membresia_tier);
   return (
     <Link to={`/recepcion/miembros/${miembro.id}`} className="rec-miembro-card">
+      <AvatarMiembro nombre={miembro.nombre || miembro.email} url={miembro.avatar_url} size={40} />
       <div className="rec-miembro-card-info">
         <p className="rec-miembro-card-nombre">{capitalizar(miembro.nombre) || miembro.email}</p>
         <p className="rec-miembro-card-email">{miembro.email}</p>

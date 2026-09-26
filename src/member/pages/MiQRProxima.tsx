@@ -4,6 +4,7 @@ import { QrCode, CalendarPlus } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { supabase } from '@shared/lib/supabase';
 import { EmptyState } from '@shared/components/EmptyState';
+import { desdeReservasVigentesISO } from '@member/logic/reservasVigentes';
 
 /**
  * /app/qr — resuelve el QR de la PRÓXIMA reserva confirmada del miembro (el
@@ -27,7 +28,7 @@ export default function MiQRProxima() {
         .select('id')
         .eq('usuario_id', usuario.id)
         .eq('status', 'confirmada')
-        .gte('slot_inicio', new Date().toISOString())
+        .gte('slot_fin', desdeReservasVigentesISO())
         .order('slot_inicio', { ascending: true })
         .limit(1)
         .maybeSingle();

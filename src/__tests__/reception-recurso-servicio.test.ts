@@ -56,7 +56,7 @@ async function invocar(event: AnyEvent) {
   return res as { statusCode: number; body: string };
 }
 
-const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista' };
+const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo' };
 const RECURSO = { id: 'rec1', tenant_id: 't1', nombre: 'Estudio A', fuera_de_servicio: false };
 
 describe('reception-recurso-servicio (Bloque F)', () => {

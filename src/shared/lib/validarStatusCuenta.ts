@@ -72,6 +72,32 @@ export function validarStatusCuenta(perfil: PerfilStatus): ResultadoValidacion {
 }
 
 /**
+ * Staff (admin / recepcionista): al panel solo entra una cuenta `activo`.
+ *
+ * Más estricto que `validarStatusCuenta` a propósito: para un miembro,
+ * `cancelado` entra (a recomprar) y `pendiente_pago` entra (a pagar); para el
+ * equipo ninguno de los dos tiene sentido, y "Revocar acceso" tiene que sacar a
+ * la persona del panel aunque conserve su sesión abierta.
+ */
+export function validarStatusStaff(perfil: PerfilStatus): ResultadoValidacion {
+  if (perfil.status === 'activo') return { permitido: true };
+  const comoMiembro = validarStatusCuenta(perfil);
+  return {
+    permitido: false,
+    mensaje: comoMiembro.permitido
+      ? 'Tu acceso al panel no está activo. Contacta al administrador.'
+      : comoMiembro.mensaje
+  };
+}
+
+/** Validación de entrada según el rol del perfil. */
+export function validarStatusSegunRol(perfil: PerfilStatus & { rol?: string | null }): ResultadoValidacion {
+  return perfil.rol === 'admin' || perfil.rol === 'recepcionista'
+    ? validarStatusStaff(perfil)
+    : validarStatusCuenta(perfil);
+}
+
+/**
  * Traduce un mensaje de error de Supabase Auth a copy human.
  * Nunca expone el mensaje técnico crudo al usuario.
  */

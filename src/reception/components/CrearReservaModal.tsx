@@ -20,6 +20,7 @@ import { traducirErrorReserva } from '../lib/traducirErrorReserva';
 import { reprogramarReserva } from '../lib/reprogramarReserva';
 import { rangoDiaEnZona, hoyISOEnZona } from '@shared/lib/timezone';
 import { checkInManual } from '../hooks/useReservasHoy';
+import { avisoMembresia } from '../lib/avisoMembresia';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 
@@ -179,9 +180,18 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
       // y los contiguos vuelvan a ofrecerse.
       if (reprogramarDe) {
         resMiembro = quitarReservaPorSlot(resMiembro, reprogramarDe.slot_inicio);
-        if (recursoSel.id === reprogramarDe.recurso_id) {
-          resRecurso = quitarReservaPorSlot(resRecurso, reprogramarDe.slot_inicio);
-        }
+        // La reserva vieja deja de bloquear: en su propio set (siempre) y, con
+        // "un solo set a la vez", también en los demás — ahí llega como un
+        // intervalo de OTRO set (`mismo_set: false`), y moverla de set a la misma
+        // hora es justo lo que se quiere permitir. Un intervalo del MISMO set que
+        // se está mirando, si ese set no es el original, es de otra persona: se queda.
+        const viejaMs = new Date(reprogramarDe.slot_inicio).getTime();
+        const mismoSetOriginal = recursoSel.id === reprogramarDe.recurso_id;
+        resRecurso = resRecurso.filter(
+          (r) =>
+            !(new Date(r.slot_inicio).getTime() === viejaMs &&
+              (r.mismo_set === false || mismoSetOriginal))
+        );
       }
       // permitirEnCurso: el walk-in que llega 10 min tarde a su hora todavía
       // puede reservar la sesión en curso (el backend de recepción lo acepta).
@@ -189,11 +199,18 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
         generarSlotsDisponibles(recursoSel, fechaSel, config, resRecurso, resMiembro, new Date(), { permitirEnCurso: true })
       );
       setLoadingSlots(false);
+    }).catch((e: unknown) => {
+      if (!mounted) return;
+      // Sin disponibilidad cargada NO se pinta nada como libre.
+      setSlots([]);
+      setLoadingSlots(false);
+      toast.error(e instanceof Error ? e.message : 'No se pudo cargar la disponibilidad.');
     });
 
     return () => {
       mounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recursoSel, fechaSel, config, miembro.id, reprogramarDe]);
 
   async function handleConfirmar() {
@@ -274,8 +291,14 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
     // la reserva — recepción puede hacer el check-in desde "Hoy".
     if (hacerCheckin && data?.reserva_id) {
       try {
-        await checkInManual(data.reserva_id, 'Walk-in: reserva y check-in en un paso');
+        const checkin = (await checkInManual(
+          data.reserva_id,
+          'Walk-in: reserva y check-in en un paso'
+        )) as { membresia_estado?: string } | null;
         toast.success(`Reserva creada y check-in hecho · ${miembro.nombre} · ${formatHora(slotSel.inicio)}`);
+        // El check-in manual AVISA, no bloquea: sin esto el aviso se perdía aquí.
+        const aviso = avisoMembresia(checkin?.membresia_estado);
+        if (aviso) toast.warning(aviso, 12_000);
       } catch (e) {
         toast.warning(`Reserva creada, pero el check-in no se pudo hacer: ${e instanceof Error ? e.message : 'inténtalo desde Hoy'}`);
       }

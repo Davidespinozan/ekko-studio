@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
+import { esStaffActivo } from '../_lib/staff';
 
 /**
  * POST /reception-corregir-checkin
@@ -60,10 +61,10 @@ export const handler: Handler = async (event) => {
 
     const { data: caller } = await supabaseAsUser
       .from('usuarios')
-      .select('id, tenant_id, rol')
+      .select('id, tenant_id, rol, status')
       .eq('auth_id', authUser.id)
       .maybeSingle();
-    if (!caller || !['admin', 'recepcionista'].includes(caller.rol)) {
+    if (!esStaffActivo(caller)) {
       return forbidden('Solo recepción o admin pueden hacer esto');
     }
 

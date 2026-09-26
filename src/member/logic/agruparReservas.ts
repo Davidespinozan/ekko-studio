@@ -2,14 +2,21 @@
 // agruparReservas — agrupa una lista de reservas por día calendario para
 // pintarlas en secciones ("Hoy", "Mañana", "lunes 7 de julio"). Pura para
 // poder testearla sin montar la página. Preserva el orden de entrada.
+//
+// El "día" es el del ESTUDIO, no el del teléfono: una sesión a las 23:00 de
+// Mazatlán es "hoy" aunque quien la mira esté en CDMX (donde ya es mañana). Antes
+// se agrupaba con el reloj del navegador y la misma reserva cambiaba de día —y de
+// hora— según la pantalla.
 // ============================================================================
+
+import { fechaISOEnZona, diasEntreISO, formatFechaEnZona } from '@shared/lib/timezone';
 
 export interface ConSlot {
   slot_inicio: string;
 }
 
 export interface GrupoDia<T> {
-  /** Clave estable del día (YYYY-M-D en hora local). */
+  /** Clave estable del día (YYYY-MM-DD en la zona del estudio). */
   key: string;
   /** Etiqueta legible: "Hoy", "Mañana", "Ayer" o fecha larga. */
   label: string;
@@ -17,14 +24,12 @@ export interface GrupoDia<T> {
 }
 
 function claveDia(d: Date): string {
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  return fechaISOEnZona(d);
 }
 
-/** Diferencia en días calendario (local) entre dos fechas: b - a. */
+/** Diferencia en días calendario (del estudio) entre dos instantes: b - a. */
 function difDias(a: Date, b: Date): number {
-  const ma = new Date(a.getFullYear(), a.getMonth(), a.getDate()).getTime();
-  const mb = new Date(b.getFullYear(), b.getMonth(), b.getDate()).getTime();
-  return Math.round((mb - ma) / 86_400_000);
+  return diasEntreISO(fechaISOEnZona(a), fechaISOEnZona(b));
 }
 
 function capitalizar(s: string): string {
@@ -36,9 +41,7 @@ function etiquetaDia(fecha: Date, ahora: Date): string {
   if (diff === 0) return 'Hoy';
   if (diff === 1) return 'Mañana';
   if (diff === -1) return 'Ayer';
-  return capitalizar(
-    fecha.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })
-  );
+  return capitalizar(formatFechaEnZona(fecha, { weekday: 'long', day: 'numeric', month: 'long' }));
 }
 
 /**

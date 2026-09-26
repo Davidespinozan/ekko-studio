@@ -9,7 +9,7 @@ import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/ht
 import { requireEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada } from '../_lib/connectBilling';
-import { enviarPushAUsuario } from '../_lib/push';
+import { esStaffActivo } from '../_lib/staff';
 
 /**
  * POST /stripe-pausar-membresia
@@ -59,10 +59,10 @@ export const handler: Handler = async (event) => {
 
     const { data: staff } = await asUser
       .from('usuarios')
-      .select('id, tenant_id, rol')
+      .select('id, tenant_id, rol, status')
       .eq('auth_id', authUser.id)
       .maybeSingle();
-    if (!staff || !['admin', 'recepcionista'].includes(staff.rol)) {
+    if (!esStaffActivo(staff)) {
       return forbidden('Solo recepción o admin pueden pausar membresías');
     }
 
@@ -117,15 +117,9 @@ export const handler: Handler = async (event) => {
       return badRequest(humano);
     }
 
-    // Push del aviso que dejó la RPC (best-effort).
-    await enviarPushAUsuario(admin, body.usuario_id, {
-      titulo: body.pausar ? 'Tu membresía está en pausa' : 'Tu membresía volvió',
-      mensaje: body.pausar
-        ? 'No se te cobrará ni podrás reservar hasta que se reactive.'
-        : 'Ya puedes volver a reservar.',
-      url: '/app/perfil',
-      tag: body.pausar ? 'membresia_pausada' : 'membresia_reactivada'
-    });
+    // El push NO se manda aquí: la RPC deja el aviso en `notificaciones` sin
+    // `push_enviado_at` y cron-push lo reparte en el siguiente minuto (EKKO-033).
+    // Mandarlo también inline hacía que al miembro le llegara dos veces.
 
     return ok({ success: true, result: data, stripe_pausado: Boolean(subId) });
   } catch (err) {

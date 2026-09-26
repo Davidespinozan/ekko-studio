@@ -21,6 +21,20 @@ export function traducirErrorReserva(message: string): string {
   if (message.includes('EKKO_NO_AUTORIZADO')) {
     return 'No tienes permiso para esta acción.';
   }
+  // En el mostrador se habla del MIEMBRO en tercera persona (el translator
+  // compartido le habla al miembro: "No tienes un plan…").
+  if (message.includes('EKKO_SIN_MEMBRESIA')) {
+    return 'El miembro no tiene un plan vigente. Activa o renueva su plan antes de reservarle.';
+  }
+  if (message.includes('EKKO_MEMBRESIA_VENCIDA')) {
+    return 'El plan del miembro venció. Renuévalo antes de reservarle.';
+  }
+  if (message.includes('EKKO_SIN_CREDITOS')) {
+    return 'Al miembro no le alcanzan los créditos para este estudio.';
+  }
+  if (message.includes('EKKO_DURACION_INVALIDA')) {
+    return 'La duración no es válida: entre 15 minutos y 8 horas, sin pasar de la medianoche.';
+  }
 
   // Códigos compartidos (slot ocupado, reserva no cancelable, etc.).
   // `traducirErrorRPC` ya trae su propio fallback genérico (ERROR-UI-FIX

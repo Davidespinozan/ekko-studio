@@ -34,8 +34,34 @@ export interface ActivarResult {
   result?: unknown;
 }
 
-export function activarMembresiaMostrador(usuario_id: string, tier: string): Promise<ActivarResult> {
-  return backendPost<ActivarResult>('reception-activar-membresia', { usuario_id, tier });
+/**
+ * `confirmarPerdida`: pasar a un plan sin créditos quema el saldo del paquete
+ * anterior. Sin `true`, el servidor responde 409 (ver `esPerdidaDeCreditos`) y la
+ * pantalla debe preguntar antes de reintentar con `true`.
+ */
+export function activarMembresiaMostrador(
+  usuario_id: string,
+  tier: string,
+  opts: { confirmarPerdida?: boolean; motivo?: string } = {}
+): Promise<ActivarResult> {
+  return backendPost<ActivarResult>('reception-activar-membresia', {
+    usuario_id,
+    tier,
+    confirmar_perdida: opts.confirmarPerdida === true,
+    // Queda en audit_log: cómo pagó / por qué se asignó sin pasar por Stripe.
+    ...(opts.motivo ? { motivo: opts.motivo } : {})
+  });
+}
+
+/**
+ * ¿El error es el 409 "perdería créditos" de `reception-activar-membresia`?
+ * Devuelve cuántos créditos están en juego (1 si no se pudo leer), o null.
+ */
+export function esPerdidaDeCreditos(e: unknown): number | null {
+  const err = e as { status?: number; message?: string } | null;
+  if (err?.status !== 409) return null;
+  const n = Number.parseInt(err.message?.match(/(\d+)/)?.[1] ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
 /**
@@ -113,8 +139,14 @@ export interface PagoHistorial {
   monto_centavos: number;
   moneda: string;
   fecha: string;
+  /** 'succeeded' | 'pending' | 'failed' | 'refunded' */
   status: string;
+  /** Concepto legible: "Renovación de membresía · Esencial", "Paquete · 4 horas", "Invitados extra (2)". */
   descripcion: string;
+  /** Recibo de Stripe; null si el cargo no lo trae (o backend viejo). */
+  receipt_url?: string | null;
+  /** Centavos devueltos (parcial o total). */
+  reembolsado_centavos?: number;
 }
 export interface BillingInfo {
   paymentMethod: MetodoPago | null;

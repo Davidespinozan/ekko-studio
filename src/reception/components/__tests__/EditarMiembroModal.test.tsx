@@ -4,8 +4,10 @@ import { ToastProvider } from '@shared/providers/ToastProvider';
 import { EditarMiembroModal, type MiembroEditable } from '../EditarMiembroModal';
 
 /**
- * Bloque A: el modal exige "Motivo del cambio" cuando se cambia status o tier,
- * y NO lo pide cuando solo se editan datos de contacto.
+ * R5 (paridad SALA): "Editar datos" en recepción es SOLO contacto. Poner
+ * status='activo' o un plan a mano (sin cobrar) ya no es posible desde aquí:
+ * esas acciones viven en MembresiaCard / EstadoCuentaCard con su regla y su
+ * rastro. Este test fija que el modal no ofrezca ni envíe esos campos.
  */
 
 const mockActualizar = vi.fn();
@@ -17,9 +19,7 @@ const MIEMBRO: MiembroEditable = {
   id: 'm-1',
   nombre: 'Ana',
   email: 'ana@cravia.mx',
-  telefono: '123',
-  status: 'activo',
-  membresia_tier: 'basica'
+  telefono: '123'
 };
 
 function renderModal() {
@@ -30,56 +30,36 @@ function renderModal() {
   );
 }
 
-describe('EditarMiembroModal · motivo obligatorio (Bloque A)', () => {
+describe('EditarMiembroModal · solo contacto (R5)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockActualizar.mockResolvedValue({ success: true, cambios: ['status→suspendido'] });
+    mockActualizar.mockResolvedValue({ success: true, cambios: ['nombre'] });
   });
 
-  it('no muestra el campo motivo si no cambió nada sensible', () => {
+  it('no ofrece estado de cuenta ni plan', () => {
     renderModal();
+    expect(screen.queryByLabelText('Estado')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Plan')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/motivo del cambio/i)).not.toBeInTheDocument();
   });
 
-  it('al cambiar status aparece el campo motivo', () => {
-    renderModal();
-    fireEvent.change(screen.getByLabelText('Estado'), { target: { value: 'suspendido' } });
-    expect(screen.getByLabelText(/motivo del cambio/i)).toBeInTheDocument();
-  });
-
-  it('cambiar status sin elegir motivo NO llama al backend', async () => {
-    renderModal();
-    fireEvent.change(screen.getByLabelText('Estado'), { target: { value: 'suspendido' } });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
-    await waitFor(() => {
-      expect(mockActualizar).not.toHaveBeenCalled();
-    });
-  });
-
-  it('cambiar status con motivo SÍ llama al backend con el motivo', async () => {
-    renderModal();
-    fireEvent.change(screen.getByLabelText('Estado'), { target: { value: 'suspendido' } });
-    fireEvent.change(screen.getByLabelText(/motivo del cambio/i), {
-      target: { value: 'Cliente solicitó suspensión' }
-    });
-    fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
-    await waitFor(() => {
-      expect(mockActualizar).toHaveBeenCalledTimes(1);
-    });
-    const [, patch] = mockActualizar.mock.calls[0] as [string, Record<string, unknown>];
-    expect(patch.status).toBe('suspendido');
-    expect(patch.motivo).toBe('Cliente solicitó suspensión');
-  });
-
-  it('editar solo contacto NO requiere motivo', async () => {
+  it('envía únicamente nombre, teléfono y email (nunca status ni membresia_tier)', async () => {
     renderModal();
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Ana María' } });
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
-    await waitFor(() => {
-      expect(mockActualizar).toHaveBeenCalledTimes(1);
-    });
-    const [, patch] = mockActualizar.mock.calls[0] as [string, Record<string, unknown>];
-    expect(patch.nombre).toBe('Ana María');
-    expect(patch.motivo).toBeUndefined();
+    await waitFor(() => expect(mockActualizar).toHaveBeenCalledTimes(1));
+    const [id, patch] = mockActualizar.mock.calls[0] as [string, Record<string, unknown>];
+    expect(id).toBe('m-1');
+    expect(patch).toEqual({ nombre: 'Ana María', telefono: '123', email: 'ana@cravia.mx' });
+    expect(patch).not.toHaveProperty('status');
+    expect(patch).not.toHaveProperty('membresia_tier');
+    expect(patch).not.toHaveProperty('motivo');
+  });
+
+  it('avisa que cambiar el email cambia el acceso', () => {
+    renderModal();
+    expect(screen.queryByText(/inicia sesión/i)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Email (acceso)'), { target: { value: 'nueva@cravia.mx' } });
+    expect(screen.getByText(/también cambia el correo con el que el cliente inicia sesión/i)).toBeInTheDocument();
   });
 });

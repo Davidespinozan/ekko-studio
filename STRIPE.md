@@ -68,8 +68,11 @@ Y en el dashboard de Stripe: crear el **webhook endpoint** como endpoint de
 eventos se perderían en silencio). Eventos:
 `account.updated`, `payment_intent.succeeded`, `invoice.paid`,
 `invoice.payment_failed`, `customer.subscription.updated`,
-`customer.subscription.deleted` (+ `checkout.session.completed` si se usa el
-Checkout como fallback). Su signing secret va en `STRIPE_CONNECT_WEBHOOK_SECRET`.
+`customer.subscription.deleted`, `charge.refunded` (sin él los reembolsos hechos
+desde el dashboard nunca llegan: ni se registran ni se avisa al admin) y
+`checkout.session.completed` (Checkout como fallback). La lista canónica vive en
+`scripts/stripe-eventos.mjs` y un test exige que coincida con los `case` de
+`clasificarEvento`. Su signing secret va en `STRIPE_CONNECT_WEBHOOK_SECRET`.
 
 **Con script (recomendado):** `STRIPE_SECRET_KEY=sk_test_… node scripts/stripe-setup-webhooks.mjs`
 crea/sincroniza el endpoint con la URL, los eventos y el flag de Connected
@@ -106,3 +109,23 @@ Cuando esté validado en test → cambiar a keys **live** y `price_id` reales.
 Sin `STRIPE_SECRET_KEY`: `suscribir-membresia` y `stripe-portal` responden
 `stripe_pendiente`; la UI dice "acercate a recepción". Recepción activa en
 mostrador (`reception-activar-membresia`). No se finge ningún pago.
+
+## Apple Pay y Google Pay
+
+No requieren código: el formulario de pago es el `<PaymentElement>` y los cobros ya se
+crean con `automatic_payment_methods`. Stripe muestra los botones solos **si el dominio
+está registrado y verificado en la CUENTA CONECTADA del estudio** (cobros directos de
+Connect: registrarlo en la plataforma no sirve; el síntoma es que Apple Pay simplemente no
+aparece, sin ningún error).
+
+```
+STRIPE_SECRET_KEY=sk_live_… node scripts/stripe-wallets-dominio.mjs            # registra y valida
+STRIPE_SECRET_KEY=sk_live_… node scripts/stripe-wallets-dominio.mjs --solo-ver  # solo diagnóstico
+```
+
+Correrlo **después** de publicar el sitio en `ekkostudio.app` (Stripe verifica el dominio
+por HTTPS) y cada vez que un estudio nuevo active sus cobros. Apple Pay solo existe en
+modo live. Para probarlo: iPhone con una tarjeta en Wallet, **Safari** (no el navegador
+interno de Instagram/WhatsApp), llegar al pago → el botón sale arriba del formulario de
+tarjeta. Tarjeta de crédito/débito (Visa, Mastercard, Amex) ya funcionan sin nada de esto.
+

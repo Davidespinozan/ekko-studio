@@ -48,7 +48,9 @@ vi.mock('@supabase/supabase-js', () => ({
   }))
 }));
 
-vi.mock('../../netlify/functions/_lib/stripe', () => ({
+vi.mock('../../netlify/functions/_lib/stripe', async (orig) => ({
+  // llavePrecio es pura: se usa la real (la cubre stripe-lib.test.ts).
+  llavePrecio: (await orig<typeof import('../../netlify/functions/_lib/stripe')>()).llavePrecio,
   getStripe: () => ({
     prices: { create: mockPriceCreate },
     subscriptions: { retrieve: mockSubRetrieve, update: mockSubUpdate }
@@ -85,6 +87,18 @@ beforeEach(() => {
 });
 
 describe('cambiar-plan-suscripcion', () => {
+  it('destino retirado de la venta (en_venta=false) → 400, sin tocar Stripe', async () => {
+    mockTierMaybe.mockResolvedValue({
+      data: { id: 'tier-viejo', slug: 'viejo', activo: true, en_venta: false, tenant_id: 't1', nombre: 'Viejo', precio_centavos: 50000, moneda: 'mxn', tipo: 'tiempo' },
+      error: null
+    });
+    const res = await invocar('viejo');
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/ya no está a la venta/);
+    expect(mockPriceCreate).not.toHaveBeenCalled();
+    expect(mockSubUpdate).not.toHaveBeenCalled();
+  });
+
   it('destino paquete → sin_suscripcion (front usa PaymentModal)', async () => {
     mockTierMaybe.mockResolvedValue({
       data: { id: 'tier-pack', slug: 'starter', activo: true, tenant_id: 't1', nombre: 'Starter', precio_centavos: 65000, moneda: 'mxn', tipo: 'creditos' },
@@ -140,6 +154,12 @@ describe('cambiar-plan-suscripcion', () => {
     // Tier persistido en ambas tablas (el webhook no toca el tier).
     expect(mockMemUpdate).toHaveBeenCalledWith('id', 'mem-1');
     expect(mockUsuariosUpdate).toHaveBeenCalledWith('id', 'u1');
+  });
+
+  it('la idempotencyKey del precio cambia si cambia el precio o el nombre del plan', async () => {
+    await invocar();
+    const key = (mockPriceCreate.mock.calls[0][1] as { idempotencyKey: string }).idempotencyKey;
+    expect(key).toMatch(/^ekko_price_[0-9a-f]{40}$/);
   });
 
   it('precio recurrente creado sobre la cuenta conectada', async () => {

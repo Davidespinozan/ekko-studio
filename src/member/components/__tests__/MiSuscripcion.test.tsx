@@ -34,6 +34,7 @@ vi.mock('@shared/lib/backend', () => ({
 }));
 
 vi.mock('@shared/hooks/useTenant', () => ({ useTenant: () => ({ id: 't-1', config: {} }) }));
+vi.mock('@shared/hooks/useAuth', () => ({ useAuth: () => ({ refreshUsuario: vi.fn().mockResolvedValue(undefined) }) }));
 vi.mock('@shared/hooks/useToast', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() })
 }));
@@ -42,8 +43,8 @@ import { MiSuscripcion } from '../MiSuscripcion';
 
 beforeEach(() => {
   h.tiers = [
-    { slug: 'basica', nombre: 'Básica', precio_centavos: 85000, beneficios: ['Acceso diario'], descripcion: null },
-    { slug: 'pro', nombre: 'Pro', precio_centavos: 120000, beneficios: ['Todo Básica', 'Estudios pro'], descripcion: null }
+    { slug: 'basica', nombre: 'Básica', precio_centavos: 85000, beneficios: ['Acceso diario'], descripcion: null, activo: true, en_venta: true },
+    { slug: 'pro', nombre: 'Pro', precio_centavos: 120000, beneficios: ['Todo Básica', 'Estudios pro'], descripcion: null, activo: true, en_venta: true }
   ];
   h.pagos = [];
   h.membresias = [];
@@ -91,5 +92,62 @@ describe('MiSuscripcion', () => {
     // Gestión ahora es 100% in-app: actualizar tarjeta + cancelar plan (sin portal).
     expect(screen.getByText('Actualizar tarjeta')).toBeInTheDocument();
     expect(screen.getByText('Cancelar plan')).toBeInTheDocument();
+  });
+
+  /**
+   * `en_venta=false` = el estudio dejó de VENDER el plan; sus suscriptores lo
+   * conservan. Antes la lista se filtraba por en_venta, `planActual` quedaba en
+   * null y el suscriptor veía "No tienes un plan activo" SIN botón de cancelar,
+   * mientras se le seguía cobrando.
+   */
+  it('plan retirado de la venta: sigue siendo SU plan, se lo dice, y puede cancelarlo', async () => {
+    h.tiers = [
+      { slug: 'basica', nombre: 'Básica', precio_centavos: 85000, beneficios: [], descripcion: null, activo: true, en_venta: true },
+      { slug: 'pro', nombre: 'Pro', precio_centavos: 120000, beneficios: [], descripcion: null, activo: true, en_venta: false }
+    ];
+    h.membresias = [{ status: 'activa', stripe_subscription_id: 'sub_1', cancel_at_period_end: false, periodo_actual_fin: '2099-01-01T00:00:00Z', creditos_restantes: null }];
+
+    renderComp('pro');
+
+    expect(await screen.findByText('Pro')).toBeInTheDocument();
+    expect(screen.queryByText(/No tienes un plan activo/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('plan-fuera-de-venta')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /cancelar plan/i })).toBeInTheDocument();
+  });
+
+  it('un plan retirado de la venta NO se ofrece al cambiar de plan', async () => {
+    h.tiers = [
+      { slug: 'basica', nombre: 'Básica', precio_centavos: 85000, beneficios: [], descripcion: null, activo: true, en_venta: true },
+      { slug: 'viejo', nombre: 'Plan Viejo', precio_centavos: 50000, beneficios: [], descripcion: null, activo: true, en_venta: false }
+    ];
+    renderComp('basica');
+    fireEvent.click(await screen.findByRole('button', { name: /cambiar|ver planes|elegir/i }));
+    await waitFor(() => expect(screen.queryByText('Plan Viejo')).not.toBeInTheDocument());
+  });
+});
+
+describe('MiSuscripcion · historial con concepto, recibo y reembolsos (A11)', () => {
+  it('muestra qué se cobró, el enlace al recibo y "Reembolsado" cuando aplica', async () => {
+    h.backend = vi.fn().mockImplementation((path: string) =>
+      Promise.resolve(
+        path === 'stripe-billing-info'
+          ? {
+              paymentMethod: null,
+              pagos: [
+                { id: 'ch_a', monto_centavos: 120000, moneda: 'mxn', fecha: '2026-09-01T12:00:00Z', status: 'succeeded', descripcion: 'Renovación de membresía · Premium', receipt_url: 'https://pay.stripe.com/receipts/abc', reembolsado_centavos: 0 },
+                { id: 'ch_b', monto_centavos: 85000, moneda: 'mxn', fecha: '2026-08-01T12:00:00Z', status: 'refunded', descripcion: 'Paquete · 4 horas', receipt_url: null, reembolsado_centavos: 85000 }
+              ]
+            }
+          : { activated: false, reason: 'stripe_pendiente' }
+      )
+    );
+    renderComp('pro');
+    await waitFor(() => expect(screen.getByText('Renovación de membresía · Premium')).toBeInTheDocument());
+    const recibo = screen.getByRole('link', { name: 'Ver recibo' });
+    expect(recibo).toHaveAttribute('href', 'https://pay.stripe.com/receipts/abc');
+    expect(recibo).toHaveAttribute('target', '_blank');
+    expect(screen.getByText('Paquete · 4 horas')).toBeInTheDocument();
+    expect(screen.getByText('Reembolsado')).toBeInTheDocument();
+    expect(screen.getByText('Pagado')).toBeInTheDocument();
   });
 });

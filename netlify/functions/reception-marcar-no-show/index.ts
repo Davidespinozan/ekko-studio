@@ -13,6 +13,7 @@ import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
 import { enviarPushAUsuario } from '../_lib/push';
 import { leerPenalizacionConfig, calcularPenalizacionNoShow, mensajeNoShow } from '../_lib/noShow';
+import { esStaffActivo } from '../_lib/staff';
 
 /**
  * POST /reception-marcar-no-show
@@ -37,6 +38,12 @@ import { leerPenalizacionConfig, calcularPenalizacionNoShow, mensajeNoShow } fro
 interface Body {
   reserva_id?: string;
   motivo?: string;
+}
+
+/** Tolerancia de llegada = ventana de check-in del estudio (Admin → Reglas); 15 min por defecto. */
+function leerToleranciaMin(config: unknown): number {
+  const v = Number((config as { reserva?: { ventana_check_in_min?: unknown } } | null)?.reserva?.ventana_check_in_min);
+  return Number.isFinite(v) && v >= 0 && v <= 180 ? v : 15;
 }
 
 export const handler: Handler = async (event) => {
@@ -66,10 +73,10 @@ export const handler: Handler = async (event) => {
 
     const { data: caller } = await supabaseAsUser
       .from('usuarios')
-      .select('id, tenant_id, rol')
+      .select('id, tenant_id, rol, status')
       .eq('auth_id', authUser.id)
       .maybeSingle();
-    if (!caller || !['admin', 'recepcionista'].includes(caller.rol)) {
+    if (!esStaffActivo(caller)) {
       return forbidden('Solo recepción o admin pueden hacer esto');
     }
 
@@ -80,7 +87,7 @@ export const handler: Handler = async (event) => {
     // 2. Cargar la reserva y validar.
     const { data: reserva, error: reservaErr } = await supabaseAdmin
       .from('reservas')
-      .select('id, tenant_id, usuario_id, status, check_in_at, slot_fin, folio')
+      .select('id, tenant_id, usuario_id, status, check_in_at, slot_inicio, slot_fin, folio')
       .eq('id', body.reserva_id)
       .maybeSingle();
     if (reservaErr) return serverError(reservaErr.message);
@@ -93,9 +100,6 @@ export const handler: Handler = async (event) => {
     }
     if (reserva.check_in_at) {
       return badRequest('La reserva ya tiene check-in; no se puede marcar no-show');
-    }
-    if (new Date(reserva.slot_fin).getTime() >= Date.now()) {
-      return badRequest('El horario de la reserva todavía no terminó');
     }
 
     // 3. Cargar al miembro (para el contador + bloqueo).
@@ -115,6 +119,23 @@ export const handler: Handler = async (event) => {
       .eq('id', reserva.tenant_id)
       .maybeSingle();
     if (tenantErr) return serverError(tenantErr.message);
+
+    // ¿Ya se le puede dar por ausente? Antes había que esperar a que TERMINARA la
+    // sesión (slot_fin): durante esa hora el estudio quedaba bloqueado —ni se
+    // podía marcar la falta ni cancelar (eso exige slot_inicio futuro)— y un
+    // walk-in recibía "horario ocupado" con el estudio vacío. En renta de 1
+    // reserva por slot eso es una hora de estudio perdida por cada ausente.
+    // Ahora basta con que pase la tolerancia de llegada (la ventana de check-in).
+    const toleranciaMin = leerToleranciaMin(tenantRow?.config ?? null);
+    const desde = new Date(reserva.slot_inicio ?? reserva.slot_fin).getTime() + toleranciaMin * 60_000;
+    if (Date.now() < desde) {
+      return badRequest(
+        new Date(reserva.slot_inicio ?? reserva.slot_fin).getTime() > Date.now()
+          ? 'La sesión todavía no empieza'
+          : `Espera la tolerancia de llegada (${toleranciaMin} min desde el inicio) antes de marcar la falta`
+      );
+    }
+
     const cfg = leerPenalizacionConfig(tenantRow?.config ?? null);
     const countAntes = miembro.no_shows_count ?? 0;
     const pen = calcularPenalizacionNoShow({
@@ -126,11 +147,19 @@ export const handler: Handler = async (event) => {
     const bloqueoNuevo = pen.bloqueadoHasta;
 
     // 4. Aplicar: reserva → no_show, miembro → penalización.
-    const { error: upReservaErr } = await supabaseAdmin
+    // Condicionado a que SIGA confirmada: si el cron de no-shows o un doble
+    // envío se adelantaron, no se penaliza dos veces (antes el UPDATE era ciego y
+    // el contador se recalculaba desde un valor viejo).
+    const { data: marcada, error: upReservaErr } = await supabaseAdmin
       .from('reservas')
       .update({ status: 'no_show' })
-      .eq('id', reserva.id);
+      .eq('id', reserva.id)
+      .eq('status', 'confirmada')
+      .select('id');
     if (upReservaErr) return serverError(upReservaErr.message);
+    if (!marcada || marcada.length === 0) {
+      return badRequest('La reserva ya cambió de estado; recarga la pantalla.');
+    }
 
     const { error: upMiembroErr } = await supabaseAdmin
       .from('usuarios')

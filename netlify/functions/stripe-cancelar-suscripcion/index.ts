@@ -62,7 +62,9 @@ export const handler: Handler = async (event) => {
       .from('membresias')
       .select('stripe_subscription_id')
       .eq('usuario_id', socio.id)
-      .in('status', ['trialing', 'activa', 'past_due'])
+      // 'pausada' incluida: quien pausó por un viaje y decide no volver debe
+      // poder darse de baja sin tener que pedir que lo reanuden primero.
+      .in('status', ['trialing', 'activa', 'past_due', 'pausada'])
       .not('stripe_subscription_id', 'is', null)
       .order('created_at', { ascending: false })
       .limit(1)

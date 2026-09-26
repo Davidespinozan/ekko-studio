@@ -52,3 +52,19 @@ describe('agruparPorDia', () => {
     expect(agruparPorDia([], AHORA)).toEqual([]);
   });
 });
+
+describe('agruparPorDia — el día es el del ESTUDIO, no el del teléfono', () => {
+  it('una sesión a las 22:30 de Mazatlán es "Hoy" aunque en UTC (o en CDMX) ya sea mañana', () => {
+    const ahora = new Date('2026-09-20T20:00:00.000Z'); // 13:00 en Mazatlán, 20-sep
+    const sesion = { slot_inicio: '2026-09-21T05:30:00.000Z' }; // 22:30 en Mazatlán, 20-sep
+    const [grupo] = agruparPorDia([sesion], ahora);
+    expect(grupo.label).toBe('Hoy');
+    expect(grupo.key).toBe('2026-09-20');
+  });
+
+  it('00:30 de Mazatlán del día siguiente → "Mañana"', () => {
+    const ahora = new Date('2026-09-20T20:00:00.000Z');
+    const [grupo] = agruparPorDia([{ slot_inicio: '2026-09-21T07:30:00.000Z' }], ahora);
+    expect(grupo.label).toBe('Mañana');
+  });
+});

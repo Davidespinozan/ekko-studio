@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { validarStatusCuenta, traducirErrorAuth } from '../validarStatusCuenta';
+import { validarStatusCuenta, validarStatusStaff, validarStatusSegunRol, traducirErrorAuth } from '../validarStatusCuenta';
 
 describe('validarStatusCuenta', () => {
   it('activo → permitido', () => {
@@ -91,5 +91,30 @@ describe('traducirErrorAuth', () => {
     expect(traducirErrorAuth('INVALID LOGIN CREDENTIALS')).toBe(
       'Email o contraseña incorrectos.'
     );
+  });
+});
+
+describe('validarStatusStaff — al panel solo entra una cuenta activa', () => {
+  it('activo → permitido', () => {
+    expect(validarStatusStaff({ status: 'activo' })).toEqual({ permitido: true });
+  });
+
+  it('revocado / suspendido → bloqueado con su mensaje', () => {
+    expect(validarStatusStaff({ status: 'revocado' })).toMatchObject({ permitido: false });
+    expect(validarStatusStaff({ status: 'revocado' }).mensaje).toMatch(/revocado/i);
+    expect(validarStatusStaff({ status: 'suspendido' }).mensaje).toMatch(/suspendida/i);
+  });
+
+  it('cancelado: un MIEMBRO entra (a recomprar), el STAFF no', () => {
+    expect(validarStatusCuenta({ status: 'cancelado' }).permitido).toBe(true);
+    const r = validarStatusStaff({ status: 'cancelado' });
+    expect(r.permitido).toBe(false);
+    expect(r.mensaje).toMatch(/panel no está activo/i);
+  });
+
+  it('validarStatusSegunRol elige la regla por rol', () => {
+    expect(validarStatusSegunRol({ rol: 'miembro', status: 'cancelado' }).permitido).toBe(true);
+    expect(validarStatusSegunRol({ rol: 'recepcionista', status: 'cancelado' }).permitido).toBe(false);
+    expect(validarStatusSegunRol({ rol: 'admin', status: 'activo' }).permitido).toBe(true);
   });
 });

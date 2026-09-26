@@ -8,9 +8,9 @@
 // lo crea con la URL, los eventos y el flag connect exactos que espera el
 // backend. Lección de SALA (3fddde9 / a3ca993).
 //
-// LOS EVENTOS NO SE HARDCODEAN A CIEGAS: son los mismos `case '...'` de
-// netlify/functions/_lib/stripe.ts (clasificarEvento). Si agregas un case nuevo,
-// agrégalo aquí.
+// LOS EVENTOS viven en scripts/stripe-eventos.mjs y son los mismos `case '...'`
+// de netlify/functions/_lib/stripe.ts (clasificarEvento); un test exige que
+// coincidan. Si agregas un case nuevo, agrégalo allí y vuelve a correr esto.
 //
 // USO:
 //   STRIPE_SECRET_KEY=sk_test_xxx node scripts/stripe-setup-webhooks.mjs
@@ -22,6 +22,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 import Stripe from 'stripe';
+import { EVENTOS_WEBHOOK } from './stripe-eventos.mjs';
 
 function morir(msg) {
   console.error(`\n✖ ${msg}\n`);
@@ -37,16 +38,8 @@ function definirWebhooks(host) {
       path: '/.netlify/functions/stripe-webhook',
       connect: true,
       envVar: 'STRIPE_CONNECT_WEBHOOK_SECRET',
-      // = case '...' de _lib/stripe.ts → clasificarEvento
-      events: [
-        'account.updated',
-        'checkout.session.completed',
-        'customer.subscription.updated',
-        'customer.subscription.deleted',
-        'invoice.paid',
-        'invoice.payment_failed',
-        'payment_intent.succeeded'
-      ]
+      // = case '...' de _lib/stripe.ts → clasificarEvento (ver stripe-eventos.mjs)
+      events: EVENTOS_WEBHOOK
     }
   ].map((w) => ({ ...w, url: `https://${host}${w.path}` }));
 }

@@ -1,6 +1,7 @@
 import { PlanChip } from '@shared/components/PlanChip';
 import { VigenciaMembresia } from '@shared/components/VigenciaMembresia';
 import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
+import type { MembresiaVigente } from '@shared/hooks/useMembresiaVigente';
 import { statusMiembro } from '../../lib/miembroStatus';
 import { fechaCorta } from './perfilUtils';
 import type { MiembroPerfil } from './types';
@@ -15,7 +16,14 @@ function Dato({ label, valor }: { label: string; valor: React.ReactNode }) {
 }
 
 /** Datos operativos del miembro (email, plan, estado, inasistencias…). */
-export function DatosOperativosCard({ miembro }: { miembro: MiembroPerfil }) {
+export function DatosOperativosCard({
+  miembro,
+  membresia
+}: {
+  miembro: MiembroPerfil;
+  /** La que cargó la ficha (misma fuente que la tarjeta de membresía). */
+  membresia?: MembresiaVigente | null;
+}) {
   const st = statusMiembro(miembro.status);
   const { planes } = usePlanesActivos();
   // Solo mostramos el plan si sigue ACTIVO (no los tiers eliminados tipo pro/basica).
@@ -28,7 +36,7 @@ export function DatosOperativosCard({ miembro }: { miembro: MiembroPerfil }) {
         label="Plan"
         valor={planVigente ? <PlanChip slug={miembro.membresia_tier} /> : <span style={{ color: 'var(--ek-ink-faint)' }}>Sin plan</span>}
       />
-      <Dato label="Membresía" valor={<VigenciaMembresia usuarioId={miembro.id} />} />
+      <Dato label="Membresía" valor={<VigenciaMembresia usuarioId={miembro.id} membresia={membresia} />} />
       <Dato label="Cuenta" valor={<span style={{ color: st.color, fontWeight: 600 }}>{st.label}</span>} />
       <Dato label="Inasistencias" valor={String(miembro.no_shows_count ?? 0)} />
       <Dato label="Miembro desde" valor={fechaCorta(miembro.created_at)} />

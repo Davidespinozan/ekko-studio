@@ -36,15 +36,15 @@ vi.mock('@supabase/supabase-js', () => ({
   }))
 }));
 
-import { handler } from '../../netlify/functions/reception-datos-identidad/index';
+import { handler, fusionarCampo } from '../../netlify/functions/reception-datos-identidad/index';
 
 type AnyEvent = Parameters<typeof handler>[0];
 const post = (body: unknown): AnyEvent =>
   ({ httpMethod: 'POST', headers: { authorization: 'Bearer tok' }, body: JSON.stringify(body) } as unknown as AnyEvent);
 const invocar = async (e: AnyEvent) => (await handler(e, {} as never, () => {})) as { statusCode: number; body: string };
 
-const CALLER = { id: 'u1', tenant_id: 't1', rol: 'recepcionista' };
-const TARGET = { id: 'm1', tenant_id: 't1', avatar_url: 'http://a/x.jpg', identidad_completa: false, contrato_firmado: false };
+const CALLER = { id: 'u1', tenant_id: 't1', rol: 'recepcionista', status: 'activo' };
+const TARGET = { id: 'm1', tenant_id: 't1', rol: 'miembro', avatar_url: 'http://a/x.jpg', identidad_completa: false, contrato_firmado: false };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -101,5 +101,94 @@ describe('reception-datos-identidad', () => {
     const res = await invocar(post({ usuario_id: 'm1', fecha_nacimiento: '1995-05-10' }));
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).identidad_completa).toBe(false);
+  });
+
+  // ── Fase 1 identidad: PATCH, nunca sobrescritura ──────────────────────────
+  describe('semántica PATCH (Fase 1 identidad)', () => {
+    const PREV = { fecha_nacimiento: '1990-05-05', domicilio: 'Calle 1', ine_folio: 'ABC123', ine_foto_path: 't1/m1-ine.jpg' };
+    const conFicha = (target: Record<string, unknown> = TARGET) => {
+      mockUsuariosMaybe
+        .mockResolvedValueOnce({ data: CALLER, error: null })
+        .mockResolvedValueOnce({ data: target, error: null });
+      mockDpMaybe.mockResolvedValueOnce({ data: PREV, error: null });
+    };
+    const upsertEnviado = () => mockDpUpsert.mock.calls[0]?.[0] as Record<string, unknown> | undefined;
+    const patchUsuarios = () => {
+      const fromMock = (mockUsuariosUpdateEq.mock.calls.length, null);
+      return fromMock;
+    };
+
+    it('campo omitido → conserva el valor actual (antes quedaba en NULL)', async () => {
+      conFicha();
+      const res = await invocar(post({ usuario_id: 'm1', domicilio: 'Calle 2' }));
+      expect(res.statusCode).toBe(200);
+      expect(upsertEnviado()).toMatchObject({
+        fecha_nacimiento: '1990-05-05',
+        domicilio: 'Calle 2',
+        ine_folio: 'ABC123',
+        ine_foto_path: 't1/m1-ine.jpg'
+      });
+      expect(JSON.parse(res.body).cambios).toEqual(['domicilio']);
+    });
+
+    it('un POST con todos los campos ausentes o vacíos no escribe nada en la ficha', async () => {
+      conFicha();
+      const res = await invocar(post({ usuario_id: 'm1', fecha_nacimiento: '', domicilio: '   ' }));
+      expect(res.statusCode).toBe(200);
+      expect(mockDpUpsert).not.toHaveBeenCalled();
+      expect(JSON.parse(res.body).cambios).toEqual([]);
+    });
+
+    it('null explícito borra; string vacío no', () => {
+      expect(fusionarCampo(null, 'x')).toEqual({ valor: null, cambio: true });
+      expect(fusionarCampo('', 'x')).toEqual({ valor: 'x', cambio: false });
+      expect(fusionarCampo(undefined, 'x')).toEqual({ valor: 'x', cambio: false });
+      expect(fusionarCampo('  y ', 'x')).toEqual({ valor: 'y', cambio: true });
+      expect(fusionarCampo('x', 'x')).toEqual({ valor: 'x', cambio: false });
+    });
+
+    it('fecha con formato inválido → 400 sin escribir', async () => {
+      conFicha();
+      const res = await invocar(post({ usuario_id: 'm1', fecha_nacimiento: '05/05/1990' }));
+      expect(res.statusCode).toBe(400);
+      expect(mockDpUpsert).not.toHaveBeenCalled();
+    });
+
+    it('contrato ya firmado + guardar otra cosa → NO reescribe contrato_firmado_at', async () => {
+      conFicha({ ...TARGET, identidad_completa: true, contrato_firmado: true });
+      const res = await invocar(post({ usuario_id: 'm1', domicilio: 'Calle 3', contrato_firmado: true }));
+      expect(res.statusCode).toBe(200);
+      // identidad_completa no cambió y el contrato ya estaba: no hay update a usuarios.
+      expect(mockUsuariosUpdateEq).not.toHaveBeenCalled();
+      expect(JSON.parse(res.body)).toMatchObject({ contrato_firmado: true, cambios: ['domicilio'] });
+    });
+
+    it('contrato false→true fija contrato_firmado_at una sola vez', async () => {
+      conFicha({ ...TARGET, identidad_completa: true, contrato_firmado: false });
+      const res = await invocar(post({ usuario_id: 'm1', contrato_firmado: true }));
+      expect(res.statusCode).toBe(200);
+      expect(mockUsuariosUpdateEq).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(res.body)).toMatchObject({ contrato_firmado: true, cambios: ['contrato_firmado'] });
+    });
+
+    it('desmarcar un contrato firmado NO borra la fecha: se ignora y se avisa', async () => {
+      conFicha({ ...TARGET, identidad_completa: true, contrato_firmado: true });
+      const res = await invocar(post({ usuario_id: 'm1', contrato_firmado: false }));
+      expect(res.statusCode).toBe(200);
+      expect(mockUsuariosUpdateEq).not.toHaveBeenCalled();
+      const body = JSON.parse(res.body);
+      expect(body.contrato_firmado).toBe(true);
+      expect(body.aviso).toMatch(/ya estaba firmado/i);
+    });
+
+    it('identidad_completa se recalcula con los valores FUSIONADOS (foto + ficha previa completa → true)', async () => {
+      conFicha({ ...TARGET, identidad_completa: false, contrato_firmado: false });
+      const res = await invocar(post({ usuario_id: 'm1', ine_folio: 'NUEVO1' }));
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).identidad_completa).toBe(true);
+      expect(mockUsuariosUpdateEq).toHaveBeenCalledTimes(1);
+    });
+
+    void patchUsuarios;
   });
 });

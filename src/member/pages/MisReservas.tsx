@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -19,6 +19,9 @@ import { ESTADOS_RESERVA_HISTORICOS } from '@shared/constants/reservaStatus';
 import { agruparPorDia } from '@member/logic/agruparReservas';
 import { PagarInvitadosExtra } from '@member/components/PagarInvitadosExtra';
 import type { Database } from '@shared/types/database';
+import { desdeReservasVigentesISO, sesionEnCurso } from '@member/logic/reservasVigentes';
+import { BotonCancelarReserva } from '@member/components/BotonCancelarReserva';
+import { formatHoraEnZona } from '@shared/lib/timezone';
 
 type Reserva = Database['public']['Tables']['reservas']['Row'];
 type Recurso = Database['public']['Tables']['recursos']['Row'];
@@ -37,6 +40,9 @@ function useMisReservas(usuarioId: string | undefined) {
   const [proximas, setProximas] = useState<ReservaConRecurso[]>([]);
   const [historial, setHistorial] = useState<ReservaConRecurso[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Se incrementa para recargar (tras cancelar una reserva desde la lista).
+  const [version, setVersion] = useState(0);
+  const recargar = useCallback(() => setVersion((v) => v + 1), []);
 
   useEffect(() => {
     if (!usuarioId) {
@@ -44,17 +50,18 @@ function useMisReservas(usuarioId: string | undefined) {
       return;
     }
     let mounted = true;
-    setIsLoading(true);
+    // Solo el primer load muestra skeleton: al recargar, la lista no parpadea.
+    if (version === 0) setIsLoading(true);
 
     async function load() {
-      const ahoraIso = new Date().toISOString();
+      const vigentesDesde = desdeReservasVigentesISO();
       const [proxRes, histRes] = await Promise.all([
         supabase
           .from('reservas')
           .select('*, recurso:recursos(nombre, max_invitados_extra)')
           .eq('usuario_id', usuarioId!)
           .eq('status', 'confirmada')
-          .gte('slot_inicio', ahoraIso)
+          .gte('slot_fin', vigentesDesde)
           .order('slot_inicio', { ascending: true }),
         supabase
           .from('reservas')
@@ -74,17 +81,18 @@ function useMisReservas(usuarioId: string | undefined) {
     return () => {
       mounted = false;
     };
-  }, [usuarioId]);
+  }, [usuarioId, version]);
 
-  return { proximas, historial, isLoading };
+  return { proximas, historial, isLoading, recargar };
 }
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
+/** Hora de pared del ESTUDIO (no la del teléfono): la misma que ve recepción. */
 function hora(iso: string): string {
-  return new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return formatHoraEnZona(iso);
 }
 
 function badgeParaReserva(status: string): { label: string; className: string; icon: LucideIcon } {
@@ -103,7 +111,7 @@ function badgeParaReserva(status: string): { label: string; className: string; i
 export default function MisReservas() {
   const { usuario } = useAuth();
   const tenant = useTenant();
-  const { proximas, historial, isLoading } = useMisReservas(usuario?.id);
+  const { proximas, historial, isLoading, recargar } = useMisReservas(usuario?.id);
   const [tab, setTab] = useState<Tab>('proximas');
   const [invitadosPara, setInvitadosPara] = useState<string | null>(null);
 
@@ -179,6 +187,9 @@ export default function MisReservas() {
                           <p className="ek-body-faint" style={{ marginTop: '2px' }}>
                             {hora(r.slot_inicio)} · Folio{' '}
                             <span style={{ fontFamily: 'var(--ek-font-mono)' }}>{r.folio}</span>
+                            {sesionEnCurso(r.slot_inicio) && (
+                              <span className="ek-badge ek-badge--success" style={{ marginLeft: '8px' }}>EN CURSO</span>
+                            )}
                           </p>
                         </div>
                         <ArrowRight size={16} className="ek-quick-action-arrow" aria-hidden="true" />
@@ -193,6 +204,16 @@ export default function MisReservas() {
                         >
                           <UserPlus size={15} aria-hidden="true" /> Pagar invitados extra
                         </button>
+                      )}
+                      {/* Cancelar CUALQUIER reserva, no solo la próxima: antes el botón
+                          vivía únicamente en el hero del inicio y quien tenía dos
+                          reservas no podía soltar la segunda → no-show y crédito
+                          perdido. Una sesión ya empezada no se cancela. */}
+                      {!sesionEnCurso(r.slot_inicio) && (
+                        <BotonCancelarReserva
+                          reserva={{ id: r.id, slot_inicio: r.slot_inicio, folio: r.folio ?? '', recurso_nombre: r.recurso?.nombre ?? 'Estudio', invitados_extra_pagados: r.invitados_extra_pagados }}
+                          onCancelada={recargar}
+                        />
                       )}
                     </div>
                   ))}

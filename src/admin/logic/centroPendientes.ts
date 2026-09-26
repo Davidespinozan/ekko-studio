@@ -40,7 +40,7 @@ export function construirPendientes(c: ConteoPendientes): ItemPendiente[] {
       detail: 'Periodo terminado y siguen activas. Renueva o suspende.',
       count: c.membresiasVencidas,
       tono: 'dang',
-      to: '/admin/miembros'
+      to: '/admin/miembros?filtro=vencidas'
     });
   }
   if (c.cobrosPendientes > 0) {
@@ -51,7 +51,8 @@ export function construirPendientes(c: ConteoPendientes): ItemPendiente[] {
       detail: 'Miembros que aún no completan el pago de su plan.',
       count: c.cobrosPendientes,
       tono: 'warn',
-      to: '/admin/cobros'
+      // A la lista de QUIÉNES son, no a /admin/cobros (eso es la conexión con Stripe).
+      to: '/admin/miembros?status=pendiente_pago'
     });
   }
   if (c.identidadPendiente > 0) {
@@ -62,7 +63,7 @@ export function construirPendientes(c: ConteoPendientes): ItemPendiente[] {
       detail: 'Con acceso pero sin ficha completa (foto / INE / contrato).',
       count: c.identidadPendiente,
       tono: 'warn',
-      to: '/admin/miembros'
+      to: '/admin/miembros?filtro=identidad'
     });
   }
   if (c.noShows7d > 0) {

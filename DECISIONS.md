@@ -283,3 +283,316 @@ test en `src/__tests__`.
 - **EKKO-034 — Reportes "cobrado · dinero real"** desde `payment_events`
   (mes actual vs. anterior, por concepto, reembolsos, cobros rechazados 30 d),
   separado del MRR (ingreso contratado).
+
+## Paridad con SALA — Auditoría #2, Sprint A (2026-09-20)
+
+Detalle y evidencia en `SALA_PARITY_AUDIT_2.md` §2 y §7.
+
+- **EKKO-035 — Tests conductuales de la base (`src/__tests__/db`).** Un Postgres
+  real embebido (PGlite, sin Docker ni psql) aplica TODAS las migraciones y
+  ejecuta las RPC como lo hace la app. Corre con `vitest`, o sea en CI. Reemplaza
+  como red de seguridad a los "contratos" `position(texto in prosrc)`, que
+  afirman que una función contiene una frase, no que se comporta bien.
+  `EKKO_DB_HASTA=<timestamp>` aplica solo hasta esa migración (para comprobar que
+  un test nuevo falla antes del fix). Regla: toda migración que toque dinero o
+  acceso lleva su caso aquí.
+- **EKKO-036 — Reservar exige una membresía viva, en el trigger de débito.**
+  `creditos_debitar_al_reservar`: sin membresía → `EKKO_SIN_MEMBRESIA`. Vive en
+  el trigger (no en las RPC) porque toda inserción a `reservas` pasa por él y así
+  no se recrean dos RPC largas. Vale también para recepción. Mensual con
+  suscripción Stripe: manda el `status` del webhook, no la fecha (`invoice.paid`
+  puede tardar); mensual de mostrador (sin Stripe): sí se valida la fecha.
+- **EKKO-037 — El trigger de débito es AFTER INSERT.** Como BEFORE insertaba el
+  asiento del ledger con un `reserva_id` que aún no existía (FK no diferible):
+  ningún miembro con paquete podía reservar. Un RAISE en AFTER aborta igual la
+  inserción, y un slot ocupado ya no llega a debitar.
+- **EKKO-038 — La duración la fija el estudio.** Miembro: exactamente
+  `reserva.duracion_default_min`. Staff: 15 min–8 h (reprogramar conserva la
+  duración original). Nadie cruza la medianoche del estudio.
+- **EKKO-039 — Staff inactivo = sin poderes.** `is_admin()`, `is_recepcionista()`
+  y `get_my_rol()` exigen `status='activo'`; `get_my_rol()` devuelve `'revocado'`
+  y NO `NULL` (con NULL, `IF v_rol NOT IN (…)` no dispara y los triggers lo
+  tratan como proceso sin sesión). Toda function de staff valida al caller con
+  `_lib/staff` (`esStaffActivo` / `esAdminActivo`); un test falla si una function
+  compara el rol a mano. Admin y recepción sacan del panel a la sesión abierta de
+  una cuenta inactiva. La migración normaliza a `activo` al staff `pendiente_*`
+  y ABORTA si un tenant se quedaría sin ningún admin activo.
+- **EKKO-040 — Recepción solo opera sobre miembros** (`puedeOperarSobre`): las
+  cuentas del equipo las toca un admin. Un admin no se cambia el rol a sí mismo.
+- **EKKO-041 — La baja de una suscripción vieja no castiga al miembro.**
+  `sync_membresia_stripe('cancelada')` solo toca `usuarios` si no hay otra
+  membresía viva; y vuelve a soltar `membresia_tier` (fix de 0704 que se perdió
+  al recrear la función el 0821).
+- **EKKO-042 — Las cuentas demo no llevan contraseña fija.** `admin-seed-demo`
+  genera una al azar por corrida y la devuelve una sola vez.
+- **EKKO-043 — Una sola lista de eventos del webhook** (`scripts/stripe-eventos.mjs`)
+  y un test que exige que coincida con los `case` de `clasificarEvento`.
+  Se agregó `charge.refunded`.
+
+## Paridad con SALA — Auditoría #2, Sprint C · dinero (2026-09-20)
+
+- **EKKO-044 — Un pago único acredita una vez.** `activar_membresia` recibe
+  `p_referencia` (id del PaymentIntent) y lo guarda en `membresias.referencia_pago`
+  (único). La sesión de Checkout y su PaymentIntent son dos eventos del mismo
+  pago: el segundo es no-op, aunque el paquete ya se haya reemplazado. El usuario
+  se bloquea `FOR UPDATE` para serializar eventos simultáneos.
+- **EKKO-045 — Recomprar nunca acorta.** Un paquete nuevo vence en la fecha más
+  lejana entre la suya y la del saldo que arrastra. Una mensualidad de mostrador
+  (sin Stripe) del MISMO plan renovada antes de vencer apila desde su fin actual;
+  cambiar a otro plan no hereda días. Con Stripe manda Stripe.
+- **EKKO-046 — La pausa cuenta como membresía viva.** Entra al índice único, al
+  cierre/arrastre de `activar_membresia`, a la devolución de créditos y a las
+  listas de las functions (cancelar, subs previas del webhook). Reanudar una
+  membresía sin Stripe le devuelve los días que estuvo en pausa, y vuelve al
+  status que tenía (`pausada_desde_status`): una `past_due` sigue debiendo.
+- **EKKO-047 — Perder créditos exige confirmación en el servidor.**
+  `p_confirmar_perdida` (default true para el webhook, que ya cobró); recepción
+  manda false salvo confirmación → `EKKO_PERDERIA_CREDITOS` → 409 → la UI pregunta.
+- **EKKO-048 — Un cobro no levanta una sanción.** `sync_membresia_stripe` solo
+  reactiva a quien estaba sin acceso por PAGO (`cancelado`, `pendiente_*`) o por
+  la pausa de esa misma membresía; nunca a un `suspendido`/`revocado` por el admin.
+- **EKKO-049 — La devolución vuelve a la membresía que pagó** si sigue viva o en
+  pausa; si ya se reemplazó, a la viva actual.
+- **EKKO-050 — Recibido ≠ procesado.** `stripe_webhook_events.processed_at` se
+  marca al terminar la acción de dinero (antes de contabilidad y avisos). Un
+  reintento que encuentra la fila sin procesar y con más de 60 s la reclama con
+  un UPDATE condicionado; si es más reciente responde 503. `sync` que devuelve
+  `success:false` se reporta a Sentry (no relanza: reintentar no lo arregla).
+- **EKKO-051 — A quien pagó no se le borra.** `admin-delete-user` responde 409
+  si hay suscripción viva en Stripe, cobros registrados o huella de staff
+  (check-ins, cancelaciones, notas, bitácora): se revoca, no se elimina.
+- **EKKO-052 — `en_venta` se valida en el servidor** en las tres functions de
+  cobro. La idempotencyKey de `prices.create` es un hash de todos sus parámetros
+  (`llavePrecio`): editar un plan ya no bloquea sus altas 24 h.
+- **EKKO-053 — Avisos de cobro.** Pago fallido: aviso in-app al miembro (lo
+  empuja cron-push) + aviso al equipo, haya o no email. Compra de paquete:
+  correo con saldo y vigencia. `stripe-pausar-membresia` ya no empuja inline (el
+  aviso de la RPC lo reparte cron-push; llegaba dos veces). `fetch` a Resend con
+  timeout de 5 s.
+- **Sin cambio (decisión conservadora, pendiente de David):** cancelación tardía
+  hecha por recepción sigue devolviendo el crédito y sin contar para el tope
+  (M15); invitados extra pagados no se reembolsan al cancelar (M16).
+
+## Paridad con SALA — Auditoría #2, Sprint D · operación diaria (2026-09-20)
+
+- **EKKO-054 — La ficha decide por el estado de la MEMBRESÍA, no por
+  `usuarios.status`.** `accionesDeMembresia()` (pura) dice qué ofrecer: sin plan →
+  Asignar; vencida / sin créditos → Renovar; en pausa → Reanudar; vigente →
+  cambiar, pausar, ajustar créditos, dar de baja. Con suscripción Stripe nunca se
+  ofrece "Renovar" (se renueva sola). La membresía se carga UNA vez por ficha y
+  baja a todas las tarjetas; tras cada acción se recarga todo junto.
+- **EKKO-055 — Asignar / renovar / cambiar plan en un paso** (`AsignarPlanModal`),
+  con motivo ("cómo pagó") obligatorio en la UI y registrado en `audit_log`.
+  Sustituye a "Editar datos → elegir plan → guardar → Activar membresía".
+- **EKKO-056 — `staff_ajustar_creditos`**: ±1..50, motivo ≥ 5 caracteres, saldo
+  nunca < 0, asiento `ajuste` en el ledger, bitácora y aviso al miembro. Funciona
+  también con la membresía en pausa.
+- **EKKO-057 — `staff_cancelar_membresia` + function `staff-cancelar-membresia`.**
+  Con suscripción: no se renueva (`cancel_at_period_end`) y conserva el acceso;
+  Stripe primero y, si la RPC rechaza, se revierte. Inmediata (sin suscripción, en
+  pausa, o pedida): RPC primero y `subscriptions.cancel` después, porque cancelar
+  en Stripe no se deshace; si falla se reporta y lo recoge el reconciliador. Los
+  créditos que se pierden quedan asentados. NO cancela las reservas futuras.
+- **EKKO-058 — No-show durante la sesión.** Se puede marcar la falta desde
+  `slot_inicio + reserva.ventana_check_in_min` (15 por defecto), no hasta que
+  termine la hora: libera el estudio para un walk-in. El UPDATE va condicionado a
+  `status='confirmada'` (no penaliza dos veces si el cron se adelantó).
+- **EKKO-059 — La cancelación por el estudio queda en la bitácora** (trigger sobre
+  `confirmada → cancelada_admin`; cubre recepción y el UPDATE directo de admin).
+- **EKKO-060 — "Vigente" para el miembro = hasta 30 min después de `slot_fin`.**
+  Inicio, Mis reservas y el acceso al QR filtran por `slot_fin` con la gracia del
+  check-in: la sesión en curso ya no desaparece con su QR. Una sesión empezada no
+  se puede cancelar.
+- **EKKO-061 — El miembro cancela cualquiera de sus reservas**, no solo la próxima.
+- **EKKO-062 — Fechas y horas del miembro en la zona del ESTUDIO** (hero, Mis
+  reservas y su agrupación por día, QR, modal de cancelar, mensaje de WhatsApp,
+  Reservar, restricción).
+- **EKKO-063 — El plan actual se muestra aunque ya no se venda.** `MiSuscripcion`
+  carga todos los planes y filtra lo comprable con `vendible`; el suscriptor de un
+  plan retirado lo ve, con un aviso, y puede cancelarlo.
+- **EKKO-064 — Tras pagar desde el Perfil se sondea la activación** (webhook) y se
+  refresca el usuario: Reservar deja de decir "Necesitas un plan".
+- **EKKO-065 — Reservar avisa ANTES** si el plan no incluye el estudio o hay una
+  restricción; se quitó el sufijo "· Inténtalo otra vez".
+- **EKKO-066 — Pausa ≠ sanción.** En el login, un miembro `suspendido` por la
+  pausa de su membresía lee un mensaje propio; en la ficha de recepción no se
+  muestra la alarma de "cuenta suspendida". (Decisión conservadora: sigue sin
+  entrar a la app; el modo lectura queda pendiente de David.)
+- **EKKO-067 — El banner de instalar no estorba:** solo landing e inicio del
+  miembro, solo pantallas de teléfono, tras 4 s, por debajo de los modales y por
+  encima de la barra de navegación; el descarte dura 90 días.
+- **EKKO-068 — Push para el staff.** `ActivarAvisosPush` es compartido; admin
+  (dashboard) y recepción (Hoy) lo ven como invitación hasta activarlo.
+
+## Solicitud de cambios del cliente (2026-09-20)
+
+Detalle en `SOLICITUD_CLIENTE.md`.
+
+- **EKKO-069 — La disponibilidad se pide a `slots_ocupados()`, nunca a `reservas`.**
+  RLS no deja a un miembro ver reservas ajenas (correcto), así que leer la tabla
+  pintaba libres los horarios de otros. La RPC devuelve solo intervalos.
+- **EKKO-070 — "Un solo set a la vez"** (`reserva.sets_exclusivos`) se hace cumplir en
+  la base: trigger + `pg_advisory_xact_lock` por estudio. La grilla decide por
+  TRASLAPE de intervalos (no por igualdad de hora) y distingue `otro_set`.
+- **EKKO-071 — Disponibilidad "en tiempo real" por sondeo (20 s)**, no por Realtime:
+  Realtime respeta RLS y no entrega cambios de reservas ajenas.
+- **EKKO-072 — Calendario en el navegador**: `.ics` (con `data:`, no `blob:`, por la
+  PWA de iOS) + enlace de Google. Horas en UTC; UID estable por reserva.
+- **EKKO-073 — Correo = despachador central** (`cron-email` sobre
+  `notificaciones.email_enviado_at`), mismo patrón que el push. Lista blanca de tipos.
+  Sin Resend no marca nada. Todo el texto del aviso se escapa (también el preheader).
+- **EKKO-074 — La confirmación de reserva nace en un trigger** de `reservas` (cubre la
+  app y recepción). Fechas de los avisos con `_fecha_hora_estudio()`.
+- **EKKO-075 — Material = archivo o enlace**, ligado a la reserva, con vigencia que
+  también rige en Storage. Un aviso por tanda. Subida directa ≤ 500 MB.
+- **Apple Pay / Google Pay**: sin código; dominio registrado en la CUENTA CONECTADA
+  (`scripts/stripe-wallets-dominio.mjs`).
+
+## Restos de la solicitud del cliente + Sprint E (2026-09-20)
+
+- **EKKO-076 — Reprogramar = un solo aviso de "cambio de horario".**
+  `staff_avisar_reprogramacion` retira el par agendada + cancelada recién creado y
+  deja uno con de-dónde-a-dónde. Best-effort: si falla, quedan los dos originales.
+- **EKKO-077 — La ficha ADMIN del miembro usa la misma tarjeta y modales de
+  membresía que recepción.** El plan ya no se edita en un select + "Guardar" +
+  "Activar manualmente". El status de la cuenta va por `reception-update-member`
+  (motivo obligatorio + bitácora), con etiquetas humanas. Material por sesión.
+- **EKKO-078 — El admin cancela reservas por `cancelar_reserva_atomic`**, no con un
+  UPDATE. Se quitó la opción de cancelar sin avisar al miembro. El dashboard solo
+  ofrece "Cancelar" en reservas confirmadas que no han empezado, y "Ver detalle"
+  abre el modal (antes era un toast de desarrollo).
+- **EKKO-079 — El centro de pendientes lleva a listas ya filtradas**
+  (`/admin/miembros?status=…` / `?filtro=vencidas|identidad`).
+- **EKKO-080 — Reset de contraseña del equipo desde Admin → Equipo.**
+- **EKKO-081 — La campana es un historial** (20 avisos, leídos atenuados), "marcar
+  todas" es una sola sentencia, revierte si el servidor falla, y navega a
+  `metadata.url` (solo rutas internas). El aviso `cambiar_password` no se puede
+  descartar desde la campana: es lo que mantiene encendido el gate.
+
+## "Pago por hora" en un solo flujo (2026-09-21)
+
+- **EKKO-082 — Elegir la hora primero; el paquete se compra ahí mismo.** Sin plan o
+  sin saldo, tocar una hora ofrece `elegirPaquetePorHora()` (el paquete de créditos
+  más barato que, con el saldo actual, alcanza para ESE estudio y que el estudio
+  acepta; nunca una mensualidad ni un plan retirado). Al pagar, se sondea la
+  acreditación (webhook, ≤ 30 s) y se reserva la hora sola; si se ocupó mientras
+  tanto, los créditos quedan y se elige otra.
+- **Bug corregido de paso:** `useVisibilityAwarePolling` ejecuta `poll` al montar y
+  cada vez que cambia su identidad; en Reservar se le pasaba una arrow inline →
+  bucle infinito de recargas de la grilla. Ahora es un `useCallback` estable que
+  ignora el primer tick. Lo atrapó el test de render de la página.
+
+## Endurecimiento de base + índices + e2e (2026-09-21)
+
+- **EKKO-083 — Nadie deja el estudio sin admin activo** (trigger en `usuarios`,
+  UPDATE y DELETE, aplica también a service_role y al SQL editor). El miembro
+  tampoco toca `email`, `auth_id`, `membresia_activa_id`, `notas_admin` ni
+  `invitado` sobre su propia fila (sí nombre y teléfono).
+- **EKKO-084 — Ledgers inmutables por trigger**, no solo por RLS: `audit_log`
+  nunca se modifica ni se borra; `membresia_movimientos` solo admite el SET NULL
+  de `reserva_id` (FK) y el DELETE en cascada al borrar la membresía. Para
+  corregir un saldo se registra un ajuste.
+  `_estado_membresia_checkin` ya no es ejecutable por `authenticated` (un miembro
+  podía consultar el estado de otro por UUID).
+- **EKKO-085 — Los checks de `supabase/tests/*.sql` corren en CI**
+  (`src/__tests__/db/checks-sql.db.test.ts`) en vez de pegarse a mano. Índices
+  parciales para recordatorios / no-shows y por usuario, PaymentIntent y fecha en
+  `payment_events` y el ledger. Smokes e2e reales (landing, móvil, login, signup,
+  404, /app sin sesión) en lugar del placeholder; el job sigue gateado por
+  `RUN_E2E` hasta que existan los secrets.
+
+## Restos del Sprint D de la paridad SALA (2026-09-21, tarde)
+
+- **EKKO-086 — "Editar datos" en recepción es SOLO contacto** (nombre, teléfono,
+  email). Poner `status='activo'` o un plan a mano sin cobrar era la puerta trasera
+  que la auditoría #1 cerró en admin (P0-7) y aquí seguía abierta (R5). El plan se
+  activa con dinero (`MembresiaCard`) y el estado de la cuenta se cambia con motivo
+  (`EstadoCuentaCard`). El servidor (`reception-update-member`) sigue aceptando
+  `status` con motivo porque esa tarjeta lo usa.
+- **EKKO-087 — Atajos de mostrador en Hoy (R7):** check-in de UN toque desde
+  "Llegando ahora" (mismo RPC y mismo `CheckInDetail` después: el aviso de
+  membresía vencida no se pierde), cancelar la reserva desde la tarjeta (solo
+  confirmadas que no empezaron; el RPC deja `cancelada_admin` y avisa), búsqueda por
+  TELÉFONO en Hoy y en el padrón (`lib/buscarEnPadron.ts`, últimos dígitos, con o
+  sin formato), foto o iniciales en las tarjetas y aviso "Ficha o contrato
+  pendiente" antes de que llegue.
+- **EKKO-088 — El historial de pagos dice QUÉ se cobró** (A11):
+  `conceptoDeCargo()` en `stripe-billing-info` resuelve "Paquete · 4 horas",
+  "Renovación de membresía · Esencial", "Invitados extra (2)" a partir de la
+  metadata del cargo o de la invoice expandida; trae `receipt_url` (enlace "Ver
+  recibo") y los reembolsos: un cargo devuelto se muestra "Reembolsado", uno
+  parcial "Devuelto $X". Antes un cargo reembolsado decía "Pagado".
+- **EKKO-089 — "Contacta al estudio" con enlace de verdad** (A12):
+  `ContactoEstudio` abre el WhatsApp del estudio con el mensaje ya escrito (login
+  con cuenta no activa, restricción activa en Inicio, sin estudios al reservar,
+  cancelación con invitados pagados). Sin número configurado no pinta nada; sin
+  `TenantProvider` tampoco truena (`useTenantOpcional`). Los Términos ya no prometen
+  "reprogramar": la app cancela y vuelve a reservar; con menos anticipación se acuerda
+  con el estudio.
+- **EKKO-090 — Cancelar con invitados extra pagados avisa** (M16, parte "aviso"):
+  el modal dice cuántos invitados se cobraron, que ese cobro NO se devuelve solo, y
+  da el WhatsApp con el folio. El reembolso automático sigue siendo decisión de
+  David (M16 dinero). **A8 en la sesión abierta:** `MemberLayout` distingue pausa de
+  sanción ANTES de cerrar la sesión (con la sesión viva aún puede leer sus
+  membresías) y manda a /login con `MENSAJE_EN_PAUSA`; el mensaje se resuelve antes
+  del redirect genérico para que `signOut` no se lo coma.
+- **De paso, e2e:** Playwright corre `npm run dev` en un puerto propio (5187). Con
+  el 5173 compartido el smoke corría contra el dev server de SALA que estaba abierto
+  en esta máquina y pasaban 5 de 6 pruebas por casualidad. `/signup` sin `?tier=`
+  redirige al landing (eso es lo que se prueba); el alta se prueba siguiendo un plan
+  real del landing y se salta si el entorno no tiene planes en venta.
+
+## Identidad única · Fase 1 — data safety + invariantes de acceso (2026-09-25)
+
+Origen: auditoría maestra de identidad (misma sesión). Veredicto PARTIAL: una sola
+entidad persona (`usuarios`) y un solo embudo de alta, pero estado de membresía
+copiado en `usuarios`, correo en tres sistemas y resolución de identidad solo por
+email exacto en Auth. Esta fase corrige lo que podía PERDER datos o dar acceso
+indebido; la desnormalización membresía ↔ usuarios queda para la Fase 2.
+
+- **EKKO-091 — Sanción administrativa ≠ estado comercial.** `usuarios.sancionado_at`
+  + `sancion_motivo`. MEMBRESÍA dice si tiene plan/créditos/vigencia; SANCIÓN dice si
+  el estudio le permite usar el servicio. Trigger `trg_sancion_manda`: mientras haya
+  sanción el status se fuerza a `suspendido`, la escriba quien la escriba
+  (`activar_membresia`, reanudar pausa, `sync_membresia_stripe`, cambiar-plan…); y una
+  operación de membresía nunca saca a nadie de `revocado`. Stripe informa el estado de
+  la SUSCRIPCIÓN; no tiene autoridad sobre la sanción. Suspender desde el mostrador
+  (`reception-update-member`) fija la sanción con motivo; activar o dejar pendiente de
+  pago la levanta, en el mismo UPDATE y auditado. `suscribir-membresia` y
+  `crear-pago-intent` rechazan (403) a sancionados y revocados: el cobro crearía la
+  membresía y la cuenta seguiría suspendida. Backfill: miembro `suspendido` sin
+  membresía `pausada` = sanción (la pausa deja `membresias.status='pausada'`).
+  Pendiente de Fase 2: `status` sigue siendo copia; un sancionado cuya suscripción se
+  cancela conserva `suspendido` y al levantarle la sanción queda `activo` sin plan (el
+  trigger de reserva exige membresía viva, así que no reserva).
+- **EKKO-092 — Ficha de identidad por PATCH.** `reception-datos-identidad`: campo
+  ausente o vacío conserva; texto actualiza; `null` es borrado explícito (la UI no lo
+  manda); la INE no reenviada se conserva; sin cambios no se escribe. Antes un campo
+  omitido quedaba en NULL y una carga fallida del modal borraba fecha de nacimiento,
+  domicilio e INE. El modal no permite guardar si la ficha actual no cargó (error +
+  reintentar) y envía solo lo que cambió.
+- **EKKO-093 — `contrato_firmado_at` es un evento histórico.** false→true fija la
+  fecha; true→true no la toca; true→false se ignora y se reporta (quitar una firma
+  exige una operación propia y auditada, no un checkbox). El modal muestra el contrato
+  firmado bloqueado.
+- **EKKO-094 — `avatar_url` es evidencia de identidad, no cosmético.** Forma parte de
+  `identidad_completa` (foto + nacimiento + domicilio + INE) y el miembro podía
+  cambiársela por PostgREST tras la verificación. Ahora `avatar_url`,
+  `contrato_firmado_at`, `sancionado_at` y `sancion_motivo` son columnas privilegiadas
+  (solo staff por función o admin). `identidad_completa` se recalcula por trigger al
+  cambiar la foto o la ficha (cualquier ruta, incluida la foto que admin sube por RLS).
+  Para la Fase 2: separar foto de perfil (cosmética) de foto de identidad (evidencia).
+- **EKKO-095 — El alta en Auth vincula, no ignora.** `handle_new_auth_user` con correo
+  normalizado (lower/trim): sin fila → INSERT; una fila del mismo tenant sin `auth_id`
+  → LINK (+ audit `auth_vinculado`); una fila ya vinculada a otra cuenta o varias filas →
+  excepción `EKKO_IDENTIDAD_AMBIGUA` (el alta en Auth se revierte; nunca se roba un
+  `auth_id`). `admin-create-user` ya no responde éxito si el perfil final no existe:
+  borra la cuenta de Auth y avisa. `fake-signup` normaliza el correo en el servidor.
+- **EKKO-096 — Correo único por estudio sin importar mayúsculas** (índice
+  `usuarios_tenant_email_lower_uniq`, migración aparte `20260925110000`): se crea SOLO
+  si no hay duplicados por capitalización; si los hay, avisa y no se aplica. El precheck
+  de producción es `supabase/precheck_identidad_fase1.sql` (solo SELECT).
+- **EKKO-097 — `reception-update-member` ya no acepta `membresia_tier`** (400). Era la
+  única ruta genérica capaz de conceder o quitar acceso comercial escribiendo la copia
+  derivada; el plan se activa con cobro (`activar_membresia`) o se da de baja con
+  `staff_cancelar_membresia`.

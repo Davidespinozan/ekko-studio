@@ -784,6 +784,8 @@ export type Database = {
           nombre: string | null
           notas_admin: string | null
           rol: string
+          sancion_motivo: string | null
+          sancionado_at: string | null
           status: string
           telefono: string | null
           tenant_id: string
@@ -808,6 +810,8 @@ export type Database = {
           nombre?: string | null
           notas_admin?: string | null
           rol?: string
+          sancion_motivo?: string | null
+          sancionado_at?: string | null
           status?: string
           telefono?: string | null
           tenant_id: string
@@ -832,6 +836,8 @@ export type Database = {
           nombre?: string | null
           notas_admin?: string | null
           rol?: string
+          sancion_motivo?: string | null
+          sancionado_at?: string | null
           status?: string
           telefono?: string | null
           tenant_id?: string

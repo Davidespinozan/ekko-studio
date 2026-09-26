@@ -1,4 +1,4 @@
-import { useMembresiaVigente } from '@shared/hooks/useMembresiaVigente';
+import { useMembresiaVigente, type MembresiaVigente } from '@shared/hooks/useMembresiaVigente';
 import { estadoMembresia, ESTADO_MEMBRESIA_LABEL, esPaqueteDeCreditos } from '@shared/lib/membresiaEstado';
 import { formatFechaEnZona } from '@shared/lib/timezone';
 
@@ -6,6 +6,13 @@ interface Props {
   usuarioId: string;
   /** 'linea' = una línea compacta (check-in); 'detalle' = estado + vence/créditos (ficha). */
   variante?: 'linea' | 'detalle';
+  /**
+   * Membresía ya cargada por la pantalla (`null` = sin membresía). Si se pasa, el
+   * componente NO consulta por su cuenta: la ficha tiene UNA sola fuente y se
+   * refresca junta. Antes esta instancia solo cargaba al montar y, tras activar o
+   * pausar, seguía diciendo "sin membresía" → recepción repetía la acción.
+   */
+  membresia?: MembresiaVigente | null;
 }
 
 /**
@@ -14,8 +21,11 @@ interface Props {
  * del tier de `usuarios`, que no dice si el plan sigue vigente ni cuántos
  * créditos quedan. (SALA f4ea7ac / bca45ce.)
  */
-export function VigenciaMembresia({ usuarioId, variante = 'detalle' }: Props) {
-  const { membresia, isLoading } = useMembresiaVigente(usuarioId);
+export function VigenciaMembresia({ usuarioId, variante = 'detalle', membresia: controlada }: Props) {
+  const esControlada = controlada !== undefined;
+  const propia = useMembresiaVigente(esControlada ? null : usuarioId);
+  const membresia = esControlada ? controlada : propia.membresia;
+  const isLoading = esControlada ? false : propia.isLoading;
   if (isLoading) return <span style={{ fontSize: '12px', color: 'var(--ek-ink-faint)' }}>…</span>;
 
   const estado = estadoMembresia(membresia);

@@ -39,8 +39,8 @@ function renderBuscar() {
 
 beforeEach(() => {
   hoisted.miembros = [
-    { id: 'm-1', nombre: 'José Pérez', email: 'jose@ekko.mx', status: 'activo', membresia_tier: 'pro', bloqueado_hasta: '2999-01-01T00:00:00Z' },
-    { id: 'm-2', nombre: 'Ana López', email: 'ana@ekko.mx', status: 'activo', membresia_tier: 'basica', bloqueado_hasta: null }
+    { id: 'm-1', nombre: 'José Pérez', email: 'jose@ekko.mx', status: 'activo', membresia_tier: 'pro', bloqueado_hasta: '2999-01-01T00:00:00Z', telefono: '+52 667 123 4567', avatar_url: null },
+    { id: 'm-2', nombre: 'Ana López', email: 'ana@ekko.mx', status: 'activo', membresia_tier: 'basica', bloqueado_hasta: null, telefono: null, avatar_url: null }
   ];
 });
 
@@ -75,5 +75,15 @@ describe('BuscarMiembro · acentos/mayúsculas', () => {
     renderBuscar();
     fireEvent.click(screen.getByRole('button', { name: 'Registrar' }));
     expect(await screen.findByText('Nuevo miembro')).toBeInTheDocument();
+  });
+});
+
+describe('BuscarMiembro · teléfono (R7)', () => {
+  it('encuentra al miembro por los últimos dígitos de su teléfono', async () => {
+    renderBuscar();
+    await screen.findByText('José Pérez');
+    fireEvent.change(screen.getByLabelText('Buscar miembro'), { target: { value: '4567' } });
+    expect(await screen.findByText('José Pérez')).toBeInTheDocument();
+    expect(screen.queryByText('Ana López')).not.toBeInTheDocument();
   });
 });

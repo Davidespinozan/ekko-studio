@@ -9,6 +9,7 @@ import { PaymentModal } from '@shared/components/PaymentModal';
 import { PlanTipoToggle, type VistaPlan } from '@shared/components/PlanTipoToggle';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
+import { useAuth } from '@shared/hooks/useAuth';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Spinner } from '@shared/components/Spinner';
 
@@ -29,6 +30,8 @@ interface TierInfo {
   tipo: string;
   clases_incluidas: number | null;
   duracion_dias: number | null;
+  /** Se puede COMPRAR hoy (activo y en venta). El plan actual puede no serlo. */
+  vendible: boolean;
 }
 
 function formatearPesos(centavos: number): string {
@@ -55,6 +58,7 @@ interface Props {
 export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const tenant = useTenant();
   const toast = useToast();
+  const { refreshUsuario } = useAuth();
   const [tiers, setTiers] = useState<TierInfo[]>([]);
   const [pagos, setPagos] = useState<PagoHistorial[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<MetodoPago | null>(null);
@@ -74,6 +78,34 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   // Destino de un cambio créditos→mensual que perdería el saldo (aviso).
   const [confirmarCambio, setConfirmarCambio] = useState<TierInfo | null>(null);
 
+  /**
+   * Tras pagar, la activación llega por el WEBHOOK de Stripe (segundos después).
+   * Antes solo salía un toast: el Perfil seguía mostrando el plan y los créditos
+   * viejos, y Reservar —que gatea con `usuario.membresia_tier` del AuthProvider—
+   * seguía diciendo "Necesitas un plan" hasta recargar la página a mano.
+   * Se sondea la membresía hasta que cambie (o ~25 s) y se refresca el usuario.
+   */
+  async function esperarActivacion() {
+    const huella = (m: MembresiaInfo | null) =>
+      m ? `${m.status}|${m.stripe_subscription_id ?? ''}|${m.creditos_restantes ?? ''}|${m.periodo_actual_fin ?? ''}` : '';
+    const antes = huella(membresia);
+    for (let intento = 0; intento < 10; intento++) {
+      await new Promise((r) => setTimeout(r, 2500));
+      const { data } = await supabase
+        .from('membresias')
+        .select('status, stripe_subscription_id, cancel_at_period_end, periodo_actual_fin, creditos_restantes')
+        .eq('usuario_id', usuarioId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const nueva = ((data ?? [])[0] as MembresiaInfo | undefined) ?? null;
+      if (huella(nueva) !== antes) {
+        setMembresia(nueva);
+        break;
+      }
+    }
+    await Promise.all([refreshUsuario(), recargarBilling()]);
+  }
+
   // Recarga tarjeta + historial tras un cambio (nueva tarjeta guardada).
   async function recargarBilling() {
     try {
@@ -91,10 +123,14 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
       const [tiersRes, memRes] = await Promise.all([
         supabase
           .from('tiers')
-          .select('slug, nombre, precio_centavos, beneficios, descripcion, tipo, clases_incluidas, duracion_dias')
+          // SIN filtrar por activo/en_venta: el plan ACTUAL del miembro puede estar
+          // retirado de la venta o archivado, y aun así es SU plan. Antes se
+          // filtraba aquí, `planActual` quedaba en null y un suscriptor de un plan
+          // retirado veía "No tienes un plan activo"… sin botón de Cancelar,
+          // mientras se le seguía cobrando. Lo que se ofrece a la venta se filtra
+          // abajo con `vendible`.
+          .select('slug, nombre, precio_centavos, beneficios, descripcion, tipo, clases_incluidas, duracion_dias, activo, en_venta')
           .eq('tenant_id', tenant.id)
-          .eq('activo', true)
-          .eq('en_venta', true)
           // Mismo orden que el registro (PagarMembresia): mensuales primero,
           // luego paquetes. `orden` agrupa por modelo; precio desempata.
           .order('orden', { ascending: true })
@@ -116,7 +152,8 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           descripcion: t.descripcion,
           tipo: t.tipo,
           clases_incluidas: t.clases_incluidas,
-          duracion_dias: t.duracion_dias
+          duracion_dias: t.duracion_dias,
+          vendible: t.activo === true && t.en_venta !== false
         }))
       );
       setMembresia(((memRes.data ?? [])[0] as MembresiaInfo | undefined) ?? null);
@@ -172,8 +209,9 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
 
   const planActual = tiers.find((t) => t.slug === currentSlug) ?? null;
   // Selector Membresías · Paquetes en el modal de cambio (igual que la landing).
-  const planesMensuales = tiers.filter((t) => !esPlanPaquete(t));
-  const planesPaquetes = tiers.filter((t) => esPlanPaquete(t));
+  const enVenta = tiers.filter((t) => t.vendible);
+  const planesMensuales = enVenta.filter((t) => !esPlanPaquete(t));
+  const planesPaquetes = enVenta.filter((t) => esPlanPaquete(t));
   const hayAmbosTipos = planesMensuales.length > 0 && planesPaquetes.length > 0;
   const planesVisibles = vistaPlan === 'paquetes' ? planesPaquetes : planesMensuales;
   const statusMeta = STATUS_META[status ?? ''] ?? { texto: status ?? '—', clase: 'ek-badge--neutral' };
@@ -334,6 +372,11 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             {planActual && (
               <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: '-8px 0 14px' }}>
                 {detallePlan(planActual)}
+              </p>
+            )}
+            {planActual && !planActual.vendible && (
+              <p data-testid="plan-fuera-de-venta" style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '-6px 0 14px', lineHeight: 1.45 }}>
+                Este plan ya no está a la venta. Lo conservas mientras sigas suscrito; si lo cancelas o cambias, no podrás volver a él.
               </p>
             )}
 
@@ -511,12 +554,25 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                         {formatearPesos(p.monto_centavos)}
                         <span style={{ color: 'var(--ek-ink-muted)', fontWeight: 500 }}> {p.moneda.toUpperCase()}</span>
                       </p>
+                      {/* Concepto (A11): qué se cobró, no solo cuánto. */}
+                      <p style={{ margin: '2px 0 0', fontSize: '13px', color: 'var(--ek-ink)' }}>{p.descripcion}</p>
                       <p className="ek-body-faint" style={{ margin: 0 }}>
                         {new Date(p.fecha).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {(p.reembolsado_centavos ?? 0) > 0 && p.status !== 'refunded' && (
+                          <> · Devuelto {formatearPesos(p.reembolsado_centavos ?? 0)}</>
+                        )}
+                        {p.receipt_url && (
+                          <>
+                            {' · '}
+                            <a href={p.receipt_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--ek-mustard)', textDecoration: 'underline' }}>
+                              Ver recibo
+                            </a>
+                          </>
+                        )}
                       </p>
                     </div>
-                    <span className={`ek-badge ${p.status === 'succeeded' ? 'ek-badge--success' : p.status === 'pending' ? 'ek-badge--outline' : 'ek-badge--danger'}`}>
-                      {p.status === 'succeeded' ? 'Pagado' : p.status === 'pending' ? 'Pendiente' : 'Falló'}
+                    <span className={`ek-badge ${p.status === 'succeeded' ? 'ek-badge--success' : p.status === 'pending' || p.status === 'refunded' ? 'ek-badge--outline' : 'ek-badge--danger'}`}>
+                      {p.status === 'succeeded' ? 'Pagado' : p.status === 'pending' ? 'Pendiente' : p.status === 'refunded' ? 'Reembolsado' : 'Falló'}
                     </span>
                   </li>
                 ))}
@@ -608,7 +664,9 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           onClose={() => setPagarTier(null)}
           onPagado={() => {
             setPagarTier(null);
+            setCambiarOpen(false);
             toast.success('¡Pago recibido! Tu plan se está activando, puede tardar unos segundos.');
+            void esperarActivacion();
           }}
         />
       )}

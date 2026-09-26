@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, UserPlus } from 'lucide-react';
 import { PlanChip } from '@shared/components/PlanChip';
 import { InvitadosModal } from './InvitadosModal';
 import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
+import { avisoMembresia } from '../lib/avisoMembresia';
 import { ZONA_ESTUDIO } from '@shared/lib/timezone';
 import { VigenciaMembresia } from '@shared/components/VigenciaMembresia';
 
@@ -47,17 +48,12 @@ interface Props {
   onClose: () => void;
 }
 
-const AVISO_MEMBRESIA: Record<string, string> = {
-  sin_membresia: 'Sin membresía vigente: cobra o activa un plan antes de dejarlo grabar.',
-  vencida: 'Membresía VENCIDA: renovar antes de dejarlo grabar.',
-  pago_pendiente: 'Pago PENDIENTE (la tarjeta rechazó el cobro): pídele que actualice su tarjeta o cobra en mostrador.'
-};
-
 const AUTO_CLOSE_MS = 15_000;
 
 export function CheckInDetail({ kind, miembro, recurso, reserva, stats, membresiaEstado, errorMessage, onClose }: Props) {
   const [secondsLeft, setSecondsLeft] = useState(Math.ceil(AUTO_CLOSE_MS / 1000));
   const [invitadosOpen, setInvitadosOpen] = useState(false);
+  const aviso = avisoMembresia(membresiaEstado);
 
   // Feedback sonoro + táctil al abrir el detalle (1 vez)
   useEffect(() => {
@@ -143,19 +139,14 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, membresi
 
       <div className="rec-detail-divider" />
 
-      {membresiaEstado && membresiaEstado !== 'ok' && (
+      {aviso && (
         <div
           role="alert"
           data-testid="aviso-membresia"
           style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', border: '1px solid var(--ek-danger)', borderRadius: 'var(--ek-r-sm)', padding: '10px 12px', marginBottom: '12px', background: 'rgba(226,85,85,0.10)' }}
         >
           <AlertTriangle size={16} aria-hidden="true" style={{ color: 'var(--ek-danger)', flexShrink: 0, marginTop: '1px' }} />
-          <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.4 }}>
-            {AVISO_MEMBRESIA[membresiaEstado] ??
-              (membresiaEstado.startsWith('cuenta_')
-                ? `Cuenta ${membresiaEstado.replace('cuenta_', '')}: el miembro no debería poder entrar; revisa con administración.`
-                : 'La membresía no está vigente; revisa antes de dejarlo grabar.')}
-          </p>
+          <p style={{ margin: 0, fontSize: '13px', lineHeight: 1.4 }}>{aviso}</p>
         </div>
       )}
 

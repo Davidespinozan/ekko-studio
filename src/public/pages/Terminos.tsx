@@ -69,7 +69,7 @@ export default function Terminos() {
       <h2>6. Reservas, cancelaciones y no-shows</h2>
       <ul>
         <li>Las reservas se hacen por bloques dentro del horario de cada estudio; cada bloque admite <strong>una sola reserva</strong>.</li>
-        <li>Puedes cancelar o reprogramar una sesión con la anticipación indicada en la plataforma.</li>
+        <li>Puedes cancelar una sesión con la anticipación indicada en la plataforma y reservar otro horario; con menos anticipación, el cambio se acuerda con el estudio.</li>
         <li>Si no te presentas a una sesión reservada (<strong>no-show</strong>) o cancelas fuera de tiempo, la sesión se considera consumida: se descuenta el crédito correspondiente o se pierde la sesión del período, según tu plan.</li>
         <li>La acumulación de inasistencias puede derivar en la restricción temporal de nuevas reservas por un período determinado.</li>
       </ul>

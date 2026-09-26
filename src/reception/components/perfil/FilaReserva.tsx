@@ -8,13 +8,16 @@ export function FilaReserva({
   historico,
   onCancelar,
   onReprogramar,
-  reprogramarBloqueado
+  reprogramarBloqueado,
+  onMaterial
 }: {
   reserva: ReservaPerfil;
   historico?: boolean;
   onCancelar?: () => void;
   onReprogramar?: () => void;
   reprogramarBloqueado?: boolean;
+  /** Subir / entregar el material de esta sesión (no aplica a canceladas). */
+  onMaterial?: () => void;
 }) {
   const cancelada = reserva.status === 'cancelada' || reserva.status === 'cancelada_admin';
   const conAcciones = onCancelar != null || onReprogramar != null;
@@ -75,7 +78,20 @@ export function FilaReserva({
           )}
         </div>
       ) : (
-        <span style={{ flexShrink: 0 }}>
+        <span style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          {onMaterial && !cancelada && (
+            <button
+              type="button"
+              onClick={onMaterial}
+              style={{
+                minHeight: '44px', padding: '4px 8px', background: 'transparent', border: 'none',
+                color: 'var(--ek-mustard)', fontSize: '12px', fontWeight: 600, cursor: 'pointer',
+                textDecoration: 'underline', textUnderlineOffset: '3px'
+              }}
+            >
+              Material
+            </button>
+          )}
           <StatusBadge status={reserva.status} size={11} />
         </span>
       )}

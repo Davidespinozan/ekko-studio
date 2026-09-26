@@ -34,6 +34,24 @@ vi.mock('../../netlify/functions/_lib/stripe', async (importOriginal) => ({
   })
 }));
 
+const mockInsert = vi.fn().mockResolvedValue({ error: null });
+const mockUpdate = vi.fn();
+let reclamoGanado = true;
+const filaPorTabla: Record<string, unknown> = {};
+const mockAvisarStaff = vi.fn().mockResolvedValue(1);
+vi.mock('../../netlify/functions/_lib/avisosStaff', () => ({
+  avisarStaff: (...a: unknown[]) => mockAvisarStaff(...a)
+}));
+const mockEnviarEmail = vi.fn().mockResolvedValue({ sent: true });
+vi.mock('../../netlify/functions/_lib/email', async (orig) => ({
+  ...(await orig<typeof import('../../netlify/functions/_lib/email')>()),
+  enviarEmail: (...a: unknown[]) => mockEnviarEmail(...a)
+}));
+const mockReportar = vi.fn().mockResolvedValue(undefined);
+vi.mock('../../netlify/functions/_lib/sentry', () => ({
+  reportarErrorServidor: (...a: unknown[]) => mockReportar(...a)
+}));
+
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
     rpc: mockRpc,
@@ -46,7 +64,22 @@ vi.mock('@supabase/supabase-js', () => ({
       return {
         upsert: vi.fn(() => ({ select: mockUpsertSelect })),
         delete: vi.fn(() => ({ eq: mockDeleteEq })),
-        select: vi.fn(() => makeChain())
+        insert: (fila: unknown) => mockInsert(table, fila),
+        // update().eq()…  — awaitable (marca processed_at) y con .select() (reclamo).
+        update: (patch: unknown) => {
+          mockUpdate(table, patch);
+          const u: Record<string, unknown> = {};
+          for (const m of ['eq', 'is']) u[m] = () => u;
+          u.select = () => Promise.resolve({ data: reclamoGanado ? [{ id: 'evt_1' }] : [], error: null });
+          u.then = (cb: (v: unknown) => unknown) => Promise.resolve({ error: null }).then(cb);
+          return u;
+        },
+        select: vi.fn(() => {
+          const c = makeChain();
+          // Fila por tabla para los lookups con .maybeSingle() (default: null).
+          if (filaPorTabla[table]) c.maybeSingle = () => Promise.resolve({ data: filaPorTabla[table], error: null });
+          return c;
+        })
       };
     })
   }))
@@ -70,6 +103,8 @@ async function invocar() {
 describe('stripe-webhook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const k of Object.keys(filaPorTabla)) delete filaPorTabla[k];
+    reclamoGanado = true;
     process.env.STRIPE_SECRET_KEY = 'sk_test';
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
     process.env.VITE_SUPABASE_URL = 'http://supabase.test';
@@ -151,6 +186,168 @@ describe('stripe-webhook', () => {
     expect(mockRpc).toHaveBeenCalledWith('sync_membresia_stripe', expect.objectContaining({
       p_stripe_subscription_id: 'sub_1', p_estado: 'past_due'
     }));
+  });
+
+  it('paquete por Checkout: la sesión y su PaymentIntent mandan la MISMA referencia (idempotencia del pago)', async () => {
+    const meta = { usuario_id: 'u1', tier_id: 't1' };
+    mockConstructEvent.mockReturnValueOnce({
+      id: 'evt_sesion', type: 'checkout.session.completed', created: 1700000000,
+      data: { object: { mode: 'payment', subscription: null, customer: 'cus_1', payment_intent: 'pi_1', metadata: meta } }
+    });
+    await invocar();
+    mockConstructEvent.mockReturnValueOnce({
+      id: 'evt_pi', type: 'payment_intent.succeeded', created: 1700000001,
+      data: { object: { id: 'pi_1', customer: 'cus_1', amount: 115000, currency: 'mxn', metadata: meta } }
+    });
+    await invocar();
+
+    const refs = mockRpc.mock.calls
+      .filter((c) => c[0] === 'activar_membresia')
+      .map((c) => (c[1] as { p_referencia: string | null }).p_referencia);
+    expect(refs).toEqual(['pi_1', 'pi_1']);
+  });
+
+  it('suscripción: sin referencia (ya es idempotente por subscription_id)', async () => {
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_1', type: 'checkout.session.completed', created: 1700000000,
+      data: { object: { mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', payment_intent: null, metadata: { usuario_id: 'u1', tier_id: 't1' } } }
+    });
+    await invocar();
+    expect(mockRpc).toHaveBeenCalledWith('activar_membresia', expect.objectContaining({ p_referencia: null }));
+  });
+
+  it('sync que no encuentra la membresía (success:false) NO pasa en silencio: 200 + reporte', async () => {
+    mockConstructEvent.mockReturnValue({
+      id: 'evt_1', type: 'customer.subscription.updated', created: 1700000000,
+      data: { object: { id: 'sub_huerfana', status: 'active', cancel_at_period_end: false } }
+    });
+    mockRpc.mockResolvedValue({ data: { success: false, reason: 'membresia_no_encontrada' }, error: null });
+
+    const res = await invocar();
+
+    expect(res.statusCode).toBe(200); // reintentar no la haría aparecer
+    expect(mockDeleteEq).not.toHaveBeenCalled();
+    expect(mockReportar).toHaveBeenCalledTimes(1);
+    expect(String((mockReportar.mock.calls[0][1] as Error).message)).toMatch(/membresia_no_encontrada/);
+  });
+
+  describe('idempotencia: recibido ≠ procesado', () => {
+    const activar = {
+      id: 'evt_1', type: 'checkout.session.completed', created: 1700000000,
+      data: { object: { mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' } } }
+    };
+    const yaExistia = () => mockUpsertSelect.mockResolvedValue({ data: [], error: null });
+    const hace = (ms: number) => new Date(Date.now() - ms).toISOString();
+
+    it('evento nuevo: tras la acción de dinero se marca processed_at', async () => {
+      mockConstructEvent.mockReturnValue(activar);
+      await invocar();
+      expect(mockUpdate).toHaveBeenCalledWith('stripe_webhook_events', { processed_at: expect.any(String) });
+    });
+
+    it('si la acción FALLA no se marca procesado (y se borra para que Stripe reintente)', async () => {
+      mockConstructEvent.mockReturnValue(activar);
+      mockRpc.mockResolvedValue({ data: null, error: { message: 'boom' } });
+      await invocar();
+      expect(mockUpdate).not.toHaveBeenCalledWith('stripe_webhook_events', { processed_at: expect.any(String) });
+      expect(mockDeleteEq).toHaveBeenCalledWith('id', 'evt_1');
+    });
+
+    it('reintento de un evento YA procesado → duplicate, sin tocar nada', async () => {
+      mockConstructEvent.mockReturnValue(activar);
+      yaExistia();
+      filaPorTabla.stripe_webhook_events = { received_at: hace(300_000), processed_at: hace(299_000) };
+      const res = await invocar();
+      expect(JSON.parse(res.body)).toMatchObject({ duplicate: true });
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it('HUÉRFANO (recibido hace 5 min, sin processed_at: la function murió a medias) → se reclama y SE PROCESA', async () => {
+      mockConstructEvent.mockReturnValue(activar);
+      yaExistia();
+      filaPorTabla.stripe_webhook_events = { received_at: hace(300_000), processed_at: null };
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith('activar_membresia', expect.objectContaining({ p_usuario_id: 'u1' }));
+    });
+
+    it('recibido hace 2 s y sin terminar (otro intento en curso) → 503, no se procesa dos veces', async () => {
+      mockConstructEvent.mockReturnValue(activar);
+      yaExistia();
+      filaPorTabla.stripe_webhook_events = { received_at: hace(2_000), processed_at: null };
+      const res = await invocar();
+      expect(res.statusCode).toBe(503);
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it('dos reintentos reclaman el mismo huérfano: el que pierde el UPDATE condicionado no procesa', async () => {
+      mockConstructEvent.mockReturnValue(activar);
+      yaExistia();
+      filaPorTabla.stripe_webhook_events = { received_at: hace(300_000), processed_at: null };
+      reclamoGanado = false;
+      const res = await invocar();
+      expect(res.statusCode).toBe(503);
+      expect(mockRpc).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('avisos', () => {
+    const pagoFallido = {
+      id: 'evt_1', type: 'invoice.payment_failed', created: 1700000000,
+      data: { object: { id: 'in_1', subscription: 'sub_1', customer: 'cus_1', amount_due: 85000, currency: 'mxn' } }
+    };
+
+    it('pago fallido SIN email del miembro: igual deja el aviso in-app y avisa al equipo', async () => {
+      mockConstructEvent.mockReturnValue(pagoFallido);
+      filaPorTabla.membresias = { usuario_id: 'u1', tenant_id: 't1' };
+      filaPorTabla.usuarios = { email: null, nombre: 'Ana' };
+
+      const res = await invocar();
+
+      expect(res.statusCode).toBe(200);
+      const aviso = mockInsert.mock.calls.find((c) => c[0] === 'notificaciones')?.[1] as Record<string, unknown>;
+      expect(aviso).toMatchObject({ usuario_id: 'u1', tenant_id: 't1', tipo: 'pago_rechazado' });
+      // Sin push_enviado_at: cron-push lo lleva al teléfono.
+      expect(aviso).not.toHaveProperty('push_enviado_at');
+      expect(mockAvisarStaff).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tipo: 'cobro_rechazado', tenant_id: 't1' }));
+      expect(mockEnviarEmail).not.toHaveBeenCalled();
+    });
+
+    it('pago fallido CON email: además manda el correo', async () => {
+      mockConstructEvent.mockReturnValue(pagoFallido);
+      filaPorTabla.membresias = { usuario_id: 'u1', tenant_id: 't1' };
+      filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana' };
+      await invocar();
+      expect(mockEnviarEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'ana@e.mx' }));
+      expect(mockAvisarStaff).toHaveBeenCalledTimes(1);
+    });
+
+    it('compra de paquete: correo de confirmación con saldo y vigencia', async () => {
+      mockConstructEvent.mockReturnValue({
+        id: 'evt_1', type: 'payment_intent.succeeded', created: 1700000000,
+        data: { object: { id: 'pi_9', customer: 'cus_1', amount: 199000, currency: 'mxn', metadata: { usuario_id: 'u1', tier_id: 't1' } } }
+      });
+      mockRpc.mockResolvedValue({ data: { success: true, creditos: 12, periodo_fin: '2027-01-18T12:00:00Z' }, error: null });
+      filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana', tenant_id: 't1' };
+
+      await invocar();
+
+      const correo = mockEnviarEmail.mock.calls[0]?.[0] as { subject: string; html: string };
+      expect(correo.subject).toMatch(/paquete/i);
+      expect(correo.html).toMatch(/12 créditos/);
+      expect(correo.html).toMatch(/18 de enero de 2027/);
+    });
+
+    it('segundo evento del MISMO pago (idempotente): no se manda otro correo', async () => {
+      mockConstructEvent.mockReturnValue({
+        id: 'evt_1', type: 'payment_intent.succeeded', created: 1700000000,
+        data: { object: { id: 'pi_9', customer: 'cus_1', amount: 199000, currency: 'mxn', metadata: { usuario_id: 'u1', tier_id: 't1' } } }
+      });
+      mockRpc.mockResolvedValue({ data: { success: true, idempotente: true }, error: null });
+      filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana', tenant_id: 't1' };
+      await invocar();
+      expect(mockEnviarEmail).not.toHaveBeenCalled();
+    });
   });
 
   it('si el RPC falla → borra idempotencia y 500 (para que Stripe reintente)', async () => {

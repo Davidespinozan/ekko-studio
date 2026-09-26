@@ -38,7 +38,7 @@ async function invocar(event: AnyEvent) {
   return res as { statusCode: number; body: string };
 }
 
-const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista' };
+const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo' };
 const TARGET = { id: 'm1', tenant_id: 't1' };
 
 function seq(...vals: unknown[]) {
