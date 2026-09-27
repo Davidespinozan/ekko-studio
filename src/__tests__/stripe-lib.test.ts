@@ -4,6 +4,8 @@ import {
   periodoFinFromSubscription,
   clasificarEvento,
   extraerMontoDeEvento,
+  suscripcionDeFactura,
+  paymentIntentDeFactura,
   esDeOtraApp,
   llavePrecio
 } from '../../netlify/functions/_lib/stripe';
@@ -186,7 +188,7 @@ describe('clasificarEvento', () => {
 describe('extraerMontoDeEvento', () => {
   it('payment_intent.succeeded → monto del PI', () => {
     const r = extraerMontoDeEvento(
-      ev('payment_intent.succeeded', { id: 'pi_1', amount: 45000, currency: 'mxn', customer: 'cus_1' })
+      ev('payment_intent.succeeded', { id: 'pi_1', amount: 45000, currency: 'mxn', customer: 'cus_1', metadata: { app: 'ekko' } })
     );
     expect(r).toEqual({
       monto_centavos: 45000,
@@ -378,5 +380,57 @@ describe('clasificarEvento — referencia del pago único (idempotencia de paque
       data: { object: { mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', payment_intent: null, metadata: meta } }
     } as never);
     expect(sesion).toMatchObject({ kind: 'activar', referencia: null });
+  });
+});
+
+// ── F2 · R1: facturas con la forma basil (API 2025-08-27) ────────────────────
+describe('R1 · facturas basil y PaymentIntents propios', () => {
+  const basil = {
+    id: 'in_b1', amount_paid: 85000, amount_due: 85000, currency: 'mxn', customer: 'cus_7', billing_reason: 'subscription_cycle',
+    parent: { type: 'subscription_details', subscription_details: { subscription: 'sub_b1', metadata: { app: 'ekko', usuario_id: 'u1' } } },
+    payments: { data: [{ payment: { type: 'payment_intent', payment_intent: 'pi_b1' } }] }
+  };
+
+  it('helpers: suscripción y PaymentIntent en forma basil y legacy', () => {
+    expect(suscripcionDeFactura(basil)).toBe('sub_b1');
+    expect(paymentIntentDeFactura(basil)).toBe('pi_b1');
+    expect(suscripcionDeFactura({ subscription: 'sub_l' })).toBe('sub_l');
+    expect(suscripcionDeFactura({ subscription: { id: 'sub_obj' } })).toBe('sub_obj');
+    expect(paymentIntentDeFactura({ payment_intent: 'pi_l' })).toBe('pi_l');
+    expect(suscripcionDeFactura({})).toBeNull();
+    expect(paymentIntentDeFactura({ payments: { data: [] } })).toBeNull();
+  });
+
+  it('invoice.paid basil → monto con suscripción y PaymentIntent resueltos', () => {
+    const r = extraerMontoDeEvento(ev('invoice.paid', basil));
+    expect(r).toMatchObject({ monto_centavos: 85000, stripe_subscription_id: 'sub_b1', stripe_payment_intent_id: 'pi_b1', stripe_invoice_id: 'in_b1' });
+  });
+
+  it('invoice.payment_failed basil → failed con la suscripción resuelta', () => {
+    const r = extraerMontoDeEvento(ev('invoice.payment_failed', basil));
+    expect(r).toMatchObject({ status: 'failed', stripe_subscription_id: 'sub_b1' });
+  });
+
+  it('clasificarEvento: invoice.paid basil de renovación → sync con la suscripción', () => {
+    expect(clasificarEvento(ev('invoice.paid', basil))).toMatchObject({ kind: 'sync', subscription_id: 'sub_b1', estado: 'activa' });
+  });
+
+  it('clasificarEvento: factura basil de OTRA app → ignore app_ajena', () => {
+    const ajena = { ...basil, parent: { subscription_details: { subscription: 'sub_x', metadata: { app: 'hogar' } } } };
+    expect(clasificarEvento(ev('invoice.paid', ajena))).toMatchObject({ kind: 'ignore', reason: 'app_ajena' });
+  });
+
+  it('PaymentIntent sin metadata de EKKO (el de una factura de suscripción en basil) → no se registra: no duplica ni se atribuye', () => {
+    expect(extraerMontoDeEvento(ev('payment_intent.succeeded', { id: 'pi_sub', amount: 85000, currency: 'mxn', customer: 'cus_7' }))).toBeNull();
+    expect(
+      extraerMontoDeEvento(ev('payment_intent.succeeded', { id: 'pi_h', amount: 1000, currency: 'mxn', metadata: { app: 'hogar' } }))
+    ).toBeNull();
+  });
+
+  it('PaymentIntent de EKKO (paquete o invitados) → sí se registra', () => {
+    const r = extraerMontoDeEvento(
+      ev('payment_intent.succeeded', { id: 'pi_e', amount: 25000, currency: 'mxn', customer: 'cus_1', metadata: { app: 'ekko', tier_id: 't1' } })
+    );
+    expect(r).toMatchObject({ monto_centavos: 25000, stripe_payment_intent_id: 'pi_e' });
   });
 });

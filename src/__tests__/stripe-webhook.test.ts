@@ -35,6 +35,7 @@ vi.mock('../../netlify/functions/_lib/stripe', async (importOriginal) => ({
 }));
 
 const mockInsert = vi.fn().mockResolvedValue({ error: null });
+const mockUpsertFila = vi.fn();
 const mockUpdate = vi.fn();
 let reclamoGanado = true;
 const filaPorTabla: Record<string, unknown> = {};
@@ -62,7 +63,10 @@ vi.mock('@supabase/supabase-js', () => ({
         return { select: () => c, update: mockTenantUpdate };
       }
       return {
-        upsert: vi.fn(() => ({ select: mockUpsertSelect })),
+        upsert: vi.fn((fila: unknown) => {
+          mockUpsertFila(table, fila);
+          return { select: mockUpsertSelect };
+        }),
         delete: vi.fn(() => ({ eq: mockDeleteEq })),
         insert: (fila: unknown) => mockInsert(table, fila),
         // update().eq()…  — awaitable (marca processed_at) y con .select() (reclamo).
@@ -325,7 +329,7 @@ describe('stripe-webhook', () => {
     it('compra de paquete: correo de confirmación con saldo y vigencia', async () => {
       mockConstructEvent.mockReturnValue({
         id: 'evt_1', type: 'payment_intent.succeeded', created: 1700000000,
-        data: { object: { id: 'pi_9', customer: 'cus_1', amount: 199000, currency: 'mxn', metadata: { usuario_id: 'u1', tier_id: 't1' } } }
+        data: { object: { id: 'pi_9', customer: 'cus_1', amount: 199000, currency: 'mxn', metadata: { app: 'ekko', usuario_id: 'u1', tier_id: 't1' } } }
       });
       mockRpc.mockResolvedValue({ data: { success: true, creditos: 12, periodo_fin: '2027-01-18T12:00:00Z' }, error: null });
       filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana', tenant_id: 't1' };
@@ -404,6 +408,106 @@ describe('stripe-webhook', () => {
       expect(mockTenantUpdate).toHaveBeenCalledWith({ stripe_charges_enabled: true, stripe_details_submitted: true });
       expect(mockTenantUpdateEq).toHaveBeenCalledWith('stripe_account_id', 'acct_ekko');
       expect(mockRpc).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── F2 · R1: atribución determinista de payment_events y conflictos ─────────
+  describe('R1 · atribución y conflictos', () => {
+    const pagoRegistrado = () =>
+      mockUpsertFila.mock.calls.find((c) => c[0] === 'payment_events')?.[1] as Record<string, unknown> | undefined;
+
+    it('renovación basil (parent.subscription_details) → sync de ESA suscripción y pago atribuido a membresía, usuario y tenant', async () => {
+      mockConstructEvent.mockReturnValue({
+        id: 'evt_b1', type: 'invoice.paid', created: 1700000000,
+        data: { object: {
+          id: 'in_b1', amount_paid: 85000, currency: 'mxn', customer: 'cus_7', billing_reason: 'subscription_cycle',
+          parent: { subscription_details: { subscription: 'sub_b1', metadata: {} } },
+          payments: { data: [{ payment: { type: 'payment_intent', payment_intent: 'pi_b1' } }] }
+        } }
+      });
+      filaPorTabla.membresias = { id: 'mem_1', usuario_id: 'u1', tenant_id: 't1' };
+      filaPorTabla.usuarios = { email: null, nombre: 'Ana' };
+
+      const res = await invocar();
+
+      expect(res.statusCode).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith('sync_membresia_stripe', expect.objectContaining({ p_stripe_subscription_id: 'sub_b1', p_estado: 'activa' }));
+      expect(pagoRegistrado()).toMatchObject({
+        usuario_id: 'u1', tenant_id: 't1', membresia_id: 'mem_1',
+        stripe_subscription_id: 'sub_b1', stripe_payment_intent_id: 'pi_b1', status: 'succeeded'
+      });
+    });
+
+    it('pago fallido basil → el miembro y el equipo SÍ reciben el aviso (antes el usuario no se resolvía)', async () => {
+      mockConstructEvent.mockReturnValue({
+        id: 'evt_b2', type: 'invoice.payment_failed', created: 1700000000,
+        data: { object: { id: 'in_b2', amount_due: 85000, currency: 'mxn', customer: 'cus_7', parent: { subscription_details: { subscription: 'sub_b1' } } } }
+      });
+      filaPorTabla.membresias = { id: 'mem_1', usuario_id: 'u1', tenant_id: 't1' };
+      filaPorTabla.usuarios = { email: null, nombre: 'Ana' };
+
+      await invocar();
+
+      expect(pagoRegistrado()).toMatchObject({ usuario_id: 'u1', membresia_id: 'mem_1', status: 'failed' });
+      const aviso = mockInsert.mock.calls.find((c) => c[0] === 'notificaciones')?.[1];
+      expect(aviso).toMatchObject({ usuario_id: 'u1', tipo: 'pago_rechazado' });
+    });
+
+    it('suscripción que no es de EKKO (sin membresía) → pago sin atribuir: no se adivina', async () => {
+      mockConstructEvent.mockReturnValue({
+        id: 'evt_b3', type: 'invoice.paid', created: 1700000000,
+        data: { object: { id: 'in_b3', amount_paid: 1000, currency: 'mxn', customer: 'cus_x', billing_reason: 'subscription_cycle',
+          parent: { subscription_details: { subscription: 'sub_desconocida' } } } }
+      });
+      mockRpc.mockResolvedValue({ data: { success: false, reason: 'membresia_no_encontrada' }, error: null });
+
+      await invocar();
+
+      expect(pagoRegistrado()).toMatchObject({ usuario_id: null, tenant_id: null, membresia_id: null });
+    });
+
+    it('evento de OTRA app (HOGAR) → no toca membresías ni registra el pago', async () => {
+      mockConstructEvent.mockReturnValue({
+        id: 'evt_h', type: 'invoice.paid', created: 1700000000,
+        data: { object: { id: 'in_h', amount_paid: 1000, currency: 'mxn', parent: { subscription_details: { subscription: 'sub_h', metadata: { app: 'hogar' } } } } }
+      });
+
+      const res = await invocar();
+
+      expect(JSON.parse(res.body)).toMatchObject({ ignored: 'app_ajena' });
+      expect(mockRpc).not.toHaveBeenCalled();
+      expect(pagoRegistrado()).toBeUndefined();
+    });
+
+    it('paquete de EKKO → el pago lleva la membresía que creó activar_membresia', async () => {
+      mockConstructEvent.mockReturnValue({
+        id: 'evt_p', type: 'payment_intent.succeeded', created: 1700000000,
+        data: { object: { id: 'pi_p', customer: 'cus_1', amount: 25000, currency: 'mxn', metadata: { app: 'ekko', usuario_id: 'u1', tier_id: 't1' } } }
+      });
+      mockRpc.mockResolvedValue({ data: { success: true, membresia_id: 'mem_nueva', creditos: 1 }, error: null });
+      filaPorTabla.usuarios = { email: null, nombre: 'Ana', tenant_id: 't1' };
+
+      await invocar();
+
+      expect(pagoRegistrado()).toMatchObject({ usuario_id: 'u1', tenant_id: 't1', membresia_id: 'mem_nueva' });
+    });
+
+    it('estado contradictorio (Stripe viva sobre membresía terminal) → 200 sin reintento, reportado', async () => {
+      mockConstructEvent.mockReturnValue({
+        id: 'evt_c', type: 'invoice.paid', created: 1700000000,
+        data: { object: { id: 'in_c', amount_paid: 85000, currency: 'mxn', billing_reason: 'subscription_cycle', subscription: 'sub_c' } }
+      });
+      mockRpc.mockResolvedValue({ data: { success: true, ignorado: 'membresia_terminal', conflicto: true, membresia_id: 'mem_c' }, error: null });
+
+      const res = await invocar();
+
+      expect(res.statusCode).toBe(200);
+      expect(mockDeleteEq).not.toHaveBeenCalled(); // no se libera el evento para reintento
+      expect(mockReportar).toHaveBeenCalledWith(
+        'stripe-webhook',
+        expect.objectContaining({ message: expect.stringMatching(/contradictorio/) }),
+        expect.objectContaining({ membresia_id: 'mem_c' })
+      );
     });
   });
 });

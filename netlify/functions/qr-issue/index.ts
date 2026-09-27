@@ -8,7 +8,7 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, serverError } from '../_lib/http';
+import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 
 /**
@@ -63,11 +63,21 @@ export const handler: Handler = async (event) => {
     // ownership y tenant; RLS también lo limita, pero somos defensivos).
     const { data: usuarioRow, error: usuarioErr } = await supabase
       .from('usuarios')
-      .select('id, tenant_id')
+      .select('id, tenant_id, status, sancionado_at')
       .eq('auth_id', authUserId)
       .maybeSingle();
     if (usuarioErr || !usuarioRow) {
       return unauthorized('Usuario no encontrado');
+    }
+
+    // F2 · R1 (defensa en profundidad del P0-1): una cuenta revocada o sancionada
+    // no obtiene QR aunque la reserva sea válida y ya esté pagada. La puerta
+    // (check_in_atomic) sigue siendo la autoridad y también la rechaza.
+    if (usuarioRow.status === 'revocado') {
+      return forbidden('Tu acceso fue revocado. Escríbele al estudio.');
+    }
+    if (usuarioRow.sancionado_at) {
+      return forbidden('Tu cuenta está suspendida por el estudio. Escríbele para resolverlo antes de tu sesión.');
     }
 
     // Buscar reserva (RLS valida que sea suya; chequeamos explícito igual).

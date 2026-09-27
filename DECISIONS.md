@@ -596,3 +596,59 @@ indebido; la desnormalización membresía ↔ usuarios queda para la Fase 2.
   única ruta genérica capaz de conceder o quitar acceso comercial escribiendo la copia
   derivada; el plan se activa con cobro (`activar_membresia`) o se da de baja con
   `staff_cancelar_membresia`.
+
+## F2 · R1 — invariantes de membresía y observabilidad (2026-09-27)
+
+Origen: auditoría F2 de estado de membresía (solo lectura). R1 es quirúrgico: no
+introduce el derecho canónico (R2) ni cambia el contrato externo de
+`activar_membresia`. Migración `20260927100000_r1_invariantes_membresia.sql`;
+tests en `src/__tests__/db/r1-invariantes.db.test.ts` (34 casos; 26 fallan sin la
+migración).
+
+- **EKKO-098 — P0-1: la cuenta manda sobre una reserva ya pagada.**
+  `_estado_membresia_checkin` evalúa revocación y sanción ANTES del atajo "la sesión
+  ya se pagó con créditos". El crédito no se vuelve a descontar (cambia la
+  autorización, no la historia del pago). La pausa (suspendido sin sanción) conserva
+  su comportamiento: con reserva ya pagada, entra. `qr-issue` no entrega QR a
+  cuentas revocadas o sancionadas (defensa en profundidad; la puerta sigue siendo la
+  autoridad).
+- **EKKO-099 — Check-in manual (decisión final de David, 2026-09-27).** REVOCADO:
+  bloqueado también en mostrador (trigger `trg_bloquear_checkin_revocado`, BEFORE:
+  rechaza con `EKKO_CUENTA_REVOCADA` y no queda ningún check-in; cubre también la
+  corrección "sí asistió"). SANCIONADO: recepción puede dar ingreso como excepción;
+  el RPC devuelve `cuenta_sancionada`, la ficha muestra el aviso y un trigger deja
+  `checkin_manual_con_restriccion` (actor, reserva, `override: true`). El intento
+  rechazado de un revocado no se audita (el rechazo revierte la transacción).
+- **EKKO-100 — Revocación persistente.** `trg_sancion_manda` mantiene `revocado`
+  frente a cualquier UPDATE (activación, sync de Stripe, pausa/reanudación, baja
+  inmediata, admin por RLS). La única vía es `restaurar_acceso_revocado` (service
+  role; actor admin activo; motivo; audit `acceso_restaurado`), que usa
+  `reception-update-member` cuando un admin cambia el estado de una cuenta revocada.
+  Recepción recibe 403. Una sanción vigente sigue mandando tras la restauración.
+- **EKKO-101 — Stripe no resucita membresías.** `sync_membresia_stripe` no toca una
+  membresía `cancelada` o `expirada`; si Stripe la reporta viva, registra
+  `stripe_estado_contradictorio` y responde éxito (sin reintentos infinitos ni la
+  violación del índice de una sola viva). Toma `FOR UPDATE` sobre la membresía. El
+  orden descarta solo eventos ESTRICTAMENTE más viejos; dos eventos distintos del
+  mismo segundo se aplican en orden de llegada (la idempotencia la da el id del
+  evento en `stripe_webhook_events`; `event.created` tiene resolución de 1 s y no
+  permite un orden total dentro del mismo segundo).
+- **EKKO-102 — Facturas basil y atribución.** Con la API `2025-08-27.basil` (SDK
+  18.5) la factura trae la suscripción en `parent.subscription_details` y el PI en
+  `payments.data[].payment`; el PI y el cargo ya no traen `invoice`. Extractor
+  compatible con ambas formas. Un `payment_intent.succeeded` solo se registra si lo
+  creó EKKO (`metadata.app = 'ekko'`): así el PI de una factura de suscripción no se
+  cuenta dos veces. `payment_events` recibe `membresia_id`, usuario y tenant solo por
+  vía determinista (la membresía creada o la dueña de la suscripción). Sin
+  backfill de los 14 eventos históricos (R5).
+- **EKKO-103 — Auditoría del ciclo de vida con el estado real.** Triggers AFTER en
+  `usuarios` (status, rol, sanción → `cuenta_estado_cambio`) y `membresias` (alta,
+  status, plan → `membresia_estado_cambio`), con el actor de la sesión o `sistema`.
+  `staff_pausar_membresia`, `reception-activar-membresia` y `reception-update-member`
+  registran el estado persistido, no el pedido.
+- **EKKO-104 — `v_reconciliacion_membresia`.** Vista de solo lectura con
+  `security_invoker` (respeta RLS y tenant). `divergencias`: activo sin derecho,
+  tier sin membresía viva, membresía viva sin id, id inválido, tier distinto,
+  membresía vencida sin expirar, varias vivas, contradicción de Stripe, customer
+  distinto. `restricciones`: revocado o sancionado con membresía viva (la membresía
+  se conserva). No repara nada.

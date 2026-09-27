@@ -23,3 +23,10 @@ describe('avisoMembresia', () => {
     expect(avisoMembresia('algo_nuevo')).toMatch(/no está vigente/);
   });
 });
+
+describe('avisoMembresia · F2 · R1 (restricciones de cuenta)', () => {
+  it('revocado y sancionado se anuncian como excepción registrada, no como ingreso normal', () => {
+    expect(avisoMembresia('cuenta_revocado')).toMatch(/ACCESO REVOCADO.*no puede entrar/);
+    expect(avisoMembresia('cuenta_sancionada')).toMatch(/SANCIONADA.*excepción/);
+  });
+});

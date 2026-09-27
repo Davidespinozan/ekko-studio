@@ -129,4 +129,19 @@ describe('reception-activar-membresia (Pagos)', () => {
     const res = await invocar(evento({ usuario_id: 'm1', tier: 'pro' }));
     expect(res.statusCode).toBe(403);
   });
+
+  it('F2 · R1: el audit registra el estado REAL tras la activación (sanción → suspendido), no "activo"', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: CALLER, error: null })
+      .mockResolvedValueOnce({ data: TARGET, error: null })
+      .mockResolvedValueOnce({ data: { status: 'suspendido', membresia_tier: 'pro' }, error: null });
+    mockTierMaybe.mockResolvedValue({ data: TIER, error: null });
+
+    const res = await invocar(evento({ usuario_id: 'm1', tier: 'pro' }));
+
+    expect(res.statusCode).toBe(200);
+    const fila = mockAuditInsert.mock.calls[0][0] as Record<string, unknown>;
+    expect(fila.accion).toBe('membership_activated');
+    expect(fila.despues).toEqual({ status: 'suspendido', membresia_tier: 'pro' });
+  });
 });

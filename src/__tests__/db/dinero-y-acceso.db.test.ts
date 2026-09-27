@@ -58,7 +58,10 @@ describe('sync_membresia_stripe — la baja de una suscripción VIEJA no castiga
       "SELECT sync_membresia_stripe('sub_vieja_1', 'cancelada', NULL, NULL, now()) AS r"
     );
 
-    expect(r.r).toMatchObject({ success: true, usuario_intacto: true });
+    // F2 · R1: la sub vieja ya quedó `cancelada` localmente al activar el paquete,
+    // así que el sync la trata como terminal y no toca nada (antes respondía
+    // `usuario_intacto`). Lo que importa sigue igual: el miembro queda intacto.
+    expect(r.r).toMatchObject({ success: true, ignorado: 'membresia_terminal', conflicto: false });
     expect(await b.estadoUsuario(m)).toEqual({
       status: 'activo',
       membresia_tier: 'pro-pack',

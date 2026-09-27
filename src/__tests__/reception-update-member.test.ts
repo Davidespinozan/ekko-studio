@@ -16,8 +16,10 @@ const mockAuditInsert = vi.fn();
 const mockUpdateUserById = vi.fn();
 const mockTierMaybeSingle = vi.fn();
 
+const mockRpc = vi.fn();
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
+    rpc: mockRpc,
     auth: {
       getUser: mockGetUser,
       admin: { updateUserById: mockUpdateUserById }
@@ -105,6 +107,7 @@ describe('reception-update-member · gobernanza (Bloque A)', () => {
     mockUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
     // Por defecto el plan pedido existe y está activo en el tenant.
     mockTierMaybeSingle.mockResolvedValue({ data: { slug: 'pro' }, error: null });
+    mockRpc.mockResolvedValue({ data: { success: true, status: 'activo' }, error: null });
   });
 
   it('cambio de status SIN motivo → 400, sin update ni audit', async () => {
@@ -240,5 +243,40 @@ describe('reception-update-member · gobernanza (Bloque A)', () => {
     const patch = patchEnviado();
     expect(patch).toMatchObject({ status: 'activo', sancionado_at: null, sancion_motivo: null });
     expect(auditDe('status_change')?.antes).toEqual({ status: 'suspendido', sancionado: true });
+  });
+
+  // ── F2 · R1: la revocación es persistente ──────────────────────────────────
+  it('recepción NO puede levantar una revocación (403, sin update ni RPC)', async () => {
+    setCallerTarget({ ...TARGET, status: 'revocado' });
+    const res = await invocar(evento({ usuario_id: 'm-1', status: 'activo', motivo: 'Volvió' }));
+    expect(res.statusCode).toBe(403);
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('un admin la levanta SOLO por la RPC explícita restaurar_acceso_revocado, y el audit dice el estado final', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { ...CALLER, id: 'u-admin', rol: 'admin' }, error: null })
+      .mockResolvedValueOnce({ data: { ...TARGET, status: 'revocado' }, error: null })
+      .mockResolvedValueOnce({ data: { status: 'activo' }, error: null });
+
+    const res = await invocar(evento({ usuario_id: 'm-1', status: 'activo', motivo: 'Revocación por error' }));
+
+    expect(res.statusCode).toBe(200);
+    expect(mockRpc).toHaveBeenCalledWith('restaurar_acceso_revocado', {
+      p_usuario_id: 'm-1', p_actor_id: 'u-admin', p_status: 'activo', p_motivo: 'Revocación por error'
+    });
+    // El UPDATE normal no lleva status (lo pondría el trigger de vuelta en revocado).
+    expect(patchEnviado()).not.toHaveProperty('status');
+    expect(auditDe('status_change')?.despues).toMatchObject({ status: 'activo' });
+  });
+
+  it('el audit de status_change registra lo que quedó persistido, no lo pedido', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: CALLER, error: null })
+      .mockResolvedValueOnce({ data: TARGET, error: null })
+      .mockResolvedValueOnce({ data: { status: 'suspendido' }, error: null });
+    await invocar(evento({ usuario_id: 'm-1', status: 'pendiente_pago', motivo: 'Debe la mensualidad' }));
+    expect(auditDe('status_change')?.despues).toMatchObject({ status: 'suspendido' });
   });
 });

@@ -125,6 +125,11 @@ export const handler: Handler = async (event) => {
       return serverError(rpcErr.message);
     }
 
+    // Estado REAL tras la activación (F2 · R1): una sanción deja 'suspendido' y una
+    // revocación 'revocado'; el audit no debe afirmar 'activo'.
+    const fin = await supabaseAdmin.from('usuarios').select('status, membresia_tier').eq('id', target.id).maybeSingle();
+    const final = (fin?.data as { status?: string; membresia_tier?: string | null } | null) ?? null;
+
     await writeAuditLog(supabaseAdmin, {
       tenant_id: target.tenant_id,
       actor_usuario_id: caller.id,
@@ -133,7 +138,7 @@ export const handler: Handler = async (event) => {
       target_tipo: 'usuario',
       target_id: target.id,
       antes: { status: target.status, membresia_tier: target.membresia_tier },
-      despues: { status: 'activo', membresia_tier: tier.slug },
+      despues: { status: final?.status ?? 'activo', membresia_tier: final?.membresia_tier ?? tier.slug },
       motivo: typeof body.motivo === 'string' && body.motivo.trim() ? body.motivo.trim() : undefined,
       metadata: { via: 'mostrador', perdida_de_creditos_confirmada: body.confirmar_perdida === true }
     });

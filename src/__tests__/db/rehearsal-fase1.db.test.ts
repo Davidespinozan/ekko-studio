@@ -50,7 +50,8 @@ const ejecutable = (firma: string, rol: string) =>
 describe('ensayo: 92 migraciones en orden sobre base limpia', () => {
   it('el repo tiene 92 migraciones y todas aplicaron (levantarBase no lanzó)', () => {
     const archivos = readdirSync(resolve(__dirname, '../../../supabase/migrations')).filter((f) => f.endsWith('.sql'));
-    expect(archivos.length).toBe(92);
+    // 92 al cerrar Fase 1; las fases posteriores (F2 · R1…) suman sobre esa base.
+    expect(archivos.length).toBeGreaterThanOrEqual(92);
   });
 
   it('identidad: índice único de correo normalizado por estudio', async () => {

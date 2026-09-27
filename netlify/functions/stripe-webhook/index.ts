@@ -187,6 +187,9 @@ export const handler: Handler = async (event) => {
     // usuario del pago (para payment_events): se captura en cada rama donde ya
     // lo conocemos; en renovaciones (sync) se resuelve por la suscripción.
     let usuarioIdPago: string | null = null;
+    // Membresía del pago (F2 · R1): solo cuando se conoce de forma determinista
+    // (la que creó activar_membresia o la dueña de la suscripción). Nunca por email.
+    let membresiaIdPago: string | null = null;
     // Paquete recién activado (pago único): para el correo de confirmación.
     let paqueteActivado: { creditos: number | null; periodo_fin: string | null } | null = null;
 
@@ -211,7 +214,8 @@ export const handler: Handler = async (event) => {
       });
       if (error) throw new Error(`activar_membresia: ${error.message}`);
       usuarioIdPago = accion.usuario_id;
-      const act = activacion as { idempotente?: boolean; creditos?: number | null; periodo_fin?: string | null } | null;
+      const act = activacion as { idempotente?: boolean; membresia_id?: string | null; creditos?: number | null; periodo_fin?: string | null } | null;
+      membresiaIdPago = act?.membresia_id ?? null;
       // Segundo evento del mismo pago → ya se activó y ya se avisó: nada más que hacer.
       if (!act?.idempotente) {
         if (!accion.subscription_id) {
@@ -228,7 +232,7 @@ export const handler: Handler = async (event) => {
       const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
       if (usuarioId && tierId && customerId) {
         const subsPrevias = await subsAnterioresDelSocio(admin, usuarioId, accion.subscription_id);
-        const { error } = await admin.rpc('activar_membresia', {
+        const { data: actSub, error } = await admin.rpc('activar_membresia', {
           p_usuario_id: usuarioId,
           p_tier_id: tierId,
           p_stripe_subscription_id: accion.subscription_id,
@@ -237,6 +241,7 @@ export const handler: Handler = async (event) => {
         });
         if (error) throw new Error(`activar_membresia (sub): ${error.message}`);
         usuarioIdPago = usuarioId;
+        membresiaIdPago = (actSub as { membresia_id?: string | null } | null)?.membresia_id ?? null;
         // #2: cancelar la(s) suscripción(es) anterior(es) en Stripe para que el
         // miembro NO quede pagando dos mensualidades tras un cambio de plan.
         await cancelarSubsAnteriores(stripe, subsPrevias, acctOpt);
@@ -266,7 +271,17 @@ export const handler: Handler = async (event) => {
       // Antes pasaba en silencio — y es justo el síntoma de un cobro huérfano (un
       // miembro borrado cuya suscripción sigue viva en Stripe). No se relanza:
       // reintentar no la va a hacer aparecer; se reporta para que alguien mire.
-      const resSync = sync as { success?: boolean; reason?: string } | null;
+      const resSync = sync as { success?: boolean; reason?: string; conflicto?: boolean; membresia_id?: string } | null;
+      // F2 · R1: Stripe dice "viva" pero la membresía local está cancelada o
+      // expirada. No se resucita (queda en audit_log como stripe_estado_contradictorio)
+      // y se responde 200: reintentar no cambia nada. Se reporta para revisión.
+      if (resSync?.conflicto) {
+        await reportarErrorServidor(
+          'stripe-webhook',
+          new Error(`sync_membresia_stripe: estado contradictorio (${stripeEvent.type} → ${accion.estado} sobre membresía terminal)`),
+          { event_id: stripeEvent.id, subscription_id: accion.subscription_id, membresia_id: resSync.membresia_id }
+        );
+      }
       if (resSync?.success === false) {
         await reportarErrorServidor(
           'stripe-webhook',
@@ -338,17 +353,22 @@ export const handler: Handler = async (event) => {
     if (monto) {
       try {
         let tenantIdPago: string | null = null;
-        // Renovación (sync): resolver usuario + tenant por la suscripción.
-        if (!usuarioIdPago && monto.stripe_subscription_id) {
+        // Renovación (sync) o activación por suscripción: resolver membresía,
+        // usuario y tenant por la suscripción (determinista: la suscripción es de
+        // una sola membresía). Sin coincidencia → sin atribución (no se adivina).
+        if (monto.stripe_subscription_id && (!usuarioIdPago || !membresiaIdPago)) {
           const { data: mem } = await admin
             .from('membresias')
-            .select('usuario_id, tenant_id')
+            .select('id, usuario_id, tenant_id')
             .eq('stripe_subscription_id', monto.stripe_subscription_id)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
-          usuarioIdPago = mem?.usuario_id ?? null;
-          tenantIdPago = mem?.tenant_id ?? null;
+          if (mem && (!usuarioIdPago || mem.usuario_id === usuarioIdPago)) {
+            usuarioIdPago = mem.usuario_id ?? null;
+            tenantIdPago = mem.tenant_id ?? null;
+            membresiaIdPago = membresiaIdPago ?? mem.id ?? null;
+          }
         }
         if (usuarioIdPago && !tenantIdPago) {
           const { data: u } = await admin
@@ -364,6 +384,7 @@ export const handler: Handler = async (event) => {
             stripe_event_type: stripeEvent.type,
             tenant_id: tenantIdPago,
             usuario_id: usuarioIdPago,
+            membresia_id: membresiaIdPago,
             monto_centavos: monto.monto_centavos,
             moneda: monto.moneda,
             status: monto.status,

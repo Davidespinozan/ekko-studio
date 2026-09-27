@@ -145,6 +145,42 @@ export function esDeOtraApp(meta: { app?: string } | null | undefined): boolean 
 }
 
 /**
+ * Forma de factura que EKKO puede recibir. Con la API fijada (`2025-08-27.basil`,
+ * SDK 18.x) la suscripción vive en `parent.subscription_details.subscription` y el
+ * PaymentIntent en `payments.data[].payment.payment_intent`; las versiones
+ * anteriores los traían en `invoice.subscription` / `invoice.payment_intent`. Se
+ * aceptan ambas formas (F2 · R1).
+ */
+export type FacturaCompat = {
+  subscription?: string | { id: string } | null;
+  payment_intent?: string | { id: string } | null;
+  parent?: { subscription_details?: { subscription?: string | { id: string } | null; metadata?: { app?: string } | null } | null } | null;
+  subscription_details?: { metadata?: { app?: string } | null } | null;
+  payments?: { data?: Array<{ payment?: { type?: string; payment_intent?: string | { id: string } | null } | null }> } | null;
+};
+
+const idDe = (ref: string | { id: string } | null | undefined): string | null =>
+  typeof ref === 'string' ? ref : ref?.id ?? null;
+
+/** Id de la suscripción de una factura (legacy o basil). null si no la tiene. */
+export function suscripcionDeFactura(inv: FacturaCompat): string | null {
+  return idDe(inv.subscription) ?? idDe(inv.parent?.subscription_details?.subscription);
+}
+
+/** Id del PaymentIntent de una factura (legacy o basil). */
+export function paymentIntentDeFactura(inv: FacturaCompat): string | null {
+  const legacy = idDe(inv.payment_intent);
+  if (legacy) return legacy;
+  const pago = inv.payments?.data?.find((p) => p.payment?.type === 'payment_intent' || p.payment?.payment_intent);
+  return idDe(pago?.payment?.payment_intent);
+}
+
+/** Metadata de la suscripción que viaja en la factura (basil o legacy). */
+export function metadataSuscripcionDeFactura(inv: FacturaCompat): { app?: string } | null | undefined {
+  return inv.parent?.subscription_details?.metadata ?? inv.subscription_details?.metadata;
+}
+
+/**
  * Traduce un evento de Stripe a una acción interna, SIN llamar a Stripe.
  * (La activación necesita además leer la suscripción para el periodo_fin; eso
  * lo hace el webhook, no este mapper.)
@@ -201,17 +237,9 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
 
     case 'invoice.payment_failed':
     case 'invoice.paid': {
-      const inv = event.data.object as Stripe.Invoice & {
-        subscription?: string | { id: string };
-        billing_reason?: string;
-        // API 2025+: invoice.subscription se movió a parent.subscription_details.
-        parent?: { subscription_details?: { subscription?: string | { id: string }; metadata?: { app?: string } } };
-        subscription_details?: { metadata?: { app?: string } };
-      };
-      const metaSub = inv.parent?.subscription_details?.metadata ?? inv.subscription_details?.metadata;
-      if (esDeOtraApp(metaSub)) return { kind: 'ignore', reason: 'app_ajena' };
-      const subRef = inv.subscription ?? inv.parent?.subscription_details?.subscription;
-      const subscription_id = typeof subRef === 'string' ? subRef : subRef?.id;
+      const inv = event.data.object as unknown as FacturaCompat & { billing_reason?: string };
+      if (esDeOtraApp(metadataSuscripcionDeFactura(inv))) return { kind: 'ignore', reason: 'app_ajena' };
+      const subscription_id = suscripcionDeFactura(inv);
       if (!subscription_id) return { kind: 'ignore', reason: 'invoice_sin_suscripcion' };
       // 1ª factura de la suscripción (Elements) → ACTIVAR (crea la membresía).
       // Renovación → sync; payment_failed → past_due.
@@ -310,8 +338,11 @@ export function extraerMontoDeEvento(event: Stripe.Event): MontoEvento | null {
     if (typeof pi.amount !== 'number') return null;
     // Si el PI pagó una FACTURA de suscripción, el ingreso ya se cuenta por
     // `invoice.paid` — NO contarlo otra vez acá (evita duplicar el ingreso).
-    // Solo se cuentan los PI sin factura: los paquetes (pago único).
+    // Legacy: el PI traía `invoice`. Basil ya no lo trae (la relación vive en la
+    // factura), así que solo se cuentan los PI que EKKO creó: los que llevan
+    // `metadata.app = 'ekko'` (paquetes e invitados extra). F2 · R1.
     if (pi.invoice) return null;
+    if (pi.metadata?.app !== APP_ID) return null;
     return {
       monto_centavos: pi.amount,
       moneda: pi.currency ?? 'mxn',
@@ -324,20 +355,15 @@ export function extraerMontoDeEvento(event: Stripe.Event): MontoEvento | null {
   }
 
   if (event.type === 'invoice.paid') {
-    const inv = event.data.object as Stripe.Invoice & {
-      subscription?: string | { id: string } | null;
-      payment_intent?: string | { id: string } | null;
-    };
+    const inv = event.data.object as Stripe.Invoice & FacturaCompat;
     if (typeof inv.amount_paid !== 'number') return null;
     return {
       monto_centavos: inv.amount_paid,
       moneda: inv.currency ?? 'mxn',
       status: 'succeeded',
       stripe_invoice_id: inv.id ?? null,
-      stripe_payment_intent_id:
-        typeof inv.payment_intent === 'string' ? inv.payment_intent : inv.payment_intent?.id ?? null,
-      stripe_subscription_id:
-        typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id ?? null,
+      stripe_payment_intent_id: paymentIntentDeFactura(inv),
+      stripe_subscription_id: suscripcionDeFactura(inv),
       stripe_customer_id: typeof inv.customer === 'string' ? inv.customer : inv.customer?.id ?? null
     };
   }
@@ -363,10 +389,7 @@ export function extraerMontoDeEvento(event: Stripe.Event): MontoEvento | null {
   // (amount_due). NO suma a ingresos (esos leen status='succeeded'), pero le da
   // ojos a la cobranza/dunning en el admin.
   if (event.type === 'invoice.payment_failed') {
-    const inv = event.data.object as Stripe.Invoice & {
-      subscription?: string | { id: string } | null;
-      payment_intent?: string | { id: string } | null;
-    };
+    const inv = event.data.object as Stripe.Invoice & FacturaCompat;
     const monto = typeof inv.amount_due === 'number' ? inv.amount_due : inv.amount_remaining;
     if (typeof monto !== 'number') return null;
     return {
@@ -374,10 +397,8 @@ export function extraerMontoDeEvento(event: Stripe.Event): MontoEvento | null {
       moneda: inv.currency ?? 'mxn',
       status: 'failed',
       stripe_invoice_id: inv.id ?? null,
-      stripe_payment_intent_id:
-        typeof inv.payment_intent === 'string' ? inv.payment_intent : inv.payment_intent?.id ?? null,
-      stripe_subscription_id:
-        typeof inv.subscription === 'string' ? inv.subscription : inv.subscription?.id ?? null,
+      stripe_payment_intent_id: paymentIntentDeFactura(inv),
+      stripe_subscription_id: suscripcionDeFactura(inv),
       stripe_customer_id: typeof inv.customer === 'string' ? inv.customer : inv.customer?.id ?? null
     };
   }

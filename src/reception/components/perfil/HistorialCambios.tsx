@@ -64,6 +64,18 @@ function describirCambio(e: AuditEntryUsuario): string {
       return `Retiró material: ${valorTexto(e.antes?.titulo)}`;
     case 'reserva_observacion':
       return 'Anotó una observación en una reserva';
+    case 'cuenta_estado_cambio':
+      return `Estado de cuenta: ${valorTexto(e.antes?.status)} → ${valorTexto(e.despues?.status)}`;
+    case 'membresia_estado_cambio':
+      return e.antes
+        ? `Membresía: ${valorTexto(e.antes?.membresia_status)} → ${valorTexto(e.despues?.membresia_status)}`
+        : `Membresía nueva: ${valorTexto(e.despues?.tier)}`;
+    case 'checkin_manual_con_restriccion':
+      return `Ingreso manual con restricción (${valorTexto(e.despues?.membresia_estado)})`;
+    case 'stripe_estado_contradictorio':
+      return 'Stripe reportó una suscripción viva sobre una membresía cerrada (sin cambios)';
+    case 'acceso_restaurado':
+      return 'Restauró un acceso revocado';
     default:
       // Una acción nueva sin etiqueta: legible, nunca el identificador crudo.
       return e.accion.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());

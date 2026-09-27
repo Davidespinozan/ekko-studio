@@ -183,9 +183,18 @@ export const handler: Handler = async (event) => {
       return badRequest('Motivo obligatorio para esta acción');
     }
 
+    // --- Revocación (F2 · R1): es PERSISTENTE. El trigger trg_sancion_manda no
+    // deja que un UPDATE normal la levante; la única vía es la RPC explícita
+    // restaurar_acceso_revocado, y solo para un ADMIN.
+    const restaurarRevocado =
+      target.status === 'revocado' && statusNuevo !== null && statusNuevo !== 'suspendido';
+    if (restaurarRevocado && caller.rol !== 'admin') {
+      return forbidden('Solo un admin puede restaurar un acceso revocado');
+    }
+
     // --- Status ---
     if (statusNuevo !== null) {
-      patch.status = statusNuevo;
+      if (!restaurarRevocado) patch.status = statusNuevo;
       // Suspender desde el mostrador = SANCIÓN administrativa; activar o dejar
       // pendiente de pago = levantarla. Va en el MISMO UPDATE: el trigger
       // trg_sancion_manda fuerza `suspendido` mientras sancionado_at no sea NULL.
@@ -281,11 +290,37 @@ export const handler: Handler = async (event) => {
 
     // B1/B2: la auditoría ya NO vive en notas_admin (campo borrable por admin).
     // Va a audit_log (insert-only). notas_admin vuelve a ser solo notas humanas.
-    const { error: updErr } = await supabaseAdmin
-      .from('usuarios')
-      .update(patch)
-      .eq('id', target.id);
-    if (updErr) return serverError(updErr.message);
+    if (Object.keys(patch).length > 0) {
+      const { error: updErr } = await supabaseAdmin
+        .from('usuarios')
+        .update(patch)
+        .eq('id', target.id);
+      if (updErr) return serverError(updErr.message);
+    }
+
+    // Restaurar una revocación: DESPUÉS del patch (que ya levantó la sanción si
+    // correspondía), por la RPC explícita y auditada.
+    if (restaurarRevocado) {
+      const { error: restErr } = await supabaseAdmin.rpc('restaurar_acceso_revocado', {
+        p_usuario_id: target.id,
+        p_actor_id: caller.id,
+        p_status: statusNuevo,
+        p_motivo: motivo
+      });
+      if (restErr) return serverError(restErr.message);
+    }
+
+    // El audit registra el estado REAL persistido: los triggers pueden dejar
+    // 'suspendido' (sanción) o 'revocado' aunque se haya pedido otro.
+    if (statusNuevo !== null) {
+      const fin = await supabaseAdmin.from('usuarios').select('status').eq('id', target.id).maybeSingle();
+      const statusFinal = (fin?.data as { status?: string } | null)?.status ?? statusNuevo;
+      for (const entry of auditEntries) {
+        if (entry.accion === 'status_change' && entry.despues) {
+          entry.despues = { ...entry.despues, status: statusFinal };
+        }
+      }
+    }
 
     // Auditoría inmutable — una entrada por acción. NO rompe la respuesta si falla.
     for (const entry of auditEntries) {
