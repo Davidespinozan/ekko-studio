@@ -1,10 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest';
 
 /**
  * Webhook de Stripe: firma, idempotencia (dedupe por event.id + borrado en
  * error para forzar reintento) y dispatch a los RPCs activar/sync.
  * Mantiene los mappers reales (`clasificarEvento`) y mockea solo Stripe + DB.
+ *
+ * Entorno hermético (PKG-00C): el handler lee STRIPE_CONNECT_WEBHOOK_SECRET
+ * antes que STRIPE_WEBHOOK_SECRET. Si el runner (Netlify build) inyecta el
+ * primero, el caso "sin secret" deja de serlo. Cada escenario fija o borra
+ * explícitamente ambas variables y la suite restaura el entorno original.
  */
+
+const ENV_SUITE = ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'STRIPE_CONNECT_WEBHOOK_SECRET', 'VITE_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'] as const;
+const envOriginal: Partial<Record<(typeof ENV_SUITE)[number], string | undefined>> = {};
+beforeAll(() => { for (const k of ENV_SUITE) envOriginal[k] = process.env[k]; });
+afterAll(() => {
+  for (const k of ENV_SUITE) {
+    if (envOriginal[k] === undefined) delete process.env[k];
+    else process.env[k] = envOriginal[k];
+  }
+});
 
 const mockConstructEvent = vi.fn();
 const mockSubRetrieve = vi.fn().mockResolvedValue({ current_period_end: 1_700_000_000 });
@@ -111,6 +126,7 @@ describe('stripe-webhook', () => {
     reclamoGanado = true;
     process.env.STRIPE_SECRET_KEY = 'sk_test';
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+    delete process.env.STRIPE_CONNECT_WEBHOOK_SECRET; // el escenario base usa el secret genérico
     process.env.VITE_SUPABASE_URL = 'http://supabase.test';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
     mockRpc.mockResolvedValue({ data: {}, error: null });
@@ -120,6 +136,7 @@ describe('stripe-webhook', () => {
 
   it('sin secret → no-op', async () => {
     delete process.env.STRIPE_WEBHOOK_SECRET;
+    delete process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
     const res = await invocar();
     expect(JSON.parse(res.body).skipped).toBe('stripe_no_configurado');
   });

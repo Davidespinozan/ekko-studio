@@ -1,10 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest';
 
 /**
  * Bloque F — `reception-recurso-servicio`: marca/reactiva un estudio,
  * auto-cancela las reservas futuras al marcarlo fuera de servicio, notifica,
  * y escribe audit_log. Rechaza body inválido y cross-tenant.
+ *
+ * Entorno hermético (PKG-00C): el escenario es "push NO configurado" (sin
+ * VAPID, el envío es un no-op). Si el runner inyecta claves VAPID, el handler
+ * intenta enviar push contra el mock de supabase. La suite borra esas
+ * variables explícitamente y restaura el entorno original.
  */
+
+const ENV_SUITE = ['VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY', 'VAPID_SUBJECT'] as const;
+const envOriginal: Partial<Record<(typeof ENV_SUITE)[number], string | undefined>> = {};
+beforeAll(() => { for (const k of ENV_SUITE) envOriginal[k] = process.env[k]; });
+afterAll(() => {
+  for (const k of ENV_SUITE) {
+    if (envOriginal[k] === undefined) delete process.env[k];
+    else process.env[k] = envOriginal[k];
+  }
+});
 
 const mockGetUser = vi.fn();
 const mockMaybeSingle = vi.fn();
@@ -66,6 +81,9 @@ describe('reception-recurso-servicio (Bloque F)', () => {
     process.env.VITE_SUPABASE_URL = 'http://supabase.test';
     process.env.VITE_SUPABASE_ANON_KEY = 'anon';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
+    delete process.env.VAPID_PUBLIC_KEY; // push no configurado → no-op
+    delete process.env.VAPID_PRIVATE_KEY;
+    delete process.env.VAPID_SUBJECT;
     mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-caller' } }, error: null });
     mockRecursoUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
     mockReservasUpdate.mockReturnValue({ in: mockReservasIn });
