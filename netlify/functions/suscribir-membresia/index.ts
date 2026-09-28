@@ -20,6 +20,11 @@ import { resolverCuentaConectada, getOrCreateSocioCustomer } from '../_lib/conne
  * devuelve { client_secret, account } para montar el Embedded Checkout en el
  * modal de EKKO. La activación la dispara el webhook de Connect (no acá).
  *
+ * PKG-01B (C17): crear la Checkout Session NO otorga entitlement. El webhook
+ * exige evidencia financiera: `checkout.session.completed` solo activa con
+ * `payment_status = 'paid'`; una sesión `unpaid` se ignora y el derecho llega,
+ * si llega, por `payment_intent.succeeded` (paquete) o `invoice.paid` (mensual).
+ *
  *   - Sin STRIPE_SECRET_KEY        → { reason: 'stripe_pendiente' }.
  *   - Estudio sin cobros activados → { reason: 'cobros_no_activos' }.
  * STRYV es la plataforma; el dinero cae directo al banco del estudio.

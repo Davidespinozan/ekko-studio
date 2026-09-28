@@ -208,6 +208,26 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
       if (s.mode !== 'subscription' && s.mode !== 'payment') {
         return { kind: 'ignore', reason: 'no_es_suscripcion_ni_pago' };
       }
+      // PKG-01B (C17) · NO FINANCIAL SUCCESS → NO ENTITLEMENT SUCCESS.
+      // `completed` NO significa pagado: con un método de notificación diferida
+      // la sesión termina con payment_status='unpaid'. Solo 'paid' activa.
+      //   paid                → activar (idempotente con el evento financiero hermano).
+      //   unpaid              → ignore: el dinero, si llega, entra por
+      //                         payment_intent.succeeded (misma referencia = PI) o
+      //                         invoice.paid subscription_create (mismo sub id).
+      //   no_payment_required → revision: EKKO no vende nada sin cobro por Stripe
+      //                         (sin trials ni anclas); si aparece, alguien lo mire.
+      //   ausente/otro        → revision (fail-safe).
+      const payment_status = (s as { payment_status?: string }).payment_status;
+      if (payment_status === 'unpaid') {
+        return { kind: 'ignore', reason: `checkout_sin_pagar:${s.mode}` };
+      }
+      if (payment_status === 'no_payment_required') {
+        return { kind: 'revision', motivo: 'checkout_sin_cobro_requerido' };
+      }
+      if (payment_status !== 'paid') {
+        return { kind: 'revision', motivo: 'checkout_payment_status_desconocido' };
+      }
       if (!usuario_id || !tier_id || !customer_id) {
         // La sesión la creó EKKO (las de otras apps traen metadata.app) y se
         // completó: hay dinero sin destinatario claro. Nunca "ignorado".
@@ -571,6 +591,8 @@ export function resumenEvento(event: Stripe.Event): Record<string, unknown> {
     monto: o.amount_paid ?? o.amount_due ?? o.amount_refunded ?? o.amount_total ?? o.amount ?? null,
     currency: o.currency ?? null,
     status: o.status ?? null,
+    // PKG-01B: evidencia de si la sesión de Checkout estaba pagada al completarse.
+    payment_status: o.payment_status ?? null,
     billing_reason: o.billing_reason ?? null,
     mode: o.mode ?? null,
     metadata

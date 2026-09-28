@@ -202,3 +202,50 @@ describe('periodoFinFromSubscription con la suscripción que devuelve la API fij
     expect(periodoFinFromSubscription({ id: 'sub_x', items: { data: [] } })).toBeNull();
   });
 });
+
+// ── PKG-01B · Checkout Session con la forma dahlia (payment_status explícito) ─
+/** Sesión de Checkout (forma dahlia). Valores sintéticos. */
+function checkoutSessionDahlia(over: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 'cs_dahlia_1',
+    object: 'checkout.session',
+    livemode: true,
+    status: 'complete',
+    mode: 'payment',
+    payment_status: 'paid',
+    ui_mode: 'embedded_page',
+    customer: 'cus_dahlia_3',
+    payment_intent: 'pi_dahlia_cs_1',
+    subscription: null,
+    invoice: null,
+    amount_total: 25000,
+    currency: 'mxn',
+    customer_details: { email: 'sintetico@ejemplo.test', name: 'Sintético' },
+    metadata: { app: 'ekko', usuario_id: 'usuario_1', tier_id: 'tier_1' },
+    ...over
+  };
+}
+
+describe('PKG-01B · checkout.session.completed dahlia', () => {
+  it('paid (payment) → activar con referencia = payment_intent; el evento NO cuenta dinero (lo cuenta el PI)', () => {
+    const e = ev('checkout.session.completed', checkoutSessionDahlia());
+    expect(clasificarEvento(e)).toMatchObject({ kind: 'activar', referencia: 'pi_dahlia_cs_1', subscription_id: null, customer_id: 'cus_dahlia_3' });
+    expect(extraerMontoDeEvento(e)).toBeNull();
+  });
+
+  it('unpaid (payment) → ignore checkout_sin_pagar:payment', () => {
+    expect(clasificarEvento(ev('checkout.session.completed', checkoutSessionDahlia({ payment_status: 'unpaid' })))).toEqual({ kind: 'ignore', reason: 'checkout_sin_pagar:payment' });
+  });
+
+  it('paid (subscription) → activar por subscription_id; unpaid → ignore', () => {
+    const sub = { mode: 'subscription', subscription: 'sub_dahlia_cs', payment_intent: null, invoice: 'in_dahlia_cs' };
+    expect(clasificarEvento(ev('checkout.session.completed', checkoutSessionDahlia({ ...sub, payment_status: 'paid' })))).toMatchObject({ kind: 'activar', subscription_id: 'sub_dahlia_cs', referencia: null });
+    expect(clasificarEvento(ev('checkout.session.completed', checkoutSessionDahlia({ ...sub, payment_status: 'unpaid' })))).toEqual({ kind: 'ignore', reason: 'checkout_sin_pagar:subscription' });
+  });
+
+  it('no_payment_required → revision; sin payment_status → revision', () => {
+    expect(clasificarEvento(ev('checkout.session.completed', checkoutSessionDahlia({ payment_status: 'no_payment_required' })))).toEqual({ kind: 'revision', motivo: 'checkout_sin_cobro_requerido' });
+    const sin = checkoutSessionDahlia(); delete (sin as Record<string, unknown>).payment_status;
+    expect(clasificarEvento(ev('checkout.session.completed', sin))).toEqual({ kind: 'revision', motivo: 'checkout_payment_status_desconocido' });
+  });
+});

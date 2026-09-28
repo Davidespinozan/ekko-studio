@@ -55,7 +55,7 @@ describe('periodoFinFromSubscription', () => {
 describe('clasificarEvento', () => {
   it('checkout.session.completed con metadata → activar', () => {
     const r = clasificarEvento(ev('checkout.session.completed', {
-      mode: 'subscription',
+      payment_status: 'paid', mode: 'subscription',
       subscription: 'sub_1',
       customer: 'cus_1',
       metadata: { usuario_id: 'u1', tier_id: 't1' }
@@ -71,7 +71,7 @@ describe('clasificarEvento', () => {
 
   it('checkout.session.completed mode payment (paquete) → activar con subscription_id null', () => {
     const r = clasificarEvento(ev('checkout.session.completed', {
-      mode: 'payment',
+      payment_status: 'paid', mode: 'payment',
       subscription: null,
       customer: 'cus_1',
       metadata: { usuario_id: 'u1', tier_id: 't1' }
@@ -85,14 +85,14 @@ describe('clasificarEvento', () => {
 
   it('checkout.session.completed sin metadata → revision (PKG-01A: se cobró y no hay a quién dar el derecho; antes era ignore silencioso)', () => {
     const r = clasificarEvento(ev('checkout.session.completed', {
-      mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', metadata: {}
+      payment_status: 'paid', mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', metadata: {}
     }));
     expect(r).toEqual({ kind: 'revision', motivo: 'faltan_datos_en_session' });
   });
 
   it('checkout en modo setup (ni pago ni suscripción) → ignore', () => {
     const r = clasificarEvento(ev('checkout.session.completed', {
-      mode: 'setup', subscription: null, customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' }
+      payment_status: 'paid', mode: 'setup', subscription: null, customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' }
     }));
     expect(r.kind).toBe('ignore');
   });
@@ -248,7 +248,7 @@ describe('cuenta Stripe compartida — filtro por metadata.app', () => {
 
   it('checkout / subscription / payment_intent de otra app → ignore app_ajena', () => {
     const casos = [
-      ev('checkout.session.completed', { mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', metadata: { app: 'sala', usuario_id: 'u1', tier_id: 't1' } }),
+      ev('checkout.session.completed', { payment_status: 'paid', mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', metadata: { app: 'sala', usuario_id: 'u1', tier_id: 't1' } }),
       ev('customer.subscription.updated', { id: 'sub_1', status: 'active', metadata: { app: 'sala' } }),
       ev('customer.subscription.deleted', { id: 'sub_1', status: 'canceled', metadata: { app: 'hsc' } }),
       ev('payment_intent.succeeded', { customer: 'cus_1', metadata: { app: 'sala', usuario_id: 'u1', tier_id: 't1' } })
@@ -356,7 +356,7 @@ describe('clasificarEvento — referencia del pago único (idempotencia de paque
   it('Checkout mode payment y su PaymentIntent dan la MISMA referencia', () => {
     const sesion = clasificarEvento({
       type: 'checkout.session.completed', created: 1,
-      data: { object: { mode: 'payment', customer: 'cus_1', payment_intent: 'pi_1', metadata: meta } }
+      data: { object: { payment_status: 'paid', mode: 'payment', customer: 'cus_1', payment_intent: 'pi_1', metadata: meta } }
     } as never);
     const pi = clasificarEvento({
       type: 'payment_intent.succeeded', created: 2,
@@ -369,7 +369,7 @@ describe('clasificarEvento — referencia del pago único (idempotencia de paque
   it('payment_intent expandido (objeto) también', () => {
     const sesion = clasificarEvento({
       type: 'checkout.session.completed', created: 1,
-      data: { object: { mode: 'payment', customer: 'cus_1', payment_intent: { id: 'pi_7' }, metadata: meta } }
+      data: { object: { payment_status: 'paid', mode: 'payment', customer: 'cus_1', payment_intent: { id: 'pi_7' }, metadata: meta } }
     } as never);
     expect(sesion).toMatchObject({ referencia: 'pi_7' });
   });
@@ -377,7 +377,7 @@ describe('clasificarEvento — referencia del pago único (idempotencia de paque
   it('Checkout mode subscription → sin referencia', () => {
     const sesion = clasificarEvento({
       type: 'checkout.session.completed', created: 1,
-      data: { object: { mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', payment_intent: null, metadata: meta } }
+      data: { object: { payment_status: 'paid', mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', payment_intent: null, metadata: meta } }
     } as never);
     expect(sesion).toMatchObject({ kind: 'activar', referencia: null });
   });

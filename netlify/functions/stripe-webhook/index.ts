@@ -164,6 +164,8 @@ async function avisarRevision(
 /** Resultado de la acción de dinero: lo que necesita el diario y los avisos. */
 type Efecto = {
   resultado: string;
+  /** PKG-01B: la acción decidió que NO hay nada que aplicar (regla explícita) → fila `ignorado` con este motivo. */
+  ignorar?: string;
   usuarioIdPago: string | null;
   membresiaIdPago: string | null;
   paqueteActivado: { creditos: number | null; periodo_fin: string | null } | null;
@@ -275,9 +277,25 @@ async function ejecutarAccion(
         p_event_at: accion.event_at
       })
     );
-    // Divergencia: Stripe habla de una suscripción que localmente no existe.
-    // Reintentar no la hace aparecer y no se inventa una membresía: revisión.
     if (resSync?.success === false) {
+      // PKG-01B · excepción ESTRICTA: `customer.subscription.updated` que deja la
+      // suscripción `active` puede llegar antes que `invoice.paid` (Stripe no
+      // ordena); la membresía aún no existe porque la CREA el evento financiero
+      // (invoice.paid subscription_create → activar_membresia). No es divergencia:
+      // no hay nada que aplicar. Si esa factura falla, su propia fila queda en
+      // revisión. Cualquier otro caso sin membresía (past_due, pausada, cancelada,
+      // facturas, deleted) sigue siendo divergencia.
+      if (
+        stripeEvent.type === 'customer.subscription.updated' &&
+        accion.estado === 'activa' &&
+        resSync.reason === 'membresia_no_encontrada'
+      ) {
+        ef.ignorar = 'sin_membresia:activacion_por_factura';
+        ef.resultado = ef.ignorar;
+        return ef;
+      }
+      // Divergencia: Stripe habla de una suscripción que localmente no existe.
+      // Reintentar no la hace aparecer y no se inventa una membresía: revisión.
       throw new DivergenciaWebhook(resSync.reason ?? 'sync_sin_exito', `${stripeEvent.type} → ${accion.estado} sobre ${accion.subscription_id}`);
     }
     // Semántica R1 (sin cambios): evento viejo o membresía terminal → no aplica,
@@ -595,6 +613,11 @@ export const handler: Handler = async (event) => {
 
   try {
     const ef = await ejecutarAccion(admin, stripe, acctOpt, stripeEvent, accion);
+
+    if (ef.ignorar) {
+      await finalizar(admin, stripeEvent.id, 'ignorado', { accion: accion.kind, motivo: ef.ignorar });
+      return ok({ received: true, ignored: ef.ignorar });
+    }
 
     // ── Diario de cobranza (verificado) ANTES de dar el evento por procesado ─
     const monto = extraerMontoDeEvento(stripeEvent);

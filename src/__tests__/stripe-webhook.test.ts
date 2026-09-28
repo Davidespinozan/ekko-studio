@@ -133,7 +133,7 @@ const claseReportada = (i = 0) => (mockReportar.mock.calls[i]?.[2] as { clase?: 
 
 const ACTIVAR = {
   id: 'evt_1', type: 'checkout.session.completed', created: 1700000000, livemode: true, api_version: '2026-04-22.dahlia',
-  data: { object: { object: 'checkout.session', id: 'cs_1', mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' } } }
+  data: { object: { object: 'checkout.session', id: 'cs_1', payment_status: 'paid', mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' } } }
 };
 
 describe('stripe-webhook', () => {
@@ -179,7 +179,7 @@ describe('stripe-webhook', () => {
     await invocar();
     const args = mockClaim.mock.calls[0][0] as Record<string, unknown>;
     expect(args).toMatchObject({ p_id: 'evt_1', p_type: 'checkout.session.completed', p_stripe_account: 'acct_ekko', p_livemode: true, p_api_version: '2026-04-22.dahlia', p_lease_segundos: 60 });
-    expect(args.p_resumen).toMatchObject({ objeto: 'checkout.session', id: 'cs_1', subscription: 'sub_1', customer: 'cus_1', mode: 'subscription', metadata: { usuario_id: 'u1', tier_id: 't1' } });
+    expect(args.p_resumen).toMatchObject({ objeto: 'checkout.session', id: 'cs_1', subscription: 'sub_1', customer: 'cus_1', payment_status: 'paid', mode: 'subscription', metadata: { usuario_id: 'u1', tier_id: 't1' } });
     expect(JSON.stringify(args.p_resumen)).not.toMatch(/ana@e\.mx|Ana/);
   });
 
@@ -208,7 +208,7 @@ describe('stripe-webhook', () => {
   it('checkout mode payment (paquete) → activar sin retrieve de suscripción', async () => {
     mockConstructEvent.mockReturnValue({
       id: 'evt_1', type: 'checkout.session.completed', created: 1700000000,
-      data: { object: { mode: 'payment', subscription: null, customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' } } }
+      data: { object: { payment_status: 'paid', mode: 'payment', subscription: null, customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' } } }
     });
     const res = await invocar();
     expect(res.statusCode).toBe(200);
@@ -252,7 +252,7 @@ describe('stripe-webhook', () => {
     const meta = { usuario_id: 'u1', tier_id: 't1' };
     mockConstructEvent.mockReturnValueOnce({
       id: 'evt_sesion', type: 'checkout.session.completed', created: 1700000000,
-      data: { object: { mode: 'payment', subscription: null, customer: 'cus_1', payment_intent: 'pi_1', metadata: meta } }
+      data: { object: { payment_status: 'paid', mode: 'payment', subscription: null, customer: 'cus_1', payment_intent: 'pi_1', metadata: meta } }
     });
     await invocar();
     mockConstructEvent.mockReturnValueOnce({
@@ -270,7 +270,7 @@ describe('stripe-webhook', () => {
   it('suscripción: sin referencia (ya es idempotente por subscription_id)', async () => {
     mockConstructEvent.mockReturnValue({
       id: 'evt_1', type: 'checkout.session.completed', created: 1700000000,
-      data: { object: { mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', payment_intent: null, metadata: { usuario_id: 'u1', tier_id: 't1' } } }
+      data: { object: { payment_status: 'paid', mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', payment_intent: null, metadata: { usuario_id: 'u1', tier_id: 't1' } } }
     });
     await invocar();
     expect(mockRpc).toHaveBeenCalledWith('activar_membresia', expect.objectContaining({ p_referencia: null }));
@@ -457,21 +457,51 @@ describe('stripe-webhook', () => {
 
   // ── Divergencias (dinero/derecho de EKKO sin entidad) ─────────────────────
   describe('divergencias → revision con evidencia (no éxito silencioso, no membresía inventada)', () => {
-    it('sync que no encuentra la membresía (success:false) → revision membresia_no_encontrada, sin diario', async () => {
+    it('PKG-01B · subscription.updated → activa SIN membresía (invoice.paid aún no llegó) → ignorado sin_membresia:activacion_por_factura, sin revisión ni aviso', async () => {
       mockConstructEvent.mockReturnValue({
-        id: 'evt_1', type: 'customer.subscription.updated', created: 1700000000,
-        data: { object: { id: 'sub_huerfana', status: 'active', cancel_at_period_end: false } }
+        id: 'evt_1', type: 'customer.subscription.updated', created: 1700000000, account: 'acct_ekko',
+        data: { object: { id: 'sub_nueva', status: 'active', cancel_at_period_end: false } }
       });
       mockRpc.mockResolvedValue({ data: { success: false, reason: 'membresia_no_encontrada' }, error: null });
 
       const res = await invocar();
 
       expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).ignored).toBe('sin_membresia:activacion_por_factura');
+      expect(ultimaTransicion()).toMatchObject({ estado: 'ignorado', accion: 'sync', motivo: 'sin_membresia:activacion_por_factura', processed_at: expect.any(String) });
+      expect(mockRpc).toHaveBeenCalledTimes(1); // solo el sync; no se activa nada
+      expect(mockUpsertFila).not.toHaveBeenCalled();
+      expect(mockReportar).not.toHaveBeenCalled();
+      expect(mockAvisarStaff).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['customer.subscription.updated', { id: 'sub_x', status: 'past_due', cancel_at_period_end: false }, 'past_due'],
+      ['customer.subscription.updated', { id: 'sub_x', status: 'active', pause_collection: { behavior: 'void' } }, 'pausada'],
+      ['customer.subscription.deleted', { id: 'sub_x', status: 'canceled' }, 'cancelada'],
+      ['customer.subscription.updated', { id: 'sub_x', status: 'canceled' }, 'cancelada']
+    ])('%s → %s SIN membresía → sigue siendo revision membresia_no_encontrada (la excepción no se generaliza)', async (type, object, estado) => {
+      mockConstructEvent.mockReturnValue({ id: 'evt_1', type, created: 1700000000, data: { object } });
+      mockRpc.mockResolvedValue({ data: { success: false, reason: 'membresia_no_encontrada' }, error: null });
+
+      const res = await invocar();
+
+      expect(res.statusCode).toBe(200);
       expect(JSON.parse(res.body).revision).toBe('membresia_no_encontrada');
-      expect(mockDeleteEq).not.toHaveBeenCalled();
+      expect(mockRpc).toHaveBeenCalledWith('sync_membresia_stripe', expect.objectContaining({ p_estado: estado }));
       expect(ultimaTransicion()).toMatchObject({ estado: 'revision', accion: 'sync', motivo: 'membresia_no_encontrada' });
       expect(mockReportar).toHaveBeenCalledWith('stripe-webhook', expect.objectContaining({ message: expect.stringMatching(/membresia_no_encontrada/) }), expect.objectContaining({ clase: 'revision' }));
-      expect(mockRpc).toHaveBeenCalledTimes(1); // no se intenta activar nada
+    });
+
+    it('subscription.updated → activa con otro fallo del sync (no membresia_no_encontrada) → revision', async () => {
+      mockConstructEvent.mockReturnValue({
+        id: 'evt_1', type: 'customer.subscription.updated', created: 1700000000,
+        data: { object: { id: 'sub_x', status: 'active', cancel_at_period_end: false } }
+      });
+      mockRpc.mockResolvedValue({ data: { success: false, reason: 'otra_razon' }, error: null });
+      const res = await invocar();
+      expect(JSON.parse(res.body).revision).toBe('otra_razon');
+      expect(ultimaTransicion()).toMatchObject({ estado: 'revision' });
     });
 
     it('1ª factura pagada de una suscripción SIN metadata → revision suscripcion_sin_metadata (antes: procesado en silencio)', async () => {
@@ -490,7 +520,7 @@ describe('stripe-webhook', () => {
     it('checkout de EKKO completado sin usuario/plan → revision faltan_datos_en_session, sin RPC', async () => {
       mockConstructEvent.mockReturnValue({
         id: 'evt_1', type: 'checkout.session.completed', created: 1700000000,
-        data: { object: { mode: 'payment', customer: 'cus_1', metadata: {} } }
+        data: { object: { payment_status: 'paid', mode: 'payment', customer: 'cus_1', metadata: {} } }
       });
       const res = await invocar();
       expect(res.statusCode).toBe(200);
@@ -763,5 +793,196 @@ describe('stripe-webhook', () => {
       expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'sync:evento_viejo' });
       expect(mockReportar).not.toHaveBeenCalled();
     });
+  });
+});
+
+// ── PKG-01B · Checkout solo activa si está pagado (C17) ─────────────────────
+describe('PKG-01B · checkout.session.completed: NO FINANCIAL SUCCESS → NO ENTITLEMENT SUCCESS', () => {
+  const META = { app: 'ekko', usuario_id: 'u1', tier_id: 't1' };
+  const sesion = (id: string, over: Record<string, unknown> = {}) => ({
+    id, type: 'checkout.session.completed', created: 1700000000, livemode: true, api_version: '2026-04-22.dahlia', account: 'acct_ekko',
+    data: { object: { object: 'checkout.session', id: 'cs_1', status: 'complete', mode: 'payment', payment_status: 'paid', customer: 'cus_1', payment_intent: 'pi_1', subscription: null, amount_total: 25000, currency: 'mxn', metadata: META, ...over } }
+  });
+  const piSucceeded = (id: string) => ({
+    id, type: 'payment_intent.succeeded', created: 1700000001, livemode: true, account: 'acct_ekko',
+    data: { object: { object: 'payment_intent', id: 'pi_1', customer: 'cus_1', amount: 25000, currency: 'mxn', status: 'succeeded', metadata: META } }
+  });
+  const facturaAlta = (id: string) => ({
+    id, type: 'invoice.paid', created: 1700000002, livemode: true, account: 'acct_ekko',
+    data: { object: { object: 'invoice', id: 'in_1', amount_paid: 85000, currency: 'mxn', customer: 'cus_1', billing_reason: 'subscription_create', parent: { type: 'subscription_details', subscription_details: { subscription: 'sub_1', metadata: META } } } }
+  });
+  const activaciones = () => mockRpc.mock.calls.filter((c) => c[0] === 'activar_membresia');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    for (const k of Object.keys(filaPorTabla)) delete filaPorTabla[k];
+    for (const k of Object.keys(upsertResultado)) delete upsertResultado[k];
+    finalizarResultado = () => ({ data: [{ id: 'evt' }], error: null });
+    process.env.STRIPE_SECRET_KEY = 'sk_test';
+    process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+    delete process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
+    process.env.VITE_SUPABASE_URL = 'http://supabase.test';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
+    mockRpc.mockResolvedValue({ data: { success: true, membresia_id: 'mem_1', creditos: 1 }, error: null });
+    claimDevuelve('nuevo');
+    mockTenantMaybeSingle.mockResolvedValue({ data: { id: 'tenant-1' }, error: null });
+    mockSubRetrieve.mockResolvedValue({ current_period_end: 1_700_000_000, customer: 'cus_1', metadata: META });
+  });
+
+  it('1 · payment + paid → activar_membresia (ref = PI) por el camino de siempre → procesado activado', async () => {
+    mockConstructEvent.mockReturnValue(sesion('evt_cs'));
+    const res = await invocar();
+    expect(res.statusCode).toBe(200);
+    expect(mockRpc).toHaveBeenCalledWith('activar_membresia', expect.objectContaining({ p_usuario_id: 'u1', p_tier_id: 't1', p_referencia: 'pi_1', p_stripe_subscription_id: null }));
+    expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', accion: 'activar', motivo: 'activado' });
+  });
+
+  it('2 · payment + unpaid → ignorado checkout_sin_pagar:payment: sin RPC, sin diario, sin aviso, 200', async () => {
+    mockConstructEvent.mockReturnValue(sesion('evt_cs', { payment_status: 'unpaid' }));
+    const res = await invocar();
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).ignored).toBe('checkout_sin_pagar:payment');
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockUpsertFila).not.toHaveBeenCalled();
+    expect(mockAvisarStaff).not.toHaveBeenCalled();
+    expect(mockReportar).not.toHaveBeenCalled();
+    expect(ultimaTransicion()).toMatchObject({ estado: 'ignorado', accion: 'ignore', motivo: 'checkout_sin_pagar:payment', processed_at: expect.any(String) });
+    // El claim guardó la evidencia: payment_status en el resumen.
+    expect((mockClaim.mock.calls[0][0] as { p_resumen: Record<string, unknown> }).p_resumen).toMatchObject({ payment_status: 'unpaid', payment_intent: 'pi_1' });
+  });
+
+  it('3 · unpaid seguido de payment_intent.succeeded del MISMO PI → activa por el PI con referencia pi_1 y registra el diario', async () => {
+    mockConstructEvent.mockReturnValueOnce(sesion('evt_cs', { payment_status: 'unpaid' }));
+    await invocar();
+    expect(activaciones()).toHaveLength(0);
+    mockConstructEvent.mockReturnValueOnce(piSucceeded('evt_pi'));
+    filaPorTabla.usuarios = { email: null, nombre: 'Ana', tenant_id: 't1' };
+    const res = await invocar();
+    expect(res.statusCode).toBe(200);
+    expect(activaciones()).toHaveLength(1);
+    expect(activaciones()[0][1]).toMatchObject({ p_referencia: 'pi_1', p_usuario_id: 'u1' });
+    expect(mockUpsertFila.mock.calls.find((c) => c[0] === 'payment_events')?.[1]).toMatchObject({ stripe_event_id: 'evt_pi', stripe_payment_intent_id: 'pi_1', status: 'succeeded' });
+  });
+
+  it('4 · no_payment_required → revision checkout_sin_cobro_requerido: sin RPC, aviso al staff y reporte', async () => {
+    mockConstructEvent.mockReturnValue(sesion('evt_cs', { payment_status: 'no_payment_required' }));
+    const res = await invocar();
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).revision).toBe('checkout_sin_cobro_requerido');
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(ultimaTransicion()).toMatchObject({ estado: 'revision', accion: 'revision', motivo: 'checkout_sin_cobro_requerido' });
+    expect(mockAvisarStaff).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tipo: 'stripe_revision', tenant_id: 'tenant-1' }));
+    expect(mockReportar).toHaveBeenCalledWith('stripe-webhook', expect.any(Error), expect.objectContaining({ clase: 'revision' }));
+  });
+
+  it('5/6 · payment_status desconocido o ausente → revision checkout_payment_status_desconocido, sin RPC', async () => {
+    mockConstructEvent.mockReturnValueOnce(sesion('evt_a', { payment_status: 'pending' }));
+    expect(JSON.parse((await invocar()).body).revision).toBe('checkout_payment_status_desconocido');
+    const sin = sesion('evt_b'); delete (sin.data.object as Record<string, unknown>).payment_status;
+    mockConstructEvent.mockReturnValueOnce(sin);
+    expect(JSON.parse((await invocar()).body).revision).toBe('checkout_payment_status_desconocido');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('7 · paid + metadata incompleta → revision faltan_datos_en_session (01A), sin RPC', async () => {
+    mockConstructEvent.mockReturnValue(sesion('evt_cs', { metadata: { app: 'ekko' } }));
+    const res = await invocar();
+    expect(JSON.parse(res.body).revision).toBe('faltan_datos_en_session');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('8 · otra app → ignorado app_ajena sin entitlement, aunque venga paid', async () => {
+    mockConstructEvent.mockReturnValue(sesion('evt_cs', { metadata: { app: 'sala', usuario_id: 'u1', tier_id: 't1' } }));
+    const res = await invocar();
+    expect(JSON.parse(res.body).ignored).toBe('app_ajena');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('9 · subscription + paid → activar_membresia por subscription_id (lee la sub para el periodo)', async () => {
+    mockConstructEvent.mockReturnValue(sesion('evt_cs', { mode: 'subscription', subscription: 'sub_1', payment_intent: null }));
+    const res = await invocar();
+    expect(res.statusCode).toBe(200);
+    expect(mockSubRetrieve).toHaveBeenCalledWith('sub_1', { stripeAccount: 'acct_ekko' });
+    expect(mockRpc).toHaveBeenCalledWith('activar_membresia', expect.objectContaining({ p_stripe_subscription_id: 'sub_1', p_referencia: null }));
+    expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'activado' });
+  });
+
+  it('10 · subscription + unpaid → ignorado checkout_sin_pagar:subscription, sin RPC ni retrieve', async () => {
+    mockConstructEvent.mockReturnValue(sesion('evt_cs', { mode: 'subscription', subscription: 'sub_1', payment_intent: null, payment_status: 'unpaid' }));
+    const res = await invocar();
+    expect(JSON.parse(res.body).ignored).toBe('checkout_sin_pagar:subscription');
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockSubRetrieve).not.toHaveBeenCalled();
+  });
+
+  it('11 · unpaid subscription seguido de invoice.paid subscription_create → activa por la factura (activar-sub)', async () => {
+    mockConstructEvent.mockReturnValueOnce(sesion('evt_cs', { mode: 'subscription', subscription: 'sub_1', payment_intent: null, payment_status: 'unpaid' }));
+    await invocar();
+    expect(activaciones()).toHaveLength(0);
+    mockConstructEvent.mockReturnValueOnce(facturaAlta('evt_inv'));
+    filaPorTabla.usuarios = { email: null, nombre: 'Ana', tenant_id: 't1' };
+    const res = await invocar();
+    expect(res.statusCode).toBe(200);
+    expect(activaciones()).toHaveLength(1);
+    expect(activaciones()[0][1]).toMatchObject({ p_stripe_subscription_id: 'sub_1', p_usuario_id: 'u1', p_tier_id: 't1' });
+    expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'activado:sub' });
+  });
+
+  it('12 · paid + payment_intent.succeeded del mismo pago → dos llamadas con la MISMA referencia; la segunda es idempotente (sin segundo correo)', async () => {
+    mockConstructEvent.mockReturnValueOnce(sesion('evt_cs'));
+    await invocar();
+    mockRpc.mockResolvedValueOnce({ data: { success: true, membresia_id: 'mem_1', idempotente: true }, error: null });
+    mockConstructEvent.mockReturnValueOnce(piSucceeded('evt_pi'));
+    filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana', tenant_id: 't1' };
+    await invocar();
+    expect(activaciones().map((c) => (c[1] as { p_referencia: string }).p_referencia)).toEqual(['pi_1', 'pi_1']);
+    expect(mockEnviarEmail).not.toHaveBeenCalled();
+    expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'activado:idempotente' });
+  });
+
+  it('13 · paid subscription + invoice.paid subscription_create → misma subscription_id; la segunda es idempotente', async () => {
+    mockConstructEvent.mockReturnValueOnce(sesion('evt_cs', { mode: 'subscription', subscription: 'sub_1', payment_intent: null }));
+    await invocar();
+    mockRpc.mockResolvedValueOnce({ data: { success: true, membresia_id: 'mem_1', idempotente: true }, error: null });
+    mockConstructEvent.mockReturnValueOnce(facturaAlta('evt_inv'));
+    await invocar();
+    expect(activaciones().map((c) => (c[1] as { p_stripe_subscription_id: string }).p_stripe_subscription_id)).toEqual(['sub_1', 'sub_1']);
+    expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'activado:sub' });
+  });
+
+  it('14 · mismo event.id entregado dos veces → duplicado (01A), sin segunda activación', async () => {
+    mockConstructEvent.mockReturnValue(sesion('evt_cs'));
+    await invocar();
+    claimDevuelve('duplicado', { estado_previo: 'procesado', accion_previa: 'activar' });
+    const res = await invocar();
+    expect(JSON.parse(res.body).duplicate).toBe(true);
+    expect(activaciones()).toHaveLength(1);
+  });
+
+  it('15/16 · async_payment_succeeded / async_payment_failed (no soportados) → ignorado evento_no_manejado, jamás entitlement', async () => {
+    for (const type of ['checkout.session.async_payment_succeeded', 'checkout.session.async_payment_failed']) {
+      mockConstructEvent.mockReturnValueOnce({ ...sesion(`evt_${type}`), type });
+      const res = await invocar();
+      expect(JSON.parse(res.body).ignored).toBe(`evento_no_manejado:${type}`);
+    }
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('17/18 · payment_intent.processing / payment_failed → ignorado evento_no_manejado, sin entitlement', async () => {
+    for (const type of ['payment_intent.processing', 'payment_intent.payment_failed']) {
+      mockConstructEvent.mockReturnValueOnce({ ...piSucceeded(`evt_${type}`), type });
+      const res = await invocar();
+      expect(JSON.parse(res.body).ignored).toBe(`evento_no_manejado:${type}`);
+    }
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockUpsertFila).not.toHaveBeenCalled();
+  });
+
+  it('24 · diario: la sesión paid NO escribe payment_events (lo hace el PI); el handler nunca escribe membresias directo', async () => {
+    mockConstructEvent.mockReturnValue(sesion('evt_cs'));
+    await invocar();
+    expect(mockUpsertFila.mock.calls.find((c) => c[0] === 'payment_events')).toBeUndefined();
+    expect(mockInsert.mock.calls.find((c) => c[0] === 'membresias')).toBeUndefined();
+    expect(mockUpdate.mock.calls.find((c) => c[0] === 'membresias')).toBeUndefined();
   });
 });

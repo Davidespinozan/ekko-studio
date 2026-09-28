@@ -21,12 +21,12 @@ const ev = (type: string, object: unknown, extra: Record<string, unknown> = {}):
 
 describe('clasificarEvento: dinero de EKKO con datos inutilizables → revision (no ignore)', () => {
   it('checkout.session.completed sin usuario/plan → revision faltan_datos_en_session', () => {
-    const r = clasificarEvento(ev('checkout.session.completed', { mode: 'payment', customer: 'cus_1', metadata: {} }));
+    const r = clasificarEvento(ev('checkout.session.completed', { payment_status: 'paid', mode: 'payment', customer: 'cus_1', metadata: {} }));
     expect(r).toEqual({ kind: 'revision', motivo: 'faltan_datos_en_session' });
   });
 
   it('checkout de otra app → sigue siendo ignore app_ajena', () => {
-    const r = clasificarEvento(ev('checkout.session.completed', { mode: 'payment', customer: 'cus_1', metadata: { app: 'sala' } }));
+    const r = clasificarEvento(ev('checkout.session.completed', { payment_status: 'paid', mode: 'payment', customer: 'cus_1', metadata: { app: 'sala' } }));
     expect(r).toEqual({ kind: 'ignore', reason: 'app_ajena' });
   });
 
@@ -109,8 +109,8 @@ describe('resumenEvento: ids y montos, nunca PII', () => {
   });
 
   it('checkout session: mode y payment_intent; evento sin objeto no rompe', () => {
-    const r = resumenEvento(ev('checkout.session.completed', { object: 'checkout.session', id: 'cs_1', mode: 'payment', payment_intent: 'pi_1', amount_total: 1000, customer_details: { email: 'a@b.c' } }));
-    expect(r).toMatchObject({ objeto: 'checkout.session', id: 'cs_1', mode: 'payment', payment_intent: 'pi_1', monto: 1000 });
+    const r = resumenEvento(ev('checkout.session.completed', { object: 'checkout.session', id: 'cs_1', payment_status: 'paid', mode: 'payment', payment_intent: 'pi_1', amount_total: 1000, customer_details: { email: 'a@b.c' } }));
+    expect(r).toMatchObject({ objeto: 'checkout.session', id: 'cs_1', payment_status: 'paid', mode: 'payment', payment_intent: 'pi_1', monto: 1000 });
     expect(resumenEvento({ id: 'evt', type: 'x', data: {} } as unknown as Ev)).toEqual({ metadata: {} });
   });
 });
@@ -146,5 +146,72 @@ describe('redactarPayload', () => {
     const evento = ev('x', { customer_email: 'a@b.c', id: 'in_1' });
     redactarPayload(evento);
     expect((evento.data.object as { customer_email: string }).customer_email).toBe('a@b.c');
+  });
+});
+
+// ── PKG-01B · Checkout solo activa con dinero (C17) ─────────────────────────
+describe('PKG-01B · clasificarEvento(checkout.session.completed): NO FINANCIAL SUCCESS → NO ENTITLEMENT', () => {
+  const sesion = (over: Record<string, unknown>) =>
+    ev('checkout.session.completed', {
+      object: 'checkout.session', id: 'cs_1', status: 'complete', customer: 'cus_1', payment_intent: 'pi_1', subscription: null,
+      mode: 'payment', metadata: { app: 'ekko', usuario_id: 'u1', tier_id: 't1' }, ...over
+    });
+
+  it('payment + paid → activar con referencia = PI', () => {
+    expect(clasificarEvento(sesion({ payment_status: 'paid' }))).toMatchObject({ kind: 'activar', usuario_id: 'u1', tier_id: 't1', referencia: 'pi_1', subscription_id: null });
+  });
+
+  it('payment + unpaid → ignore checkout_sin_pagar:payment (aunque la metadata sea válida)', () => {
+    expect(clasificarEvento(sesion({ payment_status: 'unpaid' }))).toEqual({ kind: 'ignore', reason: 'checkout_sin_pagar:payment' });
+  });
+
+  it('subscription + paid → activar con subscription_id y sin referencia', () => {
+    expect(clasificarEvento(sesion({ payment_status: 'paid', mode: 'subscription', subscription: 'sub_1', payment_intent: null })))
+      .toMatchObject({ kind: 'activar', subscription_id: 'sub_1', referencia: null });
+  });
+
+  it('subscription + unpaid → ignore checkout_sin_pagar:subscription', () => {
+    expect(clasificarEvento(sesion({ payment_status: 'unpaid', mode: 'subscription', subscription: 'sub_1' }))).toEqual({ kind: 'ignore', reason: 'checkout_sin_pagar:subscription' });
+  });
+
+  it('no_payment_required → revision checkout_sin_cobro_requerido (nunca activar)', () => {
+    expect(clasificarEvento(sesion({ payment_status: 'no_payment_required' }))).toEqual({ kind: 'revision', motivo: 'checkout_sin_cobro_requerido' });
+    expect(clasificarEvento(sesion({ payment_status: 'no_payment_required', mode: 'subscription', subscription: 'sub_1' }))).toEqual({ kind: 'revision', motivo: 'checkout_sin_cobro_requerido' });
+  });
+
+  it('payment_status desconocido o ausente → revision checkout_payment_status_desconocido (fail-safe)', () => {
+    expect(clasificarEvento(sesion({ payment_status: 'pending' }))).toEqual({ kind: 'revision', motivo: 'checkout_payment_status_desconocido' });
+    expect(clasificarEvento(sesion({ payment_status: undefined }))).toEqual({ kind: 'revision', motivo: 'checkout_payment_status_desconocido' });
+    expect(clasificarEvento(sesion({ payment_status: null }))).toEqual({ kind: 'revision', motivo: 'checkout_payment_status_desconocido' });
+  });
+
+  it('orden: paid + metadata incompleta → revision faltan_datos_en_session; unpaid + metadata incompleta → ignore (no hay dinero)', () => {
+    expect(clasificarEvento(sesion({ payment_status: 'paid', metadata: { app: 'ekko' } }))).toEqual({ kind: 'revision', motivo: 'faltan_datos_en_session' });
+    expect(clasificarEvento(sesion({ payment_status: 'unpaid', metadata: { app: 'ekko' } }))).toEqual({ kind: 'ignore', reason: 'checkout_sin_pagar:payment' });
+  });
+
+  it('otra app → app_ajena antes de mirar payment_status; mode=setup → ignore antes también', () => {
+    expect(clasificarEvento(sesion({ payment_status: 'paid', metadata: { app: 'sala', usuario_id: 'u1', tier_id: 't1' } }))).toEqual({ kind: 'ignore', reason: 'app_ajena' });
+    expect(clasificarEvento(sesion({ payment_status: 'no_payment_required', mode: 'setup' }))).toEqual({ kind: 'ignore', reason: 'no_es_suscripcion_ni_pago' });
+  });
+
+  it('eventos async de Checkout NO están soportados: firmados llegan como evento_no_manejado y jamás activan', () => {
+    expect(clasificarEvento(ev('checkout.session.async_payment_succeeded', { object: 'checkout.session', id: 'cs_1', payment_status: 'paid', mode: 'payment', metadata: { app: 'ekko', usuario_id: 'u1', tier_id: 't1' } })))
+      .toEqual({ kind: 'ignore', reason: 'evento_no_manejado:checkout.session.async_payment_succeeded' });
+    expect(clasificarEvento(ev('checkout.session.async_payment_failed', { object: 'checkout.session', id: 'cs_1', payment_status: 'unpaid', mode: 'payment' })))
+      .toEqual({ kind: 'ignore', reason: 'evento_no_manejado:checkout.session.async_payment_failed' });
+  });
+
+  it('PaymentIntent que no es succeeded (processing / payment_failed / canceled) → evento_no_manejado, jamás activar', () => {
+    for (const t of ['payment_intent.processing', 'payment_intent.payment_failed', 'payment_intent.canceled', 'payment_intent.requires_action']) {
+      const r = clasificarEvento(ev(t, { object: 'payment_intent', id: 'pi_1', status: t.split('.')[1], customer: 'cus_1', amount: 25000, metadata: { app: 'ekko', usuario_id: 'u1', tier_id: 't1' } }));
+      expect(r, t).toEqual({ kind: 'ignore', reason: `evento_no_manejado:${t}` });
+    }
+  });
+
+  it('resumenEvento conserva payment_status como evidencia (sin PII)', () => {
+    const r = resumenEvento(sesion({ payment_status: 'unpaid', customer_details: { email: 'a@b.c', name: 'Ana' } }));
+    expect(r).toMatchObject({ objeto: 'checkout.session', id: 'cs_1', payment_status: 'unpaid', mode: 'payment', payment_intent: 'pi_1' });
+    expect(JSON.stringify(r)).not.toMatch(/a@b\.c|Ana/);
   });
 });
