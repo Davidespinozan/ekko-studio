@@ -131,7 +131,14 @@ export type EventoClasificado =
       payouts_enabled: boolean;
       event_at: string;
     }
-  | { kind: 'ignore'; reason: string };
+  | { kind: 'ignore'; reason: string }
+  | {
+      // PKG-01A: el evento es de EKKO e implica dinero, pero trae datos que no
+      // permiten producir el efecto (sesión/PI sin usuario o plan). NO es un
+      // ignore: se cobró y no se puede dar el derecho → revisión humana.
+      kind: 'revision';
+      motivo: string;
+    };
 
 /**
  * La cuenta Stripe de la plataforma se COMPARTE con otros productos (SALA, HSC).
@@ -202,7 +209,9 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
         return { kind: 'ignore', reason: 'no_es_suscripcion_ni_pago' };
       }
       if (!usuario_id || !tier_id || !customer_id) {
-        return { kind: 'ignore', reason: 'faltan_datos_en_session' };
+        // La sesión la creó EKKO (las de otras apps traen metadata.app) y se
+        // completó: hay dinero sin destinatario claro. Nunca "ignorado".
+        return { kind: 'revision', motivo: 'faltan_datos_en_session' };
       }
       const pi = typeof s.payment_intent === 'string' ? s.payment_intent : s.payment_intent?.id ?? null;
       return {
@@ -264,7 +273,7 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
         const reserva_id = pi.metadata?.reserva_id;
         const cantidad = Number.parseInt(pi.metadata?.cantidad ?? '', 10);
         if (!reserva_id || !Number.isInteger(cantidad) || cantidad <= 0) {
-          return { kind: 'ignore', reason: 'invitados_extra_sin_datos' };
+          return { kind: 'revision', motivo: 'invitados_extra_sin_datos' };
         }
         return { kind: 'invitados-extra', reserva_id, cantidad, usuario_id: pi.metadata?.usuario_id ?? null, event_at };
       }
@@ -274,7 +283,11 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
       const tier_id = pi.metadata?.tier_id;
       const customer_id = typeof pi.customer === 'string' ? pi.customer : pi.customer?.id;
       if (!usuario_id || !tier_id || !customer_id) {
-        return { kind: 'ignore', reason: 'payment_intent_sin_metadata' };
+        // Con metadata.app = ekko lo creó EKKO y se cobró: revisión. Sin app es
+        // el PI de una factura de suscripción (lo maneja invoice.paid): ignore.
+        return pi.metadata?.app === APP_ID
+          ? { kind: 'revision', motivo: 'payment_intent_ekko_sin_datos' }
+          : { kind: 'ignore', reason: 'payment_intent_sin_metadata' };
       }
       return { kind: 'activar', usuario_id, tier_id, subscription_id: null, customer_id, referencia: pi.id, event_at };
     }
@@ -470,4 +483,125 @@ export function llavePrecio(p: {
     .digest('hex')
     .slice(0, 40);
   return `ekko_price_${huella}`;
+}
+
+// ── PKG-01A · Estado durable del evento (helpers PUROS) ──────────────────────
+
+export type EstadoEventoWebhook = 'en_proceso' | 'procesado' | 'ignorado' | 'error_reintentable' | 'revision';
+
+/**
+ * Divergencia: el evento es de EKKO, implica dinero/derecho, y la entidad que
+ * debía recibir el efecto no existe o no se puede reconciliar (membresía no
+ * encontrada, suscripción sin metadata…). No se inventa nada, no se relaja R1:
+ * el evento va a `revision` con evidencia. Siempre es un error PERMANENTE.
+ */
+export class DivergenciaWebhook extends Error {
+  constructor(readonly motivo: string, detalle?: string) {
+    super(detalle ? `${motivo}: ${detalle}` : motivo);
+    this.name = 'DivergenciaWebhook';
+  }
+}
+
+/** Error devuelto por un RPC de Supabase (conserva el código SQLSTATE para clasificarlo). */
+export class ErrorRpcWebhook extends Error {
+  readonly code: string | null;
+  constructor(origen: string, err: { message?: string; code?: string | null } | null | undefined) {
+    super(`${origen}: ${err?.message ?? 'error desconocido'}`);
+    this.name = 'ErrorRpcWebhook';
+    this.code = err?.code ?? null;
+  }
+}
+
+/**
+ * ¿Reintentar puede arreglarlo? Decide entre `error_reintentable` (5xx, Stripe
+ * reintenta) y `revision` (permanente). Ante duda → transitorio (D-01A-1: la
+ * revisión nunca es un catch-all; los intentos agotados la alcanzan igual).
+ *
+ * Permanentes: divergencias; excepciones de negocio de nuestros RPC (EKKO_*,
+ * SQLSTATE P0001); violaciones de integridad/datos (23xxx, 22xxx); peticiones
+ * inválidas a Stripe (StripeInvalidRequestError: resource_missing, etc.).
+ */
+export function clasificarError(err: unknown): 'permanente' | 'transitorio' {
+  if (err instanceof DivergenciaWebhook) return 'permanente';
+  const e = err as { name?: string; type?: string; code?: string | null; message?: string } | null;
+  if (!e || typeof e !== 'object') return 'transitorio';
+  const code = typeof e.code === 'string' ? e.code : '';
+  if (code === 'P0001' || code.startsWith('23') || code.startsWith('22')) return 'permanente';
+  if (typeof e.message === 'string' && /\bEKKO_[A-Z_]+/.test(e.message)) return 'permanente';
+  const tipoStripe = e.type ?? e.name ?? '';
+  if (tipoStripe === 'StripeInvalidRequestError') return 'permanente';
+  return 'transitorio';
+}
+
+/**
+ * ¿Re-ejecutar la acción tras un crash a medias es seguro? activar (por
+ * suscripción/referencia), sync (guardia de orden), reembolso (solo aviso) y
+ * cuenta-conectada (update) son idempotentes. `registrar_invitados_extra_pagados`
+ * NO: un reclamo de lease vencido con esa acción va a revisión, no se repite.
+ */
+export function accionIdempotente(kind: EventoClasificado['kind']): boolean {
+  return kind !== 'invitados-extra';
+}
+
+const METADATA_EKKO = ['app', 'usuario_id', 'tier_id', 'reserva_id', 'cantidad', 'tipo'] as const;
+
+const idODef = (v: unknown): string | null =>
+  typeof v === 'string' ? v : v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'string' ? (v as { id: string }).id : null;
+
+/**
+ * Resumen mínimo del evento para `stripe_webhook_events.resumen`: ids y montos,
+ * NUNCA correo/nombre/dirección. Con esto se localiza el objeto en el dashboard
+ * de Stripe y se reenvía el evento tras corregir la causa.
+ */
+export function resumenEvento(event: Stripe.Event): Record<string, unknown> {
+  const o = (event.data?.object ?? {}) as unknown as Record<string, unknown>;
+  const parent = o.parent as { subscription_details?: { subscription?: unknown; metadata?: Record<string, unknown> } } | undefined;
+  const metaOrigen = (o.metadata ?? parent?.subscription_details?.metadata ?? {}) as Record<string, unknown>;
+  const metadata: Record<string, unknown> = {};
+  for (const k of METADATA_EKKO) if (metaOrigen[k] !== undefined) metadata[k] = metaOrigen[k];
+
+  const resumen: Record<string, unknown> = {
+    objeto: o.object ?? null,
+    id: idODef(o.id),
+    subscription: idODef(o.subscription) ?? idODef(parent?.subscription_details?.subscription),
+    customer: idODef(o.customer),
+    invoice: idODef(o.invoice),
+    payment_intent: idODef(o.payment_intent),
+    charge: o.object === 'charge' ? idODef(o.id) : idODef(o.latest_charge),
+    monto: o.amount_paid ?? o.amount_due ?? o.amount_refunded ?? o.amount_total ?? o.amount ?? null,
+    currency: o.currency ?? null,
+    status: o.status ?? null,
+    billing_reason: o.billing_reason ?? null,
+    mode: o.mode ?? null,
+    metadata
+  };
+  for (const k of Object.keys(resumen)) if (resumen[k] === null || resumen[k] === undefined) delete resumen[k];
+  return resumen;
+}
+
+/** Claves con PII que Stripe incluye en facturas, sesiones, PI, charges y customers. */
+const CLAVES_PII_PAYLOAD = new Set([
+  'customer_email', 'customer_name', 'customer_address', 'customer_phone', 'customer_shipping',
+  'customer_tax_ids', 'customer_details', 'receipt_email', 'billing_details', 'shipping',
+  'email', 'name', 'phone', 'address', 'account_name', 'account_holder_name', 'tax_ids',
+  'individual', 'company', 'support_email', 'support_phone', 'support_address'
+]);
+
+/**
+ * Copia del evento sin PII para `payment_events.raw_payload` (evidencia para
+ * identificación, conciliación, diagnóstico y atribución; nada más). Solo para
+ * eventos NUEVOS: las filas históricas no se tocan (PKG-01A).
+ */
+export function redactarPayload<T>(valor: T, profundidad = 0): T {
+  if (valor === null || typeof valor !== 'object' || profundidad > 12) return valor;
+  if (Array.isArray(valor)) return valor.map((v) => redactarPayload(v, profundidad + 1)) as unknown as T;
+  const salida: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(valor as Record<string, unknown>)) {
+    if (CLAVES_PII_PAYLOAD.has(k)) {
+      salida[k] = v === null || v === undefined ? v : '[redactado]';
+    } else {
+      salida[k] = redactarPayload(v, profundidad + 1);
+    }
+  }
+  return salida as T;
 }

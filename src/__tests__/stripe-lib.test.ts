@@ -83,11 +83,11 @@ describe('clasificarEvento', () => {
     }
   });
 
-  it('checkout.session.completed sin metadata → ignore', () => {
+  it('checkout.session.completed sin metadata → revision (PKG-01A: se cobró y no hay a quién dar el derecho; antes era ignore silencioso)', () => {
     const r = clasificarEvento(ev('checkout.session.completed', {
       mode: 'subscription', subscription: 'sub_1', customer: 'cus_1', metadata: {}
     }));
-    expect(r.kind).toBe('ignore');
+    expect(r).toEqual({ kind: 'revision', motivo: 'faltan_datos_en_session' });
   });
 
   it('checkout en modo setup (ni pago ni suscripción) → ignore', () => {
@@ -165,11 +165,11 @@ describe('clasificarEvento', () => {
     }
   });
 
-  it('invitados_extra sin reserva_id / cantidad inválida → ignore', () => {
+  it('invitados_extra sin reserva_id / cantidad inválida → revision (PKG-01A: pago de EKKO sin datos para aplicarlo)', () => {
     const r = clasificarEvento(ev('payment_intent.succeeded', {
       customer: 'cus_1', metadata: { tipo: 'invitados_extra', cantidad: '0' }
     }));
-    expect(r.kind).toBe('ignore');
+    expect(r).toEqual({ kind: 'revision', motivo: 'invitados_extra_sin_datos' });
   });
 
   it('evento no manejado → ignore', () => {
