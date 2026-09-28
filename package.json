@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:full": "netlify dev",
     "build": "tsc && vite build",
+    "ci:gate": "npm run lint && tsc && npm test && vite build",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix",

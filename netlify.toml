@@ -1,5 +1,8 @@
 [build]
-  command = "npm run build"
+  # PKG-00C: Netlify solo publica si pasan lint, typecheck, tests (incluye las
+  # pruebas de DB con PGlite, sin secretos ni red) y el build de producción.
+  # Cualquier etapa en rojo → exit ≠ 0 → el deploy falla y queda el publicado anterior.
+  command = "npm run ci:gate"
   publish = "dist"
   functions = "netlify/functions"
 
