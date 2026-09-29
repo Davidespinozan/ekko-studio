@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, CalendarOff } from 'lucide-react';
 import { useReservasRango } from '../../hooks/useAdminData';
 import { formatHora } from '@member/logic/reservaLogic';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ErrorCarga, ErrorInline } from '@shared/components/ErrorCarga';
+import { estadoDeCarga } from '@shared/lib/estadoCarga';
 import { hoyISOEnZona, sumarDiasISO, rangoDiaEnZona, formatFechaEnZona, instanteDeFechaHoraEnZona } from '@shared/lib/timezone';
 
 interface Props {
@@ -22,7 +24,9 @@ export default function VistaDia({ refreshTick, onVerDetalle }: Props) {
   const [fecha, setFecha] = useState<string>(() => hoyISOEnZona());
 
   const rango = useMemo(() => rangoDiaEnZona(fecha), [fecha]);
-  const { reservas, isLoading, refetch } = useReservasRango(rango.inicio, rango.fin);
+  const { reservas, isLoading, error, cargado, refetch } = useReservasRango(rango.inicio, rango.fin);
+  // PKG-02A (C02): fallo de consulta ≠ día vacío.
+  const estado = estadoDeCarga({ isLoading, error, cargado });
 
   useEffect(() => {
     if (refreshTick > 0) void refetch();
@@ -56,7 +60,14 @@ export default function VistaDia({ refreshTick, onVerDetalle }: Props) {
         </button>
       </div>
 
-      {isLoading ? (
+      {estado === 'stale' && (
+        <div style={{ marginBottom: '10px' }}>
+          <ErrorInline mensaje="No pudimos actualizar las reservas; ves la última versión cargada." onReintentar={() => void refetch()} />
+        </div>
+      )}
+      {estado === 'error' ? (
+        <ErrorCarga titulo="No pudimos cargar las reservas de este día." onReintentar={() => void refetch()} />
+      ) : estado === 'cargando' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {Array.from({ length: 4 }).map((_, i) => (
             <div

@@ -21,8 +21,11 @@ const h = vi.hoisted(() => ({
   // `config` (useMemo sobre tenant.config) cambiaría y la página recargaría los
   // horarios en bucle.
   tenant: { id: 't-1', nombre: 'EKKO', config: { reserva: { anticipacion_min_horas: 0 } } },
-  resumen: { resumen: { tier: null, membresia: null }, isLoading: false, refetch: vi.fn() },
-  refreshUsuario: vi.fn()
+  resumen: { resumen: { tier: null, membresia: null }, isLoading: false, error: false, refetch: vi.fn() },
+  refreshUsuario: vi.fn(),
+  tiersError: null as unknown,
+  recursosError: false,
+  recargarRecursos: vi.fn()
 }));
 
 const RECURSO = {
@@ -38,7 +41,9 @@ vi.mock('@shared/lib/supabase', () => ({
       for (const m of ['select', 'eq', 'in', 'order', 'limit', 'gte', 'lt']) c[m] = () => c;
       c.maybeSingle = () => Promise.resolve({ data: null, error: null });
       c.then = (cb: (v: unknown) => unknown) =>
-        Promise.resolve({ data: tabla === 'tiers' ? h.tiers : [], error: null }).then(cb);
+        Promise.resolve(
+          tabla === 'tiers' && h.tiersError ? { data: null, error: h.tiersError } : { data: tabla === 'tiers' ? h.tiers : [], error: null }
+        ).then(cb);
       return c;
     },
     rpc: () => Promise.resolve({ data: h.ocupados, error: null })
@@ -49,7 +54,7 @@ vi.mock('@shared/hooks/useTenant', () => ({ useTenant: () => h.tenant }));
 vi.mock('@member/hooks/useResumenMiembro', () => ({ useResumenMiembro: () => h.resumen }));
 vi.mock('../../hooks/useReservas', async (orig) => ({
   ...(await orig<typeof import('../../hooks/useReservas')>()),
-  useRecursosDelTenant: () => ({ recursos: [RECURSO], isLoading: false }),
+  useRecursosDelTenant: () => ({ recursos: h.recursosError ? [] : [RECURSO], isLoading: false, error: h.recursosError, recargar: h.recargarRecursos }),
   fetchReservasDelUsuario: () => Promise.resolve([]),
   crearReserva: (...a: unknown[]) => h.crearReserva(...a)
 }));
@@ -82,6 +87,9 @@ async function tocarPrimeraHora() {
 beforeEach(() => {
   vi.clearAllMocks();
   h.usuario.membresia_tier = null;
+  h.resumen.error = false;
+  h.tiersError = null;
+  h.recursosError = false;
   // Reloj fijo: a las 09:00 del estudio (Mazatlán, UTC-7) siempre quedan horas
   // ese día. Con el reloj real, corrido de noche no había ninguna hora que tocar.
   vi.setSystemTime(new Date('2026-09-22T16:00:00Z'));
@@ -114,5 +122,55 @@ describe('Reservar · pago por hora', () => {
     await tocarPrimeraHora();
     expect(await screen.findByText('CONFIRMAR RESERVA')).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: /pagar esta hora/i })).not.toBeInTheDocument();
+  });
+});
+
+// ── PKG-02A (C02 · F06) · plan/saldo no leídos → no se decide con datos falsos ─
+describe('Reservar · resumen del miembro en error (PKG-02A)', () => {
+  it('sin plan en `usuarios` pero resumen en ERROR: no ofrece comprar la hora (dinero) ni abre la confirmación; avisa y pide reintentar', async () => {
+    h.resumen.error = true;
+    montar();
+    expect(await screen.findByText(/No pudimos cargar tu plan y tu saldo/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(h.resumen.refetch).toHaveBeenCalledTimes(1);
+    await tocarPrimeraHora();
+    expect(screen.queryByRole('dialog', { name: /pagar esta hora/i })).not.toBeInTheDocument();
+    expect(screen.queryByText('CONFIRMAR RESERVA')).not.toBeInTheDocument();
+    expect(h.pagoAbierto).not.toHaveBeenCalled();
+    expect(await screen.findByText(/Reintenta para poder reservar/)).toBeInTheDocument();
+  });
+
+  it('con plan en `usuarios` pero resumen en ERROR: tampoco abre la confirmación (no se inventa saldo)', async () => {
+    h.usuario.membresia_tier = 'esencial';
+    h.resumen.error = true;
+    montar();
+    await tocarPrimeraHora();
+    expect(screen.queryByText('CONFIRMAR RESERVA')).not.toBeInTheDocument();
+    expect(h.crearReserva).not.toHaveBeenCalled();
+  });
+});
+
+// ── PKG-02A (C02 · F11/F18) ───────────────────────────────────────────────────
+describe('Reservar · estudios y planes en error (PKG-02A)', () => {
+  it('F11 · estudios en ERROR → "No pudimos cargar los estudios." + Reintentar; nunca "Sin estudios disponibles"', async () => {
+    h.recursosError = true;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    montar();
+    expect(await screen.findByText('No pudimos cargar los estudios.')).toBeInTheDocument();
+    expect(screen.queryByText('Sin estudios disponibles')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(h.recargarRecursos).toHaveBeenCalledTimes(1);
+  });
+
+  it('F18 · sin plan y planes en ERROR → no se ofrece "pagar esta hora" con lista vacía falsa; avisa y no concluye', async () => {
+    h.tiersError = { message: 'permission denied' };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    montar();
+    expect(await screen.findByText(/No pudimos cargar los planes disponibles para pagar por hora/)).toBeInTheDocument();
+    await tocarPrimeraHora();
+    expect(screen.queryByRole('dialog', { name: /pagar esta hora/i })).not.toBeInTheDocument();
+    expect(h.pagoAbierto).not.toHaveBeenCalled();
+    expect(await screen.findByText(/No pudimos cargar los planes disponibles\. Reintenta/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/permission denied/);
   });
 });

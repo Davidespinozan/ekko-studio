@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { ArrowLeft, UserX, CalendarPlus } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ErrorInline } from '@shared/components/ErrorCarga';
 import { NotasMiembro } from '@shared/components/NotasMiembro';
 import { EnviarAvisoModal } from '@shared/components/EnviarAvisoModal';
 import { CrearReservaModal, type ReservaOriginal } from '../components/CrearReservaModal';
@@ -53,13 +54,16 @@ export default function PerfilMiembroRecepcion() {
   const [materialDe, setMaterialDe] = useState<ReservaPerfil | null>(null);
   const [miembro, setMiembro] = useState<MiembroPerfil | null>(null);
   const [reservas, setReservas] = useState<ReservaPerfil[]>([]);
+  // PKG-02A (C02 · F19): fallo leyendo reservas ≠ "sin reservas". Estado propio,
+  // independiente del de la membresía (F03).
+  const [errorReservas, setErrorReservas] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [noEncontrado, setNoEncontrado] = useState(false);
   const [crearOpen, setCrearOpen] = useState(false);
   const [cancelarTarget, setCancelarTarget] = useState<ReservaParaCancelar | null>(null);
   const [reprogramarTarget, setReprogramarTarget] = useState<ReservaOriginal | null>(null);
   const [pausaOpen, setPausaOpen] = useState<null | boolean>(null);
-  const { membresia: membresiaViva, isLoading: membresiaCargando, refetch: recargarMembresia } = useMembresiaVigente(id);
+  const { membresia: membresiaViva, isLoading: membresiaCargando, error: membresiaError, refetch: recargarMembresia } = useMembresiaVigente(id);
   const [editarOpen, setEditarOpen] = useState(false);
   const [fotoOpen, setFotoOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -75,12 +79,18 @@ export default function PerfilMiembroRecepcion() {
 
   const recargarReservas = useCallback(async () => {
     if (!id) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('reservas')
       .select('id, slot_inicio, slot_fin, status, folio, recurso_id, invitados_count, recurso:recursos(nombre)')
       .eq('usuario_id', id)
       .order('slot_inicio', { ascending: false })
       .limit(50);
+    if (error) {
+      console.error('[PerfilMiembroRecepcion] reservas', error);
+      setErrorReservas(true); // las reservas anteriores se conservan
+      return;
+    }
+    setErrorReservas(false);
     setReservas((data ?? []) as unknown as ReservaPerfil[]);
   }, [id]);
 
@@ -174,7 +184,13 @@ export default function PerfilMiembroRecepcion() {
     <div className="rec-main">
       <PerfilHeader miembro={miembro} onFoto={() => setFotoOpen(true)} />
 
-      <MembresiaCard membresia={membresiaViva} cargando={membresiaCargando} onAccion={abrirAccionMembresia} />
+      <MembresiaCard
+        membresia={membresiaViva}
+        cargando={membresiaCargando}
+        error={membresiaError}
+        onReintentar={() => void recargarMembresia()}
+        onAccion={abrirAccionMembresia}
+      />
 
       <EstadoCuentaCard
         miembro={miembro}
@@ -271,7 +287,14 @@ export default function PerfilMiembroRecepcion() {
 
         <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>PRÓXIMAS RESERVAS</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {proximas.length === 0 ? (
+          {/* PKG-02A (F19): error sin dato → aviso (no "Sin reservas"); error con dato previo → lista + aviso stale. */}
+          {errorReservas && (
+            <ErrorInline
+              mensaje={reservas.length === 0 ? 'No pudimos cargar las reservas del miembro.' : 'No pudimos actualizar las reservas; ves la última versión cargada.'}
+              onReintentar={() => void recargarReservas()}
+            />
+          )}
+          {!errorReservas && proximas.length === 0 ? (
             <p className="ek-body-faint">Sin reservas próximas.</p>
           ) : (
             proximas.map((r) => (
@@ -301,7 +324,9 @@ export default function PerfilMiembroRecepcion() {
 
         <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '10px' }}>HISTORIAL ({historial.length})</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {historial.length === 0 ? (
+          {errorReservas && reservas.length === 0 ? (
+            <p className="ek-body-faint">Historial no disponible.</p>
+          ) : historial.length === 0 ? (
             <p className="ek-body-faint">Sin reservas anteriores.</p>
           ) : (
             historial.slice(0, 15).map((r) => (

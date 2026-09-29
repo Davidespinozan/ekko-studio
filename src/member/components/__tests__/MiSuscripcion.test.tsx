@@ -12,13 +12,14 @@ const h = vi.hoisted(() => ({
   tiers: [] as unknown[],
   pagos: [] as unknown[],
   membresias: [] as unknown[],
+  tiersError: null as unknown,
   backend: vi.fn()
 }));
 
 vi.mock('@shared/lib/supabase', () => {
   function builderFor(table: string) {
     const result =
-      table === 'tiers' ? { data: h.tiers, error: null }
+      table === 'tiers' ? (h.tiersError ? { data: null, error: h.tiersError } : { data: h.tiers, error: null })
       : table === 'membresias' ? { data: h.membresias, error: null }
       : { data: h.pagos, error: null };
     const b: Record<string, unknown> = {};
@@ -48,6 +49,7 @@ beforeEach(() => {
   ];
   h.pagos = [];
   h.membresias = [];
+  h.tiersError = null;
   // Sin Stripe configurado: el cambio de plan responde stripe_pendiente.
   h.backend = vi.fn().mockResolvedValue({ activated: false, reason: 'stripe_pendiente' });
 });
@@ -149,5 +151,24 @@ describe('MiSuscripcion · historial con concepto, recibo y reembolsos (A11)', (
     expect(screen.getByText('Paquete · 4 horas')).toBeInTheDocument();
     expect(screen.getByText('Reembolsado')).toBeInTheDocument();
     expect(screen.getByText('Pagado')).toBeInTheDocument();
+  });
+});
+
+// ── PKG-02A (C02 · F16) ───────────────────────────────────────────────────────
+describe('MiSuscripcion · lectura fallida (PKG-02A)', () => {
+  it('planes/membresía en ERROR → "No pudimos cargar tu plan." + Reintentar; nunca "No tienes un plan activo" ni acciones', async () => {
+    h.tiersError = { message: 'permission denied for table tiers' };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderComp('pro');
+    expect(await screen.findByText('No pudimos cargar tu plan.')).toBeInTheDocument();
+    expect(screen.queryByText(/No tienes un plan activo/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /cambiar de plan|cancelar/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/permission denied/);
+  });
+
+  it('success sin membresía → "No tienes un plan activo" (ausencia real)', async () => {
+    renderComp(null);
+    expect(await screen.findByText(/No tienes un plan activo/)).toBeInTheDocument();
   });
 });

@@ -8,6 +8,7 @@ import { useToast } from '@shared/hooks/useToast';
 import { backendPost } from '@shared/lib/backend';
 import { Spinner } from '@shared/components/Spinner';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ErrorCarga } from '@shared/components/ErrorCarga';
 import { canModifyTeamMember, revokeTeamMember } from '../lib/crudHelpers';
 import { adminDeleteUser } from '../hooks/useAdminData';
 import CardMenuDropdown from '../components/CardMenuDropdown';
@@ -45,6 +46,7 @@ export default function Equipo() {
 
   const [staff, setStaff] = useState<Usuario[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(false);
   const [showCrearAcceso, setShowCrearAcceso] = useState(false);
   const [credencialesCreadas, setCredencialesCreadas] = useState<CredencialesCreadas | null>(null);
   const [cambioRol, setCambioRol] = useState<{ usuario: Usuario; rol: RolStaff } | null>(null);
@@ -66,13 +68,15 @@ export default function Equipo() {
 
     if (error) {
       console.error('[Equipo]', error);
-      toast.error('No se pudo cargar el equipo.');
+      // PKG-02A: estado de error explícito (antes: toast + "Sin personas con acceso todavía").
+      setErrorCarga(true);
       setIsLoading(false);
       return;
     }
+    setErrorCarga(false);
     setStaff(data ?? []);
     setIsLoading(false);
-  }, [tenant.id, toast]);
+  }, [tenant.id]);
 
   useEffect(() => {
     void refetch();
@@ -155,7 +159,9 @@ export default function Equipo() {
 
       <CuentasDemo />
 
-      {isLoading ? (
+      {errorCarga ? (
+        <ErrorCarga titulo="No pudimos cargar el equipo." onReintentar={() => void refetch()} />
+      ) : isLoading ? (
         <Spinner label="Cargando…" />
       ) : (
         <div className="adm-stack" style={{ gap: '32px' }}>

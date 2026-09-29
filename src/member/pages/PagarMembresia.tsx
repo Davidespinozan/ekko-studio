@@ -8,6 +8,7 @@ import { sufijoPrecio, esPlanPaquete, detallePlan } from '@shared/lib/planPresen
 import { PaymentModal } from '@shared/components/PaymentModal';
 import { PlanTipoToggle, type VistaPlan } from '@shared/components/PlanTipoToggle';
 import { Spinner } from '@shared/components/Spinner';
+import { ErrorCarga } from '@shared/components/ErrorCarga';
 
 /**
  * Pantalla para el miembro con cuenta `pendiente_pago`: paga su membresía y se
@@ -34,6 +35,9 @@ export default function PagarMembresia() {
   const tenant = useTenant();
   const [tiers, setTiers] = useState<TierInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  // PKG-02A (C02 · F17): fallo al leer los planes ≠ "no hay planes disponibles".
+  const [errorPlanes, setErrorPlanes] = useState(false);
+  const [intento, setIntento] = useState(0);
   const [pagarOpen, setPagarOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pagado, setPagado] = useState(false);
@@ -44,7 +48,9 @@ export default function PagarMembresia() {
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const { data } = await supabase
+      setLoading(true);
+      setErrorPlanes(false);
+      const { data, error } = await supabase
         .from('tiers')
         .select('slug, nombre, precio_centavos, tipo, clases_incluidas, duracion_dias, beneficios')
         .eq('tenant_id', tenant.id)
@@ -52,6 +58,12 @@ export default function PagarMembresia() {
         .eq('en_venta', true)
         .order('orden', { ascending: true });
       if (!mounted) return;
+      if (error) {
+        console.error('[PagarMembresia]', error);
+        setErrorPlanes(true);
+        setLoading(false);
+        return;
+      }
       setTiers(
         (data ?? []).map((d) => ({
           slug: d.slug,
@@ -67,7 +79,7 @@ export default function PagarMembresia() {
     }
     load();
     return () => { mounted = false; };
-  }, [tenant.id]);
+  }, [tenant.id, intento]);
 
   const slug = slugElegido ?? usuario?.membresia_tier ?? tiers[0]?.slug ?? null;
   const tier = tiers.find((t) => t.slug === slug) ?? null;
@@ -108,6 +120,10 @@ export default function PagarMembresia() {
 
       {loading ? (
         <div className="ek-card"><Spinner label="Cargando planes…" /></div>
+      ) : errorPlanes ? (
+        <div className="ek-card">
+          <ErrorCarga titulo="No pudimos cargar los planes." onReintentar={() => setIntento((n) => n + 1)} />
+        </div>
       ) : !tier ? (
         <div className="ek-card">
           <p className="ek-body-muted" style={{ margin: 0 }}>

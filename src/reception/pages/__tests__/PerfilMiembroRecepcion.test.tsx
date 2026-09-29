@@ -14,7 +14,9 @@ const hoisted = vi.hoisted(() => ({
   miembro: {} as Record<string, unknown>,
   reservas: [] as Record<string, unknown>[],
   audit: [] as Record<string, unknown>[],
-  membresia: null as Record<string, unknown> | null
+  membresia: null as Record<string, unknown> | null,
+  membresiaError: null as unknown,
+  reservasError: null as unknown
 }));
 
 const RESERVA_PROXIMA = {
@@ -43,7 +45,7 @@ vi.mock('@shared/lib/supabase', () => ({
         // useMembresiaVigente: select().eq().in().order().limit().maybeSingle()
         const c: Record<string, unknown> = {};
         for (const m of ['select', 'eq', 'in', 'order', 'limit']) c[m] = () => c;
-        c.maybeSingle = () => Promise.resolve({ data: hoisted.membresia, error: null });
+        c.maybeSingle = () => Promise.resolve({ data: hoisted.membresiaError ? null : hoisted.membresia, error: hoisted.membresiaError });
         return c;
       }
       if (table === 'audit_log') {
@@ -63,7 +65,7 @@ vi.mock('@shared/lib/supabase', () => ({
         select: () => ({
           eq: () => ({
             order: () => ({
-              limit: () => Promise.resolve({ data: hoisted.reservas, error: null })
+              limit: () => Promise.resolve(hoisted.reservasError ? { data: null, error: hoisted.reservasError } : { data: hoisted.reservas, error: null })
             })
           })
         })
@@ -103,6 +105,8 @@ describe('PerfilMiembroRecepcion · gestión front-desk', () => {
     hoisted.reservas = [];
     hoisted.audit = [];
     hoisted.membresia = null;
+    hoisted.membresiaError = null;
+    hoisted.reservasError = null;
   });
 
   it('muestra los datos del miembro', async () => {
@@ -167,6 +171,18 @@ describe('PerfilMiembroRecepcion · gestión front-desk', () => {
     };
     const tarjeta = async () => within(await screen.findByTestId('membresia-card'));
 
+    it('PKG-02A · la consulta de membresía FALLA → "No pudimos cargar la membresía"; ni "SIN MEMBRESÍA" ni "Asignar plan"', async () => {
+      hoisted.membresiaError = { message: 'permission denied for table membresias' };
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      renderPerfil();
+      const t = await tarjeta();
+      expect(t.getByText('No pudimos cargar la membresía.')).toBeInTheDocument();
+      expect(t.queryByText('SIN MEMBRESÍA')).not.toBeInTheDocument();
+      expect(t.queryByRole('button', { name: /asignar plan/i })).not.toBeInTheDocument();
+      expect(t.getByRole('button', { name: 'Reintentar' })).toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(/permission denied/);
+    });
+
     it('sin membresía (aunque la cuenta esté "activo") → ofrece "Asignar plan"', async () => {
       renderPerfil();
       const t = await tarjeta();
@@ -226,5 +242,39 @@ describe('PerfilMiembroRecepcion · gestión front-desk', () => {
       expect(modal.getByText(/la baja es inmediata/i)).toBeInTheDocument();
       expect(modal.getByRole('alert')).toHaveTextContent(/5 créditos/);
     });
+  });
+});
+
+// ── PKG-02A (C02 · F19) ───────────────────────────────────────────────────────
+describe('PerfilMiembroRecepcion · reservas en error (PKG-02A)', () => {
+  beforeEach(() => {
+    hoisted.miembro = {
+      id: 'm-1', nombre: 'ana lópez', email: 'ana@cravia.mx', telefono: null, avatar_url: null, membresia_tier: 'pro',
+      status: 'activo', no_shows_count: 0, bloqueado_hasta: null, created_at: '2026-01-10T12:00:00Z'
+    };
+    hoisted.reservas = [];
+    hoisted.audit = [];
+    hoisted.membresia = null;
+    hoisted.membresiaError = null;
+    hoisted.reservasError = null;
+  });
+
+  it('reservas en ERROR → "No pudimos cargar las reservas del miembro."; ni "Sin reservas próximas" ni "Sin reservas anteriores"; la membresía sigue mostrándose', async () => {
+    hoisted.reservasError = { message: 'permission denied for table reservas' };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderPerfil();
+    expect(await screen.findByText('Ana López')).toBeInTheDocument();
+    expect(await screen.findByText('No pudimos cargar las reservas del miembro.')).toBeInTheDocument();
+    expect(screen.queryByText('Sin reservas próximas.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sin reservas anteriores.')).not.toBeInTheDocument();
+    expect(screen.getByText('Historial no disponible.')).toBeInTheDocument();
+    // La tarjeta de membresía (F03) es independiente: sin membresía real → "SIN MEMBRESÍA".
+    expect(await screen.findByTestId('membresia-card')).toHaveTextContent('SIN MEMBRESÍA');
+    expect(document.body.textContent).not.toMatch(/permission denied/);
+  });
+
+  it('reservas OK vacías → "Sin reservas próximas." (vacío real)', async () => {
+    renderPerfil();
+    expect(await screen.findByText('Sin reservas próximas.')).toBeInTheDocument();
   });
 });

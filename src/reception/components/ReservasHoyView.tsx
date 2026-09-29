@@ -5,7 +5,8 @@ import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { EmptyState } from '@shared/components/EmptyState';
-import { useReservasHoy, checkInManual, type ReservaConJoin } from '../hooks/useReservasHoy';
+import { ErrorCarga, ErrorInline } from '@shared/components/ErrorCarga';
+import { useReservasHoy, checkInManual, estadoListaHoy, type ReservaConJoin } from '../hooks/useReservasHoy';
 import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 import { MarcarNoShowModal, type ReservaInfo } from './MarcarNoShowModal';
 import { CorregirCheckinModal } from './CorregirCheckinModal';
@@ -119,7 +120,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
   };
   // Polling pausa si hay un modal de check-in abierto (manual local o
   // CheckInDetail a nivel Scanner) — evita reordenar la lista debajo.
-  const { reservas, isLoading, refetch } = useReservasHoy(
+  const { reservas, isLoading, error: errorLista, cargado, refetch } = useReservasHoy(
     fechaSeleccionada,
     !selected && !noShowTarget && !corregirTarget && !asistioTarget && !cancelarTarget && !pausarPolling
   );
@@ -166,6 +167,8 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
 
   // Cargar recursos del tenant (solo activos)
   const [recursos, setRecursos] = useState<RecursoOption[]>([]);
+  // PKG-02A (F23): si el catálogo de estudios no cargó, el filtro lo dice.
+  const [errorRecursos, setErrorRecursos] = useState(false);
   useEffect(() => {
     let mounted = true;
     void supabase
@@ -178,8 +181,10 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
         if (!mounted) return;
         if (error) {
           console.error('[ReservasHoyView] recursos:', error);
+          setErrorRecursos(true);
           return;
         }
+        setErrorRecursos(false);
         setRecursos(data ?? []);
       });
     return () => {
@@ -237,7 +242,10 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
   const recursoFiltradoNombre =
     recursos.find((r) => r.id === recursoFiltrado)?.nombre ?? '';
 
-  const cargandoInicial = isLoading && reservas.length === 0;
+  // PKG-02A (C02): cargando / error (sin dato) / stale (dato previo + fallo al
+  // actualizar) / ok. Un fetch fallido NUNCA se pinta como "Sin reservas".
+  const estadoLista = estadoListaHoy({ isLoading, error: errorLista, cargado });
+  const cargandoInicial = estadoLista === 'cargando';
 
   return (
     <div className="rec-hoy">
@@ -351,6 +359,7 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
           aria-label="Filtrar por estudio"
         >
           <option value="todos">Todos los estudios</option>
+              {errorRecursos && <option value="__error" disabled>Estudios no disponibles (no se pudieron cargar)</option>}
           {recursos.map((r) => (
             <option key={r.id} value={r.id}>
               {r.nombre}
@@ -425,8 +434,22 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
         </div>
       )}
 
+      {/* Polling fallido con lista previa válida: se conserva la lista y se avisa. */}
+      {estadoLista === 'stale' && (
+        <div style={{ marginTop: '20px' }}>
+          <ErrorInline mensaje="No pudimos actualizar la lista; ves la última versión cargada." onReintentar={() => void refetch()} />
+        </div>
+      )}
+
       {/* Skeletons durante la carga inicial (no pantalla vacía) */}
-      {cargandoInicial ? (
+      {estadoLista === 'error' ? (
+        <div style={{ marginTop: '24px' }}>
+          <ErrorCarga
+            titulo={esHoy ? 'No pudimos cargar las reservas de hoy.' : 'No pudimos cargar las reservas de este día.'}
+            onReintentar={() => void refetch()}
+          />
+        </div>
+      ) : cargandoInicial ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '24px' }}>
           {Array.from({ length: 8 }).map((_, i) => (
             <div

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { adminCreateUser } from '../hooks/useAdminData';
 import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
+import { ErrorInline } from '@shared/components/ErrorCarga';
 
 interface Props {
   onClose: () => void;
@@ -18,7 +19,7 @@ export function NuevaPersonaModal({ onClose, onCreated }: Props) {
   const [telefono, setTelefono] = useState('');
   const [password, setPassword] = useState('');
   const [tier, setTier] = useState('');
-  const { planes } = usePlanesActivos();
+  const { planes, error: errorPlanes, recargar: recargarPlanes } = usePlanesActivos();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{ email: string; password: string } | null>(null);
@@ -102,12 +103,19 @@ export function NuevaPersonaModal({ onClose, onCreated }: Props) {
               value={tier}
               onChange={(e) => setTier(e.target.value)}
               className="ek-input"
+              disabled={errorPlanes}
             >
-              <option value="">— sin plan asignado —</option>
-              {planes.map((p) => (
+              <option value="">{errorPlanes ? '— planes no disponibles —' : '— sin plan asignado —'}</option>
+              {!errorPlanes && planes.map((p) => (
                 <option key={p.slug} value={p.slug}>{p.nombre}</option>
               ))}
             </select>
+            {/* PKG-02A (F12): fallo al leer los planes ≠ "no hay planes". No se asigna con datos desconocidos. */}
+            {errorPlanes && (
+              <div style={{ marginTop: '8px' }}>
+                <ErrorInline mensaje="No pudimos cargar los planes. Puedes crear la cuenta sin plan o reintentar." onReintentar={recargarPlanes} />
+              </div>
+            )}
             <p className="ek-helper-text">
               Si no asignas plan, el miembro queda en pendiente_pago hasta cobrar.
             </p>

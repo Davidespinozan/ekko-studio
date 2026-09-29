@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
+import { ErrorCarga, ErrorInline } from '@shared/components/ErrorCarga';
 import {
   useRecursosDelTenant,
   fetchReservasDelRecurso,
@@ -88,7 +89,7 @@ function quitarReservaPorSlot<T extends { slot_inicio: string }>(
 export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }: Props) {
   const tenant = useTenant();
   const toast = useToast();
-  const { recursos, isLoading: loadingRecursos } = useRecursosDelTenant();
+  const { recursos, isLoading: loadingRecursos, error: errorRecursos, recargar: recargarRecursos } = useRecursosDelTenant();
   const esReprogramar = reprogramarDe != null;
 
   // Config del tenant — anticipación a 0 para no esconder walk-ins (D1).
@@ -123,6 +124,10 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
   // siempre p_invitados: 0 y al reprogramar se perdían los de la original.
   const [invitados, setInvitados] = useState(reprogramarDe?.invitados_count ?? 0);
   const [maxInvitados, setMaxInvitados] = useState(0);
+  // PKG-02A (C02 · F09): si el límite no se pudo leer NO se asume 0 ("el plan no
+  // permite invitados"): se marca error, se bloquea confirmar y se puede reintentar.
+  const [errorLimiteInvitados, setErrorLimiteInvitados] = useState(false);
+  const [intentoLimite, setIntentoLimite] = useState(0);
   // Walk-in: reservar y hacer check-in en un paso (solo reservas de HOY).
   const [hacerCheckin, setHacerCheckin] = useState(false);
 
@@ -130,24 +135,33 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
     let mounted = true;
     (async () => {
       if (!miembro.membresia_tier) return;
+      setErrorLimiteInvitados(false);
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('tiers')
           .select('reglas')
           .eq('tenant_id', tenant.id)
           .eq('slug', miembro.membresia_tier)
           .maybeSingle();
+        if (!mounted) return;
+        if (error) {
+          console.error('[CrearReservaModal] límite de invitados', error);
+          setErrorLimiteInvitados(true);
+          return;
+        }
         const raw = (data?.reglas as { max_invitados?: unknown } | null)?.max_invitados;
         const n = Number(raw);
-        if (mounted) setMaxInvitados(Number.isFinite(n) && n > 0 ? Math.floor(n) : 0);
-      } catch {
-        if (mounted) setMaxInvitados(0);
+        setMaxInvitados(Number.isFinite(n) && n > 0 ? Math.floor(n) : 0);
+      } catch (e) {
+        if (!mounted) return;
+        console.error('[CrearReservaModal] límite de invitados', e instanceof Error ? e.message : e);
+        setErrorLimiteInvitados(true);
       }
     })();
     return () => {
       mounted = false;
     };
-  }, [tenant.id, miembro.membresia_tier]);
+  }, [tenant.id, miembro.membresia_tier, intentoLimite]);
 
   // Auto-seleccionar el recurso inicial. En modo reprogramar, el de la
   // reserva original (recepción puede cambiarlo).
@@ -390,7 +404,10 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
           </div>
         )}
 
-        {loadingRecursos ? (
+        {errorRecursos && recursos.length === 0 ? (
+          // PKG-02A (F11): fallo al leer los estudios ≠ "el plan no tiene acceso a ningún estudio".
+          <ErrorCarga titulo="No pudimos cargar los estudios." onReintentar={recargarRecursos} />
+        ) : loadingRecursos ? (
           <div className="ek-skeleton" style={{ height: '120px', borderRadius: 'var(--ek-r-md)' }} />
         ) : recursosAccesibles.length === 0 ? (
           <p className="ek-body-muted">
@@ -522,8 +539,18 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
               </div>
             )}
 
+            {/* PKG-02A (F09): límite de invitados no disponible → no se asume 0 ni se confirma. */}
+            {errorLimiteInvitados && (
+              <div style={{ marginTop: '16px' }}>
+                <ErrorInline
+                  mensaje="No pudimos cargar cuántos invitados permite el plan. Reintenta para poder confirmar la reserva."
+                  onReintentar={() => setIntentoLimite((n) => n + 1)}
+                />
+              </div>
+            )}
+
             {/* Invitados (según el plan del miembro) */}
-            {maxInvitados > 0 && (
+            {!errorLimiteInvitados && maxInvitados > 0 && (
               <div className="ek-form-field" style={{ marginTop: '16px' }}>
                 <label className="ek-label">Invitados ({invitados} de {maxInvitados})</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -597,7 +624,7 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
               <button
                 type="button"
                 onClick={handleConfirmar}
-                disabled={submitting || !recursoSel || !slotSel}
+                disabled={submitting || !recursoSel || !slotSel || errorLimiteInvitados}
                 className="ek-cta ek-cta--gold"
                 style={{ flex: 1, minHeight: '44px', opacity: submitting || !slotSel ? 0.5 : 1 }}
               >

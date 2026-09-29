@@ -75,7 +75,7 @@ export async function countActiveMembersInTier(params: {
   tierId: string;
   tierSlug: string;
   tenantId: string;
-}): Promise<number> {
+}): Promise<number | null> {
   const [memb, users] = await Promise.all([
     supabase
       .from('membresias')
@@ -90,8 +90,11 @@ export async function countActiveMembersInTier(params: {
       .eq('status', 'activo')
   ]);
 
+  // PKG-02A (C02 · F22): si alguna de las dos consultas falla, el conteo es
+  // DESCONOCIDO (null), no 0: un 0 falso permitía archivar un plan con miembros.
   if (memb.error) console.error('[countActiveMembersInTier:membresias]', memb.error);
   if (users.error) console.error('[countActiveMembersInTier:usuarios]', users.error);
+  if (memb.error || users.error) return null;
 
   const usuarioIds = new Set<string>();
   (memb.data ?? []).forEach((row) => usuarioIds.add(row.usuario_id));

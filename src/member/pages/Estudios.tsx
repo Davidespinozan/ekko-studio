@@ -2,21 +2,23 @@ import { Link } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { ArrowRight, ImageIcon } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { ErrorCarga } from '@shared/components/ErrorCarga';
 import { useTenant } from '@shared/hooks/useTenant';
-import { useToast } from '@shared/hooks/useToast';
 import type { Database } from '@shared/types/database';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 
 export default function Estudios() {
   const tenant = useTenant();
-  const toast = useToast();
   const [recursos, setRecursos] = useState<Recurso[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(false);
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
+      setIsLoading(true);
       const { data, error } = await supabase
         .from('recursos')
         .select('*')
@@ -27,20 +29,30 @@ export default function Estudios() {
       if (!mounted) return;
       if (error) {
         console.error('[Estudios]', error);
-        toast.warning('No pudimos cargar los estudios · Intenta refrescar');
+        // PKG-02A: estado de error explícito (antes: toast + cuadrícula vacía).
+        setErrorCarga(true);
       } else {
+        setErrorCarga(false);
         setRecursos(data ?? []);
       }
       setIsLoading(false);
     }
     load();
     return () => { mounted = false; };
-  }, [tenant.id, toast]);
+  }, [tenant.id, intento]);
 
   if (isLoading) {
     return (
       <div className="ek-container">
         <div className="ek-skeleton" style={{ height: '400px', borderRadius: 'var(--ek-r-card)' }} />
+      </div>
+    );
+  }
+
+  if (errorCarga) {
+    return (
+      <div className="ek-container">
+        <ErrorCarga titulo="No pudimos cargar los estudios." onReintentar={() => setIntento((n) => n + 1)} />
       </div>
     );
   }

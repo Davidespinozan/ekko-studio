@@ -93,8 +93,10 @@ export default function BuscarMiembro() {
   }
 
   // Planes activos: para NO mostrar chips de planes borrados (pro/basica viejos).
-  const { planes } = usePlanesActivos();
-  const planesActivos = useMemo(() => new Set(planes.map((p) => p.slug)), [planes]);
+  const { planes, error: errorPlanes } = usePlanesActivos();
+  // PKG-02A (F12): con los planes en error no hay contra qué validar; `undefined`
+  // = "no verificable" (la tarjeta muestra el chip tal cual, no lo oculta).
+  const planesActivos = useMemo(() => (errorPlanes ? undefined : new Set(planes.map((p) => p.slug))), [planes, errorPlanes]);
 
   const q = normalizarTexto(query);
   const buscando = q.length >= 2;
@@ -250,7 +252,8 @@ function ListaSkeleton() {
 function MiembroCard({ miembro, planesActivos, mostrarBloqueo }: { miembro: MiembroResultado; planesActivos?: Set<string>; mostrarBloqueo?: boolean }) {
   const st = statusMiembro(miembro.status);
   // Solo mostramos el plan si sigue ACTIVO (no los tiers borrados tipo pro/basica).
-  const planVigente = miembro.membresia_tier && planesActivos?.has(miembro.membresia_tier);
+  // Sin lista verificable (planes en error) se muestra el chip: no se afirma ausencia.
+  const planVigente = miembro.membresia_tier && (planesActivos ? planesActivos.has(miembro.membresia_tier) : true);
   return (
     <Link to={`/recepcion/miembros/${miembro.id}`} className="rec-miembro-card">
       <AvatarMiembro nombre={miembro.nombre || miembro.email} url={miembro.avatar_url} size={40} />

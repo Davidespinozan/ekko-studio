@@ -72,11 +72,21 @@ export default function AjustesMarca() {
     setIsSaving(true);
 
     // Merge no destructivo con otras keys (color_primary, etc.)
-    const { data: current } = await supabase
+    const { data: current, error: readErr } = await supabase
       .from('tenants')
       .select('branding')
       .eq('id', tenant.id)
       .single();
+
+    // PKG-02A (C02 · F24): si la lectura previa falla, `current` sería null y el
+    // merge escribiría SOLO el draft encima del branding real (pérdida de las
+    // demás claves). Sin lectura confiable no se guarda nada.
+    if (readErr) {
+      console.error('[AjustesMarca] lectura previa', readErr);
+      setIsSaving(false);
+      toast.error('No pudimos leer la configuración actual de la marca; no se guardó nada. Intenta de nuevo.');
+      return;
+    }
 
     const currentBranding =
       (current?.branding as Record<string, unknown> | null) ?? {};
@@ -89,7 +99,8 @@ export default function AjustesMarca() {
 
     setIsSaving(false);
     if (error) {
-      toast.error(`No se pudo guardar: ${error.message}`);
+      console.error('[AjustesMarca] guardar', error);
+      toast.error('No se pudo guardar la marca. Intenta de nuevo.');
       return;
     }
     setOriginalJson(JSON.stringify(draft));

@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Eye, Ban, ChevronLeft, ChevronRight, SearchX } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
-import { useToast } from '@shared/hooks/useToast';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { Spinner } from '@shared/components/Spinner';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ErrorCarga } from '@shared/components/ErrorCarga';
 import CardMenuDropdown from './CardMenuDropdown';
 import type { Database } from '@shared/types/database';
 import { ZONA_ESTUDIO, fechaISOEnZona, rangoDiaEnZona, inicioDeHoyEnZona } from '@shared/lib/timezone';
@@ -62,7 +62,6 @@ interface Props {
 
 export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancelar }: Props) {
   const tenant = useTenant();
-  const toast = useToast();
 
   const hoy = useMemo(() => inicioDeHoyEnZona(), []);
 
@@ -81,6 +80,7 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
   const [recursos, setRecursos] = useState<Recurso[]>([]);
   const [reservas, setReservas] = useState<ReservaListada[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorLista, setErrorLista] = useState(false);
 
   // Debounce búsqueda
   useEffect(() => {
@@ -93,7 +93,9 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
     setPagina(1);
   }, [desde, hasta, recursoId, estado, busquedaDebounced]);
 
-  // Cargar recursos para el select
+  // Cargar recursos para el select. PKG-02A (F23): si falla, el filtro lo dice
+  // ("estudios no disponibles") en vez de mostrar un selector sin opciones.
+  const [errorRecursos, setErrorRecursos] = useState(false);
   useEffect(() => {
     supabase
       .from('recursos')
@@ -103,8 +105,10 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
       .then(({ data, error }) => {
         if (error) {
           console.error('[ReservasVistaLista:recursos]', error);
+          setErrorRecursos(true);
           return;
         }
+        setErrorRecursos(false);
         setRecursos(data ?? []);
       });
   }, [tenant.id]);
@@ -139,10 +143,12 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
     const { data, error } = await query;
     if (error) {
       console.error('[ReservasVistaLista]', error);
-      toast.error('No se pudieron cargar las reservas.');
+      // PKG-02A: estado de error explícito (antes: toast + lista vacía que parecía "sin resultados").
+      setErrorLista(true);
       setIsLoading(false);
       return;
     }
+    setErrorLista(false);
 
     let lista: ReservaListada[] = (data ?? []).map((row) => {
       const r = row as unknown as {
@@ -179,7 +185,7 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
 
     setReservas(lista);
     setIsLoading(false);
-  }, [tenant.id, desde, hasta, recursoId, estado, busquedaDebounced, rangoInvalido, toast]);
+  }, [tenant.id, desde, hasta, recursoId, estado, busquedaDebounced, rangoInvalido]);
 
   useEffect(() => {
     void cargarReservas();
@@ -246,6 +252,7 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
               className="ek-input"
             >
               <option value="todos">Todos</option>
+              {errorRecursos && <option value="__error" disabled>Estudios no disponibles (no se pudieron cargar)</option>}
               {recursos.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.nombre}
@@ -312,7 +319,11 @@ export default function ReservasVistaLista({ refreshTick, onVerDetalle, onCancel
         </div>
       </div>
 
-      {!isLoading && reservas.length === 0 ? (
+      {!isLoading && errorLista ? (
+        <div className="ek-card" style={{ padding: '40px 20px' }}>
+          <ErrorCarga titulo="No pudimos cargar las reservas." onReintentar={() => void cargarReservas()} />
+        </div>
+      ) : !isLoading && reservas.length === 0 ? (
         <div className="ek-card" style={{ padding: '40px 20px' }}>
           <EmptyState
             icon={SearchX}

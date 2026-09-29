@@ -3,12 +3,6 @@ import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import type { ConteoPendientes } from '../logic/centroPendientes';
 
-// ============================================================================
-// useCentroPendientes — conteos de los pendientes operativos del admin
-// (cobros, identidad, membresías vencidas, no-shows). Todo scopeado por tenant
-// vía RLS. Tolerante a fallo: un conteo que falle queda en 0.
-// ============================================================================
-
 const VACIO: ConteoPendientes = {
   cobrosPendientes: 0,
   identidadPendiente: 0,
@@ -16,13 +10,23 @@ const VACIO: ConteoPendientes = {
   noShows7d: 0
 };
 
+/**
+ * Conteos crudos del centro de pendientes del admin. La lógica de qué mostrar
+ * y en qué orden vive en `logic/centroPendientes.ts` (pura).
+ *
+ * PKG-02A (C02): si CUALQUIERA de los 4 counts falla, `error=true` y el conteo
+ * anterior se conserva tal cual (no se suman parciales ni se rellena con 0):
+ * un 0 falso aquí se leía como "Todo al día".
+ */
 export function useCentroPendientes() {
   const tenant = useTenant();
   const [conteo, setConteo] = useState<ConteoPendientes>(VACIO);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const refetch = useCallback(async () => {
     setIsLoading(true);
+    setError(false);
     const now = new Date();
     const hace7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -57,6 +61,14 @@ export function useCentroPendientes() {
         .gte('slot_inicio', hace7d.toISOString())
     ]);
 
+    const fallo = [cobros, identidad, vencidas, noShows].find((r) => r.error);
+    if (fallo) {
+      console.error('[useCentroPendientes]', fallo.error);
+      setError(true);
+      setIsLoading(false);
+      return;
+    }
+
     setConteo({
       cobrosPendientes: cobros.count ?? 0,
       identidadPendiente: identidad.count ?? 0,
@@ -70,5 +82,5 @@ export function useCentroPendientes() {
     void refetch();
   }, [refetch]);
 
-  return { conteo, isLoading, refetch };
+  return { conteo, isLoading, error, refetch };
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 
 export interface PlanActivo {
@@ -19,26 +19,37 @@ export interface PlanActivo {
 export function usePlanesActivos() {
   const [planes, setPlanes] = useState<PlanActivo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02): un fallo al leer los planes no es "no hay planes": los
+  // selectores lo dicen y no dejan asignar con datos desconocidos.
+  const [error, setError] = useState(false);
+  const [intento, setIntento] = useState(0);
+  const recargar = useCallback(() => setIntento((n) => n + 1), []);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const { data, error } = await supabase
+      setIsLoading(true);
+      setError(false);
+      const { data, error: qErr } = await supabase
         .from('tiers')
         .select('slug, nombre')
         .eq('activo', true)
         .order('orden', { ascending: true });
 
       if (!mounted) return;
-      if (error) console.error('[usePlanesActivos]', error);
-      else setPlanes((data ?? []) as PlanActivo[]);
+      if (qErr) {
+        console.error('[usePlanesActivos]', qErr);
+        setError(true); // la lista anterior se conserva
+      } else {
+        setPlanes((data ?? []) as PlanActivo[]);
+      }
       setIsLoading(false);
     }
     load();
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [intento]);
 
-  return { planes, isLoading };
+  return { planes, isLoading, error, recargar };
 }

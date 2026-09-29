@@ -134,3 +134,66 @@ describe('useReservasHoy · visibility-aware polling', () => {
     expect(mockOrder).toHaveBeenCalledTimes(3);
   });
 });
+
+// ── PKG-02A (C02 · F02) · error ≠ "sin reservas"; polling fallido = stale ─────
+import { estadoListaHoy } from '../useReservasHoy';
+
+describe('useReservasHoy · estados honestos (PKG-02A)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    mockOrder.mockReset();
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: true, configurable: true });
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('primer fetch falla → error=true, cargado=false, lista vacía (la vista pinta error, no "Sin reservas")', async () => {
+    mockOrder.mockResolvedValue({ data: null, error: { message: 'permission denied' } });
+    const { result } = renderHook(() => useReservasHoy('2026-09-28'));
+    await flush();
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.error).toBe(true);
+    expect(result.current.cargado).toBe(false);
+    expect(result.current.reservas).toEqual([]);
+    expect(estadoListaHoy(result.current)).toBe('error');
+  });
+
+  it('success con [] → error=false, cargado=true (vacío legítimo)', async () => {
+    mockOrder.mockResolvedValue({ data: [], error: null });
+    const { result } = renderHook(() => useReservasHoy('2026-09-28'));
+    await flush();
+    expect(result.current.error).toBe(false);
+    expect(result.current.cargado).toBe(true);
+    expect(estadoListaHoy(result.current)).toBe('ok');
+  });
+
+  it('lista previa válida + refetch fallido → CONSERVA la lista y marca stale', async () => {
+    mockOrder.mockResolvedValue({ data: [{ id: 'r1', status: 'confirmada' }], error: null });
+    const { result } = renderHook(() => useReservasHoy('2026-09-28'));
+    await flush();
+    expect(result.current.reservas).toHaveLength(1);
+
+    mockOrder.mockResolvedValue({ data: null, error: { message: 'timeout' } });
+    await act(async () => { await result.current.refetch(); });
+    expect(result.current.error).toBe(true);
+    expect(result.current.reservas).toHaveLength(1); // no se vació
+    expect(estadoListaHoy(result.current)).toBe('stale');
+
+    mockOrder.mockResolvedValue({ data: [{ id: 'r1' }, { id: 'r2' }], error: null });
+    await act(async () => { await result.current.refetch(); });
+    expect(result.current.error).toBe(false);
+    expect(result.current.reservas).toHaveLength(2);
+    expect(estadoListaHoy(result.current)).toBe('ok');
+  });
+
+  it('estadoListaHoy: cargando solo mientras no hay dato ni error', () => {
+    expect(estadoListaHoy({ isLoading: true, error: false, cargado: false })).toBe('cargando');
+    expect(estadoListaHoy({ isLoading: true, error: false, cargado: true })).toBe('ok'); // refetch en curso con dato: no skeleton
+    expect(estadoListaHoy({ isLoading: false, error: true, cargado: false })).toBe('error');
+    expect(estadoListaHoy({ isLoading: false, error: true, cargado: true })).toBe('stale');
+    expect(estadoListaHoy({ isLoading: false, error: false, cargado: true })).toBe('ok');
+  });
+});

@@ -6,8 +6,12 @@ import { supabase } from '@shared/lib/supabase';
 //
 // Reúne en una sola pasada lo que antes estaba disperso (próximas reservas,
 // sesiones del mes y estado de la membresía) para pintar el carnet dorado y la
-// fila de chips de resumen. Todo tolerante a fallo: si una query falla, ese
-// campo queda en su default y el resto se muestra igual.
+// fila de chips de resumen.
+//
+// PKG-02A (C02): si CUALQUIERA de las consultas falla, `error=true` y el
+// resumen anterior se conserva. Antes el campo fallido "quedaba en su default"
+// → 0 créditos, 0 sesiones, sin plan: el miembro veía un carnet vacío y
+// Reservar decidía con datos falsos.
 // ============================================================================
 
 export interface ResumenMiembro {
@@ -40,14 +44,17 @@ export function useResumenMiembro(
 ) {
   const [resumen, setResumen] = useState<ResumenMiembro>(VACIO);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   const refetch = useCallback(async () => {
     if (!usuarioId) {
       setResumen(VACIO);
+      setError(false);
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
+    setError(false);
 
     {
       const inicioMes = new Date();
@@ -82,8 +89,16 @@ export function useResumenMiembro(
               .eq('tenant_id', tenantId)
               .eq('slug', membresiaTier)
               .maybeSingle()
-          : Promise.resolve({ data: null })
+          : Promise.resolve({ data: null, error: null })
       ]);
+
+      const fallo = [proximasRes, sesionesRes, memRes, tierRes].find((r) => (r as { error?: unknown }).error);
+      if (fallo) {
+        console.error('[useResumenMiembro]', (fallo as { error?: unknown }).error);
+        setError(true); // el resumen anterior se conserva; la UI no decide con esto
+        setIsLoading(false);
+        return;
+      }
 
       const mem = (memRes.data ?? [])[0] as
         | { status: string | null; creditos_restantes: number | null; periodo_actual_fin: string | null }
@@ -120,5 +135,5 @@ export function useResumenMiembro(
     void refetch();
   }, [refetch]);
 
-  return { resumen, isLoading, refetch };
+  return { resumen, isLoading, error, refetch };
 }

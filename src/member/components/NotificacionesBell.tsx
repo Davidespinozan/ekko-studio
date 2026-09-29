@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, Check, CheckCheck } from 'lucide-react';
 import { useNotificacionesMiembro } from '@shared/hooks/useNotificacionesMiembro';
+import { ErrorInline } from '@shared/components/ErrorCarga';
 import { tiempoRelativo } from '@shared/lib/tiempoRelativo';
 
 // ============================================================================
@@ -13,7 +14,7 @@ import { tiempoRelativo } from '@shared/lib/tiempoRelativo';
 // ============================================================================
 
 export function NotificacionesBell() {
-  const { notificaciones, noLeidas, marcarLeida, marcarTodas } = useNotificacionesMiembro();
+  const { notificaciones, noLeidas, error, cargado, marcarLeida, marcarTodas, refetch } = useNotificacionesMiembro();
   const navigate = useNavigate();
   const [abierto, setAbierto] = useState(false);
   const contenedorRef = useRef<HTMLDivElement>(null);
@@ -73,7 +74,17 @@ export function NotificacionesBell() {
             )}
           </div>
 
-          {notificaciones.length === 0 ? (
+          {/* PKG-02A (C02 · F21): primer fetch fallido ≠ "Estás al día"; polling fallido con avisos previos → lista + aviso. */}
+          {error && cargado && (
+            <div style={{ padding: '8px 12px 0' }}>
+              <ErrorInline mensaje="No pudimos actualizar tus notificaciones." onReintentar={() => void refetch()} />
+            </div>
+          )}
+          {error && !cargado ? (
+            <div style={{ padding: '12px' }}>
+              <ErrorInline mensaje="No pudimos cargar tus notificaciones." onReintentar={() => void refetch()} />
+            </div>
+          ) : notificaciones.length === 0 ? (
             <div className="ek-bell-empty">
               <Check size={22} aria-hidden="true" style={{ color: 'var(--ek-success)' }} />
               <p style={{ margin: '8px 0 0', fontSize: '13.5px', color: 'var(--ek-ink-muted)' }}>Estás al día</p>

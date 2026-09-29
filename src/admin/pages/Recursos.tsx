@@ -27,6 +27,7 @@ import {
 } from '../lib/crudHelpers';
 import { Spinner } from '@shared/components/Spinner';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ErrorCarga, ErrorInline } from '@shared/components/ErrorCarga';
 import Toggle from '../components/Toggle';
 import ImageUploader from '../components/ImageUploader';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -72,30 +73,38 @@ const DIAS = [
   { key: 'domingo', label: 'Domingo' }
 ] as const;
 
-function useTiersDelTenant(): TierOption[] {
+function useTiersDelTenant(): { tiers: TierOption[]; error: boolean; recargar: () => void } {
   const tenant = useTenant();
   const [tiers, setTiers] = useState<TierOption[]>([]);
+  // PKG-02A (C02 · F14): un fallo NO es "no hay planes": con `[]` el admin
+  // guardaría el estudio "abierto a todos" sin saberlo.
+  const [error, setError] = useState(false);
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
+    let mounted = true;
     async function load() {
-      const { data, error } = await supabase
+      setError(false);
+      const { data, error: qErr } = await supabase
         .from('tiers')
         .select('slug, nombre')
         .eq('tenant_id', tenant.id)
         .eq('activo', true)
         .order('orden', { ascending: true });
 
-      if (error) {
-        console.error('[useTiersDelTenant]', error);
-        setTiers([]);
+      if (!mounted) return;
+      if (qErr) {
+        console.error('[useTiersDelTenant]', qErr);
+        setError(true); // la lista anterior se conserva
       } else {
         setTiers(data ?? []);
       }
     }
     load();
-  }, [tenant.id]);
+    return () => { mounted = false; };
+  }, [tenant.id, intento]);
 
-  return tiers;
+  return { tiers, error, recargar: () => setIntento((n) => n + 1) };
 }
 
 type HardDeleteState =
@@ -107,7 +116,7 @@ type HardDeleteState =
 export default function Recursos() {
   const tenant = useTenant();
   const toast = useToast();
-  const { recursos, isLoading, refetch } = useRecursosAdmin();
+  const { recursos, isLoading, error, refetch } = useRecursosAdmin();
   const [modal, setModal] = useState<ModalState>(null);
   const [archivando, setArchivando] = useState<Recurso | null>(null);
   const [borrarPerm, setBorrarPerm] = useState<HardDeleteState>(null);
@@ -231,7 +240,10 @@ export default function Recursos() {
 
       {servicioOpen && <EstudiosServicioModal onClose={() => setServicioOpen(false)} />}
 
-      {isLoading ? (
+      {error ? (
+        // PKG-02A (C02 · F13): fallo de lectura ≠ "no hay estudios activos".
+        <ErrorCarga titulo="No pudimos cargar los estudios." onReintentar={() => void refetch()} />
+      ) : isLoading ? (
         <Spinner label="Cargando…" />
       ) : (
         <>
@@ -562,7 +574,7 @@ function EditarRecursoModal({
   onSaved: () => Promise<void>;
 }) {
   const tenant = useTenant();
-  const tiersDisponibles = useTiersDelTenant();
+  const { tiers: tiersDisponibles, error: errorTiers, recargar: recargarTiers } = useTiersDelTenant();
   const esCreacion = recurso === null;
 
   const [nombre, setNombre] = useState(recurso?.nombre ?? '');
@@ -717,11 +729,16 @@ function EditarRecursoModal({
 
         <div className="ek-form-field">
           <label className="ek-label">Planes con acceso a este estudio</label>
-          <MultiSelectTiers
-            options={tiersDisponibles}
-            value={tiersPermitidos}
-            onChange={setTiersPermitidos}
-          />
+          {errorTiers ? (
+            // PKG-02A (F14): sin la lista real de planes no se edita ni se guarda este campo.
+            <ErrorInline mensaje="No pudimos cargar los planes. No se puede guardar el estudio hasta reintentar." onReintentar={recargarTiers} />
+          ) : (
+            <MultiSelectTiers
+              options={tiersDisponibles}
+              value={tiersPermitidos}
+              onChange={setTiersPermitidos}
+            />
+          )}
           <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
             Solo los miembros con estos planes podrán reservar este estudio. Sin ninguno
             seleccionado, el estudio queda abierto a cualquier plan.
@@ -851,7 +868,8 @@ function EditarRecursoModal({
           </button>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || errorTiers}
+            title={errorTiers ? 'No pudimos cargar los planes; reintenta antes de guardar.' : undefined}
             className="ek-cta"
             style={{ flex: 1 }}
           >

@@ -3,6 +3,7 @@ import type { MembresiaVigente } from '@shared/hooks/useMembresiaVigente';
 import { ESTADO_MEMBRESIA_LABEL, esPaqueteDeCreditos } from '@shared/lib/membresiaEstado';
 import { accionesDeMembresia, ACCION_MEMBRESIA_LABEL, type AccionMembresia } from '@shared/lib/membresiaAcciones';
 import { formatFechaEnZona } from '@shared/lib/timezone';
+import { ErrorCarga } from '@shared/components/ErrorCarga';
 
 const ICONO: Record<AccionMembresia, typeof BadgeCheck> = {
   asignar: BadgeCheck,
@@ -37,14 +38,34 @@ function explicacion(estado: string, sinCreditos: boolean, m: MembresiaVigente |
 export function MembresiaCard({
   membresia,
   cargando,
+  error = false,
+  onReintentar,
   onAccion
 }: {
   membresia: MembresiaVigente | null;
   cargando: boolean;
+  /** PKG-02A: la lectura falló. NO es "sin membresía": sin acciones basadas en ausencia. */
+  error?: boolean;
+  onReintentar?: () => void;
   onAccion: (a: AccionMembresia) => void;
 }) {
   if (cargando) {
     return <div className="ek-skeleton" style={{ height: '96px', borderRadius: 'var(--ek-r-md)', marginBottom: '16px' }} />;
+  }
+
+  // Error de lectura: no se sabe si tiene plan. Ni "SIN MEMBRESÍA" ni "Asignar
+  // plan" (vendería/negaría con datos falsos). Solo el fallo y reintentar.
+  if (error) {
+    return (
+      <section className="ek-card" data-testid="membresia-card" style={{ marginBottom: '16px', borderLeft: '3px solid var(--ek-danger)' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ margin: '0 0 8px' }}>MEMBRESÍA</p>
+        <ErrorCarga
+          titulo="No pudimos cargar la membresía."
+          hint="No sabemos si tiene un plan vigente. Reintenta antes de asignar, renovar o dar de baja."
+          onReintentar={onReintentar}
+        />
+      </section>
+    );
   }
 
   const { estado, sinCreditos, principal, secundarias } = accionesDeMembresia(membresia);

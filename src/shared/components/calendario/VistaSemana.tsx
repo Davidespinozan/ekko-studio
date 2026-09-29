@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { Spinner } from '@shared/components/Spinner';
 import { useReservasRango } from '@shared/hooks/useReservasRango';
+import { ErrorCarga, ErrorInline } from '@shared/components/ErrorCarga';
+import { estadoDeCarga } from '@shared/lib/estadoCarga';
 import {
   hoyISOEnZona,
   sumarDiasISO,
@@ -46,7 +48,9 @@ export default function VistaSemana({ refreshTick, onVerDetalle, vistaCompactaCt
     [weekStart]
   );
 
-  const { reservas, isLoading, refetch } = useReservasRango(rango.inicio, rango.fin);
+  const { reservas, isLoading, error, cargado, refetch } = useReservasRango(rango.inicio, rango.fin);
+  // PKG-02A (C02): fallo de consulta ≠ semana vacía.
+  const estado = estadoDeCarga({ isLoading, error, cargado });
 
   useEffect(() => {
     if (refreshTick > 0) void refetch();
@@ -99,7 +103,14 @@ export default function VistaSemana({ refreshTick, onVerDetalle, vistaCompactaCt
           </button>
         </div>
 
-        {isLoading ? (
+        {estado === 'stale' && (
+          <div style={{ marginBottom: '10px' }}>
+            <ErrorInline mensaje="No pudimos actualizar las reservas; ves la última versión cargada." onReintentar={() => void refetch()} />
+          </div>
+        )}
+        {estado === 'error' ? (
+          <ErrorCarga titulo="No pudimos cargar las reservas de esta semana." onReintentar={() => void refetch()} />
+        ) : estado === 'cargando' ? (
           <Spinner label="Cargando…" />
         ) : (
           <div className="adm-cal-grid">
@@ -150,7 +161,7 @@ export default function VistaSemana({ refreshTick, onVerDetalle, vistaCompactaCt
 
         <div className="adm-cal-legend">
           <p style={{ fontSize: '0.75rem', color: 'var(--ek-ink-muted)' }}>
-            Reservas en rango: {reservas.length}
+            {estado === 'error' ? 'Reservas en rango: no disponible' : `Reservas en rango: ${reservas.length}`}
           </p>
         </div>
       </div>

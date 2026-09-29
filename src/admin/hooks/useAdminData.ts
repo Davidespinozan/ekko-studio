@@ -26,9 +26,12 @@ export function useMiembros(filtros?: { search?: string; status?: string; rol?: 
   const tenant = useTenant();
   const [miembros, setMiembros] = useState<Usuario[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02): un fallo de la consulta no es "todavía no hay miembros".
+  const [error, setError] = useState(false);
 
   const refetch = useCallback(async () => {
     setIsLoading(true);
+    setError(false);
     let query = supabase
       .from('usuarios')
       .select('*')
@@ -49,9 +52,10 @@ export function useMiembros(filtros?: { search?: string; status?: string; rol?: 
       query = query.or(`nombre.ilike.${term},email.ilike.${term}`);
     }
 
-    const { data, error } = await query;
-    if (error) {
-      console.error('[useMiembros]', error);
+    const { data, error: qErr } = await query;
+    if (qErr) {
+      console.error('[useMiembros]', qErr);
+      setError(true); // la lista anterior se conserva
       setIsLoading(false);
       return;
     }
@@ -60,7 +64,7 @@ export function useMiembros(filtros?: { search?: string; status?: string; rol?: 
   }, [tenant.id, filtros?.search, filtros?.status, filtros?.rol]);
 
   useEffect(() => { refetch(); }, [refetch]);
-  return { miembros, isLoading, refetch };
+  return { miembros, isLoading, error, refetch };
 }
 
 /**
@@ -111,17 +115,25 @@ export function useMembresiasVigentesPorUsuario() {
   const tenant = useTenant();
   const [porUsuario, setPorUsuario] = useState<Map<string, MembresiaResumen>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02): si la consulta falla, un mapa vacío etiquetaba a TODOS los
+  // miembros como "SIN MEMBRESÍA". Con `error=true` la lista dice "no disponible".
+  const [error, setError] = useState(false);
 
   const refetch = useCallback(async () => {
     setIsLoading(true);
+    setError(false);
     try {
-      const { data, error } = await supabase
+      const { data, error: qErr } = await supabase
         .from('membresias')
         .select('usuario_id, status, periodo_actual_fin, creditos_restantes, created_at, tier:tiers(slug, nombre, tipo)')
         .eq('tenant_id', tenant.id)
         .in('status', ['trialing', 'activa', 'past_due', 'pausada'])
         .order('created_at', { ascending: false });
-      if (error) console.error('[useMembresiasVigentesPorUsuario]', error);
+      if (qErr) {
+        console.error('[useMembresiasVigentesPorUsuario]', qErr);
+        setError(true); // el mapa anterior se conserva
+        return;
+      }
       const map = new Map<string, MembresiaResumen>();
       for (const m of (data ?? []) as unknown as MembresiaResumen[]) {
         if (!map.has(m.usuario_id)) map.set(m.usuario_id, m); // la más reciente gana
@@ -129,13 +141,14 @@ export function useMembresiasVigentesPorUsuario() {
       setPorUsuario(map);
     } catch (e) {
       console.error('[useMembresiasVigentesPorUsuario]', e instanceof Error ? e.message : e);
+      setError(true);
     } finally {
       setIsLoading(false);
     }
   }, [tenant.id]);
 
   useEffect(() => { refetch(); }, [refetch]);
-  return { porUsuario, isLoading, refetch };
+  return { porUsuario, isLoading, error, refetch };
 }
 
 export interface MembresiaActualAdmin {
@@ -157,11 +170,15 @@ export interface MembresiaActualAdmin {
 export function useMembresiaActualAdmin(usuarioId: string | undefined) {
   const [membresia, setMembresia] = useState<MembresiaActualAdmin | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02): error ≠ "sin membresía". La ficha no ofrece asignar/vender
+  // plan mientras `error=true`.
+  const [error, setError] = useState(false);
 
   const refetch = useCallback(async () => {
     if (!usuarioId) return;
     setIsLoading(true);
-    const { data, error } = await supabase
+    setError(false);
+    const { data, error: qErr } = await supabase
       .from('membresias')
       .select('id, status, periodo_actual_fin, creditos_restantes, stripe_subscription_id, cancel_at_period_end, created_at, tier:tiers(slug, nombre, tipo)')
       .eq('usuario_id', usuarioId)
@@ -169,13 +186,18 @@ export function useMembresiaActualAdmin(usuarioId: string | undefined) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
-    if (error) console.error('[useMembresiaActualAdmin]', error);
+    if (qErr) {
+      console.error('[useMembresiaActualAdmin]', qErr);
+      setError(true); // se conserva la membresía anterior (o null si nunca cargó)
+      setIsLoading(false);
+      return;
+    }
     setMembresia((data as unknown as MembresiaActualAdmin | null) ?? null);
     setIsLoading(false);
   }, [usuarioId]);
 
   useEffect(() => { refetch(); }, [refetch]);
-  return { membresia, isLoading, refetch };
+  return { membresia, isLoading, error, refetch };
 }
 
 /**
@@ -197,16 +219,20 @@ export function useRecursosAdmin() {
   const tenant = useTenant();
   const [recursos, setRecursos] = useState<Recurso[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02): error ≠ "no hay estudios activos".
+  const [error, setError] = useState(false);
 
   const refetch = useCallback(async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
+    setError(false);
+    const { data, error: qErr } = await supabase
       .from('recursos')
       .select('*')
       .eq('tenant_id', tenant.id)
       .order('orden', { ascending: true });
-    if (error) {
-      console.error('[useRecursosAdmin]', error);
+    if (qErr) {
+      console.error('[useRecursosAdmin]', qErr);
+      setError(true); // la lista anterior se conserva
       setIsLoading(false);
       return;
     }
@@ -215,7 +241,7 @@ export function useRecursosAdmin() {
   }, [tenant.id]);
 
   useEffect(() => { refetch(); }, [refetch]);
-  return { recursos, isLoading, refetch };
+  return { recursos, isLoading, error, refetch };
 }
 
 export async function updateRecurso(
@@ -258,16 +284,20 @@ export function useTiersAdmin() {
   const tenant = useTenant();
   const [tiers, setTiers] = useState<Tier[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02): error ≠ "no hay planes activos".
+  const [error, setError] = useState(false);
 
   const refetch = useCallback(async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
+    setError(false);
+    const { data, error: qErr } = await supabase
       .from('tiers')
       .select('*')
       .eq('tenant_id', tenant.id)
       .order('orden', { ascending: true });
-    if (error) {
-      console.error('[useTiersAdmin]', error);
+    if (qErr) {
+      console.error('[useTiersAdmin]', qErr);
+      setError(true); // la lista anterior se conserva
       setIsLoading(false);
       return;
     }
@@ -276,7 +306,7 @@ export function useTiersAdmin() {
   }, [tenant.id]);
 
   useEffect(() => { refetch(); }, [refetch]);
-  return { tiers, isLoading, refetch };
+  return { tiers, isLoading, error, refetch };
 }
 
 export async function updateTier(

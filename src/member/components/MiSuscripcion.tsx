@@ -12,6 +12,7 @@ import { useToast } from '@shared/hooks/useToast';
 import { useAuth } from '@shared/hooks/useAuth';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Spinner } from '@shared/components/Spinner';
+import { ErrorCarga } from '@shared/components/ErrorCarga';
 
 interface MembresiaInfo {
   status: string | null;
@@ -66,6 +67,9 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const [billingError, setBillingError] = useState(false);
   const [membresia, setMembresia] = useState<MembresiaInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  // PKG-02A (C02 · F16): fallo leyendo plan/membresía ≠ "No tienes un plan activo".
+  const [errorCarga, setErrorCarga] = useState(false);
+  const [intentoCarga, setIntentoCarga] = useState(0);
   const [cambiarOpen, setCambiarOpen] = useState(false);
   const [vistaPlan, setVistaPlan] = useState<VistaPlan>('membresias');
   const currentSlug = tierSlug;
@@ -120,6 +124,8 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   useEffect(() => {
     let mounted = true;
     async function load() {
+      setLoading(true);
+      setErrorCarga(false);
       const [tiersRes, memRes] = await Promise.all([
         supabase
           .from('tiers')
@@ -143,6 +149,12 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           .limit(1)
       ]);
       if (!mounted) return;
+      if (tiersRes.error || memRes.error) {
+        console.error('[MiSuscripcion]', tiersRes.error ?? memRes.error);
+        setErrorCarga(true); // no se afirma "sin plan" ni se ofrece nada con datos desconocidos
+        setLoading(false);
+        return;
+      }
       setTiers(
         (tiersRes.data ?? []).map((t) => ({
           slug: t.slug,
@@ -161,7 +173,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
     }
     load();
     return () => { mounted = false; };
-  }, [tenant.id, usuarioId]);
+  }, [tenant.id, usuarioId, intentoCarga]);
 
   // Tarjeta + historial vienen de Stripe (cuenta conectada) vía backend: los
   // miembros NO pueden leer payment_events (RLS admin-only).
@@ -301,6 +313,14 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
 
       {loading ? (
         <div className="ek-card"><Spinner size={18} label="Cargando tu plan…" /></div>
+      ) : errorCarga ? (
+        <div className="ek-card">
+          <ErrorCarga
+            titulo="No pudimos cargar tu plan."
+            hint="Tu suscripción sigue igual; solo no pudimos leerla. Revisa tu conexión e intenta de nuevo."
+            onReintentar={() => setIntentoCarga((n) => n + 1)}
+          />
+        </div>
       ) : (
         <>
           {/* Aviso de pago vencido (past_due): mantiene acceso, pide actualizar tarjeta */}

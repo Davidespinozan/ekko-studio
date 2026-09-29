@@ -8,6 +8,7 @@ import { exportarCsv } from '@shared/lib/exportarCsv';
 import { NuevaPersonaModal } from '../components/NuevaPersonaModal';
 import { Spinner } from '@shared/components/Spinner';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ErrorCarga, ErrorInline } from '@shared/components/ErrorCarga';
 
 export default function Miembros() {
   // La lista se puede abrir ya filtrada (?status=… / ?filtro=vencidas|identidad): así
@@ -19,8 +20,10 @@ export default function Miembros() {
   const [showNuevo, setShowNuevo] = useState(false);
   // Fijamos rol='miembro' para excluir staff (admins, recepcionistas).
   // El equipo se gestiona desde /admin/equipo (Sprint Equipo).
-  const { miembros: todos, isLoading, refetch } = useMiembros({ search, status, rol: 'miembro' });
-  const { porUsuario } = useMembresiasVigentesPorUsuario();
+  const { miembros: todos, isLoading, error: errorMiembros, refetch } = useMiembros({ search, status, rol: 'miembro' });
+  // PKG-02A (C02): si las membresías no cargaron, la columna dice "no disponible"
+  // (no "SIN MEMBRESÍA" para todos) y el filtro por vencidas no se evalúa.
+  const { porUsuario, error: errorMembresias, refetch: refetchMembresias } = useMembresiasVigentesPorUsuario();
 
   const FILTROS: Record<string, { texto: string; pasa: (m: (typeof todos)[number]) => boolean }> = {
     vencidas: {
@@ -33,7 +36,9 @@ export default function Miembros() {
     }
   };
   const filtroActivo = filtro ? FILTROS[filtro] : undefined;
-  const miembros = filtroActivo ? todos.filter(filtroActivo.pasa) : todos;
+  // El filtro "vencidas" depende de las membresías: con error no se puede calcular.
+  const filtroSinDatos = filtro === 'vencidas' && errorMembresias;
+  const miembros = filtroActivo && !filtroSinDatos ? todos.filter(filtroActivo.pasa) : todos;
   const hayFiltros = Boolean(search || status || filtroActivo);
 
   function limpiarFiltros() {
@@ -53,8 +58,8 @@ export default function Miembros() {
       { key: 'email', label: 'Email' },
       { key: 'telefono', label: 'Teléfono' },
       { key: 'membresia_tier', label: 'Plan asignado' },
-      { key: 'membresia', label: 'Membresía', valor: (m) => ESTADO_MEMBRESIA_LABEL[estadoMembresia(porUsuario.get(m.id) ?? null)].texto },
-      { key: 'vence', label: 'Vence / créditos', valor: (m) => detalleMembresia(porUsuario.get(m.id) ?? null) },
+      { key: 'membresia', label: 'Membresía', valor: (m) => (errorMembresias ? 'NO DISPONIBLE' : ESTADO_MEMBRESIA_LABEL[estadoMembresia(porUsuario.get(m.id) ?? null)].texto) },
+      { key: 'vence', label: 'Vence / créditos', valor: (m) => (errorMembresias ? '' : detalleMembresia(porUsuario.get(m.id) ?? null)) },
       { key: 'status', label: 'Status de cuenta' },
       { key: 'no_shows_count', label: 'Inasistencias' },
       { key: 'created_at', label: 'Alta', valor: (m) => formatFechaEnZona(m.created_at, { year: 'numeric', month: '2-digit', day: '2-digit' }) }
@@ -76,10 +81,11 @@ export default function Miembros() {
         <div>
           <p className="ek-eyebrow ek-eyebrow--mustard">MIEMBROS</p>
           <h1 className="ek-h2">Tus clientes en EKKO</h1>
-          {!isLoading && (
+          {!isLoading && !errorMiembros && (
             <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', marginTop: '4px' }}>
               {miembros.length}{' '}
-              {miembros.length === 1 ? 'cliente' : 'clientes'} · {vigentes} con membresía vigente
+              {miembros.length === 1 ? 'cliente' : 'clientes'}
+              {errorMembresias ? ' · membresías no disponibles' : ` · ${vigentes} con membresía vigente`}
             </p>
           )}
         </div>
@@ -135,7 +141,20 @@ export default function Miembros() {
         )}
       </div>
 
-      {isLoading ? (
+      {errorMembresias && !errorMiembros && !isLoading && (
+        <div style={{ marginBottom: '12px' }}>
+          <ErrorInline
+            mensaje={filtroSinDatos
+              ? 'No pudimos cargar las membresías: el filtro "Membresía vencida" no se puede aplicar. Se muestra la lista completa.'
+              : 'No pudimos cargar las membresías. La columna Membresía no está disponible.'}
+            onReintentar={() => void refetchMembresias()}
+          />
+        </div>
+      )}
+
+      {errorMiembros ? (
+        <ErrorCarga titulo="No pudimos cargar los miembros." onReintentar={() => void refetch()} />
+      ) : isLoading ? (
         <Spinner label="Cargando…" />
       ) : miembros.length === 0 ? (
         hayFiltros ? (
@@ -201,7 +220,7 @@ export default function Miembros() {
                   >
                     {m.membresia_tier ?? 'sin plan'}
                   </span>
-                  <MembresiaCelda m={porUsuario.get(m.id) ?? null} />
+                  <MembresiaCelda m={porUsuario.get(m.id) ?? null} noDisponible={errorMembresias} />
                   <StatusBadge status={m.status} />
                 </div>
               </div>
@@ -231,7 +250,7 @@ export default function Miembros() {
                   <td style={{ color: 'var(--ek-ink-muted)' }}>{m.email}</td>
                   <td>{m.membresia_tier ?? '—'}</td>
                   <td>
-                    <MembresiaCelda m={porUsuario.get(m.id) ?? null} />
+                    <MembresiaCelda m={porUsuario.get(m.id) ?? null} noDisponible={errorMembresias} />
                   </td>
                   <td>
                     <StatusBadge status={m.status} />
@@ -300,7 +319,15 @@ function detalleMembresia(m: MembresiaResumen | null): string {
 }
 
 /** Estado de la membresía derivado por fecha (no el status de la cuenta). */
-function MembresiaCelda({ m }: { m: MembresiaResumen | null }) {
+function MembresiaCelda({ m, noDisponible = false }: { m: MembresiaResumen | null; noDisponible?: boolean }) {
+  // PKG-02A: la consulta de membresías falló → no se afirma ausencia.
+  if (noDisponible) {
+    return (
+      <span title="No pudimos cargar las membresías" style={{ color: 'var(--ek-danger)', fontWeight: 700, fontSize: '11px', letterSpacing: '0.06em' }}>
+        NO DISPONIBLE
+      </span>
+    );
+  }
   const estado = estadoMembresia(m);
   const { texto, color } = ESTADO_MEMBRESIA_LABEL[estado];
   const detalle = detalleMembresia(m);

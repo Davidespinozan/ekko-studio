@@ -4,6 +4,7 @@ import { useTenant } from '@shared/hooks/useTenant';
 import { useVisibilityAwarePolling } from '@shared/hooks/useVisibilityAwarePolling';
 import type { Database } from '@shared/types/database';
 import { hoyISOEnZona, rangoDiaEnZona } from '@shared/lib/timezone';
+import { estadoDeCarga, type EstadoCarga } from '@shared/lib/estadoCarga';
 
 const POLLING_INTERVAL_MS = 30_000;
 
@@ -35,6 +36,11 @@ export function useReservasHoy(fechaISO?: string, pollingEnabled = true) {
   const tenant = useTenant();
   const [reservas, setReservas] = useState<ReservaConJoin[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02): un fetch fallido no es "no hay reservas". `error` lo dice;
+  // `cargado` distingue el primer fetch fallido (sin dato) de un polling fallido
+  // con lista previa válida (dato conservado + aviso de "no pudimos actualizar").
+  const [error, setError] = useState(false);
+  const [cargado, setCargado] = useState(false);
 
   // El día es del ESTUDIO ('YYYY-MM-DD' en America/Mazatlan), no del navegador:
   // desde otra zona horaria "hoy" y sus límites se corrían.
@@ -53,16 +59,26 @@ export function useReservasHoy(fechaISO?: string, pollingEnabled = true) {
 
     if (error) {
       console.error('[useReservasHoy]', error);
+      setError(true); // la lista anterior (si la hay) se conserva
       setIsLoading(false);
       return;
     }
     setReservas((data ?? []) as unknown as ReservaConJoin[]);
+    setError(false);
+    setCargado(true);
     setIsLoading(false);
   }, [tenant.id, dia]);
 
   useVisibilityAwarePolling(refetch, POLLING_INTERVAL_MS, pollingEnabled);
 
-  return { reservas, isLoading, refetch };
+  return { reservas, isLoading, error, cargado, refetch };
+}
+
+export type EstadoListaHoy = EstadoCarga;
+
+/** Qué debe pintar la vista con lo que devuelve el hook (ver `estadoDeCarga`). */
+export function estadoListaHoy(h: { isLoading: boolean; error: boolean; cargado: boolean }): EstadoListaHoy {
+  return estadoDeCarga(h);
 }
 
 export async function checkInManual(reservaId: string, motivo?: string) {

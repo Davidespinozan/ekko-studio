@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useCentroPendientes } from '../hooks/useCentroPendientes';
 import { construirPendientes, totalPendientes, type TonoPendiente } from '../logic/centroPendientes';
+import { ErrorCarga } from '@shared/components/ErrorCarga';
 
 // ============================================================================
 // CentroPendientes — "Mi bandeja" del admin: los pendientes operativos
@@ -36,9 +37,26 @@ const TONO_SOFT: Record<TonoPendiente, string> = {
 };
 
 export function CentroPendientes() {
-  const { conteo, isLoading } = useCentroPendientes();
+  const { conteo, isLoading, error, refetch } = useCentroPendientes();
   const items = construirPendientes(conteo);
   const total = totalPendientes(conteo);
+
+  // PKG-02A (C02): si algún conteo falló NO se concluye "Todo al día" con datos
+  // incompletos. El hook no llena huecos con 0: se muestra el fallo y se reintenta.
+  if (error) {
+    return (
+      <section style={{ marginBottom: '32px' }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ fontSize: '11px', margin: '0 0 14px' }}>PENDIENTES</p>
+        <div className="ek-card ek-card--md">
+          <ErrorCarga
+            titulo="No pudimos cargar los pendientes."
+            hint="No sabemos si hay cobros, membresías vencidas o faltas por atender. Reintenta antes de dar el día por resuelto."
+            onReintentar={() => void refetch()}
+          />
+        </div>
+      </section>
+    );
+  }
 
   if (isLoading) {
     return (

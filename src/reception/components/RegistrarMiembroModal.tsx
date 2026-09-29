@@ -6,6 +6,7 @@ import { activarMembresiaMostrador } from '@shared/lib/checkout';
 import { CopyButton } from '@shared/components/CopyButton';
 import { traducirErrorRegistro } from '../lib/traducirErrorRegistro';
 import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
+import { ErrorInline } from '@shared/components/ErrorCarga';
 
 interface Props {
   onClose: () => void;
@@ -57,7 +58,7 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [tier, setTier] = useState('');
-  const { planes } = usePlanesActivos();
+  const { planes, error: errorPlanes, recargar: recargarPlanes } = usePlanesActivos();
   // Contraseña temporal autogenerada al montar (lazy init → estable).
   const [password, setPassword] = useState(() => generarPassword());
   const [submitting, setSubmitting] = useState(false);
@@ -280,13 +281,19 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
                 value={tier}
                 onChange={(e) => setTier(e.target.value)}
                 className="ek-input"
-                disabled={submitting}
+                disabled={submitting || errorPlanes}
               >
-                <option value="">— Sin plan (activar después) —</option>
-                {planes.map((p) => (
+                <option value="">{errorPlanes ? '— planes no disponibles —' : '— Sin plan (activar después) —'}</option>
+                {!errorPlanes && planes.map((p) => (
                   <option key={p.slug} value={p.slug}>{p.nombre}</option>
                 ))}
               </select>
+              {/* PKG-02A (F12): fallo al leer los planes ≠ "no hay planes". */}
+              {errorPlanes && (
+                <div style={{ marginTop: '8px' }}>
+                  <ErrorInline mensaje="No pudimos cargar los planes. Puedes registrar sin plan y activarlo después, o reintentar." onReintentar={recargarPlanes} />
+                </div>
+              )}
               <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
                 {tier
                   ? 'Se activa la membresía al registrar (confirmas el cobro en caja).'

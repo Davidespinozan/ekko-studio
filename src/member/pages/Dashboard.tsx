@@ -12,6 +12,7 @@ import { resumenCarnet } from '@member/logic/carnetMembresia';
 import { desdeReservasVigentesISO } from '@member/logic/reservasVigentes';
 import { formatFechaEnZona } from '@shared/lib/timezone';
 import { ContactoEstudio } from '@shared/components/ContactoEstudio';
+import { ErrorCarga } from '@shared/components/ErrorCarga';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 type Reserva = Database['public']['Tables']['reservas']['Row'];
@@ -99,7 +100,7 @@ export default function Dashboard() {
     error: errorReservas,
     refetch: refetchReservas
   } = useProximasReservas(usuario?.id);
-  const { resumen, isLoading: loadingResumen, refetch: refetchResumen } = useResumenMiembro(
+  const { resumen, isLoading: loadingResumen, error: errorResumen, refetch: refetchResumen } = useResumenMiembro(
     usuario?.id,
     tenant?.id,
     usuario?.membresia_tier
@@ -213,6 +214,16 @@ export default function Dashboard() {
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="ek-skeleton" style={{ height: '92px', borderRadius: 'var(--ek-r-md)' }} />
           ))}
+        </div>
+      ) : errorResumen ? (
+        // PKG-02A (C02): la lectura falló → NO pintar carnet "sin plan", 0 créditos
+        // ni 0 sesiones como si fueran reales.
+        <div className="ek-card" style={{ marginBottom: '20px' }}>
+          <ErrorCarga
+            titulo="No pudimos cargar tu membresía."
+            hint="Tu plan, créditos y sesiones siguen ahí; solo no pudimos leerlos. Revisa tu conexión e intenta de nuevo."
+            onReintentar={() => void refetchResumen()}
+          />
         </div>
       ) : (
         <ResumenHome

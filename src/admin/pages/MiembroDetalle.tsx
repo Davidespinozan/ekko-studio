@@ -30,7 +30,7 @@ export default function MiembroDetalle() {
   const navigate = useNavigate();
   const toast = useToast();
   const { miembro, reservas, isLoading, refetch } = useMiembroDetalle(id);
-  const { membresia, isLoading: membresiaLoading, refetch: refetchMembresia } = useMembresiaActualAdmin(id);
+  const { membresia, isLoading: membresiaLoading, error: membresiaError, refetch: refetchMembresia } = useMembresiaActualAdmin(id);
   const { entries: auditEntries, isLoading: auditLoading, error: auditError } = useAuditLogDeUsuario(id);
   const [motivo, setMotivo] = useState('');
   // Modal de membresía abierto (asignar/renovar/cambiar · ajustar créditos · baja).
@@ -169,6 +169,8 @@ export default function MiembroDetalle() {
         <MembresiaCard
           membresia={membresia as unknown as MembresiaVigente | null}
           cargando={membresiaLoading}
+          error={membresiaError}
+          onReintentar={() => void refetchMembresia()}
           onAccion={abrirAccionMembresia}
         />
 

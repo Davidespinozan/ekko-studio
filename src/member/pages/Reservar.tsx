@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CalendarX } from 'lucide-react';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ErrorCarga, ErrorInline } from '@shared/components/ErrorCarga';
 import { ContactoEstudio } from '@shared/components/ContactoEstudio';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
@@ -44,7 +45,7 @@ export default function Reservar() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const recursoSlugParam = searchParams.get('recurso');
-  const { recursos, isLoading: loadingRecursos } = useRecursosDelTenant();
+  const { recursos, isLoading: loadingRecursos, error: errorRecursos, recargar: recargarRecursos } = useRecursosDelTenant();
 
   const config = useMemo<TenantReservaConfig>(() => {
     const c = (tenant.config as Record<string, any>)?.reserva ?? {};
@@ -63,7 +64,7 @@ export default function Reservar() {
   const tienePlan = !!usuario?.membresia_tier;
 
   // Saldo de créditos (null = plan por tiempo/ilimitado → no aplica el costo).
-  const { resumen, refetch: refetchResumen } = useResumenMiembro(usuario?.id, tenant.id, usuario?.membresia_tier);
+  const { resumen, error: errorResumen, refetch: refetchResumen } = useResumenMiembro(usuario?.id, tenant.id, usuario?.membresia_tier);
   const saldoCreditos = resumen.membresia?.creditosRestantes ?? null;
   const esPlanCreditos = saldoCreditos !== null;
 
@@ -86,23 +87,34 @@ export default function Reservar() {
   // "Pago por hora": si no alcanza el saldo, se ofrece comprar el paquete más chico
   // que sirva para ESTA hora y reservarla en cuanto se acredite.
   const [planes, setPlanes] = useState<PlanCandidato[]>([]);
+  // PKG-02A (C02 · F18): si los planes no se pudieron leer, no se concluye "no hay
+  // paquete que alcance" ni se ofrece pagar la hora con una lista vacía falsa.
+  const [errorPlanes, setErrorPlanes] = useState(false);
+  const [intentoPlanes, setIntentoPlanes] = useState(0);
   const [comprarPara, setComprarPara] = useState<{ slot: Slot; plan: PlanCandidato } | null>(null);
   const [pagando, setPagando] = useState(false);
   const [activando, setActivando] = useState(false);
 
   useEffect(() => {
     let vivo = true;
+    setErrorPlanes(false);
     void supabase
       .from('tiers')
       .select('slug, nombre, precio_centavos, tipo, clases_incluidas, activo, en_venta')
       .eq('tenant_id', tenant.id)
-      .then(({ data }) => {
-        if (vivo) setPlanes((data ?? []) as PlanCandidato[]);
+      .then(({ data, error }) => {
+        if (!vivo) return;
+        if (error) {
+          console.error('[Reservar] planes', error);
+          setErrorPlanes(true); // los planes anteriores se conservan
+          return;
+        }
+        setPlanes((data ?? []) as PlanCandidato[]);
       });
     return () => {
       vivo = false;
     };
-  }, [tenant.id]);
+  }, [tenant.id, intentoPlanes]);
 
   // Invitados permitidos: del plan del miembro (Admin → Planes → Máx. invitados).
   const maxInvitados = resumen.tier?.maxInvitados ?? 0;
@@ -127,7 +139,11 @@ export default function Reservar() {
       : null;
   const planNoIncluyeEstudio =
     tienePlan && recursoSel !== null && !puedeReservarRecurso(recursoSel, usuario?.membresia_tier ?? null);
-  const motivoNoReserva = bloqueadoHasta
+  // PKG-02A (C02): si no pudimos leer plan/saldo, no se decide con datos falsos
+  // (ni "sin créditos" ni "puedes reservar"): se pide reintentar antes de confirmar.
+  const motivoNoReserva = errorResumen
+    ? 'No pudimos cargar tu plan y tu saldo. Reintenta para poder reservar.'
+    : bloqueadoHasta
     ? `Tienes una restricción para reservar hasta el ${formatFechaEnZona(bloqueadoHasta, { day: 'numeric', month: 'long' })}.`
     : !tienePlan
     ? 'Necesitas un plan para reservar. Puedes ver todo mientras tanto.'
@@ -317,6 +333,19 @@ export default function Reservar() {
     );
   }
 
+  // PKG-02A (C02 · F11): fallo al leer los estudios ≠ "sin estudios disponibles".
+  if (errorRecursos && recursos.length === 0) {
+    return (
+      <div className="ek-container">
+        <ErrorCarga
+          titulo="No pudimos cargar los estudios."
+          hint="Los estudios siguen ahí; solo no pudimos leerlos. Revisa tu conexión e intenta de nuevo."
+          onReintentar={recargarRecursos}
+        />
+      </div>
+    );
+  }
+
   if (recursos.length === 0) {
     return (
       <div className="ek-container">
@@ -400,8 +429,22 @@ export default function Reservar() {
           )}
         </div>
 
+        {/* PKG-02A (F18): planes no disponibles → avisar solo si importan para reservar y sin duplicar el banner del resumen. */}
+        {errorPlanes && !errorResumen && (!tienePlan || esPlanCreditos) && (
+          <div style={{ marginBottom: '16px' }}>
+            <ErrorInline mensaje="No pudimos cargar los planes disponibles para pagar por hora." onReintentar={() => setIntentoPlanes((n) => n + 1)} />
+          </div>
+        )}
+
+        {/* PKG-02A: plan/saldo no disponibles → se avisa antes de elegir hora. */}
+        {errorResumen && (
+          <div style={{ marginBottom: '16px' }}>
+            <ErrorInline mensaje="No pudimos cargar tu plan y tu saldo. Puedes ver horarios, pero no reservar hasta reintentar." onReintentar={() => void refetchResumen()} />
+          </div>
+        )}
+
         {/* Aviso: sin plan puedes explorar todo, pero no reservar. */}
-        {!tienePlan && (
+        {!tienePlan && !errorResumen && (
           <div
             className="ek-card ek-card--md"
             style={{ display: 'flex', alignItems: 'center', gap: '12px', justifyContent: 'space-between', flexWrap: 'wrap' }}
@@ -502,7 +545,13 @@ export default function Reservar() {
                     onClick={() => {
                       if (motivoNoReserva) {
                         // Sin plan o sin saldo: en vez de solo avisar, ofrecer pagar la hora.
-                        const faltaSaldo = !bloqueadoHasta && !planNoIncluyeEstudio && (!tienePlan || saldoInsuficiente);
+                        // Con la lectura de plan/saldo fallida NO se ofrece comprar (decisión de dinero con datos falsos).
+                        const faltaSaldo = !errorResumen && !bloqueadoHasta && !planNoIncluyeEstudio && (!tienePlan || saldoInsuficiente);
+                        if (faltaSaldo && errorPlanes) {
+                          // Sin lista de planes fiable no se concluye nada sobre qué comprar.
+                          toast.warning('No pudimos cargar los planes disponibles. Reintenta para poder pagar esta hora.');
+                          return;
+                        }
                         const plan = faltaSaldo && recursoSel ? elegirPaquetePorHora(planes, recursoSel, saldoCreditos ?? 0) : null;
                         if (plan) {
                           setComprarPara({ slot, plan });

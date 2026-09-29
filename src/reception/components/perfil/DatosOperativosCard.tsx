@@ -25,16 +25,24 @@ export function DatosOperativosCard({
   membresia?: MembresiaVigente | null;
 }) {
   const st = statusMiembro(miembro.status);
-  const { planes } = usePlanesActivos();
+  const { planes, error: errorPlanes } = usePlanesActivos();
   // Solo mostramos el plan si sigue ACTIVO (no los tiers eliminados tipo pro/basica).
   const planVigente = miembro.membresia_tier && planes.some((p) => p.slug === miembro.membresia_tier);
+  // PKG-02A (F12): si los planes no se pudieron leer, no se afirma "Sin plan".
+  const planNoVerificable = errorPlanes && !!miembro.membresia_tier;
   return (
     <div className="ek-card" style={{ marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
       <Dato label="Email" valor={miembro.email} />
       {miembro.telefono && <Dato label="Teléfono" valor={miembro.telefono} />}
       <Dato
         label="Plan"
-        valor={planVigente ? <PlanChip slug={miembro.membresia_tier} /> : <span style={{ color: 'var(--ek-ink-faint)' }}>Sin plan</span>}
+        valor={
+          planVigente
+            ? <PlanChip slug={miembro.membresia_tier} />
+            : planNoVerificable
+              ? <span style={{ color: 'var(--ek-danger)' }} title="No pudimos cargar los planes">No disponible</span>
+              : <span style={{ color: 'var(--ek-ink-faint)' }}>Sin plan</span>
+        }
       />
       <Dato label="Membresía" valor={<VigenciaMembresia usuarioId={miembro.id} membresia={membresia} />} />
       <Dato label="Cuenta" valor={<span style={{ color: st.color, fontWeight: 600 }}>{st.label}</span>} />

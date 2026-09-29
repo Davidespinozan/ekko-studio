@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Cake } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { ErrorInline } from '@shared/components/ErrorCarga';
 
 interface Cumple {
   usuario_id: string;
@@ -24,29 +25,44 @@ function cuando(enDias: number): string {
  */
 export function CumpleanosCard({ dias = 7, compacto = false }: { dias?: number; compacto?: boolean }) {
   const [items, setItems] = useState<Cumple[] | null>(null);
+  // PKG-02A (C02 · F23): fallo del RPC ≠ "nadie cumple años" (antes se ocultaba la tarjeta).
+  const [error, setError] = useState(false);
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     let mounted = true;
+    setError(false);
     (async () => {
       try {
-        const { data, error } = await supabase.rpc('cumpleanos_proximos', { p_dias: dias });
+        const { data, error: qErr } = await supabase.rpc('cumpleanos_proximos', { p_dias: dias });
         if (!mounted) return;
-        if (error) {
-          console.error('[CumpleanosCard]', error);
-          setItems([]);
+        if (qErr) {
+          console.error('[CumpleanosCard]', qErr);
+          setError(true);
           return;
         }
         setItems((data ?? []) as Cumple[]);
       } catch (e) {
         if (!mounted) return;
         console.error('[CumpleanosCard]', e instanceof Error ? e.message : e);
-        setItems([]);
+        setError(true);
       }
     })();
     return () => {
       mounted = false;
     };
-  }, [dias]);
+  }, [dias, intento]);
+
+  if (error) {
+    return (
+      <div className="ek-card" data-testid="cumpleanos-card" style={{ marginBottom: compacto ? '12px' : '20px', padding: compacto ? '12px 14px' : undefined }}>
+        <p className="ek-eyebrow ek-eyebrow--mustard" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+          <Cake size={14} aria-hidden="true" /> CUMPLEAÑOS
+        </p>
+        <ErrorInline mensaje="No pudimos cargar los cumpleaños." onReintentar={() => setIntento((n) => n + 1)} />
+      </div>
+    );
+  }
 
   if (!items || items.length === 0) return null;
 

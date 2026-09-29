@@ -24,6 +24,10 @@ export function useReservasRango(fechaInicio: Date, fechaFin: Date) {
   const tenant = useTenant();
   const [reservas, setReservas] = useState<ReservaRango[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02): un fetch fallido no es "período vacío". `cargado` distingue el
+  // primer fallo (error) de un refresh fallido con dato previo (stale).
+  const [error, setError] = useState(false);
+  const [cargado, setCargado] = useState(false);
 
   const inicioMs = fechaInicio.getTime();
   const finMs = fechaFin.getTime();
@@ -40,10 +44,13 @@ export function useReservasRango(fechaInicio: Date, fechaFin: Date) {
 
     if (error) {
       console.error('[useReservasRango]', error);
+      setError(true); // las reservas anteriores (si las hay) se conservan
       setIsLoading(false);
       return;
     }
     setReservas((data ?? []) as unknown as ReservaRango[]);
+    setError(false);
+    setCargado(true);
     setIsLoading(false);
   }, [tenant.id, inicioMs, finMs]);
 
@@ -51,5 +58,5 @@ export function useReservasRango(fechaInicio: Date, fechaFin: Date) {
     void refetch();
   }, [refetch]);
 
-  return { reservas, isLoading, refetch };
+  return { reservas, isLoading, error, cargado, refetch };
 }

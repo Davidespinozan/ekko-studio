@@ -21,11 +21,24 @@ const h = vi.hoisted(() => ({
   rpc: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
   tenant: { id: 't-1', config: { reserva: {} } },
-  recursos: [{ id: 'rec-1', nombre: 'Estudio A', tiers_permitidos: ['pro'], horarios: [] }]
+  recursos: [{ id: 'rec-1', nombre: 'Estudio A', tiers_permitidos: ['pro'], horarios: [] }],
+  reglasTier: { data: { reglas: { max_invitados: 2 } }, error: null } as { data: unknown; error: unknown },
+  recursosError: false,
+  recargarRecursos: vi.fn()
 }));
 
 vi.mock('@shared/lib/supabase', () => ({
-  supabase: { rpc: (...a: unknown[]) => h.rpc(...a) }
+  supabase: {
+    rpc: (...a: unknown[]) => h.rpc(...a),
+    // Límite de invitados del plan (tiers.reglas). Antes el mock no tenía `from`:
+    // la lectura lanzaba y el modal asumía 0 invitados en silencio (F09).
+    from: () => {
+      const c: Record<string, unknown> = {};
+      for (const m of ['select', 'eq']) c[m] = () => c;
+      c.maybeSingle = () => Promise.resolve(h.reglasTier);
+      return c;
+    }
+  }
 }));
 vi.mock('@shared/hooks/useToast', () => ({ useToast: () => h.toast }));
 vi.mock('@shared/hooks/useTenant', () => ({
@@ -33,7 +46,7 @@ vi.mock('@shared/hooks/useTenant', () => ({
 }));
 
 vi.mock('@member/hooks/useReservas', () => ({
-  useRecursosDelTenant: () => ({ recursos: h.recursos, isLoading: false }),
+  useRecursosDelTenant: () => ({ recursos: h.recursosError ? [] : h.recursos, isLoading: false, error: h.recursosError, recargar: h.recargarRecursos }),
   fetchReservasDelRecurso: () => Promise.resolve([]),
   fetchReservasDelUsuario: () => Promise.resolve([])
 }));
@@ -59,6 +72,8 @@ describe('CrearReservaModal · wiring', () => {
     h.rpc.mockReset();
     h.toast.success.mockReset();
     h.toast.error.mockReset();
+    h.reglasTier = { data: { reglas: { max_invitados: 2 } }, error: null };
+    h.recursosError = false;
   });
 
   it('confirmar reserva → llama reservar_para_miembro_atomic con p_usuario_id del miembro', async () => {
@@ -137,5 +152,48 @@ describe('CrearReservaModal · wiring', () => {
     expect(fns).toContain('reservar_para_miembro_atomic');
     expect(fns).toContain('cancelar_reserva_atomic');
     await waitFor(() => expect(onCreada).toHaveBeenCalled());
+  });
+});
+
+// ── PKG-02A (C02 · F09/F11) ───────────────────────────────────────────────────
+describe('CrearReservaModal · estados honestos (PKG-02A)', () => {
+  beforeEach(() => {
+    h.rpc.mockReset();
+    h.reglasTier = { data: { reglas: { max_invitados: 2 } }, error: null };
+    h.recursosError = false;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it('límite de invitados OK → stepper visible con el máximo del plan', async () => {
+    render(<CrearReservaModal miembro={MIEMBRO} onClose={vi.fn()} onCreada={vi.fn()} />);
+    expect(await screen.findByText(/Invitados \(0 de 2\)/)).toBeInTheDocument();
+  });
+
+  it('límite de invitados en ERROR → no se asume 0: aviso, sin stepper, y Confirmar bloqueado hasta reintentar', async () => {
+    h.reglasTier = { data: null, error: { message: 'permission denied' } };
+    h.rpc.mockResolvedValue({ data: { success: true }, error: null });
+    render(<CrearReservaModal miembro={MIEMBRO} onClose={vi.fn()} onCreada={vi.fn()} />);
+    expect(await screen.findByText(/No pudimos cargar cuántos invitados permite el plan/)).toBeInTheDocument();
+    expect(screen.queryByText(/Invitados \(/)).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: '10:00' }));
+    const confirmar = screen.getByRole('button', { name: /crear reserva/i });
+    expect(confirmar).toBeDisabled();
+    expect(h.rpc).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toMatch(/permission denied/);
+
+    // Reintentar → el límite llega → se puede confirmar.
+    h.reglasTier = { data: { reglas: { max_invitados: 1 } }, error: null };
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByText(/Invitados \(0 de 1\)/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('button', { name: /crear reserva/i })).not.toBeDisabled());
+  });
+
+  it('estudios en ERROR → "No pudimos cargar los estudios", nunca "no tiene acceso a ningún estudio"', async () => {
+    h.recursosError = true;
+    render(<CrearReservaModal miembro={MIEMBRO} onClose={vi.fn()} onCreada={vi.fn()} />);
+    expect(await screen.findByText('No pudimos cargar los estudios.')).toBeInTheDocument();
+    expect(screen.queryByText(/no tiene acceso a ningún estudio/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(h.recargarRecursos).toHaveBeenCalledTimes(1);
   });
 });

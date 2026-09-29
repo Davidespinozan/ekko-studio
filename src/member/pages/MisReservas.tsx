@@ -15,6 +15,7 @@ import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ErrorCarga } from '@shared/components/ErrorCarga';
 import { ESTADOS_RESERVA_HISTORICOS } from '@shared/constants/reservaStatus';
 import { agruparPorDia } from '@member/logic/agruparReservas';
 import { PagarInvitadosExtra } from '@member/components/PagarInvitadosExtra';
@@ -40,6 +41,8 @@ function useMisReservas(usuarioId: string | undefined) {
   const [proximas, setProximas] = useState<ReservaConRecurso[]>([]);
   const [historial, setHistorial] = useState<ReservaConRecurso[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02 · F15): si alguna consulta falla, no es "sin sesiones agendadas".
+  const [error, setError] = useState(false);
   // Se incrementa para recargar (tras cancelar una reserva desde la lista).
   const [version, setVersion] = useState(0);
   const recargar = useCallback(() => setVersion((v) => v + 1), []);
@@ -52,6 +55,7 @@ function useMisReservas(usuarioId: string | undefined) {
     let mounted = true;
     // Solo el primer load muestra skeleton: al recargar, la lista no parpadea.
     if (version === 0) setIsLoading(true);
+    setError(false);
 
     async function load() {
       const vigentesDesde = desdeReservasVigentesISO();
@@ -72,6 +76,12 @@ function useMisReservas(usuarioId: string | undefined) {
           .limit(30)
       ]);
       if (!mounted) return;
+      if (proxRes.error || histRes.error) {
+        console.error('[MisReservas]', proxRes.error ?? histRes.error);
+        setError(true); // las listas anteriores se conservan
+        setIsLoading(false);
+        return;
+      }
       setProximas((proxRes.data ?? []) as unknown as ReservaConRecurso[]);
       setHistorial((histRes.data ?? []) as unknown as ReservaConRecurso[]);
       setIsLoading(false);
@@ -83,7 +93,7 @@ function useMisReservas(usuarioId: string | undefined) {
     };
   }, [usuarioId, version]);
 
-  return { proximas, historial, isLoading, recargar };
+  return { proximas, historial, isLoading, error, recargar };
 }
 
 // ============================================================================
@@ -111,7 +121,7 @@ function badgeParaReserva(status: string): { label: string; className: string; i
 export default function MisReservas() {
   const { usuario } = useAuth();
   const tenant = useTenant();
-  const { proximas, historial, isLoading, recargar } = useMisReservas(usuario?.id);
+  const { proximas, historial, isLoading, error, recargar } = useMisReservas(usuario?.id);
   const [tab, setTab] = useState<Tab>('proximas');
   const [invitadosPara, setInvitadosPara] = useState<string | null>(null);
 
@@ -145,7 +155,16 @@ export default function MisReservas() {
         </button>
       </div>
 
-      {isLoading ? (
+      {error ? (
+        // PKG-02A (C02 · F15): fallo de lectura ≠ "sin sesiones" / "sin historial".
+        <div style={{ marginTop: '8px' }}>
+          <ErrorCarga
+            titulo="No pudimos cargar tus reservas."
+            hint="Tus sesiones siguen agendadas; solo no pudimos leerlas. Revisa tu conexión e intenta de nuevo."
+            onReintentar={recargar}
+          />
+        </div>
+      ) : isLoading ? (
         <div className="ek-stack-sm" style={{ marginTop: '20px' }}>
           <div className="ek-skeleton" style={{ height: '72px', borderRadius: 'var(--ek-r-md)' }} />
           <div className="ek-skeleton" style={{ height: '72px', borderRadius: 'var(--ek-r-md)' }} />

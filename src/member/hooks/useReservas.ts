@@ -107,12 +107,18 @@ export function useRecursosDelTenant() {
   const tenant = useTenant();
   const [recursos, setRecursos] = useState<Recurso[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02): un fallo al leer los estudios no es "no hay estudios".
+  const [error, setError] = useState(false);
+  const [intento, setIntento] = useState(0);
+  const recargar = useCallback(() => setIntento((n) => n + 1), []);
 
   useEffect(() => {
     let isMounted = true;
 
     async function load() {
-      const { data, error } = await supabase
+      setIsLoading(true);
+      setError(false);
+      const { data, error: qErr } = await supabase
         .from('recursos')
         .select('*')
         .eq('tenant_id', tenant.id)
@@ -121,8 +127,9 @@ export function useRecursosDelTenant() {
         .order('orden', { ascending: true });
 
       if (!isMounted) return;
-      if (error) {
-        console.error('[useRecursosDelTenant]', error);
+      if (qErr) {
+        console.error('[useRecursosDelTenant]', qErr);
+        setError(true); // la lista anterior se conserva
         setIsLoading(false);
         return;
       }
@@ -132,9 +139,9 @@ export function useRecursosDelTenant() {
 
     load();
     return () => { isMounted = false; };
-  }, [tenant.id]);
+  }, [tenant.id, intento]);
 
-  return { recursos, isLoading };
+  return { recursos, isLoading, error, recargar };
 }
 
 /**

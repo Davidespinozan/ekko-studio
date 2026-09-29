@@ -13,21 +13,27 @@ import { ToastProvider } from '@shared/providers/ToastProvider';
 
 const h = vi.hoisted(() => ({
   reservas: [] as Record<string, unknown>[],
+  isLoading: false,
+  error: false,
+  cargado: true,
+  recursosError: null as unknown,
   refetch: vi.fn(),
   checkInManual: vi.fn(),
   onSuccess: vi.fn()
 }));
 
-vi.mock('../../hooks/useReservasHoy', () => ({
-  useReservasHoy: () => ({ reservas: h.reservas, isLoading: false, refetch: h.refetch }),
+vi.mock('../../hooks/useReservasHoy', async (orig) => ({
+  ...(await orig<typeof import('../../hooks/useReservasHoy')>()), // conserva estadoListaHoy (puro)
+  useReservasHoy: () => ({ reservas: h.reservas, isLoading: h.isLoading, error: h.error, cargado: h.cargado, refetch: h.refetch }),
   checkInManual: (...a: unknown[]) => h.checkInManual(...a)
 }));
 vi.mock('@shared/lib/supabase', () => ({
   supabase: {
-    from: () => {
+    from: (tabla: string) => {
       const b: Record<string, unknown> = {};
       for (const m of ['select', 'eq', 'order']) b[m] = () => b;
-      b.then = (cb: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(cb);
+      b.then = (cb: (v: unknown) => unknown) =>
+        Promise.resolve(tabla === 'recursos' && h.recursosError ? { data: null, error: h.recursosError } : { data: [], error: null }).then(cb);
       return b;
     }
   }
@@ -76,6 +82,10 @@ function renderHoy() {
 beforeEach(() => {
   vi.clearAllMocks();
   h.reservas = [reservaLlegando()];
+  h.isLoading = false;
+  h.error = false;
+  h.cargado = true;
+  h.recursosError = null;
   h.refetch.mockResolvedValue(undefined);
   h.checkInManual.mockResolvedValue({ miembro: { id: 'u1' }, membresia_estado: 'vencida' });
 });
@@ -128,5 +138,56 @@ describe('ReservasHoyView · atajos de mostrador', () => {
     h.reservas = [reservaLlegando({ usuario: { ...reservaLlegando().usuario as object, identidad_completa: false } })];
     renderHoy();
     expect(await screen.findByText(/ficha o contrato pendiente/i)).toBeInTheDocument();
+  });
+});
+
+// ── PKG-02A (C02 · F02) · error ≠ "Sin reservas"; polling fallido = stale ─────
+describe('ReservasHoyView · estados honestos (PKG-02A)', () => {
+  it('success con [] → "Sin reservas para hoy" (vacío real)', async () => {
+    h.reservas = [];
+    renderHoy();
+    expect(await screen.findByText('Sin reservas para hoy')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('primer fetch fallido (sin dato) → "No pudimos cargar las reservas de hoy." + Reintentar; NUNCA "Sin reservas"', async () => {
+    h.reservas = [];
+    h.error = true;
+    h.cargado = false;
+    renderHoy();
+    expect(await screen.findByText('No pudimos cargar las reservas de hoy.')).toBeInTheDocument();
+    expect(screen.queryByText('Sin reservas para hoy')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(h.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('cargando inicial → skeletons, ni vacío ni error', () => {
+    h.reservas = [];
+    h.isLoading = true;
+    h.cargado = false;
+    renderHoy();
+    expect(screen.queryByText('Sin reservas para hoy')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('lista previa válida + refresh fallido → la lista SE CONSERVA y aparece "No pudimos actualizar la lista"', async () => {
+    h.error = true;
+    h.cargado = true;
+    renderHoy();
+    expect(await screen.findByText(/Ana Núñez/)).toBeInTheDocument(); // la reserva sigue visible
+    expect(screen.getByText(/No pudimos actualizar la lista/)).toBeInTheDocument();
+    expect(screen.queryByText('Sin reservas para hoy')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(h.refetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── PKG-02A (F23) · filtro de estudios ───────────────────────────────────────
+describe('ReservasHoyView · filtro de estudios (PKG-02A)', () => {
+  it('error del catálogo → opción "Estudios no disponibles" (no un selector vacío que parece "sin estudios")', async () => {
+    h.recursosError = { message: 'timeout' };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderHoy();
+    expect(await screen.findByRole('option', { name: /Estudios no disponibles/ })).toBeInTheDocument();
   });
 });

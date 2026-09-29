@@ -4,6 +4,7 @@ import { QrCode, CalendarPlus } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { supabase } from '@shared/lib/supabase';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ErrorCarga } from '@shared/components/ErrorCarga';
 import { desdeReservasVigentesISO } from '@member/logic/reservasVigentes';
 
 /**
@@ -14,7 +15,10 @@ import { desdeReservasVigentesISO } from '@member/logic/reservasVigentes';
 export default function MiQRProxima() {
   const { usuario } = useAuth();
   const [reservaId, setReservaId] = useState<string | null>(null);
-  const [estado, setEstado] = useState<'loading' | 'none'>('loading');
+  // PKG-02A (C02): 'error' es distinto de 'none'. Un fallo al consultar no puede
+  // decirle al miembro, en la puerta, que no tiene sesión.
+  const [estado, setEstado] = useState<'loading' | 'none' | 'error'>('loading');
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     if (!usuario) return;
@@ -23,7 +27,7 @@ export default function MiQRProxima() {
     setReservaId(null);
     setEstado('loading');
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('reservas')
         .select('id')
         .eq('usuario_id', usuario.id)
@@ -33,15 +37,34 @@ export default function MiQRProxima() {
         .limit(1)
         .maybeSingle();
       if (!mounted) return;
+      if (error) {
+        console.error('[MiQRProxima]', error);
+        setEstado('error');
+        return;
+      }
       if (data?.id) setReservaId(data.id);
       else setEstado('none');
     })();
     return () => {
       mounted = false;
     };
-  }, [usuario]);
+  }, [usuario, intento]);
 
   if (reservaId) return <Navigate to={`/app/qr/${reservaId}`} replace />;
+
+  if (estado === 'error') {
+    return (
+      <div className="ek-container">
+        <div className="ek-card" style={{ marginTop: '24px' }}>
+          <ErrorCarga
+            titulo="No pudimos cargar tu próxima sesión."
+            hint="Si tienes una reserva, sigue ahí. Revisa tu conexión e intenta de nuevo."
+            onReintentar={() => setIntento((n) => n + 1)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   if (estado === 'loading') {
     return (

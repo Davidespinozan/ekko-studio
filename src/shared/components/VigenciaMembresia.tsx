@@ -27,6 +27,14 @@ export function VigenciaMembresia({ usuarioId, variante = 'detalle', membresia: 
   const membresia = esControlada ? controlada : propia.membresia;
   const isLoading = esControlada ? false : propia.isLoading;
   if (isLoading) return <span style={{ fontSize: '12px', color: 'var(--ek-ink-faint)' }}>…</span>;
+  // PKG-02A (C02): la consulta falló → "no disponible", nunca "SIN MEMBRESÍA".
+  if (!esControlada && propia.error) {
+    return (
+      <span data-testid="vigencia-membresia" role="alert" style={{ fontSize: '11px', color: 'var(--ek-danger)', fontWeight: 700, letterSpacing: '0.08em' }}>
+        MEMBRESÍA NO DISPONIBLE
+      </span>
+    );
+  }
 
   const estado = estadoMembresia(membresia);
   const { texto, color } = ESTADO_MEMBRESIA_LABEL[estado];

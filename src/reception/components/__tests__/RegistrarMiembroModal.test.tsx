@@ -15,6 +15,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 const h = vi.hoisted(() => ({
   getSession: vi.fn(),
   fetchMock: vi.fn(),
+  planesResultado: { data: [{ slug: 'pro', nombre: 'Pro' }], error: null } as { data: unknown; error: unknown },
   activarMock: vi.fn(),
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }
 }));
@@ -27,7 +28,7 @@ vi.mock('@shared/lib/supabase', () => ({
       select: () => ({
         eq: () => ({
           order: () =>
-            Promise.resolve({ data: [{ slug: 'pro', nombre: 'Pro' }], error: null })
+            Promise.resolve(h.planesResultado)
         })
       })
     })
@@ -163,5 +164,24 @@ describe('RegistrarMiembroModal · wiring', () => {
     // Aquí no debe existir ninguno: recepción nunca crea staff.
     expect(screen.queryByRole('radio')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/rol/i)).not.toBeInTheDocument();
+  });
+});
+
+// ── PKG-02A (C02 · F12) ───────────────────────────────────────────────────────
+describe('RegistrarMiembroModal · planes (PKG-02A)', () => {
+  afterEach(() => {
+    h.planesResultado = { data: [{ slug: 'pro', nombre: 'Pro' }], error: null };
+  });
+
+  it('planes en ERROR → selector deshabilitado "planes no disponibles" + aviso; nunca se interpreta como "sin planes"', async () => {
+    h.planesResultado = { data: null, error: { message: 'permission denied' } };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(<RegistrarMiembroModal onClose={vi.fn()} onRegistrado={vi.fn()} />);
+    const select = (await screen.findByLabelText(/Plan inicial/)) as HTMLSelectElement;
+    await waitFor(() => expect(select.disabled).toBe(true));
+    expect(screen.getByRole('option', { name: '— planes no disponibles —' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Pro' })).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/No pudimos cargar los planes/);
+    expect(document.body.textContent).not.toMatch(/permission denied/);
   });
 });

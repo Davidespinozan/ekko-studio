@@ -41,24 +41,32 @@ const POLLING_INTERVAL_MS = 30_000;
 export function useNotificacionesMiembro() {
   const { usuario } = useAuth();
   const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
+  // PKG-02A (C02): un fetch fallido no es "estás al día". `cargado` distingue el
+  // primer fallo (sin dato) de un polling fallido con avisos previos (stale).
+  const [error, setError] = useState(false);
+  const [cargado, setCargado] = useState(false);
 
   const refetch = useCallback(async () => {
     if (!usuario) {
       setNotificaciones([]);
+      setError(false);
       return;
     }
-    const { data, error } = await supabase
+    const { data, error: qErr } = await supabase
       .from('notificaciones')
       .select('id, tipo, titulo, mensaje, metadata, creada_at, leida')
       .eq('usuario_id', usuario.id)
       .order('creada_at', { ascending: false })
       .limit(MAX_AVISOS);
 
-    if (error) {
-      console.error('[useNotificacionesMiembro]', error);
+    if (qErr) {
+      console.error('[useNotificacionesMiembro]', qErr);
+      setError(true); // la lista anterior se conserva
       return;
     }
     setNotificaciones((data ?? []) as Notificacion[]);
+    setError(false);
+    setCargado(true);
   }, [usuario]);
 
   useVisibilityAwarePolling(refetch, POLLING_INTERVAL_MS, !!usuario);
@@ -100,5 +108,5 @@ export function useNotificacionesMiembro() {
 
   const noLeidas = notificaciones.filter((n) => !n.leida).length;
 
-  return { notificaciones, noLeidas, marcarLeida, marcarTodas, refetch };
+  return { notificaciones, noLeidas, error, cargado, marcarLeida, marcarTodas, refetch };
 }

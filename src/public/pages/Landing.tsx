@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ArrowRight, Check, X, CalendarCheck, Clapperboard, FolderDown, ImageIcon } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
+import { ErrorInline } from '@shared/components/ErrorCarga';
 import { parseBeneficios } from '@shared/lib/beneficios';
 import { sufijoPrecioSesiones, esTierRecomendado, esPlanPaquete } from '@shared/lib/planPresentacion';
 import { useLandingConfig } from '@shared/hooks/useLandingConfig';
@@ -44,11 +45,15 @@ interface TierPublico {
 function useEstudiosPublicos() {
   const [estudios, setEstudios] = useState<EstudioPublico[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02 · F20): un fallo público no es una landing "sin estudios".
+  const [error, setError] = useState(false);
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const { data, error } = await supabase
+      setError(false);
+      const { data, error: qErr } = await supabase
         .from('recursos')
         .select(
           'id, slug, nombre, descripcion, tiers_permitidos, costo_creditos, tipo_contenido, equipo_incluido, estilo_visual, capacidad_personas, foto_url'
@@ -57,25 +62,33 @@ function useEstudiosPublicos() {
         .order('orden', { ascending: true });
 
       if (!mounted) return;
-      if (error) console.error('[useEstudiosPublicos]', error);
-      else setEstudios((data ?? []) as EstudioPublico[]);
+      if (qErr) {
+        console.error('[useEstudiosPublicos]', qErr);
+        setError(true);
+      } else {
+        setEstudios((data ?? []) as EstudioPublico[]);
+      }
       setIsLoading(false);
     }
     load();
     return () => { mounted = false; };
-  }, []);
+  }, [intento]);
 
-  return { estudios, isLoading };
+  return { estudios, isLoading, error, recargar: () => setIntento((n) => n + 1) };
 }
 
 function useTiersPublicos() {
   const [tiers, setTiers] = useState<TierPublico[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // PKG-02A (C02 · F20): un fallo público no es una landing "sin tiers".
+  const [error, setError] = useState(false);
+  const [intento, setIntento] = useState(0);
 
   useEffect(() => {
     let mounted = true;
     async function load() {
-      const { data, error } = await supabase
+      setError(false);
+      const { data, error: qErr } = await supabase
         .from('tiers')
         .select('slug, nombre, precio_centavos, descripcion, beneficios, reglas, tipo, clases_incluidas, orden')
         .eq('activo', true)
@@ -83,15 +96,19 @@ function useTiersPublicos() {
         .order('orden', { ascending: true });
 
       if (!mounted) return;
-      if (error) console.error('[useTiersPublicos]', error);
-      else setTiers((data ?? []) as TierPublico[]);
+      if (qErr) {
+        console.error('[useTiersPublicos]', qErr);
+        setError(true);
+      } else {
+        setTiers((data ?? []) as TierPublico[]);
+      }
       setIsLoading(false);
     }
     load();
     return () => { mounted = false; };
-  }, []);
+  }, [intento]);
 
-  return { tiers, isLoading };
+  return { tiers, isLoading, error, recargar: () => setIntento((n) => n + 1) };
 }
 
 function formatearPesos(centavos: number): string {
@@ -107,8 +124,8 @@ export default function Landing() {
     if (!el) return;
     el.scrollBy({ left: dir * Math.min(el.clientWidth * 0.8, 480), behavior: 'smooth' });
   };
-  const { estudios, isLoading: estudiosLoading } = useEstudiosPublicos();
-  const { tiers, isLoading: tiersLoading } = useTiersPublicos();
+  const { estudios, isLoading: estudiosLoading, error: estudiosError, recargar: recargarEstudios } = useEstudiosPublicos();
+  const { tiers, isLoading: tiersLoading, error: tiersError, recargar: recargarTiers } = useTiersPublicos();
   const { hero, cta_final, whatsappUrl, membresias, estudios: estudiosCopy, como_funciona, faq, estudio_modal } =
     useLandingConfig();
   const ctaWhatsappUrl = whatsappUrl();
@@ -331,7 +348,10 @@ export default function Landing() {
           </p>
         )}
 
-        {estudiosLoading ? (
+        {estudiosError ? (
+          // PKG-02A (F20): aviso discreto, sin tecnicismos; el resto de la landing sigue.
+          <ErrorInline mensaje="No pudimos cargar los estudios en este momento." onReintentar={recargarEstudios} />
+        ) : estudiosLoading ? (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
@@ -448,7 +468,9 @@ export default function Landing() {
           <PlanTipoToggle value={vistaPlan} onChange={setTipoPlanVista} />
         )}
 
-        {tiersLoading ? (
+        {tiersError ? (
+          <ErrorInline mensaje="No pudimos cargar los planes en este momento." onReintentar={recargarTiers} />
+        ) : tiersLoading ? (
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',

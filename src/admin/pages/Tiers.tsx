@@ -27,6 +27,7 @@ import { useTenant } from '@shared/hooks/useTenant';
 import { useToast } from '@shared/hooks/useToast';
 import { Spinner } from '@shared/components/Spinner';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ErrorCarga } from '@shared/components/ErrorCarga';
 import { SegmentedToggle } from '@shared/components/SegmentedToggle';
 import Toggle from '../components/Toggle';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -46,7 +47,9 @@ type ModalState =
 type ArchivarState =
   | null
   | { tier: Tier; status: 'loading' }
-  | { tier: Tier; status: 'ready'; activeMembers: number };
+  | { tier: Tier; status: 'ready'; activeMembers: number }
+  // PKG-02A (C02 · F22): el conteo falló → no se sabe si hay miembros → no se archiva.
+  | { tier: Tier; status: 'error' };
 
 type HardDeleteTierState =
   | null
@@ -57,7 +60,7 @@ type HardDeleteTierState =
 export default function Tiers() {
   const tenant = useTenant();
   const toast = useToast();
-  const { tiers, isLoading, refetch } = useTiersAdmin();
+  const { tiers, isLoading, error, refetch } = useTiersAdmin();
   const [modal, setModal] = useState<ModalState>(null);
   const [archivar, setArchivar] = useState<ArchivarState>(null);
   const [borrarPerm, setBorrarPerm] = useState<HardDeleteTierState>(null);
@@ -109,6 +112,11 @@ export default function Tiers() {
       tierSlug: tier.slug,
       tenantId: tenant.id
     });
+    // null = no se pudo contar. Fail-safe: bloquear, explicar, dejar reintentar.
+    if (count === null) {
+      setArchivar({ tier, status: 'error' });
+      return;
+    }
     setArchivar({ tier, status: 'ready', activeMembers: count });
   }
 
@@ -159,10 +167,14 @@ export default function Tiers() {
   }
 
   const archivarTier = archivar?.tier;
-  const archivarBloqueado = archivar?.status === 'ready' && archivar.activeMembers > 0;
+  const archivarBloqueado =
+    (archivar?.status === 'ready' && archivar.activeMembers > 0) || archivar?.status === 'error';
   const archivarConfirmDescription = (() => {
     if (!archivar) return '';
     if (archivar.status === 'loading') return 'Verificando miembros activos…';
+    if (archivar.status === 'error') {
+      return 'No pudimos verificar cuántos miembros tienen este plan. Por seguridad no se puede eliminar hasta comprobarlo: cierra este aviso e intenta de nuevo.';
+    }
     if (archivar.activeMembers > 0) {
       return `${archivar.activeMembers} miembro(s) activo(s) tienen este plan. Cámbialos a otro plan antes de eliminar este.`;
     }
@@ -191,7 +203,10 @@ export default function Tiers() {
         </button>
       </div>
 
-      {isLoading ? (
+      {error ? (
+        // PKG-02A (C02 · F13): fallo de lectura ≠ "no hay planes activos".
+        <ErrorCarga titulo="No pudimos cargar los planes." onReintentar={() => void refetch()} />
+      ) : isLoading ? (
         <Spinner label="Cargando…" />
       ) : (
         <>
@@ -320,8 +335,9 @@ export default function Tiers() {
   );
 }
 
-function useMemberCount(tier: Tier, tenantId: string): number | null {
-  const [count, setCount] = useState<number | null>(null);
+/** Conteo por fila: `undefined` = cargando, `null` = no se pudo contar (F22), número = real. */
+function useMemberCount(tier: Tier, tenantId: string): number | null | undefined {
+  const [count, setCount] = useState<number | null | undefined>(undefined);
 
   useEffect(() => {
     let mounted = true;
@@ -452,8 +468,10 @@ function TierRow({
           </p>
         )}
         <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: 0 }}>
-          {memberCount === null
+          {memberCount === undefined
             ? <Spinner label="Cargando…" />
+            : memberCount === null
+            ? <span style={{ color: 'var(--ek-danger)' }}>Miembros activos: no disponible</span>
             : memberCount === 0
             ? 'Sin miembros activos'
             : `${memberCount} ${memberCount === 1 ? 'miembro activo' : 'miembros activos'}`}
