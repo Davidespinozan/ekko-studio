@@ -8,7 +8,17 @@ import { sufijoPrecio, esPlanPaquete, detallePlan } from '@shared/lib/planPresen
 import { PaymentModal } from '@shared/components/PaymentModal';
 import { PlanTipoToggle, type VistaPlan } from '@shared/components/PlanTipoToggle';
 import { Spinner } from '@shared/components/Spinner';
-import { ErrorCarga } from '@shared/components/ErrorCarga';
+import { ErrorCarga, ErrorInline } from '@shared/components/ErrorCarga';
+import { observarActivacion } from '@shared/lib/observarActivacion';
+import {
+  guardarPagoPendiente,
+  leerPagoPendiente,
+  leerRetornoPago,
+  limpiarPagoPendiente,
+  mensajePagoPendiente,
+  MENSAJE_PAGO,
+  type PagoPendiente
+} from '@shared/lib/pagoEstado';
 
 /**
  * Pantalla para el miembro con cuenta `pendiente_pago`: paga su membresía y se
@@ -31,7 +41,7 @@ function pesos(centavos: number): string {
 }
 
 export default function PagarMembresia() {
-  const { usuario, signOut } = useAuth();
+  const { usuario, signOut, refreshUsuario } = useAuth();
   const tenant = useTenant();
   const [tiers, setTiers] = useState<TierInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +50,11 @@ export default function PagarMembresia() {
   const [intento, setIntento] = useState(0);
   const [pagarOpen, setPagarOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pagado, setPagado] = useState(false);
+  // PKG-02B (C04): tras un pago con `succeeded` la cuenta NO está activa hasta
+  // observarlo (usuarios.status ≠ pendiente_pago). Mientras haya un pago
+  // confirmado/en proceso/desconocido sin resolver, NO se vuelve a ofrecer "Pagar".
+  const [pendiente, setPendiente] = useState<PagoPendiente | null>(() => leerPagoPendiente('pagar'));
+  const [activacion, setActivacion] = useState<'idle' | 'observando' | 'no_observada' | 'error'>('idle');
   // null = usar el plan del signup; si el usuario elige otro, gana este.
   const [slugElegido, setSlugElegido] = useState<string | null>(null);
   const [vistaPlan, setVistaPlan] = useState<VistaPlan>('membresias');
@@ -81,6 +95,53 @@ export default function PagarMembresia() {
     return () => { mounted = false; };
   }, [tenant.id, intento]);
 
+  // Retorno de un método con redirección (iDEAL/Bancontact/EPS): leer el estado real.
+  useEffect(() => {
+    const r = leerRetornoPago(window.location.search);
+    if (r.flujo !== 'pagar' || r.estado === null) return;
+    if (r.estado === 'succeeded') {
+      setPendiente(guardarPagoPendiente({ flujo: 'pagar', paymentIntentId: r.paymentIntentId, estado: 'confirmado' }));
+    } else if (r.estado === 'processing') {
+      setPendiente(guardarPagoPendiente({ flujo: 'pagar', paymentIntentId: r.paymentIntentId, estado: 'en_proceso' }));
+    } else if (r.estado === 'desconocido') {
+      setPendiente(guardarPagoPendiente({ flujo: 'pagar', paymentIntentId: r.paymentIntentId, estado: 'desconocido' }));
+    } else {
+      // failed → no se afirma cargo; el CTA "Pagar" sigue disponible.
+      setRetornoFallido(true);
+    }
+    window.history.replaceState(null, '', window.location.pathname);
+  }, []);
+  const [retornoFallido, setRetornoFallido] = useState(false);
+
+  // Observar la activación (solo LECTURA de usuarios.status). Éxito = la cuenta
+  // dejó de estar pendiente de pago; entonces refreshUsuario y MemberLayout deja
+  // pasar. Timeout ≠ fallo del pago; error de lectura ≠ "no se activó".
+  async function comprobarActivacion() {
+    if (!usuario?.id) return;
+    setActivacion('observando');
+    const obs = await observarActivacion<{ status: string | null }>({
+      leer: async () => {
+        const { data, error } = await supabase.from('usuarios').select('status').eq('id', usuario.id).maybeSingle();
+        return { data: (data as { status: string | null } | null) ?? null, error };
+      },
+      listo: (u) => u.status !== null && u.status !== 'pendiente_pago'
+    });
+    if (obs.resultado === 'observada') {
+      limpiarPagoPendiente();
+      setPendiente(null);
+      setActivacion('idle');
+      await refreshUsuario(); // MemberLayout re-evalúa el gate y entra a la app
+      return;
+    }
+    setActivacion(obs.resultado === 'error' ? 'error' : 'no_observada');
+  }
+
+  useEffect(() => {
+    // Solo un pago CONFIRMADO se observa solo; en_proceso/desconocido esperan al webhook.
+    if (pendiente?.estado === 'confirmado' && activacion === 'idle') void comprobarActivacion();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendiente?.paymentIntentId, pendiente?.estado]);
+
   const slug = slugElegido ?? usuario?.membresia_tier ?? tiers[0]?.slug ?? null;
   const tier = tiers.find((t) => t.slug === slug) ?? null;
   const esPaquete = tier?.tipo === 'creditos' || tier?.tipo === 'hibrido';
@@ -91,19 +152,44 @@ export default function PagarMembresia() {
   const hayAmbosTipos = planesMensuales.length > 0 && planesPaquetes.length > 0;
   const planesVisibles = vistaPlan === 'paquetes' ? planesPaquetes : planesMensuales;
 
-  if (pagado) {
+  if (pendiente) {
+    const confirmado = pendiente.estado === 'confirmado';
+    const observando = activacion === 'observando';
     return (
-      <div style={{ maxWidth: '460px', margin: '0 auto', padding: '48px 24px', textAlign: 'center' }}>
+      <div data-testid="pago-pendiente" style={{ maxWidth: '460px', margin: '0 auto', padding: '48px 24px', textAlign: 'center' }}>
         <span className="ek-empty-icon" style={{ width: 56, height: 56, marginBottom: '16px' }}>
           <Check size={26} aria-hidden="true" />
         </span>
         <h1 style={{ fontFamily: 'var(--ek-font-display)', fontSize: '24px', fontWeight: 700, margin: '0 0 8px' }}>
-          ¡Pago recibido!
+          {confirmado ? 'Pago recibido' : pendiente.estado === 'en_proceso' ? 'Pago en proceso' : 'Pago sin confirmar'}
         </h1>
-        <p className="ek-body-muted" style={{ margin: '0 0 8px' }}>
-          Estamos activando tu cuenta, puede tardar unos segundos…
+        <p className="ek-body-muted" style={{ margin: '0 0 16px', lineHeight: 1.5 }}>
+          {observando ? MENSAJE_PAGO.recibidoActivando : mensajePagoPendiente(pendiente)}
         </p>
-        <Spinner size={20} />
+        {activacion === 'error' && (
+          <div style={{ marginBottom: '14px', textAlign: 'left' }}>
+            <ErrorInline mensaje={MENSAJE_PAGO.comprobacionFallo} />
+          </div>
+        )}
+        {observando ? (
+          <Spinner size={20} />
+        ) : (
+          confirmado && (
+            <button type="button" className="ek-cta ek-cta--gold" onClick={() => void comprobarActivacion()}>
+              Volver a comprobar
+            </button>
+          )
+        )}
+        <p className="ek-helper-text" style={{ marginTop: '18px' }}>
+          Si después de unos minutos sigue sin activarse, acércate a recepción: pueden verificar tu pago. No pagues otra vez.
+        </p>
+        <button
+          type="button"
+          onClick={signOut}
+          style={{ display: 'block', margin: '14px auto 0', fontSize: '13px', color: 'var(--ek-ink-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
+        >
+          Salir
+        </button>
       </div>
     );
   }
@@ -158,6 +244,11 @@ export default function PagarMembresia() {
             )}
           </div>
 
+          {retornoFallido && (
+            <div style={{ marginBottom: '12px' }}>
+              <ErrorInline mensaje={MENSAJE_PAGO.noCompletado} />
+            </div>
+          )}
           <button type="button" className="ek-cta ek-cta--gold ek-cta--full" onClick={() => setPagarOpen(true)}>
             Pagar ahora
           </button>
@@ -245,12 +336,16 @@ export default function PagarMembresia() {
               tierNombre={tier.nombre}
               precio={Math.round(tier.precio_centavos / 100)}
               esPaquete={esPaquete}
+              flujo="pagar"
               onClose={() => setPagarOpen(false)}
-              onPagado={() => {
+              onPagado={(pago) => {
+                // PAGO CONFIRMADO ≠ CUENTA ACTIVA: se observa la activación; nada de reload ciego.
                 setPagarOpen(false);
-                setPagado(true);
-                // El webhook activa la cuenta; recargamos para entrar activo.
-                setTimeout(() => window.location.reload(), 4500);
+                setPendiente(guardarPagoPendiente({ flujo: 'pagar', paymentIntentId: pago.paymentIntentId, estado: 'confirmado' }));
+              }}
+              onEnProceso={(pago) => {
+                setPagarOpen(false);
+                setPendiente(guardarPagoPendiente({ flujo: 'pagar', paymentIntentId: pago.paymentIntentId, estado: 'en_proceso' }));
               }}
             />
           )}

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ToastProvider } from '@shared/providers/ToastProvider';
+import { CLAVE_PAGO_PENDIENTE, MENSAJE_PAGO } from '@shared/lib/pagoEstado';
 
 /**
  * "Pago por hora" en un solo flujo (solicitud del cliente, punto 2): sin plan o sin
@@ -25,7 +26,10 @@ const h = vi.hoisted(() => ({
   refreshUsuario: vi.fn(),
   tiersError: null as unknown,
   recursosError: false,
-  recargarRecursos: vi.fn()
+  recargarRecursos: vi.fn(),
+  // PKG-02B
+  observar: vi.fn(),
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }
 }));
 
 const RECURSO = {
@@ -59,11 +63,21 @@ vi.mock('../../hooks/useReservas', async (orig) => ({
   crearReserva: (...a: unknown[]) => h.crearReserva(...a)
 }));
 vi.mock('@shared/components/PaymentModal', () => ({
-  PaymentModal: (p: { tierSlug?: string; precio: number; onPagado: () => void }) => {
-    h.pagoAbierto(p.tierSlug, p.precio);
-    return <button onClick={p.onPagado}>SIMULAR_PAGO_OK</button>;
+  // PKG-02B: el modal solo avisa `onPagado` con un PaymentIntent `succeeded` (trae su id);
+  // `processing` va por `onEnProceso`.
+  PaymentModal: (p: { tierSlug?: string; precio: number; flujo?: string; onPagado: (x: { paymentIntentId: string }) => void; onEnProceso?: (x: { paymentIntentId: string }) => void }) => {
+    h.pagoAbierto(p.tierSlug, p.precio, p.flujo);
+    return (
+      <div>
+        <button onClick={() => p.onPagado({ paymentIntentId: 'pi_hora' })}>SIMULAR_PAGO_OK</button>
+        <button onClick={() => p.onEnProceso?.({ paymentIntentId: 'pi_hora' })}>SIMULAR_PROCESSING</button>
+      </div>
+    );
   }
 }));
+vi.mock('@shared/lib/observarActivacion', () => ({ observarActivacion: (...a: unknown[]) => h.observar(...a) }));
+vi.mock('@shared/hooks/useToast', () => ({ useToast: () => h.toast }));
+vi.mock('@shared/lib/celebrar', () => ({ celebrar: () => {} }));
 
 import Reservar from '../Reservar';
 
@@ -93,6 +107,10 @@ beforeEach(() => {
   // Reloj fijo: a las 09:00 del estudio (Mazatlán, UTC-7) siempre quedan horas
   // ese día. Con el reloj real, corrido de noche no había ninguna hora que tocar.
   vi.setSystemTime(new Date('2026-09-22T16:00:00Z'));
+  h.observar.mockReset();
+  for (const f of Object.values(h.toast)) f.mockReset();
+  window.sessionStorage.clear();
+  window.history.replaceState(null, '', '/app/reservar');
 });
 
 afterEach(() => {
@@ -113,7 +131,7 @@ describe('Reservar · pago por hora', () => {
     montar();
     await tocarPrimeraHora();
     fireEvent.click(await screen.findByRole('button', { name: /pagar y reservar/i }));
-    await waitFor(() => expect(h.pagoAbierto).toHaveBeenCalledWith('sesion-suelta', 250));
+    await waitFor(() => expect(h.pagoAbierto).toHaveBeenCalledWith('sesion-suelta', 250, 'hora'));
   });
 
   it('con un plan que SÍ tiene saldo no se ofrece nada: se abre la confirmación normal', async () => {
@@ -137,7 +155,8 @@ describe('Reservar · resumen del miembro en error (PKG-02A)', () => {
     expect(screen.queryByRole('dialog', { name: /pagar esta hora/i })).not.toBeInTheDocument();
     expect(screen.queryByText('CONFIRMAR RESERVA')).not.toBeInTheDocument();
     expect(h.pagoAbierto).not.toHaveBeenCalled();
-    expect(await screen.findByText(/Reintenta para poder reservar/)).toBeInTheDocument();
+    // (useToast está mockeado en este archivo: el aviso se comprueba en el mock.)
+    await waitFor(() => expect(h.toast.warning).toHaveBeenCalledWith(expect.stringMatching(/Reintenta para poder reservar/)));
   });
 
   it('con plan en `usuarios` pero resumen en ERROR: tampoco abre la confirmación (no se inventa saldo)', async () => {
@@ -170,7 +189,108 @@ describe('Reservar · estudios y planes en error (PKG-02A)', () => {
     await tocarPrimeraHora();
     expect(screen.queryByRole('dialog', { name: /pagar esta hora/i })).not.toBeInTheDocument();
     expect(h.pagoAbierto).not.toHaveBeenCalled();
-    expect(await screen.findByText(/No pudimos cargar los planes disponibles\. Reintenta/)).toBeInTheDocument();
+    await waitFor(() => expect(h.toast.warning).toHaveBeenCalledWith(expect.stringMatching(/No pudimos cargar los planes disponibles\. Reintenta/)));
     expect(document.body.textContent).not.toMatch(/permission denied/);
+    expect(h.toast.warning.mock.calls.flat().join(' ')).not.toMatch(/permission denied/);
+  });
+});
+
+// ── PKG-02B (C04) · PAGO RECIBIDO ≠ RESERVA CONFIRMADA ────────────────────────
+describe('Reservar · pago por hora veraz (PKG-02B)', () => {
+  async function pagarHora() {
+    montar();
+    await tocarPrimeraHora();
+    fireEvent.click(await screen.findByRole('button', { name: /pagar y reservar/i }));
+    await screen.findByText('SIMULAR_PAGO_OK');
+  }
+
+  it('21 · succeeded → primero "PAGO RECIBIDO · RESERVANDO" (sin reserva); al observar el saldo se reserva y entonces sí "Reserva confirmada"', async () => {
+    let resolver: (v: unknown) => void = () => {};
+    h.observar.mockImplementation(() => new Promise((r) => { resolver = r; }));
+    await pagarHora();
+    fireEvent.click(screen.getByText('SIMULAR_PAGO_OK'));
+    const overlay = await screen.findByTestId('acreditando');
+    expect(within(overlay).getByText('PAGO RECIBIDO · RESERVANDO')).toBeInTheDocument();
+    expect(h.crearReserva).not.toHaveBeenCalled();
+    expect(h.toast.success).not.toHaveBeenCalled();
+    expect(JSON.parse(window.sessionStorage.getItem(CLAVE_PAGO_PENDIENTE)!)).toMatchObject({ flujo: 'hora', estado: 'confirmado', paymentIntentId: 'pi_hora', contexto: { recursoId: 'r-1', costo: 1 } });
+    // La evidencia: saldo suficiente para ESTA hora.
+    const opts = h.observar.mock.calls[0][0] as { listo: (m: { creditos_restantes: number | null }) => boolean };
+    expect(opts.listo({ creditos_restantes: 0 })).toBe(false);
+    expect(opts.listo({ creditos_restantes: null })).toBe(false);
+    expect(opts.listo({ creditos_restantes: 1 })).toBe(true);
+
+    resolver({ resultado: 'observada', dato: { creditos_restantes: 1 } });
+    await waitFor(() => expect(h.crearReserva).toHaveBeenCalledTimes(1));
+    expect(h.crearReserva.mock.calls[0][0]).toMatchObject({ recursoId: 'r-1' });
+    await waitFor(() => expect(h.toast.success).toHaveBeenCalledWith(expect.stringMatching(/^Reserva confirmada/)));
+    expect(window.sessionStorage.getItem(CLAVE_PAGO_PENDIENTE)).toBeNull();
+  });
+
+  it('22 · saldo no observado → pendiente con "Volver a comprobar" (solo lee); NO reserva, NO "confirmada", NO otro pago', async () => {
+    h.observar.mockResolvedValue({ resultado: 'no_observada', ultimo: { creditos_restantes: 0 } });
+    await pagarHora();
+    fireEvent.click(screen.getByText('SIMULAR_PAGO_OK'));
+    const overlay = await screen.findByTestId('acreditando');
+    expect(await within(overlay).findByText(/tardando más de lo normal/)).toBeInTheDocument();
+    expect(within(overlay).getByText('PAGO RECIBIDO')).toBeInTheDocument();
+    expect(h.crearReserva).not.toHaveBeenCalled();
+    expect(h.toast.success).not.toHaveBeenCalled();
+    fireEvent.click(within(overlay).getByRole('button', { name: 'Volver a comprobar' }));
+    await waitFor(() => expect(h.observar).toHaveBeenCalledTimes(2));
+    expect(h.pagoAbierto).toHaveBeenCalledTimes(1); // el PaymentModal no se reabrió
+  });
+
+  it('23 · error al leer el saldo → "No pudimos comprobar…" (no "sin créditos", no "fallido"); sin reserva', async () => {
+    h.observar.mockResolvedValue({ resultado: 'error' });
+    await pagarHora();
+    fireEvent.click(screen.getByText('SIMULAR_PAGO_OK'));
+    const overlay = await screen.findByTestId('acreditando');
+    expect(await within(overlay).findByText(MENSAJE_PAGO.comprobacionFallo)).toBeInTheDocument();
+    expect(h.crearReserva).not.toHaveBeenCalled();
+    expect(within(overlay).getByRole('button', { name: 'Volver a comprobar' })).toBeInTheDocument();
+  });
+
+  it('processing → aviso "pago en proceso" sin "Volver a comprobar"; tocar otra hora NO ofrece pagar de nuevo', async () => {
+    await pagarHora();
+    fireEvent.click(screen.getByText('SIMULAR_PROCESSING'));
+    const banner = await screen.findByTestId('pago-hora-pendiente');
+    expect(within(banner).getByText(MENSAJE_PAGO.pagoEnProcesoPersistido)).toBeInTheDocument();
+    expect(within(banner).queryByRole('button', { name: 'Volver a comprobar' })).not.toBeInTheDocument();
+    expect(h.observar).not.toHaveBeenCalled();
+    await tocarPrimeraHora();
+    await waitFor(() => expect(h.toast.warning).toHaveBeenCalledWith(expect.stringMatching(/pago pendiente de acreditar/), expect.anything()));
+    expect(screen.queryByRole('dialog', { name: /pagar esta hora/i })).not.toBeInTheDocument();
+    expect(h.pagoAbierto).toHaveBeenCalledTimes(1);
+  });
+
+  it('18/19 · pendiente confirmado persistido (refresh): bloquea "Pagar y reservar"; "Volver a comprobar" solo lee y NO reserva sola', async () => {
+    window.sessionStorage.setItem(CLAVE_PAGO_PENDIENTE, JSON.stringify({
+      flujo: 'hora', paymentIntentId: 'pi_prev', estado: 'confirmado', ts: Date.now() - 60_000,
+      contexto: { slotInicio: '2026-09-22T20:00:00.000Z', recursoId: 'r-1', costo: 1 }
+    }));
+    h.observar.mockResolvedValue({ resultado: 'observada', dato: { creditos_restantes: 1 } });
+    montar();
+    const banner = await screen.findByTestId('pago-hora-pendiente');
+    expect(within(banner).getByText(MENSAJE_PAGO.activacionTarda)).toBeInTheDocument();
+    await tocarPrimeraHora();
+    await waitFor(() => expect(h.toast.warning).toHaveBeenCalledWith(expect.stringMatching(/No pagues otra vez/), expect.anything()));
+    expect(h.pagoAbierto).not.toHaveBeenCalled();
+
+    fireEvent.click(within(banner).getByRole('button', { name: 'Volver a comprobar' }));
+    await waitFor(() => expect(h.toast.success).toHaveBeenCalledWith('Tus créditos ya están en tu cuenta. Elige tu hora.'));
+    expect(h.crearReserva).not.toHaveBeenCalled(); // acreditado ≠ reservado: elige la hora
+    expect(window.sessionStorage.getItem(CLAVE_PAGO_PENDIENTE)).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('pago-hora-pendiente')).not.toBeInTheDocument());
+  });
+
+  it('20 · retorno de redirect fallido → "El pago no se completó…" y se puede volver a intentar; sin pendiente', async () => {
+    window.history.replaceState(null, '', '/app/reservar?pago=hora&payment_intent=pi_r&payment_intent_client_secret=pi_r_secret&redirect_status=requires_payment_method');
+    montar();
+    expect(await screen.findByText(MENSAJE_PAGO.noCompletado)).toBeInTheDocument();
+    expect(window.sessionStorage.getItem(CLAVE_PAGO_PENDIENTE)).toBeNull();
+    expect(window.location.search).toBe('');
+    await tocarPrimeraHora();
+    expect(await screen.findByRole('dialog', { name: /pagar esta hora/i })).toBeInTheDocument();
   });
 });

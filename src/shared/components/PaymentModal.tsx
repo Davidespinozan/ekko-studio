@@ -5,12 +5,28 @@ import { X, Lock } from 'lucide-react';
 import { Spinner } from '@shared/components/Spinner';
 import { crearPagoIntent, type PagoIntentResult } from '@shared/lib/checkout';
 import { useAuth } from '@shared/hooks/useAuth';
+import {
+  interpretarResultadoPago,
+  mensajeParaResultado,
+  guardarPagoPendiente,
+  urlRetornoPago,
+  MENSAJE_PAGO,
+  type FlujoPago,
+  type PagoConfirmado,
+  type ResultadoPago
+} from '@shared/lib/pagoEstado';
 
 /**
  * Modal de pago PROPIO de EKKO con Stripe Elements (<PaymentElement>) sobre la
  * CUENTA CONECTADA del estudio (direct charge). Formulario oscuro con los tokens
  * de EKKO — el usuario NO sale de la app y no ve la UI blanca de Stripe. La
  * activación la dispara el webhook de Connect.
+ *
+ * PKG-02B (C04): el modal afirma solo lo que Stripe.js devuelve. `onPagado` se
+ * llama ÚNICAMENTE con `paymentIntent.status === 'succeeded'` y transporta el id
+ * del PaymentIntent como evidencia mínima. `processing`, `requires_*`, sin PI o
+ * error → nunca es éxito; el modal lo dice y registra el intento no resuelto en
+ * sessionStorage para que ninguna pantalla vuelva a ofrecer "Pagar" a ciegas.
  */
 
 const PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
@@ -48,11 +64,18 @@ interface Props {
   pedirNombre?: boolean;
   /** Fuente del clientSecret; default: crearPagoIntent(tierSlug). */
   fetchIntent?: () => Promise<PagoIntentResult>;
+  /** Desde dónde se paga: decide la URL de retorno de un método con redirección y el contexto persistido. */
+  flujo?: FlujoPago;
+  /** Datos técnicos (ids, hora) para retomar el flujo tras un redirect/refresh. Nunca PII. */
+  contexto?: Record<string, string | number>;
   onClose: () => void;
-  onPagado: () => void;
+  /** PAGO CONFIRMADO por Stripe (status = succeeded). No significa membresía activa. */
+  onPagado: (pago: PagoConfirmado) => void;
+  /** Stripe aceptó el pago pero sigue en proceso (métodos diferidos). No es éxito ni fallo. */
+  onEnProceso?: (pago: PagoConfirmado) => void;
 }
 
-export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, subtitulo, pedirNombre = true, fetchIntent, onClose, onPagado }: Props) {
+export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, subtitulo, pedirNombre = true, fetchIntent, flujo = 'perfil', contexto, onClose, onPagado, onEnProceso }: Props) {
   const { usuario } = useAuth();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [customerSessionSecret, setCustomerSessionSecret] = useState<string | null>(null);
@@ -89,8 +112,11 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, 
         }
       })
       .catch((e) => {
+        // El backend ya devuelve mensajes humanos (backend.ts); cualquier otra
+        // excepción (red, parseo) no se muestra cruda.
+        console.error('[PaymentModal] abrir pago', e);
         setEstado('error');
-        setMsg(e instanceof Error ? e.message : 'No pudimos abrir el pago.');
+        setMsg('No pudimos abrir el pago. Revisa tu conexión e intenta de nuevo.');
       });
     // El guard `fetched.current` asegura una sola llamada; no re-ejecutar por
     // identidad de fetchIntent (viene inline del caller).
@@ -139,7 +165,14 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, 
               ...(customerSessionSecret ? { customerSessionClientSecret: customerSessionSecret } : {})
             }}
           >
-            <CheckoutForm onPagado={onPagado} nombreDefault={usuario?.nombre ?? ''} pedirNombre={pedirNombre} />
+            <CheckoutForm
+              onPagado={onPagado}
+              onEnProceso={onEnProceso}
+              flujo={flujo}
+              contexto={contexto}
+              nombreDefault={usuario?.nombre ?? ''}
+              pedirNombre={pedirNombre}
+            />
           </Elements>
         )}
       </div>
@@ -147,17 +180,35 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, 
   );
 }
 
-function CheckoutForm({ onPagado, nombreDefault, pedirNombre }: { onPagado: () => void; nombreDefault: string; pedirNombre: boolean }) {
+function CheckoutForm({
+  onPagado,
+  onEnProceso,
+  flujo,
+  contexto,
+  nombreDefault,
+  pedirNombre
+}: {
+  onPagado: (pago: PagoConfirmado) => void;
+  onEnProceso?: (pago: PagoConfirmado) => void;
+  flujo: FlujoPago;
+  contexto?: Record<string, string | number>;
+  nombreDefault: string;
+  pedirNombre: boolean;
+}) {
   const stripe = useStripe();
   const elements = useElements();
   const [procesando, setProcesando] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [nombre, setNombre] = useState(nombreDefault);
+  // Resultado no final que ya se comunicó: el formulario queda cerrado para no
+  // invitar a repetir un cobro cuyo resultado no se conoce.
+  const [resuelto, setResuelto] = useState<ResultadoPago | null>(null);
   const submitting = useRef(false);
+  const notificado = useRef(false);
 
   async function pagar(e: React.FormEvent) {
     e.preventDefault();
-    if (!stripe || !elements || submitting.current) return;
+    if (!stripe || !elements || submitting.current || resuelto) return;
     submitting.current = true;
     setProcesando(true);
     setMsg(null);
@@ -171,21 +222,43 @@ function CheckoutForm({ onPagado, nombreDefault, pedirNombre }: { onPagado: () =
       // tarjeta). Se adjunta a la tarjeta NUEVA vía payment_method_data; si el
       // miembro elige una tarjeta GUARDADA, Stripe usa esa y este dato no aplica.
       const nombreTrim = nombre.trim();
-      const { error } = await stripe.confirmPayment({
+      const res = await stripe.confirmPayment({
         elements,
         confirmParams: {
-          return_url: `${window.location.origin}/app/perfil?suscripcion=ok`,
+          return_url: urlRetornoPago(window.location.origin, flujo),
           ...(nombreTrim ? { payment_method_data: { billing_details: { name: nombreTrim } } } : {})
         },
         redirect: 'if_required'
       });
-      if (error) {
-        setMsg(error.message ?? 'No se pudo procesar el pago.');
+      // PKG-02B: se interpreta el estado REAL. "Sin error" no es "pagado".
+      const r = interpretarResultadoPago(res);
+      if (r.tipo === 'confirmado') {
+        if (notificado.current) return; // nunca dos veces
+        notificado.current = true;
+        guardarPagoPendiente({ flujo, paymentIntentId: r.paymentIntentId, estado: 'confirmado', contexto });
+        onPagado({ paymentIntentId: r.paymentIntentId });
         return;
       }
-      onPagado();
+      if (r.tipo === 'en_proceso') {
+        setResuelto(r);
+        setMsg(mensajeParaResultado(r));
+        guardarPagoPendiente({ flujo, paymentIntentId: r.paymentIntentId, estado: 'en_proceso', contexto });
+        onEnProceso?.({ paymentIntentId: r.paymentIntentId });
+        return;
+      }
+      if (r.tipo === 'desconocido') {
+        // Ni éxito ni "vuelve a pagar": se cierra el formulario y se registra.
+        setResuelto(r);
+        setMsg(mensajeParaResultado(r));
+        guardarPagoPendiente({ flujo, paymentIntentId: r.paymentIntentId, estado: 'desconocido', contexto });
+        return;
+      }
+      // fallido / requiere_accion / requiere_metodo: el PI sigue vivo y se puede
+      // reintentar con el MISMO PaymentIntent (no es un cobro nuevo).
+      setMsg(mensajeParaResultado(r));
     } catch (err) {
-      setMsg(err instanceof Error ? err.message : 'Error al procesar el pago.');
+      console.error('[PaymentModal] confirmPayment', err);
+      setMsg(MENSAJE_PAGO.desconocido);
     } finally {
       submitting.current = false;
       setProcesando(false);
@@ -220,10 +293,20 @@ function CheckoutForm({ onPagado, nombreDefault, pedirNombre }: { onPagado: () =
         </label>
       )}
       <PaymentElement options={{ layout: 'tabs', fields: { billingDetails: { name: 'never' } } }} />
-      {msg && <p style={{ color: 'var(--ek-danger)', fontSize: '13px', marginTop: '10px' }}>{msg}</p>}
-      <button type="submit" className="ek-cta ek-cta--gold ek-cta--full" style={{ marginTop: '18px' }} disabled={!stripe || procesando}>
-        {procesando ? <Spinner size={16} /> : 'Pagar ahora'}
-      </button>
+      {msg && (
+        <p
+          role={resuelto ? 'status' : 'alert'}
+          data-testid="pago-mensaje"
+          style={{ color: resuelto ? 'var(--ek-mustard)' : 'var(--ek-danger)', fontSize: '13px', marginTop: '10px', lineHeight: 1.45 }}
+        >
+          {msg}
+        </p>
+      )}
+      {!resuelto && (
+        <button type="submit" className="ek-cta ek-cta--gold ek-cta--full" style={{ marginTop: '18px' }} disabled={!stripe || procesando}>
+          {procesando ? <Spinner size={16} /> : 'Pagar ahora'}
+        </button>
+      )}
       <p className="ek-helper-text" style={{ marginTop: '10px', textAlign: 'center' }}>
         Pago protegido por Stripe. Tus datos de tarjeta no pasan por EKKO.
       </p>

@@ -10,9 +10,19 @@ import { useVisibilityAwarePolling } from '@shared/hooks/useVisibilityAwarePolli
 import { useToast } from '@shared/hooks/useToast';
 import { celebrar } from '@shared/lib/celebrar';
 import { PaymentModal } from '@shared/components/PaymentModal';
+import { PagarInvitadosExtra } from '@member/components/PagarInvitadosExtra';
 import { elegirPaquetePorHora, type PlanCandidato } from '../logic/sesionSuelta';
 import { supabase } from '@shared/lib/supabase';
-import { crearPagoInvitados } from '@shared/lib/checkout';
+import { observarActivacion } from '@shared/lib/observarActivacion';
+import {
+  guardarPagoPendiente,
+  leerPagoPendiente,
+  leerRetornoPago,
+  limpiarPagoPendiente,
+  mensajePagoPendiente,
+  MENSAJE_PAGO,
+  type PagoPendiente
+} from '@shared/lib/pagoEstado';
 import {
   useRecursosDelTenant,
   fetchReservasDelRecurso,
@@ -93,7 +103,14 @@ export default function Reservar() {
   const [intentoPlanes, setIntentoPlanes] = useState(0);
   const [comprarPara, setComprarPara] = useState<{ slot: Slot; plan: PlanCandidato } | null>(null);
   const [pagando, setPagando] = useState(false);
-  const [activando, setActivando] = useState(false);
+  // PKG-02B (C04): tras un pago CONFIRMADO se observa el saldo (solo lectura) antes
+  // de reservar. `pendienteHora` conserva el estado honesto si el saldo tarda o la
+  // lectura falla; `pagoPendientePersistido` bloquea "Pagar y reservar" mientras
+  // exista un pago cuyo resultado no se resolvió (también tras un refresh).
+  const [pendienteHora, setPendienteHora] = useState<{ estado: 'observando' | 'no_observada' | 'error' | 'en_proceso'; slotInicio: Date; costo: number } | null>(null);
+  const [pagoPendientePersistido, setPagoPendientePersistido] = useState<PagoPendiente | null>(() => leerPagoPendiente('hora'));
+  const [retornoFallido, setRetornoFallido] = useState(false);
+  const activando = pendienteHora?.estado === 'observando';
 
   useEffect(() => {
     let vivo = true;
@@ -235,53 +252,108 @@ export default function Reservar() {
   );
 
   /**
-   * Tras pagar el paquete, la activación llega por el webhook de Stripe (segundos).
-   * Se sondea el saldo hasta que alcance para esta hora y entonces se reserva. Si
-   * en ~30 s no se acreditó, el pago sigue siendo válido: los créditos aparecen
-   * solos y la hora se elige de nuevo.
+   * Tras un pago CONFIRMADO (Stripe: succeeded), la acreditación llega por el
+   * webhook (segundos). Se OBSERVA el saldo (solo lectura) hasta que alcance para
+   * esta hora y entonces se reserva. Timeout ≠ pago fallido: queda en pendiente
+   * con "Volver a comprobar" (solo vuelve a leer; nunca crea otro pago). Un error
+   * de lectura ≠ "sin créditos".
    */
-  async function reservarTrasPago(slot: Slot, costo: number) {
-    if (!recursoSel) return;
-    setActivando(true);
-    try {
-      let saldo = -1;
-      for (let intento = 0; intento < 12; intento++) {
-        await new Promise((r) => setTimeout(r, 2500));
+  async function reservarTrasPago(slotInicio: Date, costo: number) {
+    if (!recursoSel || !usuario) return;
+    setPendienteHora({ estado: 'observando', slotInicio, costo });
+    const obs = await observarActivacion<{ creditos_restantes: number | null }>({
+      leer: async () => {
         await refetchResumen();
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('membresias')
           .select('creditos_restantes')
-          .eq('usuario_id', usuario!.id)
+          .eq('usuario_id', usuario.id)
           .in('status', ['trialing', 'activa', 'past_due'])
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
-        saldo = data?.creditos_restantes ?? -1;
-        if (saldo >= costo) break;
-      }
-      await refreshUsuario();
-      if (saldo < costo) {
-        toast.warning('Tu pago se recibió, pero la acreditación tarda más de lo normal. En cuanto aparezcan tus créditos, elige tu hora otra vez.', 12_000);
-        setRefresco((n) => n + 1);
-        return;
-      }
+        return { data: (data as { creditos_restantes: number | null } | null) ?? null, error };
+      },
+      listo: (m) => (m.creditos_restantes ?? 0) >= costo
+    });
+    if (obs.resultado !== 'observada') {
+      setPendienteHora({ estado: obs.resultado === 'error' ? 'error' : 'no_observada', slotInicio, costo });
+      return;
+    }
+    // Créditos acreditados: el pago ya se resolvió, se puede reservar.
+    limpiarPagoPendiente();
+    setPagoPendientePersistido(null);
+    await refreshUsuario();
+    try {
       const res = await crearReserva({
         recursoId: recursoSel.id,
-        slotInicio: slot.inicio,
+        slotInicio,
         duracionMin: config.duracion_default_min
       });
+      setPendienteHora(null);
       celebrar();
-      toast.success(`Reserva confirmada · ${formatFechaEnZona(slot.inicio, { weekday: 'long', day: 'numeric', month: 'long' })}, ${formatHora(slot.inicio)}`);
+      toast.success(`Reserva confirmada · ${formatFechaEnZona(slotInicio, { weekday: 'long', day: 'numeric', month: 'long' })}, ${formatHora(slotInicio)}`);
       const reservaId: string | undefined = (res as { reserva_id?: string })?.reserva_id;
       navigate(reservaId ? `/app/qr/${reservaId}?nueva=1` : '/app');
     } catch (e) {
       // Ya tiene los créditos: si la hora se ocupó mientras pagaba, que elija otra.
+      setPendienteHora(null);
       toast.error(e instanceof Error ? e.message : 'No se pudo reservar. Tus créditos ya están en tu cuenta: elige otra hora.', 10_000);
       setRefresco((n) => n + 1);
-    } finally {
-      setActivando(false);
     }
   }
+
+  /** Solo LECTURA del saldo para un pago pendiente persistido (tras refresh/redirect): sin reservar automáticamente. */
+  async function comprobarSaldoPendiente() {
+    if (!usuario) return;
+    const p = pagoPendientePersistido;
+    const costo = Number(p?.contexto?.costo) || 1;
+    setPendienteHora({ estado: 'observando', slotInicio: new Date(String(p?.contexto?.slotInicio ?? Date.now())), costo });
+    const obs = await observarActivacion<{ creditos_restantes: number | null }>({
+      leer: async () => {
+        await refetchResumen();
+        const { data, error } = await supabase
+          .from('membresias')
+          .select('creditos_restantes')
+          .eq('usuario_id', usuario.id)
+          .in('status', ['trialing', 'activa', 'past_due'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        return { data: (data as { creditos_restantes: number | null } | null) ?? null, error };
+      },
+      listo: (m) => (m.creditos_restantes ?? 0) >= costo,
+      intentos: 4
+    });
+    if (obs.resultado === 'observada') {
+      limpiarPagoPendiente();
+      setPagoPendientePersistido(null);
+      setPendienteHora(null);
+      await refreshUsuario();
+      toast.success('Tus créditos ya están en tu cuenta. Elige tu hora.');
+      setRefresco((n) => n + 1);
+      return;
+    }
+    setPendienteHora((prev) => (prev ? { ...prev, estado: obs.resultado === 'error' ? 'error' : 'no_observada' } : prev));
+  }
+
+  // Retorno de un método con redirección (?pago=hora&redirect_status=…).
+  useEffect(() => {
+    const r = leerRetornoPago(window.location.search);
+    if (r.flujo !== 'hora' || r.estado === null) return;
+    const previo = leerPagoPendiente('hora');
+    if (r.estado === 'succeeded') {
+      setPagoPendientePersistido(guardarPagoPendiente({ flujo: 'hora', paymentIntentId: r.paymentIntentId, estado: 'confirmado', contexto: previo?.contexto }));
+    } else if (r.estado === 'processing') {
+      setPagoPendientePersistido(guardarPagoPendiente({ flujo: 'hora', paymentIntentId: r.paymentIntentId, estado: 'en_proceso', contexto: previo?.contexto }));
+    } else if (r.estado === 'desconocido') {
+      setPagoPendientePersistido(guardarPagoPendiente({ flujo: 'hora', paymentIntentId: r.paymentIntentId, estado: 'desconocido', contexto: previo?.contexto }));
+    } else {
+      setRetornoFallido(true);
+    }
+    window.history.replaceState(null, '', window.location.pathname + (recursoSlugParam ? `?recurso=${recursoSlugParam}` : ''));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function confirmarReserva() {
     if (!slotPendiente || !recursoSel) return;
@@ -436,6 +508,22 @@ export default function Reservar() {
           </div>
         )}
 
+        {/* PKG-02B: pago recibido/en proceso pendiente de acreditar (también tras refresh o redirect). */}
+        {pagoPendientePersistido && !pendienteHora && (
+          <div data-testid="pago-hora-pendiente" style={{ marginBottom: '16px' }}>
+            <ErrorInline
+              mensaje={mensajePagoPendiente(pagoPendientePersistido)}
+              onReintentar={pagoPendientePersistido.estado === 'en_proceso' ? undefined : () => void comprobarSaldoPendiente()}
+              etiquetaReintentar="Volver a comprobar"
+            />
+          </div>
+        )}
+        {retornoFallido && (
+          <div style={{ marginBottom: '16px' }}>
+            <ErrorInline mensaje={MENSAJE_PAGO.noCompletado} />
+          </div>
+        )}
+
         {/* PKG-02A: plan/saldo no disponibles → se avisa antes de elegir hora. */}
         {errorResumen && (
           <div style={{ marginBottom: '16px' }}>
@@ -547,6 +635,11 @@ export default function Reservar() {
                         // Sin plan o sin saldo: en vez de solo avisar, ofrecer pagar la hora.
                         // Con la lectura de plan/saldo fallida NO se ofrece comprar (decisión de dinero con datos falsos).
                         const faltaSaldo = !errorResumen && !bloqueadoHasta && !planNoIncluyeEstudio && (!tienePlan || saldoInsuficiente);
+                        if (faltaSaldo && (pagoPendientePersistido || pendienteHora)) {
+                          // UNKNOWN PAYMENT OUTCOME ≠ SAFE TO CHARGE AGAIN.
+                          toast.warning('Tienes un pago pendiente de acreditar. No pagues otra vez: usa "Volver a comprobar".', 10_000);
+                          return;
+                        }
                         if (faltaSaldo && errorPlanes) {
                           // Sin lista de planes fiable no se concluye nada sobre qué comprar.
                           toast.warning('No pudimos cargar los planes disponibles. Reintenta para poder pagar esta hora.');
@@ -727,34 +820,71 @@ export default function Reservar() {
           tierNombre={comprarPara.plan.nombre}
           precio={Math.round(comprarPara.plan.precio_centavos / 100)}
           esPaquete
+          flujo="hora"
+          contexto={{ slotInicio: new Date(comprarPara.slot.inicio).toISOString(), recursoId: recursoSel?.id ?? '', costo: costoCreditos(recursoSel) }}
           onClose={() => { setPagando(false); setComprarPara(null); }}
-          onPagado={() => {
+          onPagado={(pago) => {
+            const { slot } = comprarPara;
+            const costo = costoCreditos(recursoSel);
+            setPagando(false);
+            setComprarPara(null);
+            setPagoPendientePersistido(guardarPagoPendiente({
+              flujo: 'hora', paymentIntentId: pago.paymentIntentId, estado: 'confirmado',
+              contexto: { slotInicio: new Date(slot.inicio).toISOString(), recursoId: recursoSel?.id ?? '', costo }
+            }));
+            // PAGO RECIBIDO ≠ RESERVA CONFIRMADA: se observa el saldo y luego se reserva.
+            void reservarTrasPago(new Date(slot.inicio), costo);
+          }}
+          onEnProceso={(pago) => {
             const { slot } = comprarPara;
             setPagando(false);
             setComprarPara(null);
-            toast.success('¡Pago recibido! Reservando tu hora en cuanto se acredite…');
-            void reservarTrasPago(slot, costoCreditos(recursoSel));
+            setPagoPendientePersistido(guardarPagoPendiente({
+              flujo: 'hora', paymentIntentId: pago.paymentIntentId, estado: 'en_proceso',
+              contexto: { slotInicio: new Date(slot.inicio).toISOString(), recursoId: recursoSel?.id ?? '', costo: costoCreditos(recursoSel) }
+            }));
           }}
         />
       )}
-      {activando && (
+      {pendienteHora && (
         <div className="ek-modal-backdrop">
-          <div className="ek-modal" role="status" aria-live="polite" style={{ textAlign: 'center' }}>
-            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>RESERVANDO</p>
-            <p className="ek-body-muted" style={{ margin: 0 }}>Acreditando tu pago y apartando la hora… no cierres esta pantalla.</p>
+          <div className="ek-modal" role="status" aria-live="polite" data-testid="acreditando" style={{ textAlign: 'center' }}>
+            <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>
+              {pendienteHora.estado === 'observando' ? 'PAGO RECIBIDO · RESERVANDO' : 'PAGO RECIBIDO'}
+            </p>
+            <p className="ek-body-muted" style={{ margin: '0 0 14px', lineHeight: 1.5 }}>
+              {pendienteHora.estado === 'observando' && 'Acreditando tu pago y apartando la hora… no cierres esta pantalla.'}
+              {pendienteHora.estado === 'no_observada' && 'La acreditación está tardando más de lo normal. No vuelvas a pagar: en cuanto aparezcan tus créditos, la hora se reserva al comprobar.'}
+              {pendienteHora.estado === 'error' && MENSAJE_PAGO.comprobacionFallo}
+              {pendienteHora.estado === 'en_proceso' && MENSAJE_PAGO.enProceso}
+            </p>
+            {pendienteHora.estado !== 'observando' && (
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                {pendienteHora.estado !== 'en_proceso' && (
+                  <button type="button" className="ek-cta ek-cta--gold" onClick={() => void reservarTrasPago(pendienteHora.slotInicio, pendienteHora.costo)}>
+                    Volver a comprobar
+                  </button>
+                )}
+                <button type="button" className="ek-cta ek-cta--secondary" onClick={() => { setPendienteHora(null); setRefresco((n) => n + 1); }}>
+                  Cerrar
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {pagarInvitados && (
-        <PaymentModal
-          precio={precioExtraPesos * pagarInvitados.cantidad}
-          titulo="Invitados extra"
-          subtitulo={`${pagarInvitados.cantidad} ${pagarInvitados.cantidad === 1 ? 'invitado' : 'invitados'} × $${precioExtraPesos.toLocaleString('es-MX')} = $${(precioExtraPesos * pagarInvitados.cantidad).toLocaleString('es-MX')}`}
-          pedirNombre={false}
-          fetchIntent={() => crearPagoInvitados(pagarInvitados.reservaId, pagarInvitados.cantidad)}
+        // PKG-02B: el pago de invitados se confirma con Stripe y el registro se OBSERVA en la
+        // reserva antes de decir "pagados"; el QR muestra el número real.
+        <PagarInvitadosExtra
+          reservaId={pagarInvitados.reservaId}
+          precioExtraCentavos={precioExtraCentavos}
+          maxCantidad={pagarInvitados.cantidad}
+          cantidadFija={pagarInvitados.cantidad}
+          pagadosActuales={0}
           onClose={() => { const id = pagarInvitados.reservaId; setPagarInvitados(null); navigate(`/app/qr/${id}?nueva=1`); }}
-          onPagado={() => { const id = pagarInvitados.reservaId; setPagarInvitados(null); toast.success('¡Invitados extra pagados!'); navigate(`/app/qr/${id}?nueva=1`); }}
+          onRegistrado={() => { const id = pagarInvitados.reservaId; setPagarInvitados(null); toast.success('Invitados extra registrados.'); navigate(`/app/qr/${id}?nueva=1`); }}
         />
       )}
     </div>

@@ -80,8 +80,9 @@ describe('MiSuscripcion', () => {
     await waitFor(() => expect(screen.getByText('Cambiar de plan')).toBeInTheDocument());
     fireEvent.click(screen.getByText('Cambiar de plan'));
     await waitFor(() => expect(screen.getByText('CAMBIAR DE PLAN')).toBeInTheDocument());
-    // Elegir el plan no-actual (Básica) abre el PaymentModal de EKKO.
-    fireEvent.click(screen.getByText('Elegir este'));
+    // Elegir el plan no-actual (Básica) abre el PaymentModal de EKKO. (PKG-02B/C28:
+    // sin membresía VIVA ningún plan es "Actual", así que ambos ofrecen CTA; Básica va primero.)
+    fireEvent.click(screen.getAllByText('Elegir este')[0]);
     // Sin VITE_STRIPE_PUBLISHABLE_KEY en test, el modal muestra el estado pendiente.
     await waitFor(() => expect(screen.getByText('PAGO SEGURO')).toBeInTheDocument());
     expect(screen.getByText(/no están configurados/i)).toBeInTheDocument();

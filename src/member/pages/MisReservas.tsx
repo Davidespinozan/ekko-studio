@@ -299,8 +299,9 @@ export default function MisReservas() {
             reservaId={invitadosPara}
             precioExtraCentavos={precioExtraCentavos}
             maxCantidad={restante}
-            onClose={() => setInvitadosPara(null)}
-            onPagado={() => setInvitadosPara(null)}
+            pagadosActuales={r?.invitados_extra_pagados ?? 0}
+            onClose={() => { setInvitadosPara(null); recargar(); }}
+            onRegistrado={() => { setInvitadosPara(null); recargar(); }}
           />
         );
       })()}

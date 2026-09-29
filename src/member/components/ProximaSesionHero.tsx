@@ -101,8 +101,9 @@ export function ProximaSesionHero({ reserva, onCancelada }: Props) {
           reservaId={reserva.id}
           precioExtraCentavos={precioExtraCentavos}
           maxCantidad={restanteExtra}
+          pagadosActuales={reserva.invitados_extra_pagados ?? 0}
           onClose={() => setInvitadosOpen(false)}
-          onPagado={() => setInvitadosOpen(false)}
+          onRegistrado={() => { setInvitadosOpen(false); onCancelada(); /* refresca reservas + resumen del inicio */ }}
         />
       )}
     </div>

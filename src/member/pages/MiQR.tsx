@@ -314,8 +314,10 @@ export default function MiQR() {
           reservaId={reserva.id}
           precioExtraCentavos={Number((tenant.config as Record<string, any>)?.reserva?.precio_invitado_extra_centavos) || 0}
           maxCantidad={(reserva.recurso?.max_invitados_extra ?? 0) - (reserva.invitados_extra_pagados ?? 0)}
+          pagadosActuales={reserva.invitados_extra_pagados ?? 0}
           onClose={() => setInvitadosOpen(false)}
-          onPagado={() => { setInvitadosOpen(false); setReserva((prev: any) => prev ? { ...prev, invitados_extra_pagados: (prev.invitados_extra_pagados ?? 0) + 1 } : prev); }}
+          // PKG-02B: el número mostrado es el OBSERVADO en la reserva, no un +1 optimista.
+          onRegistrado={(total) => { setInvitadosOpen(false); setReserva((prev: any) => prev ? { ...prev, invitados_extra_pagados: total } : prev); }}
         />
       )}
     </div>

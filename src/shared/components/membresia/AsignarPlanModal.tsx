@@ -145,6 +145,9 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
                   name="plan"
                   value={p.slug}
                   checked={activo}
+                  // PKG-02B (C28): en "Cambiar plan" el plan actual no es un cambio; se
+                  // ofrece desde "Renovar". Solo representación: el RPC no cambia.
+                  disabled={modo === 'cambiar' && p.slug === planActualSlug}
                   onChange={() => {
                     setElegido(p.slug);
                     setCreditosEnJuego(null); // otro plan: la confirmación anterior ya no vale
@@ -155,7 +158,9 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
                   <span style={{ fontSize: '14px', fontWeight: 600 }}>
                     {p.nombre}
                     {p.slug === planActualSlug && (
-                      <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--ek-ink-faint)' }}> · plan actual</span>
+                      <span style={{ fontSize: '11px', fontWeight: 500, color: 'var(--ek-ink-faint)' }}>
+                        {modo === 'cambiar' ? ' · plan actual (para repetirlo usa Renovar)' : ' · plan actual'}
+                      </span>
                     )}
                   </span>
                   <span style={{ fontSize: '12px', color: 'var(--ek-ink-muted)' }}>{describir(p)}</span>

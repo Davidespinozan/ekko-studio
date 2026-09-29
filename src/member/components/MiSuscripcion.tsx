@@ -12,7 +12,17 @@ import { useToast } from '@shared/hooks/useToast';
 import { useAuth } from '@shared/hooks/useAuth';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Spinner } from '@shared/components/Spinner';
-import { ErrorCarga } from '@shared/components/ErrorCarga';
+import { ErrorCarga, ErrorInline } from '@shared/components/ErrorCarga';
+import { observarActivacion } from '@shared/lib/observarActivacion';
+import {
+  guardarPagoPendiente,
+  leerPagoPendiente,
+  leerRetornoPago,
+  limpiarPagoPendiente,
+  mensajePagoPendiente,
+  MENSAJE_PAGO,
+  type PagoPendiente
+} from '@shared/lib/pagoEstado';
 
 interface MembresiaInfo {
   status: string | null;
@@ -20,7 +30,18 @@ interface MembresiaInfo {
   cancel_at_period_end: boolean | null;
   periodo_actual_fin: string | null;
   creditos_restantes: number | null;
+  created_at?: string | null;
+  /** Plan REAL de la membresía (PKG-02B · C28): "Actual" se deriva de aquí, no de usuarios.membresia_tier. */
+  tier?: { slug: string; tipo: string | null } | null;
 }
+
+const ESTADOS_VIVOS = ['trialing', 'activa', 'past_due', 'pausada'];
+const SELECT_MEMBRESIA = 'status, stripe_subscription_id, cancel_at_period_end, periodo_actual_fin, creditos_restantes, created_at, tier:tiers(slug, tipo)';
+
+/** Estado de la activación tras un pago (PKG-02B · C04): nunca se afirma "activo" sin observarlo. */
+type Activacion =
+  | { estado: 'observando' | 'no_observada' | 'error'; slug: string | null; desde: number }
+  | { estado: 'en_proceso' | 'desconocido'; slug: string | null; desde: number };
 
 interface TierInfo {
   slug: string;
@@ -82,32 +103,50 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   // Destino de un cambio créditos→mensual que perdería el saldo (aviso).
   const [confirmarCambio, setConfirmarCambio] = useState<TierInfo | null>(null);
 
-  /**
-   * Tras pagar, la activación llega por el WEBHOOK de Stripe (segundos después).
-   * Antes solo salía un toast: el Perfil seguía mostrando el plan y los créditos
-   * viejos, y Reservar —que gatea con `usuario.membresia_tier` del AuthProvider—
-   * seguía diciendo "Necesitas un plan" hasta recargar la página a mano.
-   * Se sondea la membresía hasta que cambie (o ~25 s) y se refresca el usuario.
-   */
-  async function esperarActivacion() {
-    const huella = (m: MembresiaInfo | null) =>
-      m ? `${m.status}|${m.stripe_subscription_id ?? ''}|${m.creditos_restantes ?? ''}|${m.periodo_actual_fin ?? ''}` : '';
-    const antes = huella(membresia);
-    for (let intento = 0; intento < 10; intento++) {
-      await new Promise((r) => setTimeout(r, 2500));
-      const { data } = await supabase
-        .from('membresias')
-        .select('status, stripe_subscription_id, cancel_at_period_end, periodo_actual_fin, creditos_restantes')
-        .eq('usuario_id', usuarioId)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      const nueva = ((data ?? [])[0] as MembresiaInfo | undefined) ?? null;
-      if (huella(nueva) !== antes) {
-        setMembresia(nueva);
-        break;
-      }
+  // PKG-02B (C04): PAGO CONFIRMADO ≠ PLAN ACTIVO. Se observa (solo lectura) la
+  // membresía hasta ver la evidencia ESPERADA: una membresía viva del plan pagado
+  // creada después del pago (activar_membresia crea una fila nueva; recomprar un
+  // paquete también). Antes bastaba "algo cambió", que se disparaba con una
+  // pausa, una cancelación o un `null` por error de red ("No tienes un plan").
+  const [activacion, setActivacion] = useState<Activacion | null>(null);
+  const [retornoFallido, setRetornoFallido] = useState(false);
+
+  async function observarActivacionPlan(slugEsperado: string | null, desde: number) {
+    setActivacion({ estado: 'observando', slug: slugEsperado, desde });
+    const obs = await observarActivacion<MembresiaInfo>({
+      leer: async () => {
+        const { data, error } = await supabase
+          .from('membresias')
+          .select(SELECT_MEMBRESIA)
+          .eq('usuario_id', usuarioId)
+          .in('status', ESTADOS_VIVOS)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        return { data: ((data ?? [])[0] as unknown as MembresiaInfo | undefined) ?? null, error };
+      },
+      listo: (m) =>
+        (slugEsperado ? m.tier?.slug === slugEsperado : true) &&
+        !!m.created_at && new Date(m.created_at).getTime() >= desde - 60_000
+    });
+    if (obs.resultado === 'observada') {
+      setMembresia(obs.dato);
+      setActivacion(null);
+      limpiarPagoPendiente();
+      toast.success('Tu plan ya está activo.');
+      await Promise.all([refreshUsuario(), recargarBilling()]);
+      return;
     }
-    await Promise.all([refreshUsuario(), recargarBilling()]);
+    setActivacion({ estado: obs.resultado === 'error' ? 'error' : 'no_observada', slug: slugEsperado, desde });
+  }
+
+  /** Pago confirmado (Stripe: succeeded) → registrar el pendiente y observar la activación. */
+  function pagoConfirmado(paymentIntentId: string | null, slug: string | null) {
+    const p = guardarPagoPendiente({ flujo: 'perfil', paymentIntentId, estado: 'confirmado', ...(slug ? { contexto: { slug } } : {}) });
+    void observarActivacionPlan(slug, p.ts);
+  }
+
+  function pagoNoResuelto(p: PagoPendiente) {
+    setActivacion({ estado: p.estado === 'en_proceso' ? 'en_proceso' : 'desconocido', slug: (p.contexto?.slug as string | undefined) ?? null, desde: p.ts });
   }
 
   // Recarga tarjeta + historial tras un cambio (nueva tarjeta guardada).
@@ -143,7 +182,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           .order('precio_centavos', { ascending: true }),
         supabase
           .from('membresias')
-          .select('status, stripe_subscription_id, cancel_at_period_end, periodo_actual_fin, creditos_restantes')
+          .select(SELECT_MEMBRESIA)
           .eq('usuario_id', usuarioId)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -168,7 +207,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           vendible: t.activo === true && t.en_venta !== false
         }))
       );
-      setMembresia(((memRes.data ?? [])[0] as MembresiaInfo | undefined) ?? null);
+      setMembresia(((memRes.data ?? [])[0] as unknown as MembresiaInfo | undefined) ?? null);
       setLoading(false);
     }
     load();
@@ -208,18 +247,46 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
     return () => { mounted = false; };
   }, [usuarioId]);
 
-  // Retorno desde el Checkout de Stripe (?suscripcion=ok|cancelado).
+  // PKG-02B: retorno de un método con redirección (?pago=perfil&redirect_status=…),
+  // retorno del Checkout (?suscripcion=ok|cancelado) y pago no resuelto persistido.
+  // Nada de esto AFIRMA activación: se observa la evidencia.
   useEffect(() => {
-    const estado = new URLSearchParams(window.location.search).get('suscripcion');
-    if (estado === 'ok') {
-      toast.success('¡Listo! Tu suscripción se está activando, puede tardar unos segundos.');
-    } else if (estado === 'cancelado') {
+    const params = new URLSearchParams(window.location.search);
+    const r = leerRetornoPago(window.location.search);
+    const pendiente = leerPagoPendiente('perfil');
+    const slugPendiente = (pendiente?.contexto?.slug as string | undefined) ?? null;
+    if (r.flujo === 'perfil' && r.estado !== null) {
+      if (r.estado === 'succeeded') pagoConfirmado(r.paymentIntentId, slugPendiente);
+      else if (r.estado === 'processing') pagoNoResuelto(guardarPagoPendiente({ flujo: 'perfil', paymentIntentId: r.paymentIntentId, estado: 'en_proceso' }));
+      else if (r.estado === 'desconocido') pagoNoResuelto(guardarPagoPendiente({ flujo: 'perfil', paymentIntentId: r.paymentIntentId, estado: 'desconocido' }));
+      else setRetornoFallido(true); // failed: no se afirma cargo
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+    const checkout = params.get('suscripcion');
+    if (checkout === 'ok') {
+      // El success_url del Checkout no prueba el cobro (01B decide): solo se comprueba.
+      void observarActivacionPlan(null, Date.now() - 10 * 60_000);
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+    if (checkout === 'cancelado') {
       toast.info('Cancelaste el checkout. Tu plan no cambió.');
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+    if (pendiente) {
+      if (pendiente.estado === 'confirmado') void observarActivacionPlan(slugPendiente, pendiente.ts);
+      else pagoNoResuelto(pendiente);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const planActual = tiers.find((t) => t.slug === currentSlug) ?? null;
+  // PKG-02B (C28): el plan "actual" es el de la membresía VIVA. `usuarios.membresia_tier`
+  // (currentSlug) solo sirve de respaldo cuando aún no cargó la fila o no existe.
+  const membresiaViva = !!membresia && ESTADOS_VIVOS.includes(membresia.status ?? '');
+  const planActualSlug = (membresiaViva ? membresia?.tier?.slug : null) ?? currentSlug;
+  const planActual = tiers.find((t) => t.slug === planActualSlug) ?? null;
   // Selector Membresías · Paquetes en el modal de cambio (igual que la landing).
   const enVenta = tiers.filter((t) => t.vendible);
   const planesMensuales = enVenta.filter((t) => !esPlanPaquete(t));
@@ -355,6 +422,39 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             </div>
           )}
 
+          {/* PKG-02B: pago confirmado/en proceso → activación pendiente (nunca "activo" sin verlo). */}
+          {activacion && (
+            <div role="status" data-testid="activacion-pendiente" className="ek-card" style={{ marginBottom: '16px', borderColor: 'var(--ek-mustard)' }}>
+              <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '6px' }}>
+                {activacion.estado === 'en_proceso' ? 'PAGO EN PROCESO' : activacion.estado === 'desconocido' ? 'PAGO SIN CONFIRMAR' : 'PAGO RECIBIDO'}
+              </p>
+              <p className="ek-body-muted" style={{ margin: '0 0 12px', lineHeight: 1.5 }}>
+                {activacion.estado === 'observando'
+                  ? MENSAJE_PAGO.recibidoActivando
+                  : mensajePagoPendiente({ flujo: 'perfil', paymentIntentId: null, estado: activacion.estado === 'en_proceso' ? 'en_proceso' : activacion.estado === 'desconocido' ? 'desconocido' : 'confirmado', ts: activacion.desde })}
+              </p>
+              {activacion.estado === 'error' && (
+                <div style={{ marginBottom: '10px' }}>
+                  <ErrorInline mensaje={MENSAJE_PAGO.comprobacionFallo} />
+                </div>
+              )}
+              {activacion.estado === 'observando' ? (
+                <Spinner size={16} label="Comprobando…" />
+              ) : (
+                activacion.estado !== 'en_proceso' && (
+                  <button type="button" className="ek-cta ek-cta--gold" style={{ padding: '9px 16px', fontSize: '13px' }} onClick={() => void observarActivacionPlan(activacion.slug, activacion.desde)}>
+                    Volver a comprobar
+                  </button>
+                )
+              )}
+            </div>
+          )}
+          {retornoFallido && (
+            <div style={{ marginBottom: '16px' }}>
+              <ErrorInline mensaje={MENSAJE_PAGO.noCompletado} />
+            </div>
+          )}
+
           {/* Plan actual */}
           <div className="ek-card--hero" style={{ marginBottom: '16px' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', marginBottom: '14px' }}>
@@ -459,13 +559,16 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
               )
             )}
 
-            <button
-              type="button"
-              className="ek-cta ek-cta--gold ek-cta--full"
-              onClick={() => { setVistaPlan(planActual && esPlanPaquete(planActual) ? 'paquetes' : 'membresias'); setCambiarOpen(true); }}
-            >
-              {planActual ? 'Cambiar de plan' : 'Ver planes'} <ArrowRight size={16} aria-hidden="true" />
-            </button>
+            {/* Mientras hay un pago sin resolver no se ofrece otro cobro. */}
+            {!activacion && (
+              <button
+                type="button"
+                className="ek-cta ek-cta--gold ek-cta--full"
+                onClick={() => { setVistaPlan(planActual && esPlanPaquete(planActual) ? 'paquetes' : 'membresias'); setCambiarOpen(true); }}
+              >
+                {planActual ? 'Cambiar de plan' : 'Ver planes'} <ArrowRight size={16} aria-hidden="true" />
+              </button>
+            )}
 
             {/* Cancelar / reactivar — todo in-app, sin salir a Stripe */}
             {planActual && tieneSuscripcion && (
@@ -628,7 +731,13 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {planesVisibles.map((t) => {
-                const esActual = t.slug === tierSlug;
+                // "Actual" solo si la membresía viva es de este plan. El mismo paquete
+                // agotado (sin membresía viva o sin créditos) se puede RECOMPRAR: no es
+                // un cambio de plan. Un plan mensual vivo con Stripe no ofrece nada
+                // (renueva solo).
+                const esMismoPlan = t.slug === planActualSlug;
+                const esActual = esMismoPlan && membresiaViva && !(esPlanPaquete(t) && (creditos ?? 0) <= 0);
+                const recompra = esMismoPlan && esPlanPaquete(t) && !esActual;
                 return (
                   <div key={t.slug} className="ek-card ek-card--md ek-card--cream" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
                     <div style={{ minWidth: 0 }}>
@@ -652,11 +761,13 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                         type="button"
                         className="ek-cta ek-cta--gold"
                         style={{ padding: '10px 14px', fontSize: '13px', whiteSpace: 'nowrap', flexShrink: 0, gap: '6px' }}
-                        onClick={() => cambiarPlan(t)}
+                        onClick={() => (recompra ? (setCambiarOpen(false), setPagarTier(t)) : cambiarPlan(t))}
                         disabled={swapping !== null}
                       >
                         {swapping === t.slug ? (
                           <Spinner size={15} />
+                        ) : recompra ? (
+                          <>Recomprar <ArrowRight size={15} aria-hidden="true" /></>
                         ) : (
                           <>Elegir este <ArrowRight size={15} aria-hidden="true" /></>
                         )}
@@ -681,12 +792,20 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           tierNombre={pagarTier.nombre}
           precio={Math.round(pagarTier.precio_centavos / 100)}
           esPaquete={pagarTier.tipo === 'creditos' || pagarTier.tipo === 'hibrido'}
+          flujo="perfil"
+          contexto={{ slug: pagarTier.slug }}
           onClose={() => setPagarTier(null)}
-          onPagado={() => {
+          onPagado={(pago) => {
+            const slug = pagarTier.slug;
             setPagarTier(null);
             setCambiarOpen(false);
-            toast.success('¡Pago recibido! Tu plan se está activando, puede tardar unos segundos.');
-            void esperarActivacion();
+            pagoConfirmado(pago.paymentIntentId, slug);
+          }}
+          onEnProceso={(pago) => {
+            const slug = pagarTier.slug;
+            setPagarTier(null);
+            setCambiarOpen(false);
+            pagoNoResuelto(guardarPagoPendiente({ flujo: 'perfil', paymentIntentId: pago.paymentIntentId, estado: 'en_proceso', contexto: { slug } }));
           }}
         />
       )}

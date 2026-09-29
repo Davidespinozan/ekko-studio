@@ -108,3 +108,23 @@ describe('AsignarPlanModal', () => {
     expect(mockActivar).toHaveBeenLastCalledWith('m1', 'pro-pack', { confirmarPerdida: false, motivo: 'Cambio de plan' });
   });
 });
+
+// ── PKG-02B (C28 · visual) ────────────────────────────────────────────────────
+describe('AsignarPlanModal · plan actual en "Cambiar plan" (PKG-02B · C28)', () => {
+  it('30 · en modo cambiar, el plan actual queda deshabilitado y explica que para repetirlo se usa Renovar', async () => {
+    abrir('cambiar', 'pro-pack');
+    const actual = await screen.findByRole('radio', { name: /pro-pack/i });
+    expect(actual).toBeDisabled();
+    expect(screen.getByText(/plan actual \(para repetirlo usa Renovar\)/)).toBeInTheDocument();
+    // El otro plan sigue eligible.
+    expect(screen.getByRole('radio', { name: /esencial/i })).not.toBeDisabled();
+  });
+
+  it('en modo renovar el plan actual NO se deshabilita (es justo lo que se repite)', async () => {
+    abrir('renovar', 'pro-pack');
+    const actual = await screen.findByRole('radio', { name: /pro-pack/i });
+    expect(actual).not.toBeDisabled();
+    expect(actual).toBeChecked();
+    expect(screen.queryByText(/para repetirlo usa Renovar/)).not.toBeInTheDocument();
+  });
+});
