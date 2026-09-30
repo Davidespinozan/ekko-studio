@@ -4,6 +4,8 @@ import { supabase } from '@shared/lib/supabase';
 export interface PlanActivo {
   slug: string;
   nombre: string;
+  /** PKG-01D: precio de lista para MOSTRAR el importe de una venta de mostrador (el servidor lo deriva por su cuenta). */
+  precio_centavos: number | null;
 }
 
 /**
@@ -32,7 +34,7 @@ export function usePlanesActivos() {
       setError(false);
       const { data, error: qErr } = await supabase
         .from('tiers')
-        .select('slug, nombre')
+        .select('slug, nombre, precio_centavos')
         .eq('activo', true)
         .order('orden', { ascending: true });
 

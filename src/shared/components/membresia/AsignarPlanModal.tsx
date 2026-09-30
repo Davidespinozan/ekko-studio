@@ -1,8 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BadgeCheck } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
-import { activarMembresiaMostrador, esPerdidaDeCreditos } from '@shared/lib/checkout';
+import {
+  activarMembresiaMostrador,
+  esPerdidaDeCreditos,
+  conflictoVentaMostrador,
+  nuevaOperacionMostrador,
+  montoCobradoMostrador,
+  METODOS_MOSTRADOR,
+  type MetodoMostrador
+} from '@shared/lib/checkout';
 import { esPaqueteDeCreditos } from '@shared/lib/membresiaEstado';
 import { ModalAccion } from './ModalAccion';
 
@@ -47,14 +55,24 @@ function describir(p: Plan): string {
  * Pasa por el RPC keystone `activar_membresia` (vía reception-activar-membresia):
  * el mismo punto de activación que el webhook. Si el cambio quema créditos, el
  * SERVIDOR responde 409 y aquí se pide la confirmación explícita.
+ *
+ * PKG-01D: la venta lleva MÉTODO obligatorio (efectivo/transferencia/terminal/
+ * cortesía) y un `operation_id` generado UNA vez al abrir el modal, que se
+ * reutiliza en cada reintento (error, timeout, confirmación de pérdida): el
+ * servidor registra UNA sola venta y UNA activación. El importe lo deriva el
+ * servidor del catálogo; aquí solo se muestra (cortesía = $0 cobrado, con el
+ * precio de lista visible). La nota deja de ser evidencia.
  */
 export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onClose, onDone }: Props) {
   const toast = useToast();
   const [planes, setPlanes] = useState<Plan[] | null>(null);
   const [errorCarga, setErrorCarga] = useState(false);
   const [elegido, setElegido] = useState<string>(modo === 'renovar' ? planActualSlug ?? '' : '');
-  const [motivo, setMotivo] = useState('');
+  const [metodo, setMetodo] = useState<MetodoMostrador | ''>('');
+  const [nota, setNota] = useState('');
   const [guardando, setGuardando] = useState(false);
+  // Una intención = un operation_id. Reabrir el modal es otra intención.
+  const operationId = useRef(nuevaOperacionMostrador());
   const [creditosEnJuego, setCreditosEnJuego] = useState<number | null>(null);
 
   useEffect(() => {
@@ -79,23 +97,36 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
 
   async function confirmar() {
     if (!elegido) return;
-    if (motivo.trim().length < 3) {
-      toast.error('Indica cómo pagó o por qué se asigna (mínimo 3 caracteres).');
+    if (!metodo) {
+      toast.error('Indica cómo pagó (efectivo, transferencia, terminal o cortesía).');
       return;
     }
     setGuardando(true);
     try {
-      await activarMembresiaMostrador(usuarioId, elegido, {
+      // El éxito solo se afirma cuando el servidor confirma la venta registrada.
+      const r = await activarMembresiaMostrador(usuarioId, elegido, {
+        operationId: operationId.current,
+        metodo,
         confirmarPerdida: creditosEnJuego !== null,
-        motivo: motivo.trim()
+        nota: nota.trim() || undefined
       });
-      toast.success(modo === 'renovar' ? 'Plan renovado.' : 'Plan activado.');
+      if (!r?.success) throw new Error('No se pudo registrar la venta.');
+      const cobrado = r.venta?.monto_cobrado_centavos;
+      toast.success(
+        r.idempotente
+          ? 'Esta venta ya estaba registrada; no se cobró ni activó dos veces.'
+          : `${modo === 'renovar' ? 'Plan renovado' : 'Plan activado'} · ${metodo === 'cortesia' ? 'cortesía, $0 cobrado' : `$${Math.round((cobrado ?? 0) / 100).toLocaleString('es-MX')} en ${METODOS_MOSTRADOR.find((m) => m.valor === metodo)?.label.toLowerCase() ?? metodo}`}.`
+      );
       await onDone();
       onClose();
     } catch (e) {
       const enJuego = esPerdidaDeCreditos(e);
       if (enJuego !== null && creditosEnJuego === null) {
-        setCreditosEnJuego(enJuego); // el siguiente Confirmar ya lleva la confirmación
+        setCreditosEnJuego(enJuego); // el siguiente Confirmar ya lleva la confirmación (mismo operation_id)
+      } else if (conflictoVentaMostrador(e) === 'suscripcion_stripe') {
+        toast.error('Este miembro tiene una suscripción de Stripe vigente. Cancélala primero desde su membresía; el mostrador no la sustituye.', 10_000);
+      } else if (conflictoVentaMostrador(e) === 'operacion_conflicto') {
+        toast.error('Esta operación ya se registró con otros datos. Cierra el modal y vuelve a abrirlo para una venta nueva.', 10_000);
       } else {
         toast.error(e instanceof Error ? e.message : 'No se pudo activar el plan.');
       }
@@ -103,6 +134,9 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
       setGuardando(false);
     }
   }
+
+  const plan = planes?.find((p) => p.slug === elegido) ?? null;
+  const pesos = (c: number) => `$${Math.round(c / 100).toLocaleString('es-MX')}`;
 
   return (
     <ModalAccion
@@ -112,7 +146,7 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
       confirmarLabel={creditosEnJuego !== null ? 'Sí, cambiar y perder créditos' : modo === 'renovar' ? 'Renovar' : 'Activar plan'}
       peligro={creditosEnJuego !== null}
       guardando={guardando}
-      bloqueado={!elegido}
+      bloqueado={!elegido || !metodo}
       onSubmit={confirmar}
       onClose={onClose}
     >
@@ -171,18 +205,52 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
         </div>
       )}
 
-      <label className="ek-label" style={{ display: 'block', marginTop: '14px' }}>
-        Cómo pagó / motivo
+      <div role="radiogroup" aria-label="Cómo pagó" style={{ marginTop: '14px' }}>
+        <span className="ek-label" style={{ display: 'block', marginBottom: '6px' }}>Cómo pagó</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          {METODOS_MOSTRADOR.map((m) => (
+            <label
+              key={m.valor}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '6px 10px', fontSize: '13px',
+                borderRadius: 'var(--ek-r-sm)', border: `1px solid ${metodo === m.valor ? 'var(--ek-mustard)' : 'var(--ek-line)'}`,
+                background: metodo === m.valor ? 'var(--ek-mustard-soft)' : 'transparent'
+              }}
+            >
+              <input type="radio" name="metodo" value={m.valor} checked={metodo === m.valor} onChange={() => setMetodo(m.valor)} />
+              {m.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {plan && metodo && (
+        // Lo que registrará el servidor (él deriva el importe del catálogo; esto solo lo muestra).
+        <p data-testid="resumen-cobro" style={{ fontSize: '13px', margin: '10px 0 0', lineHeight: 1.45 }}>
+          {metodo === 'cortesia' ? (
+            <>
+              <strong>$0 cobrado</strong> · cortesía. Precio de lista {pesos(plan.precio_centavos)}: queda registrado como no cobrado.
+            </>
+          ) : (
+            <>
+              <strong>{pesos(montoCobradoMostrador(plan.precio_centavos, metodo))} cobrado</strong> · precio de lista {pesos(plan.precio_centavos)}.
+            </>
+          )}
+        </p>
+      )}
+
+      <label className="ek-label" style={{ display: 'block', marginTop: '12px' }}>
+        Nota <span style={{ color: 'var(--ek-ink-faint)', fontWeight: 400 }}>(opcional: folio, quién autorizó…)</span>
         <input
           className="ek-input"
-          value={motivo}
-          onChange={(e) => setMotivo(e.target.value)}
-          placeholder="Ej. Transferencia confirmada · Cortesía del dueño"
+          value={nota}
+          onChange={(e) => setNota(e.target.value)}
+          placeholder="Ej. Folio 8841 · Autorizó el dueño"
           maxLength={200}
         />
       </label>
       <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: '6px 0 0', lineHeight: 1.45 }}>
-        Esto activa el plan SIN cobrar por Stripe: confirma antes que el pago ya entró. Queda registrado con tu nombre.
+        Esto activa el plan SIN cobrar por Stripe: confirma antes que el pago ya entró. La venta queda registrada con importe, método y tu nombre.
       </p>
 
       {creditosEnJuego !== null && (

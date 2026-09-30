@@ -26,6 +26,8 @@ vi.mock('@shared/lib/checkout', async (orig) => ({
 
 import { AsignarPlanModal } from '../AsignarPlanModal';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 const onDone = vi.fn();
 const onClose = vi.fn();
 
@@ -38,6 +40,7 @@ function abrir(modo: 'asignar' | 'renovar' | 'cambiar' = 'asignar', planActualSl
 }
 
 const error409 = Object.assign(new Error('El miembro perdería 8 crédito(s) al cambiar a este plan. Confirma para continuar.'), { status: 409 });
+const error409Stripe = Object.assign(new Error('El miembro tiene una suscripción de Stripe vigente. Cancélala primero desde su membresía; la venta de mostrador no la sustituye.'), { status: 409 });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -58,29 +61,34 @@ describe('AsignarPlanModal', () => {
     expect(screen.getByRole('radio', { name: /pro-pack/i })).toBeChecked();
   });
 
-  it('activa en UN paso, mandando el motivo y SIN autorizar pérdida de créditos', async () => {
+  it('activa en UN paso, mandando método + nota y SIN autorizar pérdida de créditos; nunca un importe', async () => {
     abrir();
     fireEvent.click(await screen.findByRole('radio', { name: /esencial/i }));
-    fireEvent.change(screen.getByPlaceholderText(/transferencia/i), { target: { value: 'Transferencia confirmada' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Transferencia' }));
+    fireEvent.change(screen.getByPlaceholderText(/folio/i), { target: { value: 'Folio 8841' } });
     fireEvent.click(screen.getByRole('button', { name: /activar plan/i }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalled());
-    expect(mockActivar).toHaveBeenCalledWith('m1', 'esencial', { confirmarPerdida: false, motivo: 'Transferencia confirmada' });
+    expect(mockActivar).toHaveBeenCalledWith('m1', 'esencial', {
+      operationId: expect.stringMatching(UUID), metodo: 'transferencia', confirmarPerdida: false, nota: 'Folio 8841'
+    });
+    expect(Object.keys(mockActivar.mock.calls[0][2] as object)).not.toContain('monto');
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('sin motivo no activa', async () => {
+  it('sin método no activa (la nota es opcional; el método es la evidencia)', async () => {
     abrir();
     fireEvent.click(await screen.findByRole('radio', { name: /esencial/i }));
+    expect(screen.getByRole('button', { name: /activar plan/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: /activar plan/i }));
     expect(mockActivar).not.toHaveBeenCalled();
   });
 
-  it('el SERVIDOR avisa que se perderían créditos (409): pide confirmar y solo entonces reintenta autorizándolo', async () => {
+  it('el SERVIDOR avisa que se perderían créditos (409): pide confirmar y reintenta autorizándolo con el MISMO operation_id', async () => {
     mockActivar.mockRejectedValueOnce(error409);
     abrir('cambiar', 'pro-pack');
     fireEvent.click(await screen.findByRole('radio', { name: /esencial/i }));
-    fireEvent.change(screen.getByPlaceholderText(/transferencia/i), { target: { value: 'Pidió pasar a mensual' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Efectivo' }));
     fireEvent.click(screen.getByRole('button', { name: /activar plan/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/8 créditos.*se perderán/i);
@@ -89,14 +97,15 @@ describe('AsignarPlanModal', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /sí, cambiar y perder créditos/i }));
     await waitFor(() => expect(onDone).toHaveBeenCalled());
-    expect(mockActivar).toHaveBeenLastCalledWith('m1', 'esencial', { confirmarPerdida: true, motivo: 'Pidió pasar a mensual' });
+    const primera = mockActivar.mock.calls[0][2] as { operationId: string };
+    expect(mockActivar).toHaveBeenLastCalledWith('m1', 'esencial', { operationId: primera.operationId, metodo: 'efectivo', confirmarPerdida: true, nota: undefined });
   });
 
   it('si tras el aviso elige OTRO plan, la confirmación anterior deja de valer', async () => {
     mockActivar.mockRejectedValueOnce(error409);
     abrir('cambiar', 'pro-pack');
     fireEvent.click(await screen.findByRole('radio', { name: /esencial/i }));
-    fireEvent.change(screen.getByPlaceholderText(/transferencia/i), { target: { value: 'Cambio de plan' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Efectivo' }));
     fireEvent.click(screen.getByRole('button', { name: /activar plan/i }));
     await screen.findByRole('alert');
 
@@ -105,7 +114,7 @@ describe('AsignarPlanModal', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /activar plan/i }));
     await waitFor(() => expect(mockActivar).toHaveBeenCalledTimes(2));
-    expect(mockActivar).toHaveBeenLastCalledWith('m1', 'pro-pack', { confirmarPerdida: false, motivo: 'Cambio de plan' });
+    expect(mockActivar).toHaveBeenLastCalledWith('m1', 'pro-pack', expect.objectContaining({ metodo: 'efectivo', confirmarPerdida: false }));
   });
 });
 
@@ -126,5 +135,59 @@ describe('AsignarPlanModal · plan actual en "Cambiar plan" (PKG-02B · C28)', (
     expect(actual).not.toBeDisabled();
     expect(actual).toBeChecked();
     expect(screen.queryByText(/para repetirlo usa Renovar/)).not.toBeInTheDocument();
+  });
+});
+
+// ── PKG-01D · venta de mostrador ─────────────────────────────────────────────
+describe('AsignarPlanModal · venta de mostrador (PKG-01D)', () => {
+  it('la misma apertura conserva el operation_id ante un error de red; la reapertura genera otro', async () => {
+    mockActivar.mockRejectedValueOnce(new Error('HTTP 502'));
+    const r = abrir();
+    fireEvent.click(await screen.findByRole('radio', { name: /esencial/i }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Terminal (tarjeta)' }));
+    fireEvent.click(screen.getByRole('button', { name: /activar plan/i }));
+    await waitFor(() => expect(mockActivar).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: /activar plan/i }));
+    await waitFor(() => expect(mockActivar).toHaveBeenCalledTimes(2));
+    const [a, b] = mockActivar.mock.calls.map((c) => (c[2] as { operationId: string }).operationId);
+    expect(a).toBe(b);
+    r.unmount();
+    abrir();
+    fireEvent.click(await screen.findByRole('radio', { name: /esencial/i }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Terminal (tarjeta)' }));
+    fireEvent.click(screen.getByRole('button', { name: /activar plan/i }));
+    await waitFor(() => expect(mockActivar).toHaveBeenCalledTimes(3));
+    expect((mockActivar.mock.calls[2][2] as { operationId: string }).operationId).not.toBe(a);
+  });
+
+  it('cortesía: $0 cobrado con el precio de lista visible; efectivo: cobrado = precio de lista', async () => {
+    abrir();
+    fireEvent.click(await screen.findByRole('radio', { name: /esencial/i }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Cortesía' }));
+    expect(screen.getByTestId('resumen-cobro')).toHaveTextContent('$0 cobrado');
+    expect(screen.getByTestId('resumen-cobro')).toHaveTextContent('Precio de lista $850');
+    fireEvent.click(screen.getByRole('radio', { name: 'Efectivo' }));
+    expect(screen.getByTestId('resumen-cobro')).toHaveTextContent('$850 cobrado');
+  });
+
+  it('409 por suscripción de Stripe viva NO se confunde con pérdida de créditos: mensaje propio y sin reintento', async () => {
+    mockActivar.mockRejectedValueOnce(error409Stripe);
+    abrir();
+    fireEvent.click(await screen.findByRole('radio', { name: /esencial/i }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Efectivo' }));
+    fireEvent.click(screen.getByRole('button', { name: /activar plan/i }));
+    await waitFor(() => expect(mockActivar).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/se perderán/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /activar plan/i })).toBeInTheDocument();
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it('el éxito se afirma solo con la confirmación del servidor; un replay idempotente lo dice', async () => {
+    mockActivar.mockResolvedValueOnce({ success: true, idempotente: true, venta: { monto_cobrado_centavos: 85000 } });
+    abrir();
+    fireEvent.click(await screen.findByRole('radio', { name: /esencial/i }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Efectivo' }));
+    fireEvent.click(screen.getByRole('button', { name: /activar plan/i }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
   });
 });

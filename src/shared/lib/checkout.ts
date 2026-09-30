@@ -27,42 +27,102 @@ export async function iniciarCheckout(tierSlug: string): Promise<CheckoutResult>
 }
 
 /**
- * Activación en mostrador (recepción/admin). Llama al RPC keystone vía la
- * Netlify Function — el MISMO punto de activación que el webhook de Stripe.
+ * Venta en mostrador (recepción/admin). PKG-01D: pasa por la primitiva
+ * transaccional `registrar_venta_mostrador` (vía la Netlify Function): evidencia
+ * financiera durable con snapshot del precio + activación por el RPC de R1, en
+ * una sola transacción e idempotente por `operationId`.
  */
+export type MetodoMostrador = 'efectivo' | 'transferencia' | 'terminal' | 'cortesia';
+
+export const METODOS_MOSTRADOR: ReadonlyArray<{ valor: MetodoMostrador; label: string }> = [
+  { valor: 'efectivo', label: 'Efectivo' },
+  { valor: 'transferencia', label: 'Transferencia' },
+  { valor: 'terminal', label: 'Terminal (tarjeta)' },
+  { valor: 'cortesia', label: 'Cortesía' }
+];
+
+export interface VentaMostrador {
+  id: string | null;
+  membresia_id: string | null;
+  metodo: MetodoMostrador;
+  precio_lista_centavos: number | null;
+  monto_cobrado_centavos: number | null;
+  moneda: string | null;
+}
+
 export interface ActivarResult {
   success: boolean;
+  /** true = la misma operación ya se había registrado; no hubo efecto nuevo. */
+  idempotente?: boolean;
+  venta?: VentaMostrador;
   result?: unknown;
+}
+
+/**
+ * Identidad de UNA venta lógica. Se genera una vez por intención (al abrir el
+ * modal) y se reutiliza en cada reintento: el servidor devuelve la misma venta
+ * en vez de activar dos veces. No contiene PII.
+ */
+export function nuevaOperacionMostrador(): string {
+  const c = typeof crypto !== 'undefined' ? crypto : undefined;
+  if (c?.randomUUID) return c.randomUUID();
+  const b = new Uint8Array(16);
+  c?.getRandomValues?.(b);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+/** Importe que cobra el servidor según D9: cortesía = 0; el resto, el precio de lista. */
+export function montoCobradoMostrador(precioListaCentavos: number, metodo: MetodoMostrador): number {
+  return metodo === 'cortesia' ? 0 : precioListaCentavos;
 }
 
 /**
  * `confirmarPerdida`: pasar a un plan sin créditos quema el saldo del paquete
  * anterior. Sin `true`, el servidor responde 409 (ver `esPerdidaDeCreditos`) y la
- * pantalla debe preguntar antes de reintentar con `true`.
+ * pantalla debe preguntar antes de reintentar con `true` y el MISMO operationId.
+ * El cliente NO manda importes: el servidor los deriva del catálogo.
  */
 export function activarMembresiaMostrador(
   usuario_id: string,
   tier: string,
-  opts: { confirmarPerdida?: boolean; motivo?: string } = {}
+  opts: { operationId: string; metodo: MetodoMostrador; confirmarPerdida?: boolean; nota?: string; referencia?: string }
 ): Promise<ActivarResult> {
   return backendPost<ActivarResult>('reception-activar-membresia', {
     usuario_id,
     tier,
+    operation_id: opts.operationId,
+    metodo: opts.metodo,
     confirmar_perdida: opts.confirmarPerdida === true,
-    // Queda en audit_log: cómo pagó / por qué se asignó sin pasar por Stripe.
-    ...(opts.motivo ? { motivo: opts.motivo } : {})
+    ...(opts.nota ? { nota: opts.nota } : {}),
+    ...(opts.referencia ? { referencia: opts.referencia } : {})
   });
 }
 
 /**
  * ¿El error es el 409 "perdería créditos" de `reception-activar-membresia`?
  * Devuelve cuántos créditos están en juego (1 si no se pudo leer), o null.
+ * PKG-01D: otros 409 (suscripción de Stripe viva, operación en conflicto) NO son
+ * pérdida de créditos; se distinguen por el texto porque backend.ts solo
+ * conserva el mensaje.
  */
 export function esPerdidaDeCreditos(e: unknown): number | null {
   const err = e as { status?: number; message?: string } | null;
   if (err?.status !== 409) return null;
+  if (!/cr[eé]dito/i.test(err.message ?? '')) return null;
   const n = Number.parseInt(err.message?.match(/(\d+)/)?.[1] ?? '', 10);
   return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+/** Clasifica los 409 de una venta de mostrador que NO son pérdida de créditos. */
+export function conflictoVentaMostrador(e: unknown): 'suscripcion_stripe' | 'operacion_conflicto' | null {
+  const err = e as { status?: number; message?: string } | null;
+  if (err?.status !== 409) return null;
+  if (/suscripci[oó]n de Stripe/i.test(err.message ?? '')) return 'suscripcion_stripe';
+  if (/ya se registr[oó]/i.test(err.message ?? '')) return 'operacion_conflicto';
+  return null;
 }
 
 /**

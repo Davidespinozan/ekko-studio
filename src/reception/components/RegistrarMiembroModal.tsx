@@ -1,8 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
-import { activarMembresiaMostrador } from '@shared/lib/checkout';
+import {
+  activarMembresiaMostrador,
+  nuevaOperacionMostrador,
+  montoCobradoMostrador,
+  conflictoVentaMostrador,
+  METODOS_MOSTRADOR,
+  type MetodoMostrador
+} from '@shared/lib/checkout';
 import { CopyButton } from '@shared/components/CopyButton';
 import { traducirErrorRegistro } from '../lib/traducirErrorRegistro';
 import { usePlanesActivos } from '@shared/hooks/usePlanesActivos';
@@ -28,6 +35,14 @@ function generarPassword(): string {
   return out;
 }
 
+/** PKG-01D: activación pendiente tras crear la cuenta; conserva el MISMO operation_id para reintentar. */
+interface ActivacionPendiente {
+  usuarioId: string;
+  tier: string;
+  metodo: MetodoMostrador;
+  operationId: string;
+}
+
 interface MiembroCreado {
   nombre: string;
   email: string;
@@ -36,6 +51,8 @@ interface MiembroCreado {
   planNombre: string;
   /** true si se activó la membresía en el mismo registro (cobro en caja). */
   activada: boolean;
+  /** Si la activación falló: datos para reintentarla con el mismo operation_id. */
+  pendiente?: ActivacionPendiente;
 }
 
 /**
@@ -50,6 +67,11 @@ interface MiembroCreado {
  * en un solo paso. Sin plan, el miembro nace `pendiente_pago` y se activa luego
  * desde su perfil. Si la creación funciona pero la activación falla, la cuenta
  * queda creada (pendiente) y se avisa: nunca se pierde nada.
+ *
+ * PKG-01D: con plan, el método de pago es obligatorio y la activación lleva un
+ * `operation_id` generado UNA vez al abrir el modal. Si la activación falla o
+ * se agota el tiempo, "Reintentar activación" usa el MISMO id: el servidor
+ * devuelve la venta ya registrada en vez de crear otra.
  */
 export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
   const toast = useToast();
@@ -58,7 +80,11 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
   const [email, setEmail] = useState('');
   const [telefono, setTelefono] = useState('');
   const [tier, setTier] = useState('');
+  const [metodo, setMetodo] = useState<MetodoMostrador | ''>('');
   const { planes, error: errorPlanes, recargar: recargarPlanes } = usePlanesActivos();
+  // Una intención de venta = un operation_id (no cambia por reintentos).
+  const operationId = useRef(nuevaOperacionMostrador());
+  const [reintentando, setReintentando] = useState(false);
   // Contraseña temporal autogenerada al montar (lazy init → estable).
   const [password, setPassword] = useState(() => generarPassword());
   const [submitting, setSubmitting] = useState(false);
@@ -83,7 +109,34 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
   const nombreValido = nombre.trim().length >= 2;
   const emailValido = EMAIL_REGEX.test(email.trim());
   const passwordValida = password.length >= 8;
-  const canSubmit = nombreValido && emailValido && passwordValida && !submitting;
+  const canSubmit = nombreValido && emailValido && passwordValida && !submitting && (!tier || !!metodo);
+  const planElegido = planes.find((p) => p.slug === tier) ?? null;
+  const pesos = (c: number) => `$${Math.round(c / 100).toLocaleString('es-MX')}`;
+
+  function mensajeActivacion(actErr: unknown): string {
+    if (conflictoVentaMostrador(actErr) === 'suscripcion_stripe') return 'Cuenta creada, pero tiene una suscripción de Stripe vigente: resuélvela antes de vender en mostrador.';
+    return actErr instanceof Error
+      ? `Cuenta creada, pero no se pudo activar: ${actErr.message}. Puedes reintentar con la misma venta.`
+      : 'Cuenta creada, pero no se pudo activar. Puedes reintentar con la misma venta.';
+  }
+
+  async function reintentarActivacion() {
+    if (!creado?.pendiente || reintentando) return;
+    setReintentando(true);
+    try {
+      const r = await activarMembresiaMostrador(creado.pendiente.usuarioId, creado.pendiente.tier, {
+        operationId: creado.pendiente.operationId,
+        metodo: creado.pendiente.metodo
+      });
+      if (!r?.success) throw new Error('No se pudo registrar la venta.');
+      toast.success(r.idempotente ? 'La venta ya estaba registrada: membresía activa.' : 'Membresía activada.');
+      setCreado({ ...creado, activada: true, pendiente: undefined });
+    } catch (actErr) {
+      toast.error(mensajeActivacion(actErr));
+    } finally {
+      setReintentando(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -133,17 +186,16 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
       // (cobro en caja). Si la activación falla, la cuenta ya quedó creada
       // (pendiente) → se avisa en la vista de credenciales; nada se pierde.
       let activada = false;
+      let pendiente: ActivacionPendiente | undefined;
       const nuevoId = (result?.user as { id?: string } | undefined)?.id;
-      if (tier && nuevoId) {
+      if (tier && metodo && nuevoId) {
         try {
-          await activarMembresiaMostrador(nuevoId, tier);
-          activada = true;
+          const r = await activarMembresiaMostrador(nuevoId, tier, { operationId: operationId.current, metodo });
+          activada = r?.success === true; // éxito solo con confirmación del servidor
+          if (!activada) pendiente = { usuarioId: nuevoId, tier, metodo, operationId: operationId.current };
         } catch (actErr) {
-          toast.error(
-            actErr instanceof Error
-              ? `Cuenta creada, pero no se pudo activar: ${actErr.message}. Activala desde su perfil.`
-              : 'Cuenta creada, pero no se pudo activar. Activala desde su perfil.'
-          );
+          pendiente = { usuarioId: nuevoId, tier, metodo, operationId: operationId.current };
+          toast.error(mensajeActivacion(actErr));
         }
       }
 
@@ -153,7 +205,8 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
         password,
         plan: tier,
         planNombre: planes.find((p) => p.slug === tier)?.nombre ?? tier,
-        activada
+        activada,
+        pendiente
       });
     } catch (err) {
       toast.error(traducirErrorRegistro(err instanceof Error ? err.message : ''));
@@ -200,6 +253,8 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
           <CredencialesView
             creado={creado}
             onCerrar={() => onRegistrado(creado.email)}
+            onReintentar={creado.pendiente ? reintentarActivacion : undefined}
+            reintentando={reintentando}
           />
         ) : (
           <form onSubmit={handleSubmit}>
@@ -294,9 +349,36 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
                   <ErrorInline mensaje="No pudimos cargar los planes. Puedes registrar sin plan y activarlo después, o reintentar." onReintentar={recargarPlanes} />
                 </div>
               )}
+              {tier && (
+                <div role="radiogroup" aria-label="Cómo pagó" style={{ marginTop: '10px' }}>
+                  <span className="ek-label" style={{ display: 'block', marginBottom: '6px' }}>Cómo pagó</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {METODOS_MOSTRADOR.map((m) => (
+                      <label
+                        key={m.valor}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', padding: '6px 10px', fontSize: '13px',
+                          borderRadius: 'var(--ek-r-sm)', border: `1px solid ${metodo === m.valor ? 'var(--ek-mustard)' : 'var(--ek-line)'}`,
+                          background: metodo === m.valor ? 'var(--ek-mustard-soft)' : 'transparent'
+                        }}
+                      >
+                        <input type="radio" name="rm-metodo" value={m.valor} checked={metodo === m.valor} onChange={() => setMetodo(m.valor)} disabled={submitting} />
+                        {m.label}
+                      </label>
+                    ))}
+                  </div>
+                  {planElegido && typeof planElegido.precio_centavos === 'number' && metodo && (
+                    <p data-testid="resumen-cobro" style={{ fontSize: '12px', margin: '8px 0 0', lineHeight: 1.45 }}>
+                      {metodo === 'cortesia'
+                        ? <><strong>$0 cobrado</strong> · cortesía. Precio de lista {pesos(planElegido.precio_centavos)}.</>
+                        : <><strong>{pesos(montoCobradoMostrador(planElegido.precio_centavos, metodo))} cobrado</strong> · precio de lista {pesos(planElegido.precio_centavos)}.</>}
+                    </p>
+                  )}
+                </div>
+              )}
               <p style={{ fontSize: '11px', color: 'var(--ek-ink-faint)', marginTop: '6px' }}>
                 {tier
-                  ? 'Se activa la membresía al registrar (confirmas el cobro en caja).'
+                  ? 'Se activa la membresía al registrar (confirmas el cobro en caja). La venta queda registrada con importe y método.'
                   : 'Sin plan queda pendiente de pago; lo activas luego desde su perfil.'}
               </p>
             </div>
@@ -370,10 +452,14 @@ export function RegistrarMiembroModal({ onClose, onRegistrado }: Props) {
 
 function CredencialesView({
   creado,
-  onCerrar
+  onCerrar,
+  onReintentar,
+  reintentando
 }: {
   creado: MiembroCreado;
   onCerrar: () => void;
+  onReintentar?: () => void;
+  reintentando?: boolean;
 }) {
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const credencialesTexto = [
@@ -484,6 +570,20 @@ function CredencialesView({
           <span>
             La cuenta queda <strong>PENDIENTE DE ACTIVACIÓN</strong> — asignas plan y activas desde su
             perfil (cobro en caja). Mientras tanto el miembro no podrá reservar.
+            {onReintentar && (
+              <>
+                {' '}Si ya cobraste, reintenta aquí: usa la misma venta y no se registra dos veces.
+                <button
+                  type="button"
+                  className="ek-cta ek-cta--gold"
+                  style={{ display: 'block', marginTop: '8px', padding: '8px 12px', fontSize: '13px' }}
+                  onClick={onReintentar}
+                  disabled={reintentando}
+                >
+                  {reintentando ? 'Reintentando…' : 'Reintentar activación'}
+                </button>
+              </>
+            )}
           </span>
         </div>
       )}
