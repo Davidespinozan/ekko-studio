@@ -87,6 +87,8 @@ interface Props {
    * staff). Solo prellena el campo; no se persiste.
    */
   nombreTitular?: string;
+  /** PKG-01F (D-01F-6): el miembro aceptó perder sus créditos al pasar a mensual; viaja al servidor. */
+  confirmarPerdidaCreditos?: boolean;
   onClose: () => void;
   /** PAGO CONFIRMADO por Stripe (status = succeeded). No significa membresía activa. */
   onPagado: (pago: PagoConfirmado) => void;
@@ -96,7 +98,7 @@ interface Props {
 
 type AccionPreparacion = 'reintentar' | 'preparar' | 'comprobar' | null;
 
-export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, subtitulo, pedirNombre = true, fetchIntent, objetivoOperacion, flujo = 'perfil', contexto, nombreTitular, onClose, onPagado, onEnProceso }: Props) {
+export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, subtitulo, pedirNombre = true, fetchIntent, objetivoOperacion, flujo = 'perfil', contexto, nombreTitular, confirmarPerdidaCreditos, onClose, onPagado, onEnProceso }: Props) {
   const { usuario } = useAuth();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [customerSessionSecret, setCustomerSessionSecret] = useState<string | null>(null);
@@ -163,6 +165,9 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, 
         return fallar(MENSAJE_PAGO.prepararNoIniciable, 'reintentar');
       case 'cobros_no_disponibles':
         return fallar(MENSAJE_PAGO.cobrosNoDisponibles, null, 'pendiente');
+      case 'perderia_creditos':
+        // El servidor exige consentimiento explícito (D-01F-6); no hay objeto que reintentar.
+        return fallar(MENSAJE_PAGO.perderiaCreditos, null, 'pendiente');
       case 'reintentable':
       default:
         return fallar(MENSAJE_PAGO.prepararReintentable, 'reintentar');
@@ -186,7 +191,7 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, 
       // La MISMA intención → el MISMO operation_id (reintento, refresh, otra pestaña).
       const operationId = usuarioId && objetivo ? await obtenerOperacionPago(usuarioId, objetivo) : null;
       operacion.current = operationId;
-      const obtener = fetchIntent ?? ((op?: string) => crearPagoIntent(tierSlug ?? '', op));
+      const obtener = fetchIntent ?? ((op?: string) => crearPagoIntent(tierSlug ?? '', op, { confirmarPerdidaCreditos }));
       const res = await obtener(operationId ?? undefined);
       aplicar(res, operationId);
     } catch (e) {

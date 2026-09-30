@@ -11,6 +11,7 @@ import { crearStripeFalso, type StripeFalso } from './helpers/stripeFalso';
 const h = vi.hoisted(() => ({
   stripe: null as unknown as StripeFalso,
   tier: null as Record<string, unknown> | null,
+  membresias: [] as Array<Record<string, unknown>>,
   getOrCreate: vi.fn()
 }));
 
@@ -20,6 +21,10 @@ vi.mock('@supabase/supabase-js', () => ({
     from: vi.fn((table: string) => {
       if (table === 'tiers') {
         return { select: vi.fn(() => ({ eq: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: h.tier, error: null })) })) })) })) };
+      }
+      if (table === 'membresias') {
+        // PKG-01F: saldo de créditos vivos (select().eq().in() → filas).
+        return { select: vi.fn(() => ({ eq: vi.fn(() => ({ in: vi.fn(async () => ({ data: h.membresias, error: null })) })) })) };
       }
       return {
         select: vi.fn(() => ({
@@ -56,6 +61,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   h.stripe = crearStripeFalso();
   h.tier = { ...PAQUETE };
+  h.membresias = [];
   h.getOrCreate.mockResolvedValue('cus_1');
   process.env.VITE_SUPABASE_URL = 'http://supabase.test';
   process.env.VITE_SUPABASE_ANON_KEY = 'anon';
@@ -231,5 +237,47 @@ describe('crear-pago-intent · 29 · cliente legacy (sin operation_id)', () => {
     // Dos llamadas legacy = dos objetos (riesgo residual conocido, igual que antes).
     await invocar({ tier: 'pack4' });
     expect(h.stripe.estado.pis).toHaveLength(2);
+  });
+});
+
+// ── PKG-01F (D-01F-6) · consentimiento server-side para perder créditos ─────
+describe('crear-pago-intent · paquete → mensual con créditos (PKG-01F)', () => {
+  beforeEach(() => {
+    h.tier = { ...MENSUAL };
+    h.membresias = [{ creditos_restantes: 4, periodo_actual_fin: new Date(Date.now() + 10 * 86_400_000).toISOString() }];
+  });
+
+  it('sin consentimiento → perderia_creditos con el saldo; NO se crea ningún objeto de Stripe', async () => {
+    const r = await invocar({ tier: 'esencial', operation_id: OP });
+    expect(r.body).toEqual({ estado: 'perderia_creditos', creditos: 4, operationId: OP });
+    expect(h.stripe.subscriptions.create).not.toHaveBeenCalled();
+    expect(h.stripe.subscriptions.list).not.toHaveBeenCalled();
+    expect(h.getOrCreate).not.toHaveBeenCalled();
+  });
+
+  it('solo el booleano true cuenta como consentimiento ("true" o 1 no)', async () => {
+    expect((await invocar({ tier: 'esencial', operation_id: OP, confirmar_perdida_creditos: 'true' })).body.estado).toBe('perderia_creditos');
+    expect((await invocar({ tier: 'esencial', operation_id: OP, confirmar_perdida_creditos: 1 })).body.estado).toBe('perderia_creditos');
+    expect(h.stripe.subscriptions.create).not.toHaveBeenCalled();
+  });
+
+  it('con consentimiento → se crea la suscripción y el consentimiento queda en la metadata (evidencia)', async () => {
+    const r = await invocar({ tier: 'esencial', operation_id: OP, confirmar_perdida_creditos: true });
+    expect(r.body.estado).toBe('reutilizable');
+    expect(h.stripe.estado.subs[0].metadata).toMatchObject({ confirmar_perdida_creditos: 'true', tier_id: 'tier-mes' });
+  });
+
+  it('créditos vencidos o saldo cero no exigen consentimiento; un paquete destino tampoco', async () => {
+    h.membresias = [{ creditos_restantes: 4, periodo_actual_fin: new Date(Date.now() - 86_400_000).toISOString() }];
+    expect((await invocar({ tier: 'esencial', operation_id: OP })).body.estado).toBe('reutilizable');
+    h.membresias = [{ creditos_restantes: 4, periodo_actual_fin: null }];
+    h.tier = { ...PAQUETE };
+    expect((await invocar({ tier: 'pack4', operation_id: OP2 })).body.estado).toBe('reutilizable');
+    expect(h.stripe.estado.pis[0].metadata).not.toHaveProperty('confirmar_perdida_creditos');
+  });
+
+  it('el camino legacy también exige el consentimiento (no hay objeto sin él)', async () => {
+    expect((await invocar({ tier: 'esencial' })).body).toEqual({ estado: 'perderia_creditos', creditos: 4 });
+    expect(h.stripe.subscriptions.create).not.toHaveBeenCalled();
   });
 });

@@ -3,7 +3,7 @@ import { Sparkles, Check, CreditCard, ArrowRight, X, AlertTriangle, Ticket, Cale
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios, type Beneficio } from '@shared/lib/beneficios';
 import { sufijoPrecio, detallePlan, esPlanPaquete } from '@shared/lib/planPresentacion';
-import { obtenerBillingInfo, cancelarSuscripcion, cambiarPlanSuscripcion, type MetodoPago, type PagoHistorial } from '@shared/lib/checkout';
+import { obtenerBillingInfo, cancelarSuscripcion, cambiarPlanSuscripcion, CODIGOS_SWAP_TERMINALES, type MetodoPago, type PagoHistorial, type SwapPlanResult } from '@shared/lib/checkout';
 import { TarjetaModal } from '@shared/components/TarjetaModal';
 import { PaymentModal } from '@shared/components/PaymentModal';
 import { PlanTipoToggle, type VistaPlan } from '@shared/components/PlanTipoToggle';
@@ -20,6 +20,8 @@ import {
   leerRetornoPago,
   limpiarPagoPendiente,
   mensajePagoPendiente,
+  obtenerOperacionPago,
+  descartarOperacionPago,
   MENSAJE_PAGO,
   type PagoPendiente
 } from '@shared/lib/pagoEstado';
@@ -102,6 +104,12 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
   // Destino de un cambio créditos→mensual que perdería el saldo (aviso).
   const [confirmarCambio, setConfirmarCambio] = useState<TierInfo | null>(null);
+  // PKG-01F (D-01F-6): el miembro aceptó perder sus créditos → viaja al servidor con el pago.
+  const [perdidaConfirmada, setPerdidaConfirmada] = useState(false);
+  // PKG-01F (D-01F-5): mensual con suscripción → paquete: aviso de que se pierde el resto del periodo.
+  const [confirmarSustitucion, setConfirmarSustitucion] = useState<TierInfo | null>(null);
+  // PKG-01F (D-01F-4): reservas que impiden el cambio (solo se muestran; no se tocan).
+  const [reservasBloqueo, setReservasBloqueo] = useState<{ destino: string; lista: NonNullable<SwapPlanResult['reservas']> } | null>(null);
 
   // PKG-02B (C04): PAGO CONFIRMADO ≠ PLAN ACTIVO. Se observa (solo lectura) la
   // membresía hasta ver la evidencia ESPERADA: una membresía viva del plan pagado
@@ -333,28 +341,69 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
       void hacerSwap(destino);
       return;
     }
+    // D-01F-5: pasar de una mensualidad con suscripción a un paquete sustituye la
+    // mensualidad y pierde el resto del periodo pagado, sin reembolso. Se avisa antes.
+    if (esPlanPaquete(destino) && tieneSuscripcion && membresiaViva) {
+      setConfirmarSustitucion(destino);
+      return;
+    }
     setCambiarOpen(false);
     setPagarTier(destino);
   }
 
+  const MENSAJE_SWAP: Record<string, string> = {
+    morosidad: 'Tu suscripción tiene un pago pendiente. Ponla al corriente antes de cambiar de plan.',
+    cancelacion_programada: 'Tu suscripción tiene una cancelación programada. Reactívala antes de cambiar de plan.',
+    cobro_fallido: 'No pudimos cobrar la diferencia con tu tarjeta. Tu plan no cambió. Actualiza tu tarjeta e inicia el cambio de nuevo.',
+    operacion_conflicto: 'Esta operación ya se usó con otros datos. Cierra y vuelve a abrir el cambio de plan.',
+    estado_no_permitido: 'Tu suscripción no está en un estado que permita cambiar de plan. Acércate a recepción.',
+    sub_no_verificada: 'No pudimos verificar tu suscripción. Acércate a recepción.',
+    requiere_revision: 'No pudimos confirmar el cobro del cambio. No lo repitas: el estudio lo revisará.',
+    resultado_desconocido: 'No pudimos confirmar el cambio. Reintenta: no se aplicará dos veces.',
+    reintentable: 'No pudimos cambiar tu plan. Intenta de nuevo.',
+    pago_no_iniciable: 'No pudimos cambiar tu plan. Acércate a recepción.'
+  };
+
   // Cambio in-place de la suscripción vigente usando la tarjeta guardada.
+  // PKG-01F: una intención = un operation_id (se reutiliza en cada reintento; el
+  // servidor devuelve la misma operación). Éxito solo con el 200 del servidor.
   async function hacerSwap(destino: TierInfo) {
     setSwapping(destino.slug);
+    const objetivo = `swap:${destino.slug}`;
+    let operationId: string | null = null;
     try {
-      const res = await cambiarPlanSuscripcion(destino.slug);
+      operationId = await obtenerOperacionPago(usuarioId, objetivo);
+      const res = await cambiarPlanSuscripcion(destino.slug, operationId);
       // Sin suscripción/pasarela → caer al pago normal (PaymentModal).
       if (res.reason) {
         setCambiarOpen(false);
         setPagarTier(destino);
         return;
       }
-      if (!res.success) throw new Error();
+      if (!res.success) {
+        const code = res.code ?? 'reintentable';
+        // Operación terminal: el mismo id no sirve para otro intento (p. ej. la key replayaría el cobro fallido).
+        if (CODIGOS_SWAP_TERMINALES.has(code)) descartarOperacionPago(usuarioId, objetivo, operationId);
+        if (code === 'reservas_incompatibles') {
+          setReservasBloqueo({ destino: destino.nombre, lista: res.reservas ?? [] });
+          return;
+        }
+        toast.error(MENSAJE_SWAP[code] ?? MENSAJE_SWAP.reintentable, 10_000);
+        return;
+      }
+      descartarOperacionPago(usuarioId, objetivo, operationId); // aplicada
       setCambiarOpen(false);
-      toast.success(`¡Listo! Cambiaste a ${destino.nombre}. El ajuste se refleja en tu próximo cobro.`);
+      const cobrado = res.cobro?.amount_paid_centavos;
+      toast.success(
+        res.direccion === 'upgrade' && typeof cobrado === 'number'
+          ? `¡Listo! Cambiaste a ${destino.nombre}. Se cobró la diferencia: $${Math.round(cobrado / 100).toLocaleString('es-MX')}.`
+          : `¡Listo! Cambiaste a ${destino.nombre}. El ajuste se refleja en tu próximo cobro.`
+      );
       // El tier cambió server-side; recargamos para reflejar el plan actual.
       setTimeout(() => window.location.reload(), 1400);
     } catch {
-      toast.error('No pudimos cambiar tu plan. Intenta de nuevo.');
+      // Red o 5xx: no se sabe si Stripe cambió. El mismo operation_id recupera en el siguiente intento.
+      toast.error(MENSAJE_SWAP.resultado_desconocido, 10_000);
     } finally {
       setSwapping(null);
     }
@@ -362,9 +411,11 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
 
   function procederCambio(destino: TierInfo) {
     // Viene del aviso "pierdes tus créditos": es un miembro de PAQUETE (sin
-    // suscripción) pasando a mensual → siempre por el modal de pago.
+    // suscripción) pasando a mensual → siempre por el modal de pago. El
+    // consentimiento viaja al servidor (D-01F-6): sin él no se crea el cobro.
     setConfirmarCambio(null);
     setCambiarOpen(false);
+    setPerdidaConfirmada(true);
     setPagarTier(destino);
   }
 
@@ -805,7 +856,8 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
           esPaquete={pagarTier.tipo === 'creditos' || pagarTier.tipo === 'hibrido'}
           flujo="perfil"
           contexto={{ slug: pagarTier.slug }}
-          onClose={() => setPagarTier(null)}
+          confirmarPerdidaCreditos={perdidaConfirmada && !esPlanPaquete(pagarTier)}
+          onClose={() => { setPagarTier(null); setPerdidaConfirmada(false); }}
           onPagado={(pago) => {
             const slug = pagarTier.slug;
             setPagarTier(null);
@@ -850,6 +902,54 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
                 {gestionando ? <Spinner size={15} /> : 'Sí, cancelar'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {confirmarSustitucion && (
+        <div className="ek-backdrop" onClick={() => setConfirmarSustitucion(null)} role="dialog" aria-modal="true">
+          <div className="ek-card" data-testid="aviso-sustitucion" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '100%', animation: 'ek-scale-in 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
+            <p className="ek-eyebrow" style={{ color: 'var(--ek-warning)', marginBottom: '8px' }}>
+              <AlertTriangle size={12} aria-hidden="true" /> TU MENSUALIDAD SE SUSTITUYE
+            </p>
+            <h3 className="ek-display-md" style={{ margin: '0 0 8px' }}>Comprar {confirmarSustitucion.nombre}</h3>
+            <p className="ek-body-muted" style={{ marginTop: 0, marginBottom: '18px' }}>
+              Al pagar el paquete, tu plan mensual actual <strong>se cancela</strong> y{' '}
+              <strong>el tiempo restante del periodo ya pagado se pierde</strong>. No hay reembolso ni prorrateo automático de ese periodo.
+              {finPeriodo ? <> Tu periodo actual termina el <strong>{finPeriodo}</strong>.</> : null}
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" className="ek-cta ek-cta--secondary ek-cta--full" onClick={() => setConfirmarSustitucion(null)}>
+                Mejor no
+              </button>
+              <button type="button" className="ek-cta ek-cta--full" onClick={() => { const d = confirmarSustitucion; setConfirmarSustitucion(null); setCambiarOpen(false); setPagarTier(d); }}>
+                Entiendo, comprar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reservasBloqueo && (
+        <div className="ek-backdrop" onClick={() => setReservasBloqueo(null)} role="dialog" aria-modal="true">
+          <div className="ek-card" data-testid="reservas-bloqueo" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px', width: '100%', animation: 'ek-scale-in 0.22s cubic-bezier(0.16,1,0.3,1)' }}>
+            <p className="ek-eyebrow" style={{ color: 'var(--ek-warning)', marginBottom: '8px' }}>
+              <AlertTriangle size={12} aria-hidden="true" /> RESERVAS QUE IMPIDEN EL CAMBIO
+            </p>
+            <p className="ek-body-muted" style={{ marginTop: 0, marginBottom: '12px' }}>
+              El plan <strong>{reservasBloqueo.destino}</strong> no permite estas reservas. Cámbialas o cancélalas y vuelve a intentar. No se modificó nada.
+            </p>
+            <ul style={{ margin: '0 0 18px', paddingLeft: '18px', fontSize: '13px', lineHeight: 1.5 }}>
+              {reservasBloqueo.lista.map((r) => (
+                <li key={r.reserva_id}>
+                  {r.folio} · {r.recurso} · {new Date(r.slot_inicio).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}
+                  {' · '}{r.motivo === 'invitados_exceden' ? `${r.invitados} invitados, más de lo que permite el plan` : 'estudio no incluido en el plan'}
+                </li>
+              ))}
+            </ul>
+            <button type="button" className="ek-cta ek-cta--secondary ek-cta--full" onClick={() => setReservasBloqueo(null)}>
+              Entendido
+            </button>
           </div>
         </div>
       )}

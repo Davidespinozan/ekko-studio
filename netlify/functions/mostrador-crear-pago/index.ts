@@ -13,6 +13,7 @@ import { esStaffActivo, puedeOperarSobre } from '../_lib/staff';
 import { resolverCuentaConectada, getOrCreateSocioCustomer } from '../_lib/connectBilling';
 import { crearPresupuesto, leerOperationId, clasificarErrorSaliente } from '../_lib/operacionPago';
 import { prepararPagoPlan, esPaquete } from '../_lib/pagoPlan';
+import { saldoCreditosVivo, consentimientoPerdida } from '../_lib/perdidaCreditos';
 
 /**
  * POST /mostrador-crear-pago
@@ -41,6 +42,8 @@ interface Body {
   usuario_id?: string;
   tier?: string;
   operation_id?: unknown;
+  /** PKG-01F (D-01F-6): consentimiento explícito (staff, con el miembro) para perder los créditos vivos al pasar a mensual. */
+  confirmar_perdida_creditos?: unknown;
 }
 
 const FUNCION = 'mostrador-crear-pago';
@@ -127,6 +130,13 @@ export const handler: Handler = async (event) => {
       };
     }
 
+    // PKG-01F (D-01F-6): mensual sobre un saldo de créditos exige consentimiento explícito.
+    const perdidaConfirmada = consentimientoPerdida(body.confirmar_perdida_creditos);
+    if (!esPaquete(tier)) {
+      const saldo = await saldoCreditosVivo(admin, target.id);
+      if (saldo > 0 && !perdidaConfirmada) return ok({ estado: 'perderia_creditos', creditos: saldo, operationId });
+    }
+
     if (!process.env.STRIPE_SECRET_KEY) return ok({ reason: 'stripe_pendiente' });
     const { accountId, chargesEnabled } = await resolverCuentaConectada(admin, target.tenant_id);
     if (!accountId || !chargesEnabled) return ok({ reason: 'cobros_no_activos' });
@@ -159,7 +169,10 @@ export const handler: Handler = async (event) => {
       feePct,
       operationId,
       // Atribución sin PII: ids técnicos y rol.
-      metadataExtra: { origen: 'mostrador', actor_usuario_id: caller.id, actor_rol: caller.rol ?? '' },
+      metadataExtra: {
+        origen: 'mostrador', actor_usuario_id: caller.id, actor_rol: caller.rol ?? '',
+        ...(!esPaquete(tier) && perdidaConfirmada ? { confirmar_perdida_creditos: 'true' } : {})
+      },
       funcion: FUNCION
     });
     return ok({ ...respuesta, miembro: { id: target.id } });

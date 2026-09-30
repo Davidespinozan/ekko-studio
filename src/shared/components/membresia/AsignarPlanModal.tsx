@@ -214,7 +214,15 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
         objetivoOperacion={`mostrador:${usuarioId}:${plan.slug}`}
         contexto={{ miembro: usuarioId, slug: plan.slug }}
         fetchIntent={async (operationId) => {
-          const r = await crearPagoMostrador(usuarioId, plan.slug, operationId ?? '');
+          // PKG-01F (D-01F-6): pasar a mensual con créditos vivos exige consentimiento
+          // explícito; el servidor lo pide con `perderia_creditos` y aquí se muestra el
+          // mismo aviso rojo que en la vía 01D para que el staff confirme con el miembro.
+          const r = await crearPagoMostrador(usuarioId, plan.slug, operationId ?? '', { confirmarPerdidaCreditos: creditosEnJuego !== null });
+          if (r.estado === 'perderia_creditos') {
+            setCreditosEnJuego(r.creditos ?? 1);
+            setStripe(null);
+            return r;
+          }
           objetoStripe.current = r.subscriptionId ?? r.objetoId ?? null;
           return r;
         }}
@@ -270,7 +278,11 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
       titulo={TITULO[modo]}
       icono={<BadgeCheck size={14} aria-hidden="true" />}
       sujeto={nombre ?? 'Miembro'}
-      confirmarLabel={metodo === 'stripe' ? 'Cobrar con tarjeta' : creditosEnJuego !== null ? 'Sí, cambiar y perder créditos' : modo === 'renovar' ? 'Renovar' : 'Activar plan'}
+      confirmarLabel={
+        metodo === 'stripe'
+          ? creditosEnJuego !== null ? 'Sí, cobrar y perder créditos' : 'Cobrar con tarjeta'
+          : creditosEnJuego !== null ? 'Sí, cambiar y perder créditos' : modo === 'renovar' ? 'Renovar' : 'Activar plan'
+      }
       peligro={creditosEnJuego !== null}
       guardando={guardando}
       bloqueado={!elegido || !metodo}

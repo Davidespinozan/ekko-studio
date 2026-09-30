@@ -234,7 +234,7 @@ describe('AsignarPlanModal · Tarjeta por Stripe (PKG-01E)', () => {
     expect(h.modalProps).toMatchObject({ tierSlug: 'esencial', flujo: 'mostrador', objetivoOperacion: 'mostrador:m1:esencial', nombreTitular: 'Ana', contexto: { miembro: 'm1', slug: 'esencial' } });
     // fetchIntent prepara el cobro para el miembro objetivo con el operation_id.
     await (h.modalProps!.fetchIntent as (op?: string) => Promise<unknown>)('3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
-    expect(h.crearPagoMostrador).toHaveBeenCalledWith('m1', 'esencial', '3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
+    expect(h.crearPagoMostrador).toHaveBeenCalledWith('m1', 'esencial', '3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f', { confirmarPerdidaCreditos: false });
   });
 
   it('succeeded NO activa: observa la membresía del miembro por referencia_pago = PaymentIntent; al verla, onDone', async () => {
@@ -313,5 +313,28 @@ describe('AsignarPlanModal · Tarjeta por Stripe (PKG-01E)', () => {
     await screen.findByTestId('stripe-activacion');
     const todo = JSON.stringify({ l: { ...window.localStorage }, s: { ...window.sessionStorage } });
     expect(todo).not.toMatch(/cs_x|secret|Ana|@|4242/);
+  });
+});
+
+// ── PKG-01F (D-01F-6) · vía Stripe con créditos vivos ────────────────────────
+describe('AsignarPlanModal · Tarjeta por Stripe y pérdida de créditos (PKG-01F)', () => {
+  it('perderia_creditos → cierra el pago, muestra el aviso rojo y el siguiente cobro lleva el consentimiento', async () => {
+    h.crearPagoMostrador
+      .mockResolvedValueOnce({ estado: 'perderia_creditos', creditos: 5, operationId: 'x' })
+      .mockResolvedValueOnce({ estado: 'reutilizable', clientSecret: 'cs_x', account: 'acct_1', modo: 'suscripcion', objetoId: 'sub_1', subscriptionId: 'sub_1' });
+    abrir();
+    fireEvent.click(await screen.findByRole('radio', { name: /esencial/i }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Tarjeta por Stripe' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cobrar con tarjeta' }));
+    await screen.findByTestId('payment-modal');
+    await (h.modalProps!.fetchIntent as (op?: string) => Promise<unknown>)('3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
+    expect(await screen.findByRole('alert')).toHaveTextContent(/5 créditos.*se perderán/i);
+    expect(screen.queryByTestId('payment-modal')).not.toBeInTheDocument();
+    expect(h.crearPagoMostrador.mock.calls[0][3]).toEqual({ confirmarPerdidaCreditos: false });
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, cobrar y perder créditos' }));
+    await screen.findByTestId('payment-modal');
+    await (h.modalProps!.fetchIntent as (op?: string) => Promise<unknown>)('3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
+    expect(h.crearPagoMostrador.mock.calls[1][3]).toEqual({ confirmarPerdidaCreditos: true });
+    expect(mockActivar).not.toHaveBeenCalled();
   });
 });

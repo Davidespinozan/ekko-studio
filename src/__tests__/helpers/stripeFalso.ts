@@ -24,6 +24,7 @@ const errConexion = () => Object.assign(new Error('Request aborted due to timeou
 export function crearStripeFalso() {
   let n = 0;
   let perder = false;
+  let fallarCobro = false;
   const porKey = new Map<string, { firma: string; obj: Obj }>();
   const pis: Obj[] = [];
   const subs: Obj[] = [];
@@ -99,7 +100,38 @@ export function crearStripeFalso() {
         return obj;
       })
     ),
-    list: vi.fn(async (params: Obj, _opts: Obj) => ({ data: subs.filter((s) => s.customer === params.customer).slice().reverse() }))
+    list: vi.fn(async (params: Obj, _opts: Obj) => ({ data: subs.filter((s) => s.customer === params.customer).slice().reverse() })),
+    retrieve: vi.fn(async (id: string, _params: Obj, _opts: Obj) => {
+      const s = subs.find((x) => x.id === id);
+      if (!s) throw Object.assign(new Error(`No such subscription: ${id}`), { type: 'StripeInvalidRequestError', statusCode: 404 });
+      return { ...s, metadata: { ...s.metadata } };
+    }),
+    /**
+     * PKG-01F: update idempotente por key. Cambia el precio del item, mezcla
+     * metadata y simula la liquidación: con `always_invoice` genera una factura
+     * de prorrata pagada (o, si `fallarCobro()`, rechaza TODO el update con un
+     * error de tarjeta como hace `error_if_incomplete`); con `create_prorations`
+     * no factura ahora.
+     */
+    update: vi.fn(async (id: string, params: Obj, opts: Obj) =>
+      idempotente(opts?.idempotencyKey, { id, ...params }, () => {
+        const s = subs.find((x) => x.id === id);
+        if (!s) throw Object.assign(new Error(`No such subscription: ${id}`), { type: 'StripeInvalidRequestError', statusCode: 404 });
+        const nuevo = params.items?.[0]?.price as string | undefined;
+        const unitNuevo = nuevo ? Number(String(nuevo).replace('price_', '')) : s.items.data[0].price.unit_amount;
+        const unitViejo = s.items.data[0].price.unit_amount;
+        if (params.proration_behavior === 'always_invoice' && params.payment_behavior === 'error_if_incomplete' && fallarCobro) {
+          fallarCobro = false;
+          throw Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError', code: 'card_declined', statusCode: 402 });
+        }
+        if (nuevo) s.items = { data: [{ ...s.items.data[0], price: { id: nuevo, unit_amount: unitNuevo, currency: 'mxn' } }] };
+        if (params.metadata) s.metadata = { ...s.metadata, ...params.metadata };
+        if (params.proration_behavior === 'always_invoice') {
+          s.latest_invoice = { id: `in_${++n}`, status: 'paid', amount_paid: Math.max(0, unitNuevo - unitViejo), currency: 'mxn', billing_reason: 'subscription_update' };
+        }
+        return { ...s, metadata: { ...s.metadata } };
+      })
+    )
   };
 
   const invoices = { list: vi.fn(async (_params: Obj, _opts: Obj) => ({ data: [] as Obj[] })) };
@@ -152,6 +184,27 @@ export function crearStripeFalso() {
     /** La PRÓXIMA creación ocurre en Stripe pero su respuesta se pierde. */
     perderRespuesta() {
       perder = true;
+    },
+    /** El PRÓXIMO update con cobro inmediato falla como una tarjeta rechazada (nada cambia). */
+    fallarCobro() {
+      fallarCobro = true;
+    },
+    /** Siembra una suscripción existente (para cambios de plan). */
+    sembrarSuscripcion(o: { id: string; customer: string; unit_amount: number; status?: string; metadata?: Obj; cancel_at_period_end?: boolean }) {
+      const obj = {
+        id: o.id,
+        object: 'subscription',
+        status: o.status ?? 'active',
+        customer: o.customer,
+        cancel_at_period_end: o.cancel_at_period_end ?? false,
+        metadata: { app: 'ekko', ...(o.metadata ?? {}) },
+        application_fee_percent: null,
+        items: { data: [{ id: `si_${o.id}`, price: { id: `price_${o.unit_amount}`, unit_amount: o.unit_amount, currency: 'mxn' } }] },
+        latest_invoice: { id: `in_${o.id}`, status: 'paid', amount_paid: o.unit_amount, currency: 'mxn', billing_reason: 'subscription_cycle' },
+        created: 1_700_000_000
+      };
+      subs.push(obj);
+      return obj;
     },
     estado: { pis, subs, sesiones }
   };

@@ -167,11 +167,18 @@ export interface PagoIntentResult {
   moneda?: string;
   /** Mensual: id de la suscripción (la membresía se observa por `stripe_subscription_id`). */
   subscriptionId?: string;
+  /** PKG-01F: con `estado: 'perderia_creditos'`, créditos vivos que se perderían al pasar a mensual. */
+  creditos?: number;
 }
 
 /** PKG-01C: `operationId` = una intención de compra; se reutiliza en cada reintento. */
-export function crearPagoIntent(tierSlug: string, operationId?: string): Promise<PagoIntentResult> {
-  return backendPost<PagoIntentResult>('crear-pago-intent', { tier: tierSlug, ...(operationId ? { operation_id: operationId } : {}) });
+export function crearPagoIntent(tierSlug: string, operationId?: string, opts: { confirmarPerdidaCreditos?: boolean } = {}): Promise<PagoIntentResult> {
+  return backendPost<PagoIntentResult>('crear-pago-intent', {
+    tier: tierSlug,
+    ...(operationId ? { operation_id: operationId } : {}),
+    // PKG-01F (D-01F-6): consentimiento explícito para perder créditos al pasar a mensual.
+    ...(opts.confirmarPerdidaCreditos ? { confirmar_perdida_creditos: true } : {})
+  });
 }
 
 /**
@@ -183,8 +190,13 @@ export function crearPagoIntent(tierSlug: string, operationId?: string): Promise
  * se activa nada ni se toca `ventas_mostrador`. `operationId` = una intención
  * por (miembro, plan); se reutiliza en cada reintento.
  */
-export function crearPagoMostrador(usuarioId: string, tierSlug: string, operationId: string): Promise<PagoIntentResult> {
-  return backendPost<PagoIntentResult>('mostrador-crear-pago', { usuario_id: usuarioId, tier: tierSlug, operation_id: operationId });
+export function crearPagoMostrador(usuarioId: string, tierSlug: string, operationId: string, opts: { confirmarPerdidaCreditos?: boolean } = {}): Promise<PagoIntentResult> {
+  return backendPost<PagoIntentResult>('mostrador-crear-pago', {
+    usuario_id: usuarioId,
+    tier: tierSlug,
+    operation_id: operationId,
+    ...(opts.confirmarPerdidaCreditos ? { confirmar_perdida_creditos: true } : {})
+  });
 }
 
 /**
@@ -196,12 +208,26 @@ export function crearPagoMostrador(usuarioId: string, tierSlug: string, operatio
 export interface SwapPlanResult {
   success?: boolean;
   tier?: string;
+  tier_anterior?: string | null;
   reason?: string;
+  /** PKG-01F: rechazo de negocio (HTTP 200): reservas_incompatibles | morosidad | cancelacion_programada | cobro_fallido | operacion_conflicto | estado_no_permitido | sub_no_verificada | requiere_revision | reintentable | resultado_desconocido | pago_no_iniciable */
+  code?: string;
+  error?: string;
+  reservas?: Array<{ reserva_id: string; folio: string; slot_inicio: string; recurso: string; invitados: number; motivo: string }>;
+  direccion?: 'upgrade' | 'downgrade' | 'lateral';
+  idempotente?: boolean;
+  recuperado?: boolean;
+  /** Upgrade: factura de prorrata cobrada por Stripe. */
+  cobro?: { invoice_id: string | null; amount_paid_centavos: number | null; moneda: string | null } | null;
 }
 
-export function cambiarPlanSuscripcion(tierSlug: string): Promise<SwapPlanResult> {
-  return backendPost<SwapPlanResult>('cambiar-plan-suscripcion', { tier: tierSlug });
+/** PKG-01F: `operationId` = una intención de cambio; se reutiliza en cada reintento (misma key en Stripe). */
+export function cambiarPlanSuscripcion(tierSlug: string, operationId: string): Promise<SwapPlanResult> {
+  return backendPost<SwapPlanResult>('cambiar-plan-suscripcion', { tier: tierSlug, operation_id: operationId });
 }
+
+/** Un rechazo con `code` cuya operación queda TERMINAL (no se puede reintentar con el mismo id). */
+export const CODIGOS_SWAP_TERMINALES = new Set(['cobro_fallido', 'operacion_conflicto', 'reservas_incompatibles', 'morosidad', 'cancelacion_programada', 'estado_no_permitido', 'sub_no_verificada', 'pago_no_iniciable']);
 
 /**
  * Pago in-app de N invitados EXTRA de una reserva (Stripe, tarjeta guardada).

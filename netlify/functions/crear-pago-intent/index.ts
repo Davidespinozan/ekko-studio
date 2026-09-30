@@ -10,6 +10,7 @@ import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/ht
 import { requireEnv, optionalEnv } from '../_lib/env';
 import { getStripe, llavePrecio } from '../_lib/stripe';
 import { resolverCuentaConectada, getOrCreateSocioCustomer } from '../_lib/connectBilling';
+import { saldoCreditosVivo, consentimientoPerdida } from '../_lib/perdidaCreditos';
 import {
   crearPresupuesto,
   leerOperationId,
@@ -56,6 +57,8 @@ import type Stripe from 'stripe';
 interface Body {
   tier?: string;
   operation_id?: unknown;
+  /** PKG-01F (D-01F-6): consentimiento explícito para perder los créditos vivos al pasar a mensual. */
+  confirmar_perdida_creditos?: unknown;
 }
 
 const FUNCION = 'crear-pago-intent';
@@ -137,6 +140,17 @@ export const handler: Handler = async (event) => {
     // aplicaba en el Checkout (fallback); los flujos Elements no cobraban fee.
     const feePct = Number(optionalEnv('EKKO_FEE_PERCENT', '0')) || 0;
 
+    // PKG-01F (D-01F-6): un plan mensual quema el saldo de créditos al activarse.
+    // Sin consentimiento explícito no se crea el objeto financiero (y por tanto
+    // el webhook nunca activa nada). El consentimiento queda en la metadata.
+    const perdidaConfirmada = consentimientoPerdida(body.confirmar_perdida_creditos);
+    if (!esPaquete) {
+      const saldo = await saldoCreditosVivo(admin, socio.id);
+      if (saldo > 0 && !perdidaConfirmada) {
+        return ok({ estado: 'perderia_creditos', creditos: saldo, ...(operacion.tipo === 'ok' ? { operationId: operacion.id } : {}) });
+      }
+    }
+
     if (operacion.tipo === 'ausente') {
       return await legacy({ stripe, admin, socio, accountId, tier, currency, esPaquete, feePct });
     }
@@ -146,7 +160,10 @@ export const handler: Handler = async (event) => {
     const kind: KindOperacion = esPaquete ? 'pi_paquete' : 'sub_mensual';
     const target = `${esPaquete ? 'paquete' : 'mensual'}:${tier.id}`;
     const key = llaveOperacion(kind, accountId, socio.id, operationId);
-    const metadata = { app: 'ekko', usuario_id: socio.id, tier_id: tier.id, operation_id: operationId, ekko_target: target };
+    const metadata = {
+      app: 'ekko', usuario_id: socio.id, tier_id: tier.id, operation_id: operationId, ekko_target: target,
+      ...(!esPaquete && perdidaConfirmada ? { confirmar_perdida_creditos: 'true' } : {})
+    };
 
     let customerId: string;
     try {

@@ -70,7 +70,9 @@ export const MENSAJE_PAGO = {
   cobrosNoDisponibles: 'Los pagos online no están disponibles en este momento. Acércate a recepción.',
   intentoReemplazable: 'Este intento de pago quedó sin efecto (cambió el precio o los datos). No se te cobró. Prepara el pago de nuevo.',
   requiereRevision: 'No podemos continuar este pago automáticamente. No lo repitas: el estudio lo revisará.',
-  yaPagado: 'Este pago ya se había completado. No se cobró de nuevo.'
+  yaPagado: 'Este pago ya se había completado. No se cobró de nuevo.',
+  // PKG-01F
+  perderiaCreditos: 'Este plan mensual descarta los créditos que te quedan. Confirma primero que aceptas perderlos.'
 } as const;
 
 /** Copy seguro para un error de Stripe.js: solo se muestra el de Stripe cuando Stripe lo redactó para el usuario. */
@@ -433,4 +435,5 @@ export type EstadoPreparacion =
   | 'reintentable'
   | 'resultado_desconocido'
   | 'pago_no_iniciable'
-  | 'cobros_no_disponibles';
+  | 'cobros_no_disponibles'
+  | 'perderia_creditos';
