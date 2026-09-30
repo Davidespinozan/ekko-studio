@@ -71,7 +71,9 @@ export function PagarInvitadosExtra({ reservaId, precioExtraCentavos, maxCantida
         pedirNombre={false}
         flujo="invitados"
         contexto={{ reservaId, cantidad }}
-        fetchIntent={() => crearPagoInvitados(reservaId, cantidad)}
+        // PKG-01C: una intención por (reserva, cantidad); el reintento reutiliza la misma operación.
+        objetivoOperacion={`invitados:${reservaId}:${cantidad}`}
+        fetchIntent={(operationId) => crearPagoInvitados(reservaId, cantidad, operationId)}
         onClose={onClose}
         onPagado={(_pago: PagoConfirmado) => { void observarRegistro(); }}
         onEnProceso={() => { setFase('en_proceso'); onPendiente?.(); }}

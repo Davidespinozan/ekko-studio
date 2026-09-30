@@ -74,8 +74,28 @@ describe('connect-onboarding', () => {
     const res = await invocar();
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body).url).toBe('https://connect.stripe/onboard');
-    expect(mockAccountsCreate).toHaveBeenCalledWith(expect.objectContaining({ type: 'express' }));
+    // PKG-01C (C16): key estable por tenant → un reintento devuelve la MISMA cuenta Express.
+    expect(mockAccountsCreate).toHaveBeenCalledWith(expect.objectContaining({ type: 'express' }), { idempotencyKey: 'ekko:v1:acct:t1' });
     expect(mockTenantUpdateEq).toHaveBeenCalled();
+  });
+
+  it('27 · si no se pudo guardar la cuenta → 500 humano; el reintento usa la MISMA key (misma cuenta, no otra)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockAdminMaybe.mockResolvedValue({ data: { tenant_id: 't1', rol: 'admin', status: 'activo' }, error: null });
+    mockTenantMaybe.mockResolvedValue({ data: { stripe_account_id: null }, error: null });
+    mockAccountsCreate.mockResolvedValue({ id: 'acct_new' });
+    mockAccountLinksCreate.mockResolvedValue({ url: 'https://connect.stripe/onboard' });
+    mockTenantUpdateEq.mockResolvedValueOnce({ error: { code: '42501', message: 'permission denied' } });
+
+    const r1 = await invocar();
+    expect(r1.statusCode).toBe(500);
+    expect(JSON.parse(r1.body).error).toMatch(/No pudimos guardar la cuenta de cobros/);
+    expect(mockAccountLinksCreate).not.toHaveBeenCalled();
+
+    const r2 = await invocar();
+    expect(r2.statusCode).toBe(200);
+    const keys = mockAccountsCreate.mock.calls.map((c) => (c[1] as { idempotencyKey: string }).idempotencyKey);
+    expect(keys).toEqual(['ekko:v1:acct:t1', 'ekko:v1:acct:t1']);
   });
 
   it('con cuenta previa → NO crea otra, solo el link', async () => {

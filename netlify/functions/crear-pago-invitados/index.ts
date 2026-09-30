@@ -10,6 +10,20 @@ import { ok, badRequest, unauthorized, forbidden, notFound, serverError } from '
 import { requireEnv, optionalEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada, getOrCreateSocioCustomer } from '../_lib/connectBilling';
+import {
+  crearPresupuesto,
+  leerOperationId,
+  llaveOperacion,
+  llaveInvalidacion,
+  ejecutarOperacion,
+  clasificarPaymentIntent,
+  clasificarErrorSaliente,
+  porOperacion,
+  registrarOperacion,
+  crearSesionCliente,
+  RechazoNegocio
+} from '../_lib/operacionPago';
+import type Stripe from 'stripe';
 
 /**
  * POST /crear-pago-invitados
@@ -19,15 +33,28 @@ import { resolverCuentaConectada, getOrCreateSocioCustomer } from '../_lib/conne
  * sobre la cuenta conectada del estudio. Pago único (PaymentIntent). El webhook
  * (payment_intent.succeeded, tipo='invitados_extra') suma los extras pagados a la
  * reserva. Todo por Stripe — nada de efectivo/terminal en mostrador.
+ *
+ * PKG-01C: con `operation_id` la compra es idempotente por OPERACIÓN (key
+ * `ekko:v1:pi_invitados:<acct>:<usuario>:<operation_id>`). Un reintento de la
+ * misma compra devuelve el mismo PaymentIntent; una segunda compra legítima trae
+ * otro operation_id. El tope de invitados se valida al CREAR (una operación ya
+ * existente se recupera y clasifica aunque sus invitados ya cuenten en el tope).
+ * Sin `operation_id` = cliente legacy (ventana transitoria).
  */
 
 interface Body {
   reserva_id?: string;
   cantidad?: number;
+  operation_id?: unknown;
 }
+
+const FUNCION = 'crear-pago-invitados';
+const KIND = 'pi_invitados' as const;
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') return badRequest('Method not allowed');
+  // Presupuesto interno desde el inicio del handler (no es el límite de la plataforma).
+  const presupuesto = crearPresupuesto();
 
   try {
     const authHeader = event.headers.authorization || event.headers.Authorization;
@@ -38,6 +65,8 @@ export const handler: Handler = async (event) => {
     const cantidad = Number(body.cantidad);
     if (!body.reserva_id) return badRequest('reserva_id requerido');
     if (!Number.isInteger(cantidad) || cantidad <= 0) return badRequest('cantidad inválida');
+    const operacion = leerOperationId(body.operation_id);
+    if (operacion.tipo === 'invalido') return badRequest('operation_id inválido');
 
     const supabaseUrl = requireEnv('VITE_SUPABASE_URL');
     const anonKey = requireEnv('VITE_SUPABASE_ANON_KEY');
@@ -84,9 +113,11 @@ export const handler: Handler = async (event) => {
     const maxExtra = Number(recurso?.max_invitados_extra) || 0;
     const yaPagados = Number(reserva.invitados_extra_pagados) || 0;
     if (maxExtra <= 0) return badRequest('Este estudio no admite invitados extra');
-    if (yaPagados + cantidad > maxExtra) {
-      return badRequest(`Este estudio permite máximo ${maxExtra} invitados extra por reserva (ya pagaste ${yaPagados})`);
-    }
+    const errorCupo =
+      yaPagados + cantidad > maxExtra
+        ? `Este estudio permite máximo ${maxExtra} invitados extra por reserva (ya pagaste ${yaPagados})`
+        : null;
+    if (errorCupo && operacion.tipo === 'ausente') return badRequest(errorCupo);
 
     // Precio por invitado extra (config del tenant).
     const { data: tenant } = await admin.from('tenants').select('config').eq('id', socio.tenant_id).maybeSingle();
@@ -101,65 +132,141 @@ export const handler: Handler = async (event) => {
 
     const stripe = getStripe();
     const opt = { stripeAccount: accountId };
-    const customerId = await getOrCreateSocioCustomer(
-      stripe,
-      admin,
-      { id: socio.id, tenant_id: socio.tenant_id, email: socio.email ?? null },
-      accountId
-    );
+    const feePct = Number(optionalEnv('EKKO_FEE_PERCENT', '0')) || 0;
+    const amount = precioExtra * cantidad;
+    const fee = feePct > 0 ? Math.round((amount * feePct) / 100) : 0;
 
-    let customerSessionClientSecret: string | null = null;
-    try {
-      const cs = await stripe.customerSessions.create(
+    if (operacion.tipo === 'ausente') {
+      // ── Cliente LEGACY (D-01C-2): comportamiento anterior, sin idempotencia inventada.
+      registrarOperacion({ funcion: FUNCION, kind: KIND, usuario_id: socio.id, estado: 'legacy', legacy: true });
+      const customerId = await getOrCreateSocioCustomer(
+        stripe,
+        admin,
+        { id: socio.id, tenant_id: socio.tenant_id, email: socio.email ?? null },
+        accountId
+      );
+      const customerSessionClientSecret = await crearSesionCliente(stripe, customerId, accountId, 'crear-pago-invitados');
+      const intent = await stripe.paymentIntents.create(
         {
+          amount,
+          currency: 'mxn',
           customer: customerId,
-          components: {
-            payment_element: {
-              enabled: true,
-              features: {
-                payment_method_redisplay: 'enabled',
-                payment_method_allow_redisplay_filters: ['always', 'limited', 'unspecified'],
-                payment_method_save: 'enabled',
-                payment_method_save_usage: 'off_session',
-                payment_method_remove: 'enabled'
-              }
-            }
+          automatic_payment_methods: { enabled: true },
+          ...(fee > 0 ? { application_fee_amount: fee } : {}),
+          metadata: {
+            app: 'ekko',
+            tipo: 'invitados_extra',
+            reserva_id: reserva.id,
+            cantidad: String(cantidad),
+            usuario_id: socio.id,
+            ekko_op: 'legacy'
           }
         },
         opt
       );
-      customerSessionClientSecret = cs.client_secret;
-    } catch (e) {
-      console.error('[crear-pago-invitados] customerSession', e instanceof Error ? e.message : e);
+      return ok({
+        clientSecret: intent.client_secret,
+        account: accountId,
+        modo: 'pago',
+        customerSessionClientSecret
+      });
     }
 
-    const feePct = Number(optionalEnv('EKKO_FEE_PERCENT', '0')) || 0;
-    const intent = await stripe.paymentIntents.create(
-      {
-        amount: precioExtra * cantidad,
-        currency: 'mxn',
-        customer: customerId,
-        automatic_payment_methods: { enabled: true },
-        ...(feePct > 0 ? { application_fee_amount: Math.round((precioExtra * cantidad * feePct) / 100) } : {}),
-        metadata: {
-          app: 'ekko',
-          tipo: 'invitados_extra',
-          reserva_id: reserva.id,
-          cantidad: String(cantidad),
-          usuario_id: socio.id
-        }
-      },
-      opt
-    );
+    // ── PKG-01C: operación idempotente ───────────────────────────────────────
+    const operationId = operacion.id;
+    const target = `invitados:${reserva.id}`;
+    const key = llaveOperacion(KIND, accountId, socio.id, operationId);
+    const transporte = (estado: string) => {
+      registrarOperacion({ funcion: FUNCION, kind: KIND, usuario_id: socio.id, estado });
+      return ok({ estado, operationId });
+    };
 
-    return ok({
-      clientSecret: intent.client_secret,
-      account: accountId,
-      modo: 'pago',
-      customerSessionClientSecret
-    });
+    let customerId: string;
+    try {
+      customerId = await getOrCreateSocioCustomer(
+        stripe,
+        admin,
+        { id: socio.id, tenant_id: socio.tenant_id, email: socio.email ?? null },
+        accountId,
+        { presupuesto }
+      );
+    } catch (e) {
+      const estado = clasificarErrorSaliente(e, 'mutacion');
+      return transporte(estado === 'conflicto' ? 'resultado_desconocido' : estado);
+    }
+
+    const esperado = {
+      target,
+      amount,
+      currency: 'mxn',
+      fee,
+      metadata: { tipo: 'invitados_extra', reserva_id: reserva.id, cantidad: String(cantidad), usuario_id: socio.id }
+    };
+
+    let res;
+    try {
+      res = await ejecutarOperacion<Stripe.PaymentIntent>(
+        {
+          buscar: async () => {
+            const lista = await stripe.paymentIntents.list({ customer: customerId, limit: 100 }, { ...opt, ...presupuesto.opcionesLectura() });
+            return porOperacion(lista.data, operationId);
+          },
+          crear: () => {
+            // El tope solo aplica a una compra NUEVA (nada se envió a Stripe todavía).
+            if (errorCupo) throw new RechazoNegocio(errorCupo);
+            return stripe.paymentIntents.create(
+              {
+                amount,
+                currency: 'mxn',
+                customer: customerId,
+                automatic_payment_methods: { enabled: true },
+                ...(fee > 0 ? { application_fee_amount: fee } : {}),
+                metadata: {
+                  app: 'ekko',
+                  tipo: 'invitados_extra',
+                  reserva_id: reserva.id,
+                  cantidad: String(cantidad),
+                  usuario_id: socio.id,
+                  operation_id: operationId,
+                  ekko_target: target
+                }
+              },
+              { ...opt, idempotencyKey: key, ...presupuesto.opcionesMutacion() }
+            );
+          },
+          evaluar: async (pi) => clasificarPaymentIntent(pi, esperado),
+          invalidar: (pi) =>
+            stripe.paymentIntents.cancel(pi.id, {}, { ...opt, idempotencyKey: llaveInvalidacion(KIND, accountId, socio.id, operationId), ...presupuesto.opcionesMutacion() }),
+          releer: (pi) => stripe.paymentIntents.retrieve(pi.id, {}, { ...opt, ...presupuesto.opcionesLectura() })
+        },
+        presupuesto
+      );
+    } catch (e) {
+      if (e instanceof RechazoNegocio) return badRequest(e.message);
+      throw e;
+    }
+
+    if (res.tipo === 'transporte') return transporte(res.veredicto);
+    const pi = res.objeto;
+    const base = { operationId, objetoId: pi.id, creadoEn: pi.created * 1000 };
+    registrarOperacion({ funcion: FUNCION, kind: KIND, usuario_id: socio.id, estado: res.veredicto, drift: res.drift });
+    if (res.veredicto === 'reutilizable' && pi.client_secret) {
+      const customerSessionClientSecret = await crearSesionCliente(stripe, customerId, accountId, 'crear-pago-invitados', presupuesto);
+      return ok({
+        ...base,
+        estado: 'reutilizable',
+        clientSecret: pi.client_secret,
+        account: accountId,
+        modo: 'pago',
+        customerSessionClientSecret,
+        monto: pi.amount,
+        moneda: pi.currency
+      });
+    }
+    return ok({ ...base, estado: res.veredicto === 'reutilizable' ? 'requiere_revision' : res.veredicto });
   } catch (err) {
     console.error('[crear-pago-invitados]', err instanceof Error ? err.message : err);
-    return serverError(err instanceof Error ? err.message : 'Error inesperado');
+    return serverError('No pudimos preparar el pago. Intenta de nuevo.');
   }
 };
+

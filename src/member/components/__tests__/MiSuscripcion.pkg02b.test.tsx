@@ -36,12 +36,14 @@ vi.mock('@shared/hooks/useAuth', () => ({ useAuth: () => ({ refreshUsuario: (...
 vi.mock('@shared/hooks/useToast', () => ({ useToast: () => h.toast }));
 vi.mock('@shared/lib/observarActivacion', () => ({ observarActivacion: (...a: unknown[]) => h.observar(...a) }));
 vi.mock('@shared/components/PaymentModal', () => ({
-  PaymentModal: (p: { tierSlug?: string; flujo?: string; onPagado: (x: { paymentIntentId: string }) => void; onEnProceso?: (x: { paymentIntentId: string }) => void }) => {
+  PaymentModal: (p: { tierSlug?: string; flujo?: string; onPagado: (x: { paymentIntentId: string; creadoEn?: number }) => void; onEnProceso?: (x: { paymentIntentId: string }) => void }) => {
     h.modal(p.tierSlug, p.flujo);
     return (
       <div>
         <button onClick={() => p.onPagado({ paymentIntentId: 'pi_s' })}>SIMULAR_SUCCEEDED</button>
         <button onClick={() => p.onEnProceso?.({ paymentIntentId: 'pi_s' })}>SIMULAR_PROCESSING</button>
+        {/* PKG-01C: la MISMA operación ya estaba pagada (creada hace 1 h). */}
+        <button onClick={() => p.onPagado({ paymentIntentId: 'pi_s', creadoEn: Date.now() - 3_600_000 })}>SIMULAR_YA_PAGADO</button>
       </div>
     );
   }
@@ -155,6 +157,16 @@ describe('MiSuscripcion · activación observada (PKG-02B · C04)', () => {
     expect(h.observar).not.toHaveBeenCalled();
     const raw = window.sessionStorage.getItem(CLAVE_PAGO_PENDIENTE)!;
     expect(JSON.parse(raw)).toEqual({ flujo: 'perfil', paymentIntentId: 'pi_s', estado: 'en_proceso', ts: expect.any(Number), contexto: { slug: 'pro' } });
+  });
+
+  it('PKG-01C · ya_pagado de una operación anterior → la evidencia se busca desde el pago ORIGINAL (no desde ahora)', async () => {
+    h.observar.mockResolvedValue({ resultado: 'no_observada', ultimo: null });
+    await pagarPro();
+    fireEvent.click(screen.getByText('SIMULAR_YA_PAGADO'));
+    await waitFor(() => expect(h.observar).toHaveBeenCalledTimes(1));
+    const opts = h.observar.mock.calls[0][0] as { listo: (m: Record<string, unknown>) => boolean };
+    // Membresía creada hace 50 min (después del pago original, antes de "ahora").
+    expect(opts.listo({ tier: { slug: 'pro' }, created_at: new Date(Date.now() - 3_000_000).toISOString() })).toBe(true);
   });
 
   it('?suscripcion=ok (success_url del Checkout) NO afirma: solo observa', async () => {

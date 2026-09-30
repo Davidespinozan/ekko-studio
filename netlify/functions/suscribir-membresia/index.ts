@@ -10,6 +10,19 @@ import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/ht
 import { requireEnv, optionalEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada, getOrCreateSocioCustomer } from '../_lib/connectBilling';
+import {
+  crearPresupuesto,
+  leerOperationId,
+  llaveOperacion,
+  llaveInvalidacion,
+  ejecutarOperacion,
+  clasificarCheckout,
+  clasificarErrorSaliente,
+  porOperacion,
+  registrarOperacion,
+  type KindOperacion
+} from '../_lib/operacionPago';
+import type Stripe from 'stripe';
 
 /**
  * POST /suscribir-membresia
@@ -28,15 +41,27 @@ import { resolverCuentaConectada, getOrCreateSocioCustomer } from '../_lib/conne
  *   - Sin STRIPE_SECRET_KEY        → { reason: 'stripe_pendiente' }.
  *   - Estudio sin cobros activados → { reason: 'cobros_no_activos' }.
  * STRYV es la plataforma; el dinero cae directo al banco del estudio.
+ *
+ * PKG-01C: con `operation_id` la sesión es idempotente por OPERACIÓN (key
+ * `ekko:v1:cs_<paquete|mensual>:<acct>:<usuario>:<operation_id>`): se busca la
+ * sesión de esa operación y se clasifica por su estado; una sesión abierta con
+ * parámetros distintos se EXPIRA (Stripe garantiza que ya no puede completarse)
+ * antes de declararla reemplazable. Sin `operation_id` = cliente legacy. No hay
+ * caller de UI hoy: esto deja el camino seguro para uno futuro.
  */
 
 interface Body {
   tier?: string;
   embedded?: boolean;
+  operation_id?: unknown;
 }
+
+const FUNCION = 'suscribir-membresia';
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') return badRequest('Method not allowed');
+  // Presupuesto interno desde el inicio del handler (no es el límite de la plataforma).
+  const presupuesto = crearPresupuesto();
 
   try {
     const authHeader = event.headers.authorization || event.headers.Authorization;
@@ -45,6 +70,8 @@ export const handler: Handler = async (event) => {
 
     const body: Body = JSON.parse(event.body || '{}');
     if (!body.tier) return badRequest('tier requerido');
+    const operacion = leerOperationId(body.operation_id);
+    if (operacion.tipo === 'invalido') return badRequest('operation_id inválido');
 
     const supabaseUrl = requireEnv('VITE_SUPABASE_URL');
     const anonKey = requireEnv('VITE_SUPABASE_ANON_KEY');
@@ -103,80 +130,144 @@ export const handler: Handler = async (event) => {
     }
 
     const stripe = getStripe();
-    const customerId = await getOrCreateSocioCustomer(
-      stripe,
-      admin,
-      { id: socio.id, tenant_id: socio.tenant_id, email: socio.email ?? null },
-      accountId
-    );
-
+    const opt = { stripeAccount: accountId };
     const feePct = Number(optionalEnv('EKKO_FEE_PERCENT', '0')) || 0;
-    const meta = { app: 'ekko', usuario_id: socio.id, tier_id: tier.id };
     const currency = (tier.moneda || 'mxn').toLowerCase();
     const esPaquete = tier.tipo === 'creditos' || tier.tipo === 'hibrido';
-
-    const baseParams = esPaquete
-      ? {
-          mode: 'payment' as const,
-          customer: customerId,
-          line_items: [
-            {
-              price_data: { currency, product_data: { name: tier.nombre }, unit_amount: tier.precio_centavos },
-              quantity: 1
-            }
-          ],
-          payment_intent_data: {
-            metadata: meta,
-            ...(feePct > 0 ? { application_fee_amount: Math.round((tier.precio_centavos * feePct) / 100) } : {})
-          },
-          metadata: meta
-        }
-      : {
-          mode: 'subscription' as const,
-          customer: customerId,
-          line_items: [
-            {
-              price_data: {
-                currency,
-                product_data: { name: tier.nombre },
-                unit_amount: tier.precio_centavos,
-                recurring: { interval: 'month' as const }
-              },
-              quantity: 1
-            }
-          ],
-          subscription_data: {
-            metadata: meta,
-            ...(feePct > 0 ? { application_fee_percent: feePct } : {})
-          },
-          metadata: meta
-        };
-
+    const embedded = body.embedded !== false;
     const origin =
       event.headers.origin || event.headers.referer?.replace(/\/+$/, '') || optionalEnv('URL', '');
 
-    // Embedded → modal de EKKO (client_secret + la cuenta conectada, que el front
-    // necesita para inicializar Stripe.js sobre esa cuenta).
-    if (body.embedded !== false) {
-      const session = await stripe.checkout.sessions.create(
-        { ...baseParams, ui_mode: 'embedded', redirect_on_completion: 'never' },
-        { stripeAccount: accountId }
+    const operationId = operacion.tipo === 'ok' ? operacion.id : null;
+    const kind: KindOperacion = esPaquete ? 'cs_paquete' : 'cs_mensual';
+    const target = `checkout_${esPaquete ? 'paquete' : 'mensual'}:${tier.id}`;
+    // Sin operation_id: marca diagnóstica legacy (NO es operation_id ni key).
+    const meta: Record<string, string> = operationId
+      ? { app: 'ekko', usuario_id: socio.id, tier_id: tier.id, operation_id: operationId, ekko_target: target }
+      : { app: 'ekko', usuario_id: socio.id, tier_id: tier.id, ekko_op: 'legacy' };
+
+    const paramsSesion = (customerId: string): Stripe.Checkout.SessionCreateParams => {
+      const baseParams: Stripe.Checkout.SessionCreateParams = esPaquete
+        ? {
+            mode: 'payment',
+            customer: customerId,
+            line_items: [
+              {
+                price_data: { currency, product_data: { name: tier.nombre }, unit_amount: tier.precio_centavos },
+                quantity: 1
+              }
+            ],
+            payment_intent_data: {
+              metadata: meta,
+              ...(feePct > 0 ? { application_fee_amount: Math.round((tier.precio_centavos * feePct) / 100) } : {})
+            },
+            metadata: meta
+          }
+        : {
+            mode: 'subscription',
+            customer: customerId,
+            line_items: [
+              {
+                price_data: {
+                  currency,
+                  product_data: { name: tier.nombre },
+                  unit_amount: tier.precio_centavos,
+                  recurring: { interval: 'month' }
+                },
+                quantity: 1
+              }
+            ],
+            subscription_data: {
+              metadata: meta,
+              ...(feePct > 0 ? { application_fee_percent: feePct } : {})
+            },
+            metadata: meta
+          };
+      // Embedded → modal de EKKO (client_secret + la cuenta conectada, que el front
+      // necesita para inicializar Stripe.js sobre esa cuenta). Hosted = fallback.
+      return embedded
+        ? { ...baseParams, ui_mode: 'embedded', redirect_on_completion: 'never' }
+        : {
+            ...baseParams,
+            success_url: `${origin}/app/perfil?suscripcion=ok`,
+            cancel_url: `${origin}/app/perfil?suscripcion=cancelado`
+          };
+    };
+
+    if (!operationId) {
+      // ── Cliente LEGACY (D-01C-2): comportamiento anterior, sin idempotencia inventada.
+      registrarOperacion({ funcion: FUNCION, kind, usuario_id: socio.id, estado: 'legacy', legacy: true });
+      const customerId = await getOrCreateSocioCustomer(
+        stripe,
+        admin,
+        { id: socio.id, tenant_id: socio.tenant_id, email: socio.email ?? null },
+        accountId
       );
-      return ok({ activated: false, client_secret: session.client_secret, account: accountId });
+      const session = await stripe.checkout.sessions.create(paramsSesion(customerId), opt);
+      return embedded
+        ? ok({ activated: false, client_secret: session.client_secret, account: accountId })
+        : ok({ activated: false, url: session.url });
     }
 
-    // Hosted (redirect) — fallback.
-    const session = await stripe.checkout.sessions.create(
+    // ── PKG-01C: operación idempotente ───────────────────────────────────────
+    const transporte = (estado: string) => {
+      registrarOperacion({ funcion: FUNCION, kind, usuario_id: socio.id, estado });
+      return ok({ activated: false, estado, operationId });
+    };
+    let customerId: string;
+    try {
+      customerId = await getOrCreateSocioCustomer(
+        stripe,
+        admin,
+        { id: socio.id, tenant_id: socio.tenant_id, email: socio.email ?? null },
+        accountId,
+        { presupuesto }
+      );
+    } catch (e) {
+      const estado = clasificarErrorSaliente(e, 'mutacion');
+      return transporte(estado === 'conflicto' ? 'resultado_desconocido' : estado);
+    }
+
+    const esperado = {
+      target,
+      amount: tier.precio_centavos,
+      currency,
+      fee: null, // la comisión vive en el PI/sub, no es observable en la sesión
+      mode: (esPaquete ? 'payment' : 'subscription') as 'payment' | 'subscription',
+      embedded,
+      metadata: { tier_id: tier.id, usuario_id: socio.id }
+    };
+    const res = await ejecutarOperacion<Stripe.Checkout.Session>(
       {
-        ...baseParams,
-        success_url: `${origin}/app/perfil?suscripcion=ok`,
-        cancel_url: `${origin}/app/perfil?suscripcion=cancelado`
+        buscar: async () => {
+          const lista = await stripe.checkout.sessions.list({ customer: customerId, limit: 100 }, { ...opt, ...presupuesto.opcionesLectura() });
+          return porOperacion(lista.data, operationId);
+        },
+        crear: () =>
+          stripe.checkout.sessions.create(paramsSesion(customerId), {
+            ...opt,
+            idempotencyKey: llaveOperacion(kind, accountId, socio.id, operationId),
+            ...presupuesto.opcionesMutacion()
+          }),
+        evaluar: async (cs) => clasificarCheckout(cs, esperado),
+        invalidar: (cs) =>
+          stripe.checkout.sessions.expire(cs.id, {}, { ...opt, idempotencyKey: llaveInvalidacion(kind, accountId, socio.id, operationId), ...presupuesto.opcionesMutacion() }),
+        releer: (cs) => stripe.checkout.sessions.retrieve(cs.id, {}, { ...opt, ...presupuesto.opcionesLectura() })
       },
-      { stripeAccount: accountId }
+      presupuesto
     );
-    return ok({ activated: false, url: session.url });
+    if (res.tipo === 'transporte') return transporte(res.veredicto);
+    const cs = res.objeto;
+    registrarOperacion({ funcion: FUNCION, kind, usuario_id: socio.id, estado: res.veredicto, drift: res.drift });
+    const base = { activated: false, operationId, objetoId: cs.id, creadoEn: cs.created * 1000 };
+    if (res.veredicto === 'reutilizable') {
+      return embedded
+        ? ok({ ...base, estado: 'reutilizable', client_secret: cs.client_secret, account: accountId })
+        : ok({ ...base, estado: 'reutilizable', url: cs.url });
+    }
+    return ok({ ...base, estado: res.veredicto });
   } catch (err) {
-    console.error('[suscribir-membresia]', err);
-    return serverError(err instanceof Error ? err.message : 'Error inesperado');
+    console.error('[suscribir-membresia]', err instanceof Error ? err.message : err);
+    return serverError('No pudimos preparar el pago. Intenta de nuevo.');
   }
 };

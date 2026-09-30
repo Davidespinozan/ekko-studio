@@ -10,6 +10,9 @@ import {
   mensajeParaResultado,
   guardarPagoPendiente,
   urlRetornoPago,
+  obtenerOperacionPago,
+  descartarOperacionPago,
+  marcarOperacionConfirmada,
   MENSAJE_PAGO,
   type FlujoPago,
   type PagoConfirmado,
@@ -27,6 +30,11 @@ import {
  * del PaymentIntent como evidencia mínima. `processing`, `requires_*`, sin PI o
  * error → nunca es éxito; el modal lo dice y registra el intento no resuelto en
  * sessionStorage para que ninguna pantalla vuelva a ofrecer "Pagar" a ciegas.
+ *
+ * PKG-01C: cada intención de compra (usuario + objetivo) lleva un `operation_id`
+ * estable (localStorage + Web Locks). "Reintentar" reutiliza la MISMA operación:
+ * el backend devuelve el mismo objeto de Stripe, nunca uno nuevo. Solo cuando el
+ * servidor declara la operación `reemplazable`/inválida se prepara una nueva.
  */
 
 const PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
@@ -62,8 +70,13 @@ interface Props {
   subtitulo?: string;
   /** Pedir "Nombre en la tarjeta" (default true; los add-ons no lo necesitan). */
   pedirNombre?: boolean;
-  /** Fuente del clientSecret; default: crearPagoIntent(tierSlug). */
-  fetchIntent?: () => Promise<PagoIntentResult>;
+  /** Fuente del clientSecret; default: crearPagoIntent(tierSlug, operationId). */
+  fetchIntent?: (operationId?: string) => Promise<PagoIntentResult>;
+  /**
+   * PKG-01C: objetivo de la intención (namespace del operation_id). Default para
+   * planes: `paquete:<slug>` / `mensual:<slug>`. Invitados: `invitados:<reserva>`.
+   */
+  objetivoOperacion?: string;
   /** Desde dónde se paga: decide la URL de retorno de un método con redirección y el contexto persistido. */
   flujo?: FlujoPago;
   /** Datos técnicos (ids, hora) para retomar el flujo tras un redirect/refresh. Nunca PII. */
@@ -75,14 +88,110 @@ interface Props {
   onEnProceso?: (pago: PagoConfirmado) => void;
 }
 
-export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, subtitulo, pedirNombre = true, fetchIntent, flujo = 'perfil', contexto, onClose, onPagado, onEnProceso }: Props) {
+type AccionPreparacion = 'reintentar' | 'preparar' | 'comprobar' | null;
+
+export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, subtitulo, pedirNombre = true, fetchIntent, objetivoOperacion, flujo = 'perfil', contexto, onClose, onPagado, onEnProceso }: Props) {
   const { usuario } = useAuth();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [customerSessionSecret, setCustomerSessionSecret] = useState<string | null>(null);
   const [account, setAccount] = useState<string | null>(null);
   const [estado, setEstado] = useState<'cargando' | 'listo' | 'pendiente' | 'error'>('cargando');
   const [msg, setMsg] = useState('');
+  const [accion, setAccion] = useState<AccionPreparacion>(null);
+  /** Importe REAL del objeto reutilizado (centavos), si difiere del precio mostrado. */
+  const [montoReal, setMontoReal] = useState<number | null>(null);
   const fetched = useRef(false);
+  const preparando = useRef(false);
+  const operacion = useRef<string | null>(null);
+
+  const usuarioId = usuario?.id ?? null;
+  const objetivo = objetivoOperacion ?? (tierSlug ? `${esPaquete ? 'paquete' : 'mensual'}:${tierSlug}` : null);
+
+  function fallar(texto: string, siguiente: AccionPreparacion, tipo: 'error' | 'pendiente' = 'error') {
+    setEstado(tipo);
+    setMsg(texto);
+    setAccion(siguiente);
+  }
+
+  function aplicar(res: PagoIntentResult, operationId: string | null) {
+    const objetoId = res.objetoId ?? operationId ?? '';
+    const descartar = () => {
+      if (usuarioId && objetivo && operationId) descartarOperacionPago(usuarioId, objetivo, operationId);
+    };
+    switch (res.estado) {
+      case undefined:
+        // Respuesta sin veredicto (legacy / Stripe no configurado).
+        if (res.clientSecret && res.account) break;
+        if (res.reason === 'cobros_no_activos') return fallar('El estudio todavía no activó los cobros online. Acercate a recepción para activar tu plan.', null, 'pendiente');
+        if (res.reason === 'stripe_pendiente') return fallar('Los pagos online todavía no están configurados. Acercate a recepción.', null, 'pendiente');
+        return fallar('No pudimos abrir el pago. Prueba de nuevo.', 'reintentar');
+      case 'reutilizable':
+        if (res.clientSecret && res.account) break;
+        return fallar(MENSAJE_PAGO.prepararDesconocido, 'reintentar');
+      case 'en_proceso':
+        // Stripe ya tiene un pago en curso para ESTA operación: nada que cobrar.
+        guardarPagoPendiente({ flujo, paymentIntentId: objetoId || null, estado: 'en_proceso', contexto });
+        fallar(MENSAJE_PAGO.enProceso, null, 'pendiente');
+        onEnProceso?.({ paymentIntentId: objetoId });
+        return;
+      case 'ya_pagado':
+        // La MISMA operación ya estaba cobrada: se pasa a observar el derecho (02B
+        // gobierna el pendiente) y la próxima compra será una intención nueva.
+        descartar();
+        guardarPagoPendiente({ flujo, paymentIntentId: objetoId || null, estado: 'confirmado', contexto });
+        fallar(MENSAJE_PAGO.yaPagado, null, 'pendiente');
+        onPagado({ paymentIntentId: objetoId, ...(res.creadoEn ? { creadoEn: res.creadoEn } : {}) });
+        return;
+      case 'reemplazable':
+      case 'operacion_invalida':
+        // El servidor comprobó que el intento anterior ya no puede cobrarse.
+        descartar();
+        return fallar(MENSAJE_PAGO.intentoReemplazable, 'preparar');
+      case 'requiere_revision':
+        return fallar(MENSAJE_PAGO.requiereRevision, null, 'pendiente');
+      case 'desconocido':
+        return fallar(MENSAJE_PAGO.desconocido, 'comprobar', 'pendiente');
+      case 'resultado_desconocido':
+        return fallar(MENSAJE_PAGO.prepararDesconocido, 'reintentar');
+      case 'pago_no_iniciable':
+        return fallar(MENSAJE_PAGO.prepararNoIniciable, 'reintentar');
+      case 'cobros_no_disponibles':
+        return fallar(MENSAJE_PAGO.cobrosNoDisponibles, null, 'pendiente');
+      case 'reintentable':
+      default:
+        return fallar(MENSAJE_PAGO.prepararReintentable, 'reintentar');
+    }
+    setClientSecret(res.clientSecret ?? null);
+    setCustomerSessionSecret(res.customerSessionClientSecret ?? null);
+    setAccount(res.account ?? null);
+    setMontoReal(typeof res.monto === 'number' && res.monto !== Math.round(precio * 100) ? res.monto : null);
+    setMsg('');
+    setAccion(null);
+    setEstado('listo');
+  }
+
+  async function preparar() {
+    if (preparando.current) return; // un solo request a la vez
+    preparando.current = true;
+    setEstado('cargando');
+    setMsg('');
+    setAccion(null);
+    try {
+      // La MISMA intención → el MISMO operation_id (reintento, refresh, otra pestaña).
+      const operationId = usuarioId && objetivo ? await obtenerOperacionPago(usuarioId, objetivo) : null;
+      operacion.current = operationId;
+      const obtener = fetchIntent ?? ((op?: string) => crearPagoIntent(tierSlug ?? '', op));
+      const res = await obtener(operationId ?? undefined);
+      aplicar(res, operationId);
+    } catch (e) {
+      // Red, 5xx o corte de la plataforma: no se sabe si quedó preparado. Reintentar
+      // con la MISMA operación es seguro (mismo objeto, nunca un segundo cobro).
+      console.error('[PaymentModal] abrir pago', e);
+      fallar(MENSAJE_PAGO.prepararReintentable, 'reintentar');
+    } finally {
+      preparando.current = false;
+    }
+  }
 
   useEffect(() => {
     if (fetched.current) return;
@@ -92,34 +201,9 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, 
       setMsg('Los pagos online todavía no están configurados.');
       return;
     }
-    const obtener = fetchIntent ?? (() => crearPagoIntent(tierSlug ?? ''));
-    obtener()
-      .then((res) => {
-        if (res.clientSecret && res.account) {
-          setClientSecret(res.clientSecret);
-          setCustomerSessionSecret(res.customerSessionClientSecret ?? null);
-          setAccount(res.account);
-          setEstado('listo');
-        } else if (res.reason === 'cobros_no_activos') {
-          setEstado('pendiente');
-          setMsg('El estudio todavía no activó los cobros online. Acercate a recepción para activar tu plan.');
-        } else if (res.reason === 'stripe_pendiente') {
-          setEstado('pendiente');
-          setMsg('Los pagos online todavía no están configurados. Acercate a recepción.');
-        } else {
-          setEstado('error');
-          setMsg('No pudimos abrir el pago. Prueba de nuevo.');
-        }
-      })
-      .catch((e) => {
-        // El backend ya devuelve mensajes humanos (backend.ts); cualquier otra
-        // excepción (red, parseo) no se muestra cruda.
-        console.error('[PaymentModal] abrir pago', e);
-        setEstado('error');
-        setMsg('No pudimos abrir el pago. Revisa tu conexión e intenta de nuevo.');
-      });
-    // El guard `fetched.current` asegura una sola llamada; no re-ejecutar por
-    // identidad de fetchIntent (viene inline del caller).
+    void preparar();
+    // El guard `fetched.current` asegura una sola llamada inicial; no re-ejecutar
+    // por identidad de fetchIntent (viene inline del caller).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tierSlug]);
 
@@ -128,6 +212,11 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, 
     () => (PK && account ? loadStripe(PK, { stripeAccount: account }) : null),
     [account]
   );
+
+  function pagoConfirmado(pago: PagoConfirmado) {
+    if (usuarioId && objetivo && operacion.current) marcarOperacionConfirmada(usuarioId, objetivo, operacion.current);
+    onPagado(pago);
+  }
 
   // Sin cierre por clic en el fondo: en un pago un clic accidental perdía el
   // progreso. Solo cierra con el botón ✕.
@@ -149,12 +238,24 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, 
         <p className="ek-body-muted" style={{ margin: '0 0 18px', fontSize: '14px' }}>
           {subtitulo ?? `$${precio.toLocaleString('es-MX')} ${esPaquete ? '· pago único' : '/mes'}`}
         </p>
+        {estado === 'listo' && montoReal !== null && (
+          // PKG-01C: se reutiliza un intento preparado antes de un cambio de precio;
+          // se cobra EXACTAMENTE su importe, y se dice.
+          <p data-testid="monto-real" className="ek-body-muted" style={{ margin: '-10px 0 16px', fontSize: '13px', color: 'var(--ek-mustard)' }}>
+            Este intento de pago es por ${Math.round(montoReal / 100).toLocaleString('es-MX')} (el importe con el que se preparó).
+          </p>
+        )}
 
         {estado === 'cargando' && <Spinner label="Preparando el pago…" />}
         {(estado === 'pendiente' || estado === 'error') && (
-          <p className="ek-body-muted" style={{ fontSize: '14px', color: estado === 'error' ? 'var(--ek-danger)' : undefined }}>
+          <p className="ek-body-muted" data-testid="preparacion-mensaje" style={{ fontSize: '14px', color: estado === 'error' ? 'var(--ek-danger)' : undefined }}>
             {msg}
           </p>
+        )}
+        {(estado === 'pendiente' || estado === 'error') && accion && (
+          <button type="button" className="ek-cta ek-cta--secondary ek-cta--full" style={{ marginTop: '8px' }} onClick={() => void preparar()}>
+            {accion === 'preparar' ? 'Preparar el pago de nuevo' : accion === 'comprobar' ? 'Volver a comprobar' : 'Reintentar'}
+          </button>
         )}
         {estado === 'listo' && clientSecret && stripePromise && (
           <Elements
@@ -166,7 +267,7 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, 
             }}
           >
             <CheckoutForm
-              onPagado={onPagado}
+              onPagado={pagoConfirmado}
               onEnProceso={onEnProceso}
               flujo={flujo}
               contexto={contexto}

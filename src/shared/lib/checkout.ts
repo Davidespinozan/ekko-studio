@@ -1,4 +1,5 @@
 import { backendPost } from '@shared/lib/backend';
+import type { EstadoPreparacion } from '@shared/lib/pagoEstado';
 
 /**
  * Compra/cambio de plan del miembro (self-serve). ÚNICO punto de enchufe de
@@ -94,10 +95,21 @@ export interface PagoIntentResult {
   reason?: string;
   /** CustomerSession: hace que el PaymentElement muestre la tarjeta guardada. */
   customerSessionClientSecret?: string | null;
+  /** PKG-01C: veredicto de la operación (ausente en respuestas legacy / sin Stripe). */
+  estado?: EstadoPreparacion;
+  operationId?: string;
+  /** Id técnico del objeto de Stripe de la operación (pi_/sub_). */
+  objetoId?: string;
+  /** epoch ms de creación del objeto. */
+  creadoEn?: number;
+  /** Importe REAL del objeto (centavos) — puede ser el de una operación anterior a un cambio de precio. */
+  monto?: number | null;
+  moneda?: string;
 }
 
-export function crearPagoIntent(tierSlug: string): Promise<PagoIntentResult> {
-  return backendPost<PagoIntentResult>('crear-pago-intent', { tier: tierSlug });
+/** PKG-01C: `operationId` = una intención de compra; se reutiliza en cada reintento. */
+export function crearPagoIntent(tierSlug: string, operationId?: string): Promise<PagoIntentResult> {
+  return backendPost<PagoIntentResult>('crear-pago-intent', { tier: tierSlug, ...(operationId ? { operation_id: operationId } : {}) });
 }
 
 /**
@@ -120,8 +132,12 @@ export function cambiarPlanSuscripcion(tierSlug: string): Promise<SwapPlanResult
  * Pago in-app de N invitados EXTRA de una reserva (Stripe, tarjeta guardada).
  * Devuelve el mismo shape que crearPagoIntent para reutilizar el modal de pago.
  */
-export function crearPagoInvitados(reservaId: string, cantidad: number): Promise<PagoIntentResult> {
-  return backendPost<PagoIntentResult>('crear-pago-invitados', { reserva_id: reservaId, cantidad });
+export function crearPagoInvitados(reservaId: string, cantidad: number, operationId?: string): Promise<PagoIntentResult> {
+  return backendPost<PagoIntentResult>('crear-pago-invitados', {
+    reserva_id: reservaId,
+    cantidad,
+    ...(operationId ? { operation_id: operationId } : {})
+  });
 }
 
 /**

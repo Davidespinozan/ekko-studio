@@ -8,6 +8,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv, optionalEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
+import { llaveCuentaConectada } from '../_lib/operacionPago';
 
 /**
  * POST /connect-onboarding — el estudio activa sus cobros (Stripe Connect Express).
@@ -75,18 +76,28 @@ export const handler: Handler = async (event) => {
 
     let accountId = tenant?.stripe_account_id ?? null;
     if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: 'express',
-        country,
-        email: authUser.email ?? undefined,
-        metadata: { app: 'ekko', tenant_id: admin.tenant_id },
-        capabilities: {
-          card_payments: { requested: true },
-          transfers: { requested: true }
-        }
-      });
+      // PKG-01C (C16): key estable por tenant. Si la respuesta se pierde o el
+      // guardado falla, el reintento devuelve LA MISMA cuenta Express (no otra).
+      const account = await stripe.accounts.create(
+        {
+          type: 'express',
+          country,
+          email: authUser.email ?? undefined,
+          metadata: { app: 'ekko', tenant_id: admin.tenant_id },
+          capabilities: {
+            card_payments: { requested: true },
+            transfers: { requested: true }
+          }
+        },
+        { idempotencyKey: llaveCuentaConectada(admin.tenant_id) }
+      );
       accountId = account.id;
-      await adminDb.from('tenants').update({ stripe_account_id: accountId }).eq('id', admin.tenant_id);
+      const { error: errGuardar } = await adminDb.from('tenants').update({ stripe_account_id: accountId }).eq('id', admin.tenant_id);
+      if (errGuardar) {
+        // Sin guardar, el siguiente intento vuelve a crear con la MISMA key → misma cuenta.
+        console.error(JSON.stringify({ evento: 'connect_cuenta_no_guardada', tenant_id: admin.tenant_id, codigo: errGuardar.code ?? null }));
+        return serverError('No pudimos guardar la cuenta de cobros. Intenta de nuevo.');
+      }
     }
 
     const origin =

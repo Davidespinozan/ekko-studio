@@ -5,10 +5,14 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const h = vi.hoisted(() => ({
   observar: vi.fn(),
-  leerReserva: vi.fn()
+  leerReserva: vi.fn(),
+  modalProps: null as Record<string, unknown> | null,
+  crearInvitados: vi.fn()
 }));
+vi.mock('@shared/lib/checkout', () => ({ crearPagoInvitados: (...a: unknown[]) => h.crearInvitados(...a) }));
 vi.mock('@shared/components/PaymentModal', () => ({
   PaymentModal: (p: { onPagado: (x: { paymentIntentId: string }) => void; onEnProceso?: (x: { paymentIntentId: string }) => void }) => (
+    (h.modalProps = p as unknown as Record<string, unknown>),
     <div>
       <button onClick={() => p.onPagado({ paymentIntentId: 'pi_inv' })}>SIMULAR_SUCCEEDED</button>
       <button onClick={() => p.onEnProceso?.({ paymentIntentId: 'pi_inv' })}>SIMULAR_PROCESSING</button>
@@ -70,6 +74,14 @@ describe('PagarInvitadosExtra (PKG-02B)', () => {
     expect(screen.queryByRole('button', { name: 'Volver a comprobar' })).not.toBeInTheDocument();
     expect(onRegistrado).not.toHaveBeenCalled();
     expect(h.observar).not.toHaveBeenCalled();
+  });
+
+  it('PKG-01C · la intención es (reserva, cantidad) y el operation_id viaja al backend', async () => {
+    render(<PagarInvitadosExtra reservaId="r1" precioExtraCentavos={15000} maxCantidad={4} cantidadFija={3} onClose={vi.fn()} onRegistrado={vi.fn()} />);
+    await screen.findByText('SIMULAR_SUCCEEDED');
+    expect(h.modalProps?.objetivoOperacion).toBe('invitados:r1:3');
+    await (h.modalProps?.fetchIntent as (op?: string) => Promise<unknown>)('3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
+    expect(h.crearInvitados).toHaveBeenCalledWith('r1', 3, '3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
   });
 
   it('paso de cantidad: sin cantidadFija se elige y luego se abre el pago', async () => {

@@ -19,6 +19,12 @@ export type FlujoPago = 'perfil' | 'pagar' | 'hora' | 'invitados';
 /** Evidencia mínima de un pago confirmado por Stripe.js (status = succeeded). */
 export interface PagoConfirmado {
   paymentIntentId: string;
+  /**
+   * PKG-01C: epoch ms en que Stripe creó el objeto pagado. Solo viene cuando el
+   * backend reconoce que la MISMA operación ya estaba pagada (`ya_pagado`): la
+   * evidencia de activación puede ser anterior a este momento.
+   */
+  creadoEn?: number;
 }
 
 export type ResultadoPago =
@@ -32,7 +38,14 @@ export type ResultadoPago =
 /** Forma mínima de `PaymentIntentResult` de Stripe.js (no dependemos de sus tipos aquí). */
 export interface ResultadoConfirmPayment {
   paymentIntent?: { id?: string; status?: string } | null;
-  error?: { type?: string; code?: string; message?: string; decline_code?: string } | null;
+  error?: {
+    type?: string;
+    code?: string;
+    message?: string;
+    decline_code?: string;
+    /** Stripe.js adjunta el PI cuando el error es por su estado (p. ej. ya pagado en otra pestaña). */
+    payment_intent?: { id?: string; status?: string } | null;
+  } | null;
 }
 
 /** Mensaje de error de Stripe.js que SÍ es apto para el usuario (lo redacta Stripe para mostrarse). */
@@ -49,7 +62,15 @@ export const MENSAJE_PAGO = {
   activacionTarda: 'Pago recibido. La activación está tardando más de lo normal. No vuelvas a pagar: en cuanto se refleje, aparecerá aquí.',
   activacionSinConfirmar: 'No pudimos confirmar automáticamente la activación. No vuelvas a pagar todavía: vuelve a comprobar o contacta al estudio.',
   comprobacionFallo: 'No pudimos comprobar la activación. Revisa tu conexión e intenta de nuevo.',
-  pagoEnProcesoPersistido: 'Tienes un pago en proceso. No lo repitas: cuando se confirme, se activará solo.'
+  pagoEnProcesoPersistido: 'Tienes un pago en proceso. No lo repitas: cuando se confirme, se activará solo.',
+  // PKG-01C · al PREPARAR el pago (antes de cobrar nada)
+  prepararReintentable: 'No pudimos abrir el pago. Reintenta: si ya estaba preparado, se reutiliza el mismo y no se cobra dos veces.',
+  prepararDesconocido: 'No pudimos confirmar si el pago quedó preparado. Reintenta: se reutiliza el mismo intento y no se cobra dos veces.',
+  prepararNoIniciable: 'No pudimos preparar este pago. Revisa los datos o acércate a recepción.',
+  cobrosNoDisponibles: 'Los pagos online no están disponibles en este momento. Acércate a recepción.',
+  intentoReemplazable: 'Este intento de pago quedó sin efecto (cambió el precio o los datos). No se te cobró. Prepara el pago de nuevo.',
+  requiereRevision: 'No podemos continuar este pago automáticamente. No lo repitas: el estudio lo revisará.',
+  yaPagado: 'Este pago ya se había completado. No se cobró de nuevo.'
 } as const;
 
 /** Copy seguro para un error de Stripe.js: solo se muestra el de Stripe cuando Stripe lo redactó para el usuario. */
@@ -65,7 +86,16 @@ export function mensajeErrorStripe(error: { type?: string; message?: string } | 
  * "Sin error" NO es "pagado": solo `status === 'succeeded'` es confirmado.
  */
 export function interpretarResultadoPago(res: ResultadoConfirmPayment | null | undefined): ResultadoPago {
-  if (res?.error) return { tipo: 'fallido', mensaje: mensajeErrorStripe(res.error) };
+  if (res?.error) {
+    // PKG-01C: la MISMA operación puede reutilizar un PI que otra pestaña ya pagó.
+    // Stripe.js responde con error de estado + el PI: si ya está cobrado, NO es
+    // un fallo (y ofrecer "reintentar" invitaría a pagar otra vez).
+    const piErr = res.error.payment_intent;
+    const idErr = typeof piErr?.id === 'string' && piErr.id ? piErr.id : null;
+    if (idErr && piErr?.status === 'succeeded') return { tipo: 'confirmado', paymentIntentId: idErr };
+    if (idErr && piErr?.status === 'processing') return { tipo: 'en_proceso', paymentIntentId: idErr };
+    return { tipo: 'fallido', mensaje: mensajeErrorStripe(res.error) };
+  }
   const pi = res?.paymentIntent;
   const id = typeof pi?.id === 'string' && pi.id ? pi.id : null;
   switch (pi?.status) {
@@ -206,6 +236,9 @@ export function limpiarPagoPendiente(): void {
   } catch {
     /* nada */
   }
+  // PKG-01C: el derecho ya se observó → las operaciones CONFIRMADAS quedan
+  // resueltas; la próxima compra del mismo objetivo es una intención nueva.
+  limpiarOperacionesConfirmadas();
 }
 
 /** Solo cambia el COPY: un pendiente antiguo sigue bloqueando un nuevo cobro. */
@@ -219,3 +252,182 @@ export function mensajePagoPendiente(p: PagoPendiente, ahora = Date.now()): stri
   if (p.estado === 'desconocido') return MENSAJE_PAGO.desconocido;
   return pagoPendienteEsAntiguo(p, ahora) ? MENSAJE_PAGO.activacionSinConfirmar : MENSAJE_PAGO.activacionTarda;
 }
+
+// ── PKG-01C · Identidad de la operación de pago (localStorage + Web Locks) ────
+//
+// Un `operation_id` (UUID) por INTENCIÓN de compra (usuario + objetivo). Se
+// reutiliza en cada reintento, refresh, reapertura y en otras pestañas; el
+// backend lo convierte en la key estable de Stripe (misma operación → mismo
+// objeto). Solo se reemplaza con evidencia del servidor (ya_pagado,
+// reemplazable, operación inválida) o cuando 02B observa el derecho. La
+// antigüedad NUNCA habilita otra operación. Sin PII, sin secretos, sin montos.
+
+export const CLAVE_OPERACIONES_PAGO = 'ekko.operaciones_pago';
+
+interface RegistroOperacion {
+  id: string;
+  /** epoch ms de creación (solo diagnóstico: no autoriza nada). */
+  ts: number;
+  /** Stripe.js confirmó el cobro (succeeded) en esta u otra pestaña. */
+  confirmada?: boolean;
+}
+
+type MapaOperaciones = Record<string, RegistroOperacion>;
+
+const UUID_OPERACION = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Respaldo en memoria si localStorage no está disponible (modo privado): cubre reintentos en la misma página. */
+const operacionesEnMemoria: MapaOperaciones = {};
+
+function almacenLocal(): Storage | null {
+  try {
+    return typeof window !== 'undefined' ? window.localStorage : null;
+  } catch {
+    return null;
+  }
+}
+
+function leerMapa(): MapaOperaciones {
+  const ls = almacenLocal();
+  if (!ls) return operacionesEnMemoria;
+  try {
+    const raw = ls.getItem(CLAVE_OPERACIONES_PAGO);
+    const m = raw ? (JSON.parse(raw) as MapaOperaciones) : {};
+    return m && typeof m === 'object' ? m : {};
+  } catch {
+    return {};
+  }
+}
+
+function escribirMapa(m: MapaOperaciones): void {
+  const ls = almacenLocal();
+  if (!ls) {
+    for (const k of Object.keys(operacionesEnMemoria)) delete operacionesEnMemoria[k];
+    Object.assign(operacionesEnMemoria, m);
+    return;
+  }
+  try {
+    ls.setItem(CLAVE_OPERACIONES_PAGO, JSON.stringify(m));
+  } catch {
+    Object.assign(operacionesEnMemoria, m);
+  }
+}
+
+/** Namespace por usuario + objetivo (p. ej. `paquete:<slug>`, `invitados:<reserva>`). */
+export function claveOperacionPago(usuarioId: string, objetivo: string): string {
+  return `${usuarioId}|${objetivo}`;
+}
+
+function registroValido(r: RegistroOperacion | undefined): r is RegistroOperacion {
+  return !!r && typeof r.id === 'string' && UUID_OPERACION.test(r.id);
+}
+
+function nuevoUuid(): string {
+  const c = typeof crypto !== 'undefined' ? crypto : undefined;
+  if (c?.randomUUID) return c.randomUUID();
+  const b = new Uint8Array(16);
+  c?.getRandomValues?.(b);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+/** Operación vigente para el objetivo, o null. Solo lectura. */
+export function operacionPagoActual(usuarioId: string, objetivo: string): string | null {
+  const r = leerMapa()[claveOperacionPago(usuarioId, objetivo)];
+  return registroValido(r) ? r.id : null;
+}
+
+function leerOCrear(clave: string): string {
+  const m = leerMapa();
+  const r = m[clave];
+  if (registroValido(r)) return r.id;
+  m[clave] = { id: nuevoUuid(), ts: Date.now() };
+  escribirMapa(m);
+  // Releer: si otra pestaña escribió en medio, gana lo persistido.
+  const reread = leerMapa()[clave];
+  return registroValido(reread) ? reread.id : m[clave].id;
+}
+
+interface GestorLocks {
+  request<T>(nombre: string, cb: () => Promise<T> | T): Promise<T>;
+}
+
+/**
+ * Devuelve el operation_id de la intención (usuario + objetivo), creándolo si no
+ * existe. Con Web Locks (`navigator.locks`) la lectura/creación es exclusiva
+ * entre pestañas del mismo origen → dos pestañas de la misma intención obtienen
+ * el MISMO id. Sin Web Locks: lectura → escritura → espera breve → relectura
+ * (convergencia conservadora, SIN garantía perfecta de exclusión mutua; el
+ * residual queda documentado). La llamada HTTP ocurre fuera del lock.
+ */
+export async function obtenerOperacionPago(
+  usuarioId: string,
+  objetivo: string,
+  deps: { locks?: GestorLocks | null; esperar?: (ms: number) => Promise<void> } = {}
+): Promise<string> {
+  const clave = claveOperacionPago(usuarioId, objetivo);
+  const locks =
+    deps.locks !== undefined
+      ? deps.locks
+      : typeof navigator !== 'undefined' && (navigator as Navigator & { locks?: GestorLocks }).locks
+        ? (navigator as Navigator & { locks: GestorLocks }).locks
+        : null;
+  if (locks) {
+    return locks.request(`ekko-op:${clave}`, () => leerOCrear(clave));
+  }
+  const existente = operacionPagoActual(usuarioId, objetivo);
+  if (existente) return existente;
+  const propio = leerOCrear(clave);
+  await (deps.esperar ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms))))(40);
+  return operacionPagoActual(usuarioId, objetivo) ?? propio;
+}
+
+/**
+ * Descarta la operación SOLO si sigue siendo `id` (no borra una más nueva que otra
+ * pestaña ya creó). Uso: el servidor respondió ya_pagado / reemplazable / inválida.
+ */
+export function descartarOperacionPago(usuarioId: string, objetivo: string, id: string): void {
+  const clave = claveOperacionPago(usuarioId, objetivo);
+  const m = leerMapa();
+  if (m[clave]?.id !== id) return;
+  delete m[clave];
+  escribirMapa(m);
+}
+
+/** Stripe.js confirmó el cobro: la operación queda resuelta cuando 02B observe el derecho. */
+export function marcarOperacionConfirmada(usuarioId: string, objetivo: string, id: string): void {
+  const clave = claveOperacionPago(usuarioId, objetivo);
+  const m = leerMapa();
+  if (m[clave]?.id !== id) return;
+  m[clave] = { ...m[clave], confirmada: true };
+  escribirMapa(m);
+}
+
+/** Borra las operaciones ya confirmadas (se llama cuando 02B observa el derecho). */
+export function limpiarOperacionesConfirmadas(): void {
+  const m = leerMapa();
+  let cambio = false;
+  for (const [k, r] of Object.entries(m)) {
+    if (r?.confirmada) {
+      delete m[k];
+      cambio = true;
+    }
+  }
+  if (cambio) escribirMapa(m);
+}
+
+/** Respuesta del backend al preparar un pago con operación (PKG-01C). */
+export type EstadoPreparacion =
+  | 'reutilizable'
+  | 'en_proceso'
+  | 'ya_pagado'
+  | 'reemplazable'
+  | 'requiere_revision'
+  | 'desconocido'
+  | 'operacion_invalida'
+  | 'reintentable'
+  | 'resultado_desconocido'
+  | 'pago_no_iniciable'
+  | 'cobros_no_disponibles';

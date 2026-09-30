@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, configure } from '@testing-library/react';
+
+// PKG-01C: preparar el pago ahora obtiene primero el operation_id (localStorage;
+// sin Web Locks en jsdom usa el respaldo con una espera corta). Bajo carga de CI
+// el primer render puede pasar de 1 s: se amplía la espera de los find*/waitFor
+// de ESTE archivo. No cambia ninguna aserción.
+configure({ asyncUtilTimeout: 5000 });
 
 /**
  * PKG-02B (C04) — PaymentModal afirma solo lo que Stripe.js devuelve:
@@ -12,7 +18,9 @@ const h = vi.hoisted(() => {
   return {
     confirmPayment: vi.fn(),
     submit: vi.fn(),
-    intent: { clientSecret: 'cs_ficticio', account: 'acct_test', modo: 'pago' } as Record<string, unknown>
+    intent: { clientSecret: 'cs_ficticio', account: 'acct_test', modo: 'pago' } as Record<string, unknown>,
+    // PKG-01C: captura (tier, operation_id) de cada preparación.
+    crear: vi.fn()
   };
 });
 
@@ -23,11 +31,11 @@ vi.mock('@stripe/react-stripe-js', () => ({
   useStripe: () => ({ confirmPayment: (...a: unknown[]) => h.confirmPayment(...a) }),
   useElements: () => ({ submit: (...a: unknown[]) => h.submit(...a) })
 }));
-vi.mock('@shared/lib/checkout', () => ({ crearPagoIntent: () => Promise.resolve(h.intent) }));
+vi.mock('@shared/lib/checkout', () => ({ crearPagoIntent: (...a: unknown[]) => { h.crear(...a); return Promise.resolve(h.intent); } }));
 vi.mock('@shared/hooks/useAuth', () => ({ useAuth: () => ({ usuario: { id: 'u-1', nombre: 'Ana' } }) }));
 
 import { PaymentModal } from '../PaymentModal';
-import { CLAVE_PAGO_PENDIENTE } from '@shared/lib/pagoEstado';
+import { CLAVE_PAGO_PENDIENTE, CLAVE_OPERACIONES_PAGO, MENSAJE_PAGO, operacionPagoActual } from '@shared/lib/pagoEstado';
 
 async function montarYPagar(props: Partial<React.ComponentProps<typeof PaymentModal>> = {}) {
   const onPagado = vi.fn();
@@ -132,10 +140,111 @@ describe('PaymentModal (PKG-02B)', () => {
   });
 
   it('abrir el pago falla → mensaje humano, no err.message crudo', async () => {
-    h.intent = Promise.reject(new Error('PGRST301 JWT expired')) as unknown as Record<string, unknown>;
+    // El fallo se lanza AL LLAMAR (no una promesa pre-rechazada: con PKG-01C el
+    // modal obtiene antes el operation_id y esa promesa quedaría sin manejador).
+    h.crear.mockImplementationOnce(() => { throw new Error('PGRST301 JWT expired'); });
     render(<PaymentModal tierSlug="starter" tierNombre="Starter" precio={650} onClose={vi.fn()} onPagado={vi.fn()} />);
     expect(await screen.findByText(/No pudimos abrir el pago/)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/PGRST|JWT/);
+  });
+});
+
+// ── PKG-01C · operación estable al PREPARAR el pago ──────────────────────────
+describe('PaymentModal · operation_id (PKG-01C)', () => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+  const abrir = (props: Partial<React.ComponentProps<typeof PaymentModal>> = {}) => {
+    const onPagado = vi.fn();
+    const onEnProceso = vi.fn();
+    const r = render(<PaymentModal tierSlug="pack4" tierNombre="Pack 4" precio={850} esPaquete flujo="perfil" onClose={vi.fn()} onPagado={onPagado} onEnProceso={onEnProceso} {...props} />);
+    return { onPagado, onEnProceso, ...r };
+  };
+
+  beforeEach(() => {
+    h.crear.mockReset();
+    window.localStorage.clear();
+    window.sessionStorage.clear();
     h.intent = { clientSecret: 'cs_ficticio', account: 'acct_test', modo: 'pago' };
+  });
+
+  it('2 · envía un operation_id y "Reintentar" reutiliza EL MISMO (misma intención)', async () => {
+    h.intent = { estado: 'resultado_desconocido', operationId: 'x' };
+    abrir();
+    expect(await screen.findByText(MENSAJE_PAGO.prepararDesconocido)).toBeInTheDocument();
+    const op1 = h.crear.mock.calls[0][1] as string;
+    expect(op1).toMatch(UUID);
+    expect(h.crear.mock.calls[0][0]).toBe('pack4');
+    h.intent = { estado: 'reutilizable', clientSecret: 'cs_ficticio', account: 'acct_test', modo: 'pago', monto: 85000 };
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(await screen.findByRole('button', { name: 'Pagar ahora' })).toBeInTheDocument();
+    expect(h.crear.mock.calls[1][1]).toBe(op1);
+  });
+
+  it('3 · reabrir el modal (misma intención, p. ej. tras refresh) reutiliza el operation_id persistido', async () => {
+    const a = abrir();
+    await screen.findByRole('button', { name: 'Pagar ahora' });
+    a.unmount();
+    abrir();
+    await screen.findByRole('button', { name: 'Pagar ahora' });
+    expect(h.crear.mock.calls[1][1]).toBe(h.crear.mock.calls[0][1]);
+    expect(window.localStorage.getItem(CLAVE_OPERACIONES_PAGO)).toContain('u-1|paquete:pack4');
+  });
+
+  it('red / 5xx al preparar → "Reintentar" con la MISMA operación (nunca un cobro doble)', async () => {
+    h.crear.mockImplementationOnce(() => { throw new Error('HTTP 502'); });
+    abrir();
+    expect(await screen.findByText(MENSAJE_PAGO.prepararReintentable)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+    await screen.findByRole('button', { name: 'Pagar ahora' });
+    expect(h.crear.mock.calls[1][1]).toBe(h.crear.mock.calls[0][1]);
+  });
+
+  it('reemplazable → la operación se descarta y "Preparar el pago de nuevo" usa un operation_id NUEVO', async () => {
+    h.intent = { estado: 'reemplazable', operationId: 'x', objetoId: 'pi_1' };
+    abrir();
+    expect(await screen.findByText(MENSAJE_PAGO.intentoReemplazable)).toBeInTheDocument();
+    const op1 = h.crear.mock.calls[0][1];
+    expect(operacionPagoActual('u-1', 'paquete:pack4')).toBeNull();
+    h.intent = { estado: 'reutilizable', clientSecret: 'cs_ficticio', account: 'acct_test', modo: 'pago' };
+    fireEvent.click(screen.getByRole('button', { name: 'Preparar el pago de nuevo' }));
+    await screen.findByRole('button', { name: 'Pagar ahora' });
+    expect(h.crear.mock.calls[1][1]).not.toBe(op1);
+  });
+
+  it('ya_pagado → onPagado con el objeto y su fecha (02B observa el derecho); la operación se cierra', async () => {
+    h.intent = { estado: 'ya_pagado', operationId: 'x', objetoId: 'pi_7', creadoEn: 1_700_000_000_000 };
+    const { onPagado } = abrir();
+    await waitFor(() => expect(onPagado).toHaveBeenCalledWith({ paymentIntentId: 'pi_7', creadoEn: 1_700_000_000_000 }));
+    expect(JSON.parse(window.sessionStorage.getItem(CLAVE_PAGO_PENDIENTE)!)).toMatchObject({ estado: 'confirmado', paymentIntentId: 'pi_7' });
+    expect(operacionPagoActual('u-1', 'paquete:pack4')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Pagar ahora' })).not.toBeInTheDocument();
+  });
+
+  it('en_proceso → onEnProceso, sin formulario ni reintento; la operación se CONSERVA', async () => {
+    h.intent = { estado: 'en_proceso', operationId: 'x', objetoId: 'pi_8' };
+    const { onEnProceso } = abrir();
+    await waitFor(() => expect(onEnProceso).toHaveBeenCalledWith({ paymentIntentId: 'pi_8' }));
+    expect(screen.queryByRole('button', { name: /Pagar ahora|Reintentar/ })).not.toBeInTheDocument();
+    expect(operacionPagoActual('u-1', 'paquete:pack4')).toMatch(UUID);
+  });
+
+  it('requiere_revision → "No lo repitas", sin botón de pago ni de reintento', async () => {
+    h.intent = { estado: 'requiere_revision', operationId: 'x' };
+    abrir();
+    expect(await screen.findByText(MENSAJE_PAGO.requiereRevision)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Pagar ahora|Reintentar|Preparar/ })).not.toBeInTheDocument();
+  });
+
+  it('reutilizable con importe distinto al mostrado (intento previo a un cambio de precio) → se dice el importe REAL', async () => {
+    h.intent = { estado: 'reutilizable', clientSecret: 'cs_ficticio', account: 'acct_test', modo: 'suscripcion', monto: 85000 };
+    abrir({ precio: 990 });
+    expect(await screen.findByTestId('monto-real')).toHaveTextContent('$850');
+  });
+
+  it('confirmación succeeded → la operación queda marcada confirmada (se cierra cuando 02B observa el derecho)', async () => {
+    h.confirmPayment.mockResolvedValue({ paymentIntent: { id: 'pi_ok', status: 'succeeded' } });
+    const { onPagado } = await montarYPagar({ tierSlug: 'pack4' });
+    await waitFor(() => expect(onPagado).toHaveBeenCalled());
+    const mapa = JSON.parse(window.localStorage.getItem(CLAVE_OPERACIONES_PAGO)!);
+    expect(mapa['u-1|paquete:pack4']).toMatchObject({ confirmada: true });
   });
 });

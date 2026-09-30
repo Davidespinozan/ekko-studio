@@ -139,9 +139,20 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
     setActivacion({ estado: obs.resultado === 'error' ? 'error' : 'no_observada', slug: slugEsperado, desde });
   }
 
-  /** Pago confirmado (Stripe: succeeded) → registrar el pendiente y observar la activación. */
-  function pagoConfirmado(paymentIntentId: string | null, slug: string | null) {
-    const p = guardarPagoPendiente({ flujo: 'perfil', paymentIntentId, estado: 'confirmado', ...(slug ? { contexto: { slug } } : {}) });
+  /**
+   * Pago confirmado (Stripe: succeeded) → registrar el pendiente y observar la activación.
+   * PKG-01C: si la MISMA operación ya estaba pagada (`creadoEn`), la membresía pudo
+   * crearse antes de este momento: la evidencia se busca desde el pago original.
+   */
+  function pagoConfirmado(paymentIntentId: string | null, slug: string | null, creadoEn?: number) {
+    const ahora = Date.now();
+    const p = guardarPagoPendiente({
+      flujo: 'perfil',
+      paymentIntentId,
+      estado: 'confirmado',
+      ts: creadoEn ? Math.min(ahora, creadoEn) : ahora,
+      ...(slug ? { contexto: { slug } } : {})
+    });
     void observarActivacionPlan(slug, p.ts);
   }
 
@@ -799,7 +810,7 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
             const slug = pagarTier.slug;
             setPagarTier(null);
             setCambiarOpen(false);
-            pagoConfirmado(pago.paymentIntentId, slug);
+            pagoConfirmado(pago.paymentIntentId, slug, pago.creadoEn);
           }}
           onEnProceso={(pago) => {
             const slug = pagarTier.slug;
