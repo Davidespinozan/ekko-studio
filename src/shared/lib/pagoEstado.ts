@@ -14,7 +14,7 @@
  */
 
 /** Flujo desde el que se abrió el pago (para volver al sitio correcto tras un redirect). */
-export type FlujoPago = 'perfil' | 'pagar' | 'hora' | 'invitados';
+export type FlujoPago = 'perfil' | 'pagar' | 'hora' | 'invitados' | 'mostrador';
 
 /** Evidencia mínima de un pago confirmado por Stripe.js (status = succeeded). */
 export interface PagoConfirmado {
@@ -138,7 +138,7 @@ export interface RetornoPago {
   paymentIntentId: string | null;
 }
 
-const FLUJOS: readonly FlujoPago[] = ['perfil', 'pagar', 'hora', 'invitados'];
+const FLUJOS: readonly FlujoPago[] = ['perfil', 'pagar', 'hora', 'invitados', 'mostrador'];
 
 /** URL de retorno que Stripe usa tras un redirect: conserva el flujo; Stripe añade `payment_intent` y `redirect_status`. */
 export function urlRetornoPago(origin: string, flujo: FlujoPago): string {
@@ -146,7 +146,10 @@ export function urlRetornoPago(origin: string, flujo: FlujoPago): string {
     perfil: '/app/perfil',
     pagar: '/app',
     hora: '/app/reservar',
-    invitados: '/app/reservas'
+    invitados: '/app/reservas',
+    // PKG-01E: cobro iniciado por staff en el dispositivo de recepción (defensivo:
+    // en MX no aplican métodos con redirección).
+    mostrador: '/recepcion/miembros'
   };
   return `${origin}${ruta[flujo]}?pago=${flujo}`;
 }

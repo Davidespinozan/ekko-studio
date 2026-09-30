@@ -81,6 +81,12 @@ interface Props {
   flujo?: FlujoPago;
   /** Datos técnicos (ids, hora) para retomar el flujo tras un redirect/refresh. Nunca PII. */
   contexto?: Record<string, string | number>;
+  /**
+   * PKG-01E: nombre por defecto del titular cuando quien paga NO es el usuario
+   * autenticado (mostrador: el miembro teclea su tarjeta en el dispositivo del
+   * staff). Solo prellena el campo; no se persiste.
+   */
+  nombreTitular?: string;
   onClose: () => void;
   /** PAGO CONFIRMADO por Stripe (status = succeeded). No significa membresía activa. */
   onPagado: (pago: PagoConfirmado) => void;
@@ -90,7 +96,7 @@ interface Props {
 
 type AccionPreparacion = 'reintentar' | 'preparar' | 'comprobar' | null;
 
-export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, subtitulo, pedirNombre = true, fetchIntent, objetivoOperacion, flujo = 'perfil', contexto, onClose, onPagado, onEnProceso }: Props) {
+export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, subtitulo, pedirNombre = true, fetchIntent, objetivoOperacion, flujo = 'perfil', contexto, nombreTitular, onClose, onPagado, onEnProceso }: Props) {
   const { usuario } = useAuth();
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [customerSessionSecret, setCustomerSessionSecret] = useState<string | null>(null);
@@ -271,7 +277,7 @@ export function PaymentModal({ tierSlug, tierNombre, precio, esPaquete, titulo, 
               onEnProceso={onEnProceso}
               flujo={flujo}
               contexto={contexto}
-              nombreDefault={usuario?.nombre ?? ''}
+              nombreDefault={nombreTitular ?? usuario?.nombre ?? ''}
               pedirNombre={pedirNombre}
             />
           </Elements>

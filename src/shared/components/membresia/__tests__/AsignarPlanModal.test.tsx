@@ -19,9 +19,28 @@ vi.mock('@shared/lib/supabase', () => ({
 }));
 
 const mockActivar = vi.fn();
+const h = vi.hoisted(() => ({
+  crearPagoMostrador: vi.fn(),
+  observar: vi.fn(),
+  modalProps: null as Record<string, unknown> | null
+}));
 vi.mock('@shared/lib/checkout', async (orig) => ({
   ...(await orig<typeof import('@shared/lib/checkout')>()),
-  activarMembresiaMostrador: (...a: unknown[]) => mockActivar(...a)
+  activarMembresiaMostrador: (...a: unknown[]) => mockActivar(...a),
+  crearPagoMostrador: (...a: unknown[]) => h.crearPagoMostrador(...a)
+}));
+vi.mock('@shared/lib/observarActivacion', () => ({ observarActivacion: (...a: unknown[]) => h.observar(...a) }));
+vi.mock('@shared/components/PaymentModal', () => ({
+  PaymentModal: (p: Record<string, unknown> & { onPagado: (x: { paymentIntentId: string }) => void; onEnProceso?: (x: { paymentIntentId: string }) => void; onClose: () => void }) => {
+    h.modalProps = p;
+    return (
+      <div data-testid="payment-modal">
+        <button onClick={() => p.onPagado({ paymentIntentId: 'pi_mostrador' })}>SIMULAR_SUCCEEDED</button>
+        <button onClick={() => p.onEnProceso?.({ paymentIntentId: 'pi_mostrador' })}>SIMULAR_PROCESSING</button>
+        <button onClick={p.onClose}>CERRAR_PAGO</button>
+      </div>
+    );
+  }
 }));
 
 import { AsignarPlanModal } from '../AsignarPlanModal';
@@ -45,6 +64,11 @@ const error409Stripe = Object.assign(new Error('El miembro tiene una suscripció
 beforeEach(() => {
   vi.clearAllMocks();
   mockActivar.mockResolvedValue({ success: true });
+  h.crearPagoMostrador.mockReset().mockResolvedValue({ estado: 'reutilizable', clientSecret: 'cs_x', account: 'acct_1', modo: 'pago', objetoId: 'pi_mostrador' });
+  h.observar.mockReset();
+  h.modalProps = null;
+  window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 describe('AsignarPlanModal', () => {
@@ -189,5 +213,105 @@ describe('AsignarPlanModal · venta de mostrador (PKG-01D)', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Efectivo' }));
     fireEvent.click(screen.getByRole('button', { name: /activar plan/i }));
     await waitFor(() => expect(onDone).toHaveBeenCalled());
+  });
+});
+
+// ── PKG-01E · Tarjeta por Stripe ─────────────────────────────────────────────
+describe('AsignarPlanModal · Tarjeta por Stripe (PKG-01E)', () => {
+  async function elegirStripe(slug = /esencial/i) {
+    abrir();
+    fireEvent.click(await screen.findByRole('radio', { name: slug }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Tarjeta por Stripe' }));
+  }
+
+  it('las cinco vías están separadas; "Cobrar con tarjeta" abre el pago Stripe del MIEMBRO y NO llama a registrar_venta_mostrador', async () => {
+    await elegirStripe();
+    expect(screen.getAllByRole('radio', { name: /Efectivo|Transferencia|Terminal \(tarjeta\)|Cortesía|Tarjeta por Stripe/ })).toHaveLength(5);
+    expect(screen.getByTestId('resumen-cobro')).toHaveTextContent('$850 con tarjeta por Stripe');
+    fireEvent.click(screen.getByRole('button', { name: 'Cobrar con tarjeta' }));
+    expect(await screen.findByTestId('payment-modal')).toBeInTheDocument();
+    expect(mockActivar).not.toHaveBeenCalled();
+    expect(h.modalProps).toMatchObject({ tierSlug: 'esencial', flujo: 'mostrador', objetivoOperacion: 'mostrador:m1:esencial', nombreTitular: 'Ana', contexto: { miembro: 'm1', slug: 'esencial' } });
+    // fetchIntent prepara el cobro para el miembro objetivo con el operation_id.
+    await (h.modalProps!.fetchIntent as (op?: string) => Promise<unknown>)('3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
+    expect(h.crearPagoMostrador).toHaveBeenCalledWith('m1', 'esencial', '3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
+  });
+
+  it('succeeded NO activa: observa la membresía del miembro por referencia_pago = PaymentIntent; al verla, onDone', async () => {
+    h.observar.mockResolvedValue({ resultado: 'observada', dato: [{ referencia_pago: 'pi_mostrador', stripe_subscription_id: null }] });
+    await elegirStripe();
+    fireEvent.click(screen.getByRole('button', { name: 'Cobrar con tarjeta' }));
+    await screen.findByTestId('payment-modal');
+    await (h.modalProps!.fetchIntent as (op?: string) => Promise<unknown>)('3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
+    fireEvent.click(screen.getByText('SIMULAR_SUCCEEDED'));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(mockActivar).not.toHaveBeenCalled();
+    const opts = h.observar.mock.calls[0][0] as { listo: (f: Array<{ referencia_pago: string | null; stripe_subscription_id: string | null }>) => boolean };
+    expect(opts.listo([{ referencia_pago: 'pi_otro', stripe_subscription_id: null }])).toBe(false); // otra membresía no cuenta
+    expect(opts.listo([{ referencia_pago: 'pi_mostrador', stripe_subscription_id: null }])).toBe(true);
+  });
+
+  it('mensual: la evidencia es stripe_subscription_id de la suscripción preparada', async () => {
+    h.crearPagoMostrador.mockResolvedValue({ estado: 'reutilizable', clientSecret: 'in_secret', account: 'acct_1', modo: 'suscripcion', objetoId: 'sub_1', subscriptionId: 'sub_1' });
+    h.observar.mockResolvedValue({ resultado: 'no_observada', ultimo: [] });
+    await elegirStripe();
+    fireEvent.click(screen.getByRole('button', { name: 'Cobrar con tarjeta' }));
+    await screen.findByTestId('payment-modal');
+    await (h.modalProps!.fetchIntent as (op?: string) => Promise<unknown>)('3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
+    fireEvent.click(screen.getByText('SIMULAR_SUCCEEDED'));
+    await screen.findByTestId('stripe-activacion');
+    const opts = h.observar.mock.calls[0][0] as { listo: (f: Array<{ referencia_pago: string | null; stripe_subscription_id: string | null }>) => boolean };
+    expect(opts.listo([{ referencia_pago: null, stripe_subscription_id: 'sub_1' }])).toBe(true);
+    expect(opts.listo([{ referencia_pago: null, stripe_subscription_id: 'sub_otra' }])).toBe(false);
+  });
+
+  it('activación no observada → "no vuelvas a cobrar" + "Volver a comprobar" (solo lee); sin onDone ni segundo cobro', async () => {
+    h.observar.mockResolvedValueOnce({ resultado: 'no_observada', ultimo: [] }).mockResolvedValueOnce({ resultado: 'observada', dato: [] });
+    await elegirStripe();
+    fireEvent.click(screen.getByRole('button', { name: 'Cobrar con tarjeta' }));
+    await screen.findByTestId('payment-modal');
+    fireEvent.click(screen.getByText('SIMULAR_SUCCEEDED'));
+    const card = await screen.findByTestId('stripe-activacion');
+    expect(card).toHaveTextContent(/No vuelvas a cobrar/);
+    expect(onDone).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('payment-modal')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a comprobar' }));
+    await waitFor(() => expect(onDone).toHaveBeenCalled());
+    expect(h.observar).toHaveBeenCalledTimes(2);
+    expect(h.crearPagoMostrador).not.toHaveBeenCalled(); // el modal se cerró; no se preparó otro cobro
+  });
+
+  it('processing → "PAGO EN PROCESO" sin "Volver a comprobar" ni otro cobro; error de lectura → mensaje de comprobación', async () => {
+    await elegirStripe();
+    fireEvent.click(screen.getByRole('button', { name: 'Cobrar con tarjeta' }));
+    await screen.findByTestId('payment-modal');
+    fireEvent.click(screen.getByText('SIMULAR_PROCESSING'));
+    const card = await screen.findByTestId('stripe-activacion');
+    expect(card).toHaveTextContent('PAGO EN PROCESO');
+    expect(screen.queryByRole('button', { name: 'Volver a comprobar' })).not.toBeInTheDocument();
+    expect(h.observar).not.toHaveBeenCalled();
+    expect(mockActivar).not.toHaveBeenCalled();
+  });
+
+  it('cerrar el pago sin pagar vuelve al formulario; nada se registró', async () => {
+    await elegirStripe();
+    fireEvent.click(screen.getByRole('button', { name: 'Cobrar con tarjeta' }));
+    await screen.findByTestId('payment-modal');
+    fireEvent.click(screen.getByText('CERRAR_PAGO'));
+    expect(await screen.findByRole('button', { name: 'Cobrar con tarjeta' })).toBeInTheDocument();
+    expect(mockActivar).not.toHaveBeenCalled();
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it('dispositivo compartido: el modal no persiste secretos, datos de tarjeta ni PII del miembro', async () => {
+    h.observar.mockResolvedValue({ resultado: 'no_observada', ultimo: [] });
+    await elegirStripe();
+    fireEvent.click(screen.getByRole('button', { name: 'Cobrar con tarjeta' }));
+    await screen.findByTestId('payment-modal');
+    await (h.modalProps!.fetchIntent as (op?: string) => Promise<unknown>)('3f2c1d4e-5a6b-4c7d-8e9f-0a1b2c3d4e5f');
+    fireEvent.click(screen.getByText('SIMULAR_SUCCEEDED'));
+    await screen.findByTestId('stripe-activacion');
+    const todo = JSON.stringify({ l: { ...window.localStorage }, s: { ...window.sessionStorage } });
+    expect(todo).not.toMatch(/cs_x|secret|Ana|@|4242/);
   });
 });

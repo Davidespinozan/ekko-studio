@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { BadgeCheck } from 'lucide-react';
+import { BadgeCheck, Check } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import {
   activarMembresiaMostrador,
+  crearPagoMostrador,
   esPerdidaDeCreditos,
   conflictoVentaMostrador,
   nuevaOperacionMostrador,
@@ -12,7 +13,27 @@ import {
   type MetodoMostrador
 } from '@shared/lib/checkout';
 import { esPaqueteDeCreditos } from '@shared/lib/membresiaEstado';
+import { PaymentModal } from '@shared/components/PaymentModal';
+import { Spinner } from '@shared/components/Spinner';
+import { ErrorInline } from '@shared/components/ErrorCarga';
+import { observarActivacion } from '@shared/lib/observarActivacion';
+import { limpiarPagoPendiente, MENSAJE_PAGO } from '@shared/lib/pagoEstado';
 import { ModalAccion } from './ModalAccion';
+
+/**
+ * PKG-01E · "Tarjeta por Stripe" es una VÍA distinta de los cuatro métodos de
+ * `ventas_mostrador`: el staff prepara el cobro (mostrador-crear-pago), el
+ * miembro teclea su tarjeta en Stripe Elements en este dispositivo, la
+ * evidencia es `payment_events` y la activación la hace el webhook. Aquí solo
+ * se OBSERVA la membresía del miembro (02B): nunca se activa desde el frontend.
+ */
+type MetodoUI = MetodoMostrador | 'stripe';
+const OPCIONES_METODO: ReadonlyArray<{ valor: MetodoUI; label: string }> = [...METODOS_MOSTRADOR, { valor: 'stripe', label: 'Tarjeta por Stripe' }];
+const ESTADOS_VIVOS = ['trialing', 'activa', 'past_due', 'pausada'];
+
+type FaseStripe =
+  | { fase: 'pagando' }
+  | { fase: 'observando' | 'no_observada' | 'error' | 'en_proceso'; paymentIntentId: string | null };
 
 interface Plan {
   slug: string;
@@ -68,7 +89,10 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
   const [planes, setPlanes] = useState<Plan[] | null>(null);
   const [errorCarga, setErrorCarga] = useState(false);
   const [elegido, setElegido] = useState<string>(modo === 'renovar' ? planActualSlug ?? '' : '');
-  const [metodo, setMetodo] = useState<MetodoMostrador | ''>('');
+  const [metodo, setMetodo] = useState<MetodoUI | ''>('');
+  const [stripe, setStripe] = useState<FaseStripe | null>(null);
+  /** Id del objeto de Stripe preparado (pi_ o sub_) para observar la membresía por su referencia. */
+  const objetoStripe = useRef<string | null>(null);
   const [nota, setNota] = useState('');
   const [guardando, setGuardando] = useState(false);
   // Una intención = un operation_id. Reabrir el modal es otra intención.
@@ -95,10 +119,47 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
     };
   }, []);
 
+  /**
+   * PKG-01E: tras `succeeded`, observar (solo lectura) la membresía viva del
+   * miembro ligada a ESTE pago: `referencia_pago` = PaymentIntent (paquete) o
+   * `stripe_subscription_id` = suscripción (mensual). Timeout ≠ fallo.
+   */
+  async function observarActivacionStripe(paymentIntentId: string | null) {
+    setStripe({ fase: 'observando', paymentIntentId });
+    const subId = objetoStripe.current?.startsWith('sub_') ? objetoStripe.current : null;
+    const obs = await observarActivacion<Array<{ referencia_pago: string | null; stripe_subscription_id: string | null }>>({
+      leer: async () => {
+        const { data, error } = await supabase
+          .from('membresias')
+          .select('referencia_pago, stripe_subscription_id')
+          .eq('usuario_id', usuarioId)
+          .in('status', ESTADOS_VIVOS)
+          .order('created_at', { ascending: false })
+          .limit(5);
+        return { data: (data as Array<{ referencia_pago: string | null; stripe_subscription_id: string | null }> | null) ?? null, error };
+      },
+      listo: (filas) =>
+        filas.some((m) => (paymentIntentId !== null && m.referencia_pago === paymentIntentId) || (subId !== null && m.stripe_subscription_id === subId))
+    });
+    if (obs.resultado === 'observada') {
+      limpiarPagoPendiente(); // el derecho ya se observó: cierra el pendiente de 02B y la operación
+      toast.success('Pago con tarjeta recibido · plan activo.');
+      await onDone();
+      onClose();
+      return;
+    }
+    setStripe({ fase: obs.resultado === 'error' ? 'error' : 'no_observada', paymentIntentId });
+  }
+
   async function confirmar() {
     if (!elegido) return;
     if (!metodo) {
-      toast.error('Indica cómo pagó (efectivo, transferencia, terminal o cortesía).');
+      toast.error('Indica cómo pagó (efectivo, transferencia, terminal, cortesía o tarjeta por Stripe).');
+      return;
+    }
+    if (metodo === 'stripe') {
+      // Vía Stripe: NO pasa por registrar_venta_mostrador. Abre el pago del miembro.
+      setStripe({ fase: 'pagando' });
       return;
     }
     setGuardando(true);
@@ -106,7 +167,7 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
       // El éxito solo se afirma cuando el servidor confirma la venta registrada.
       const r = await activarMembresiaMostrador(usuarioId, elegido, {
         operationId: operationId.current,
-        metodo,
+        metodo: metodo as MetodoMostrador,
         confirmarPerdida: creditosEnJuego !== null,
         nota: nota.trim() || undefined
       });
@@ -138,12 +199,78 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
   const plan = planes?.find((p) => p.slug === elegido) ?? null;
   const pesos = (c: number) => `$${Math.round(c / 100).toLocaleString('es-MX')}`;
 
+  if (stripe?.fase === 'pagando' && plan) {
+    return (
+      <PaymentModal
+        tierSlug={plan.slug}
+        tierNombre={plan.nombre}
+        precio={Math.round(plan.precio_centavos / 100)}
+        esPaquete={esPaqueteDeCreditos(plan.tipo)}
+        titulo={`${plan.nombre} · ${nombre ?? 'Miembro'}`}
+        pedirNombre
+        nombreTitular={nombre ?? ''}
+        flujo="mostrador"
+        // Identidad de la intención: staff (useAuth) + miembro + plan. Reintentos reutilizan el mismo operation_id.
+        objetivoOperacion={`mostrador:${usuarioId}:${plan.slug}`}
+        contexto={{ miembro: usuarioId, slug: plan.slug }}
+        fetchIntent={async (operationId) => {
+          const r = await crearPagoMostrador(usuarioId, plan.slug, operationId ?? '');
+          objetoStripe.current = r.subscriptionId ?? r.objetoId ?? null;
+          return r;
+        }}
+        onClose={() => setStripe(null)}
+        // PAGO CONFIRMADO ≠ PLAN ACTIVO: se observa; el webhook activa.
+        onPagado={(pago) => void observarActivacionStripe(pago.paymentIntentId)}
+        onEnProceso={(pago) => setStripe({ fase: 'en_proceso', paymentIntentId: pago.paymentIntentId })}
+      />
+    );
+  }
+
+  if (stripe && stripe.fase !== 'pagando') {
+    return (
+      <div className="ek-backdrop" role="dialog" aria-modal="true">
+        <div className="ek-card" data-testid="stripe-activacion" style={{ maxWidth: '400px', width: '100%', textAlign: 'center' }}>
+          <span className="ek-empty-icon" style={{ width: 48, height: 48, marginBottom: '12px' }}>
+            <Check size={22} aria-hidden="true" />
+          </span>
+          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '8px' }}>
+            {stripe.fase === 'en_proceso' ? 'PAGO EN PROCESO' : 'PAGO RECIBIDO'}
+          </p>
+          <p className="ek-body-muted" style={{ margin: '0 0 14px', lineHeight: 1.5 }}>
+            {stripe.fase === 'observando' && 'Pago recibido. Estamos activando el plan; suele tardar unos segundos.'}
+            {stripe.fase === 'no_observada' && 'La activación está tardando más de lo normal. No vuelvas a cobrar: en cuanto Stripe confirme, el plan aparece solo.'}
+            {stripe.fase === 'en_proceso' && MENSAJE_PAGO.enProceso}
+          </p>
+          {stripe.fase === 'error' && (
+            <div style={{ marginBottom: '12px', textAlign: 'left' }}>
+              <ErrorInline mensaje={MENSAJE_PAGO.comprobacionFallo} />
+            </div>
+          )}
+          {stripe.fase === 'observando' ? (
+            <Spinner size={18} />
+          ) : (
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {stripe.fase !== 'en_proceso' && (
+                <button type="button" className="ek-cta ek-cta--gold" onClick={() => void observarActivacionStripe(stripe.paymentIntentId)}>
+                  Volver a comprobar
+                </button>
+              )}
+              <button type="button" className="ek-cta ek-cta--secondary" onClick={() => { void onDone(); onClose(); }}>
+                Cerrar
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ModalAccion
       titulo={TITULO[modo]}
       icono={<BadgeCheck size={14} aria-hidden="true" />}
       sujeto={nombre ?? 'Miembro'}
-      confirmarLabel={creditosEnJuego !== null ? 'Sí, cambiar y perder créditos' : modo === 'renovar' ? 'Renovar' : 'Activar plan'}
+      confirmarLabel={metodo === 'stripe' ? 'Cobrar con tarjeta' : creditosEnJuego !== null ? 'Sí, cambiar y perder créditos' : modo === 'renovar' ? 'Renovar' : 'Activar plan'}
       peligro={creditosEnJuego !== null}
       guardando={guardando}
       bloqueado={!elegido || !metodo}
@@ -208,7 +335,7 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
       <div role="radiogroup" aria-label="Cómo pagó" style={{ marginTop: '14px' }}>
         <span className="ek-label" style={{ display: 'block', marginBottom: '6px' }}>Cómo pagó</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-          {METODOS_MOSTRADOR.map((m) => (
+          {OPCIONES_METODO.map((m) => (
             <label
               key={m.valor}
               style={{
@@ -227,7 +354,11 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
       {plan && metodo && (
         // Lo que registrará el servidor (él deriva el importe del catálogo; esto solo lo muestra).
         <p data-testid="resumen-cobro" style={{ fontSize: '13px', margin: '10px 0 0', lineHeight: 1.45 }}>
-          {metodo === 'cortesia' ? (
+          {metodo === 'stripe' ? (
+            <>
+              <strong>{pesos(plan.precio_centavos)} con tarjeta por Stripe</strong>. El miembro introduce su tarjeta aquí; el plan se activa cuando Stripe confirma el cobro.
+            </>
+          ) : metodo === 'cortesia' ? (
             <>
               <strong>$0 cobrado</strong> · cortesía. Precio de lista {pesos(plan.precio_centavos)}: queda registrado como no cobrado.
             </>
@@ -250,7 +381,9 @@ export function AsignarPlanModal({ usuarioId, nombre, modo, planActualSlug, onCl
         />
       </label>
       <p style={{ fontSize: '12px', color: 'var(--ek-ink-faint)', margin: '6px 0 0', lineHeight: 1.45 }}>
-        Esto activa el plan SIN cobrar por Stripe: confirma antes que el pago ya entró. La venta queda registrada con importe, método y tu nombre.
+        {metodo === 'stripe'
+          ? 'El cobro lo procesa Stripe con la tarjeta del miembro; nadie del estudio ve ni guarda sus datos. La nota no se envía a Stripe.'
+          : 'Esto activa el plan SIN cobrar por Stripe: confirma antes que el pago ya entró. La venta queda registrada con importe, método y tu nombre.'}
       </p>
 
       {creditosEnJuego !== null && (

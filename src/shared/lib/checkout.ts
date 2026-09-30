@@ -165,11 +165,26 @@ export interface PagoIntentResult {
   /** Importe REAL del objeto (centavos) — puede ser el de una operación anterior a un cambio de precio. */
   monto?: number | null;
   moneda?: string;
+  /** Mensual: id de la suscripción (la membresía se observa por `stripe_subscription_id`). */
+  subscriptionId?: string;
 }
 
 /** PKG-01C: `operationId` = una intención de compra; se reutiliza en cada reintento. */
 export function crearPagoIntent(tierSlug: string, operationId?: string): Promise<PagoIntentResult> {
   return backendPost<PagoIntentResult>('crear-pago-intent', { tier: tierSlug, ...(operationId ? { operation_id: operationId } : {}) });
+}
+
+/**
+ * PKG-01E · "Tarjeta por Stripe" en mostrador: el STAFF prepara el cobro de un
+ * plan para un MIEMBRO objetivo (paquete → PaymentIntent; mensual → suscripción
+ * `default_incomplete`) y el miembro introduce su tarjeta en Stripe Elements en
+ * el dispositivo de recepción. Devuelve el mismo shape que `crearPagoIntent`.
+ * La evidencia es `payment_events` y la activación la hace el webhook: aquí no
+ * se activa nada ni se toca `ventas_mostrador`. `operationId` = una intención
+ * por (miembro, plan); se reutiliza en cada reintento.
+ */
+export function crearPagoMostrador(usuarioId: string, tierSlug: string, operationId: string): Promise<PagoIntentResult> {
+  return backendPost<PagoIntentResult>('mostrador-crear-pago', { usuario_id: usuarioId, tier: tierSlug, operation_id: operationId });
 }
 
 /**

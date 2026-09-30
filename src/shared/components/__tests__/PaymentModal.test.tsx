@@ -248,3 +248,27 @@ describe('PaymentModal · operation_id (PKG-01C)', () => {
     expect(mapa['u-1|paquete:pack4']).toMatchObject({ confirmada: true });
   });
 });
+
+// ── PKG-01E · mostrador ──────────────────────────────────────────────────────
+describe('PaymentModal · mostrador (PKG-01E)', () => {
+  it('nombreTitular prellena el titular con el MIEMBRO, no con el staff autenticado; el flujo mostrador manda su return_url', async () => {
+    h.crear.mockReset();
+    h.confirmPayment.mockReset().mockResolvedValue({ paymentIntent: { id: 'pi_m', status: 'succeeded' } });
+    h.submit.mockReset().mockResolvedValue({ error: undefined });
+    window.sessionStorage.clear();
+    window.localStorage.clear();
+    h.intent = { clientSecret: 'cs_ficticio', account: 'acct_test', modo: 'pago' };
+    const onPagado = vi.fn();
+    render(<PaymentModal tierSlug="pack4" tierNombre="Pack 4" precio={850} esPaquete flujo="mostrador" nombreTitular="Miembro Objetivo" objetivoOperacion="mostrador:m1:pack4" onClose={vi.fn()} onPagado={onPagado} />);
+    await screen.findByRole('button', { name: 'Pagar ahora' });
+    expect(screen.getByPlaceholderText('Como aparece en la tarjeta')).toHaveValue('Miembro Objetivo');
+    fireEvent.click(screen.getByRole('button', { name: 'Pagar ahora' }));
+    await waitFor(() => expect(onPagado).toHaveBeenCalledWith({ paymentIntentId: 'pi_m' }));
+    const args = h.confirmPayment.mock.calls[0][0] as { confirmParams: { return_url: string } };
+    expect(args.confirmParams.return_url).toMatch(/\/recepcion\/miembros\?pago=mostrador$/);
+    // Solo el id técnico queda en el pendiente de 02B; el nombre del titular no se persiste.
+    const raw = window.sessionStorage.getItem(CLAVE_PAGO_PENDIENTE)!;
+    expect(JSON.parse(raw)).toMatchObject({ flujo: 'mostrador', paymentIntentId: 'pi_m', estado: 'confirmado' });
+    expect(raw).not.toMatch(/Miembro Objetivo/);
+  });
+});

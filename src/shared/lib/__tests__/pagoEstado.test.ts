@@ -69,6 +69,9 @@ describe('retorno de redirect', () => {
     expect(urlRetornoPago('https://ekko.test', 'pagar')).toBe('https://ekko.test/app?pago=pagar');
     expect(urlRetornoPago('https://ekko.test', 'hora')).toBe('https://ekko.test/app/reservar?pago=hora');
     expect(urlRetornoPago('https://ekko.test', 'invitados')).toBe('https://ekko.test/app/reservas?pago=invitados');
+    // PKG-01E: cobro iniciado por staff en recepción.
+    expect(urlRetornoPago('https://ekko.test', 'mostrador')).toBe('https://ekko.test/recepcion/miembros?pago=mostrador');
+    expect(leerRetornoPago('?pago=mostrador&payment_intent=pi_9&redirect_status=succeeded')).toEqual({ flujo: 'mostrador', estado: 'succeeded', paymentIntentId: 'pi_9' });
   });
 
   it('leerRetornoPago: succeeded / processing / requires_payment_method(failed) / desconocido; ignora el client_secret', () => {
