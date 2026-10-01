@@ -189,39 +189,52 @@ export function identidadEstudio(t: { nombre?: unknown; branding?: unknown; conf
 // ── Layout base ─────────────────────────────────────────────────────────────
 // Email robusto (fondo claro, la mayoría de clientes lo renderizan mejor) con
 // el acento mostaza de EKKO. Todo inline: los clientes de correo ignoran <style>.
-// Cabecera: logo del estudio (URL https absoluta) + nombre. Pie: solo los
-// canales de contacto configurados; nunca etiquetas vacías. `preheader` y
+// Cabecera compacta: solo el logo del estudio (URL https absoluta; el `alt`
+// lleva el nombre). Pie: el aviso de correo automático y, en filas separadas,
+// solo los canales configurados; nunca etiquetas vacías. `preheader` y
 // `cuerpo` llegan YA escapados.
+const FUENTE = "-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+const FUENTE_TITULO = "Georgia,'Times New Roman',serif";
+
+function filaContacto(etiqueta: string, valor: string): string {
+  return `<tr>
+          <td style="padding:3px 12px 3px 0;font-family:${FUENTE};font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#9a9a9a;white-space:nowrap;vertical-align:top;">${etiqueta}</td>
+          <td style="padding:3px 0;font-family:${FUENTE};font-size:13px;line-height:1.5;color:#555;vertical-align:top;">${valor}</td>
+        </tr>`;
+}
+
 function layout(opts: { estudio: IdentidadEstudio; preheader: string; cuerpo: string }): string {
   const e = opts.estudio;
   const nombre = escaparHtml(e.nombre);
   const contactos: string[] = [];
   if (e.whatsapp) {
-    contactos.push(`WhatsApp: <a href="https://wa.me/${e.whatsapp}" style="color:#666;">+${e.whatsapp}</a>`);
+    contactos.push(filaContacto('WhatsApp', `<a href="https://wa.me/${e.whatsapp}" style="color:#555;text-decoration:underline;">+${e.whatsapp}</a>`));
   }
   if (e.email) {
-    contactos.push(`Correo: <a href="mailto:${escaparHtml(e.email)}" style="color:#666;">${escaparHtml(e.email)}</a>`);
+    contactos.push(filaContacto('Correo', `<a href="mailto:${escaparHtml(e.email)}" style="color:#555;text-decoration:underline;">${escaparHtml(e.email)}</a>`));
   }
   if (e.direccion) {
-    contactos.push(`Dirección: ${escaparHtml(e.direccion)}`);
+    contactos.push(filaContacto('Dirección', escaparHtml(e.direccion)));
   }
   // Receiving está apagado en Resend: no se promete respuesta a este correo.
+  const aviso = `<p style="margin:0;font-family:${FUENTE};font-size:12px;line-height:1.5;color:#9a9a9a;">Este correo se envía automáticamente y no recibe respuestas.</p>`;
   const pie = contactos.length
-    ? `Este correo se envía automáticamente y no recibe respuestas. ¿Dudas? Contáctanos.<br>${contactos.join('<br>')}`
-    : 'Este correo se envía automáticamente y no recibe respuestas.';
+    ? `${aviso}
+        <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:12px;border-collapse:collapse;">${contactos.join('')}
+        </table>`
+    : aviso;
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f4f4f2;">
 <span style="display:none;max-height:0;overflow:hidden;opacity:0;">${opts.preheader}</span>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f2;padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f2;padding:24px 12px;">
   <tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e6e6e2;">
-      <tr><td align="center" style="background:#0a0a0b;padding:22px 28px;">
-        <img src="${escaparHtml(e.logoUrl)}" alt="${nombre}" height="40" style="display:block;height:40px;width:auto;max-width:200px;border:0;margin:0 auto 8px;">
-        <span style="font-family:Georgia,'Times New Roman',serif;font-size:14px;font-weight:700;letter-spacing:0.08em;color:#e5b829;">${nombre}</span>
+      <tr><td align="center" style="background:#0a0a0b;padding:14px 24px;">
+        <img src="${escaparHtml(e.logoUrl)}" alt="${nombre}" height="56" style="display:block;height:56px;width:auto;max-width:240px;border:0;margin:0 auto;">
       </td></tr>
-      <tr><td style="padding:28px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;font-size:15px;line-height:1.6;">
+      <tr><td style="padding:28px 28px 26px;font-family:${FUENTE};color:#1a1a1a;font-size:15px;line-height:1.6;">
         ${opts.cuerpo}
       </td></tr>
-      <tr><td style="padding:18px 28px;border-top:1px solid #eee;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#999;font-size:12px;line-height:1.6;">
+      <tr><td style="padding:16px 28px 20px;border-top:1px solid #eee;background:#fafaf8;">
         ${pie}
       </td></tr>
     </table>
@@ -229,8 +242,25 @@ function layout(opts: { estudio: IdentidadEstudio; preheader: string; cuerpo: st
 </table></body></html>`;
 }
 
-function boton(url: string, texto: string): string {
-  return `<a href="${escaparHtml(url)}" style="display:inline-block;background:#e5b829;color:#111;text-decoration:none;font-weight:700;font-size:14px;padding:12px 22px;border-radius:10px;">${escaparHtml(texto)}</a>`;
+// ── Piezas del cuerpo (jerarquía compartida por las cinco plantillas) ───────
+// Todos reciben texto YA escapado salvo donde se indica.
+function saludo(n: string | null): string {
+  return `<p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#6b6b6b;">${n ? `Hola ${n},` : 'Hola,'}</p>`;
+}
+function titulo(texto: string): string {
+  return `<h1 style="margin:0 0 14px;font-family:${FUENTE_TITULO};font-size:22px;line-height:1.25;font-weight:700;color:#111;">${texto}</h1>`;
+}
+function parrafo(html: string): string {
+  return `<p style="margin:0 0 14px;font-size:15px;line-height:1.6;color:#1a1a1a;">${html}</p>`;
+}
+function nota(html: string): string {
+  return `<p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:#6b6b6b;">${html}</p>`;
+}
+/** CTA: botón proporcionado al correo. `url` y `texto` se escapan aquí. */
+function cta(url: string, texto: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:20px 0 4px;"><tr><td style="background:#e5b829;border-radius:8px;">
+          <a href="${escaparHtml(url)}" style="display:inline-block;padding:11px 20px;font-family:${FUENTE};font-size:14px;font-weight:700;line-height:1.2;color:#111;text-decoration:none;">${escaparHtml(texto)}</a>
+        </td></tr></table>`;
 }
 
 // ── Plantillas ──────────────────────────────────────────────────────────────
@@ -253,13 +283,13 @@ interface BasePago {
 /** Pago fallido: el evento más crítico. Empuja a actualizar la tarjeta. */
 export function emailPagoFallido(opts: BasePago): EmailRenderizado {
   const n = primerNombre(opts.nombre);
-  const hola = n ? `Hola ${n},` : 'Hola,';
   const url = `${APP_URL}/app/perfil`;
   const cuerpo = `
-    <p style="margin:0 0 14px;">${hola}</p>
-    <p style="margin:0 0 14px;">No pudimos procesar el cobro de tu membresía por <strong>${pesos(opts.montoCentavos, opts.moneda)}</strong>. Tu acceso sigue activo por ahora, pero para no perderlo necesitas actualizar tu tarjeta.</p>
-    <p style="margin:0 0 22px;">${boton(url, 'Actualizar mi tarjeta')}</p>
-    <p style="margin:0;color:#666;font-size:13px;">Si ya lo resolviste, ignora este correo: reintentaremos el cobro automáticamente.</p>`;
+    ${saludo(n)}
+    ${titulo('Tu pago no se procesó')}
+    ${parrafo(`No pudimos procesar el cobro de tu membresía por <strong>${pesos(opts.montoCentavos, opts.moneda)}</strong>. Tu acceso sigue activo por ahora, pero para no perderlo necesitas actualizar tu tarjeta.`)}
+    ${cta(url, 'Actualizar mi tarjeta')}
+    ${nota('Si ya lo resolviste, ignora este correo: reintentaremos el cobro automáticamente.')}`;
   return {
     plantilla: 'pago_fallido',
     subject: 'Tu pago no se procesó: actualiza tu tarjeta',
@@ -270,14 +300,14 @@ export function emailPagoFallido(opts: BasePago): EmailRenderizado {
 /** Bienvenida + recibo del primer pago (activación de la membresía). */
 export function emailBienvenida(opts: BasePago): EmailRenderizado {
   const n = primerNombre(opts.nombre);
-  const hola = n ? `¡Bienvenido, ${n}!` : '¡Bienvenido!';
   const url = `${APP_URL}/app`;
   const estudio = escaparHtml(opts.estudio.nombre);
   const cuerpo = `
-    <p style="margin:0 0 14px;">${hola}</p>
-    <p style="margin:0 0 14px;">Tu membresía en <strong>${estudio}</strong> quedó activa. Recibimos tu pago de <strong>${pesos(opts.montoCentavos, opts.moneda)}</strong>.</p>
-    <p style="margin:0 0 22px;">Ya puedes reservar tu próxima sesión desde la app.</p>
-    <p style="margin:0 0 22px;">${boton(url, 'Ir a mi estudio')}</p>`;
+    ${saludo(n)}
+    ${titulo(n ? `¡Bienvenido, ${n}!` : '¡Bienvenido!')}
+    ${parrafo(`Tu membresía en <strong>${estudio}</strong> quedó activa. Recibimos tu pago de <strong>${pesos(opts.montoCentavos, opts.moneda)}</strong>.`)}
+    ${parrafo('Ya puedes reservar tu próxima sesión desde la app.')}
+    ${cta(url, 'Ir a mi estudio')}`;
   return {
     plantilla: 'bienvenida',
     subject: `Tu membresía en ${opts.estudio.nombre} está activa`,
@@ -288,12 +318,12 @@ export function emailBienvenida(opts: BasePago): EmailRenderizado {
 /** Recibo de una renovación mensual (cobro recurrente exitoso). */
 export function emailRecibo(opts: BasePago): EmailRenderizado {
   const n = primerNombre(opts.nombre);
-  const hola = n ? `Hola ${n},` : 'Hola,';
   const estudio = escaparHtml(opts.estudio.nombre);
   const cuerpo = `
-    <p style="margin:0 0 14px;">${hola}</p>
-    <p style="margin:0 0 14px;">Recibimos el pago de tu membresía en <strong>${estudio}</strong> por <strong>${pesos(opts.montoCentavos, opts.moneda)}</strong>. ¡Gracias!</p>
-    <p style="margin:0;color:#666;font-size:13px;">Tu acceso sigue activo. Nos vemos en el estudio.</p>`;
+    ${saludo(n)}
+    ${titulo('Recibimos tu pago')}
+    ${parrafo(`Recibimos el pago de tu membresía en <strong>${estudio}</strong> por <strong>${pesos(opts.montoCentavos, opts.moneda)}</strong>. ¡Gracias!`)}
+    ${nota('Tu acceso sigue activo. Nos vemos en el estudio.')}`;
   return {
     plantilla: 'recibo',
     subject: `Recibo de tu membresía: ${pesos(opts.montoCentavos, opts.moneda)}`,
@@ -315,27 +345,25 @@ export function emailPaqueteComprado(
   }
 ): EmailRenderizado {
   const n = primerNombre(opts.nombre);
-  const hola = n ? `Hola ${n},` : 'Hola,';
   const url = `${APP_URL}/app/reservar`;
   const estudio = escaparHtml(opts.estudio.nombre);
   const saldo =
-    opts.creditos === null
-      ? ''
-      : `<p style="margin:0 0 14px;">Tu saldo es de <strong>${opts.creditos} crédito${opts.creditos === 1 ? '' : 's'}</strong>.</p>`;
+    opts.creditos === null ? '' : parrafo(`Tu saldo es de <strong>${opts.creditos} crédito${opts.creditos === 1 ? '' : 's'}</strong>.`);
   const vigencia = opts.venceEl
-    ? `<p style="margin:0 0 14px;">Úsalos antes del <strong>${new Date(opts.venceEl).toLocaleDateString('es-MX', {
+    ? parrafo(`Úsalos antes del <strong>${new Date(opts.venceEl).toLocaleDateString('es-MX', {
         day: 'numeric',
         month: 'long',
         year: 'numeric',
         timeZone: opts.zona ?? 'America/Mazatlan'
-      })}</strong>: ese día vencen los que no hayas usado.</p>`
-    : `<p style="margin:0 0 14px;">Tus créditos no caducan.</p>`;
+      })}</strong>: ese día vencen los que no hayas usado.`)
+    : parrafo('Tus créditos no caducan.');
   const cuerpo = `
-    <p style="margin:0 0 14px;">${hola}</p>
-    <p style="margin:0 0 14px;">Recibimos tu pago de <strong>${pesos(opts.montoCentavos, opts.moneda)}</strong> en <strong>${estudio}</strong>. ¡Gracias!</p>
+    ${saludo(n)}
+    ${titulo('Tu paquete está listo')}
+    ${parrafo(`Recibimos tu pago de <strong>${pesos(opts.montoCentavos, opts.moneda)}</strong> en <strong>${estudio}</strong>. ¡Gracias!`)}
     ${saldo}
     ${vigencia}
-    <p style="margin:0 0 22px;">${boton(url, 'Reservar una sesión')}</p>`;
+    ${cta(url, 'Reservar una sesión')}`;
   return {
     plantilla: 'paquete_comprado',
     subject: `Tu paquete en ${opts.estudio.nombre} está listo`,
@@ -361,14 +389,13 @@ export function emailAviso(opts: {
   pie?: string | null;
 }): EmailRenderizado {
   const n = primerNombre(opts.nombre);
-  const hola = n ? `Hola ${n},` : 'Hola,';
   const href = opts.url ? (opts.url.startsWith('http') ? opts.url : `${APP_URL}${opts.url}`) : null;
   const cuerpo = `
-    <p style="margin:0 0 14px;">${hola}</p>
-    <p style="margin:0 0 8px;font-size:17px;font-weight:700;">${escaparHtml(opts.titulo)}</p>
-    <p style="margin:0 0 22px;">${escaparHtml(opts.mensaje)}</p>
-    ${href ? `<p style="margin:0 0 22px;">${boton(href, opts.botonTexto ?? 'Abrir en la app')}</p>` : ''}
-    ${opts.pie ? `<p style="margin:0;color:#666;font-size:13px;">${escaparHtml(opts.pie)}</p>` : ''}`;
+    ${saludo(n)}
+    ${titulo(escaparHtml(opts.titulo))}
+    ${parrafo(escaparHtml(opts.mensaje))}
+    ${href ? cta(href, opts.botonTexto ?? 'Abrir en la app') : ''}
+    ${opts.pie ? nota(escaparHtml(opts.pie)) : ''}`;
   return {
     plantilla: 'aviso',
     subject: `${opts.titulo} · ${opts.estudio.nombre}`,

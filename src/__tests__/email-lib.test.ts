@@ -277,12 +277,14 @@ describe('plantillas', () => {
     expect(emailAviso({ ...base, nombre: '   ', titulo: 't', mensaje: 'm' }).html).toContain('Hola,');
   });
 
-  it('LAS CINCO: cabecera con el logo (img https absoluta, alt = nombre) y el nombre del estudio desde su configuración', () => {
+  it('LAS CINCO: cabecera compacta SOLO con el logo (img https absoluta, 56px, alt = nombre del estudio); sin el nombre como texto bajo el logo', () => {
     const casa: IdentidadEstudio = { ...ekko, nombre: 'Casa Sonora', logoUrl: 'https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/casa/logo-dark.png' };
     for (const t of todas(casa)) {
-      expect(t.html).toContain('<img src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/casa/logo-dark.png" alt="Casa Sonora"');
-      expect(t.html).toContain('>Casa Sonora</span>');
+      expect(t.html).toContain('<img src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/casa/logo-dark.png" alt="Casa Sonora" height="56"');
+      expect(t.html).toContain('height:56px;width:auto'); // proporción original, sin deformar
+      expect(t.html).not.toContain('>Casa Sonora</span>'); // ya no se repite el nombre bajo el logo
       expect(t.html).not.toContain('EKKO');
+      expect(t.html).toContain('padding:14px 24px;'); // cabecera compacta
     }
     for (const t of todas(ekko)) {
       expect(t.html).toContain(`<img src="${EKKO_LOGO_URL}" alt="EKKO Studio"`);
@@ -291,26 +293,50 @@ describe('plantillas', () => {
     }
   });
 
+  it('LAS CINCO: misma jerarquía (saludo → título h1 → párrafos → CTA en tabla) y el CTA conserva destino y texto', () => {
+    const casa: IdentidadEstudio = { ...ekko, nombre: 'Casa Sonora' };
+    const [pago, bienvenida, recibo, paquete, aviso] = todas(casa);
+    for (const t of [pago, bienvenida, recibo, paquete, aviso]) {
+      expect(t.html).toMatch(/<p style="margin:0 0 6px;[^>]*>Hola David,<\/p>/);
+      expect(t.html).toMatch(/<h1 style="margin:0 0 14px;[^>]*>/);
+    }
+    expect(pago.html).toContain('<h1 style="margin:0 0 14px;font-family:Georgia');
+    expect(pago.html).toMatch(/<a href="https:\/\/ekkostudio\.app\/app\/perfil" [^>]*>Actualizar mi tarjeta<\/a>/);
+    expect(bienvenida.html).toContain('>¡Bienvenido, David!</h1>');
+    expect(bienvenida.html).toMatch(/href="https:\/\/ekkostudio\.app\/app" [^>]*>Ir a mi estudio</);
+    expect(paquete.html).toMatch(/href="https:\/\/ekkostudio\.app\/app\/reservar" [^>]*>Reservar una sesión</);
+    expect(recibo.html).not.toContain('<a href="https://ekkostudio.app/app'); // el recibo no lleva CTA
+    const avisoApp = emailAviso({ estudio: casa, nombre: 'Ana', titulo: 'Aviso del estudio', mensaje: 'Hola', url: '/app' });
+    expect(avisoApp.html).toContain('>Aviso del estudio</h1>');
+    expect(avisoApp.html).toMatch(/href="https:\/\/ekkostudio\.app\/app" [^>]*>Abrir en la app</);
+    expect(avisoApp.html).toContain('border-radius:8px;'); // botón proporcionado
+  });
+
   it('LAS CINCO: pie con SOLO los canales configurados; sin etiquetas vacías cuando no hay contacto', () => {
     const completo: IdentidadEstudio = { ...ekko, whatsapp: '5216671234567', email: 'hola@ekkostudio.app', direccion: 'Av. del Mar 123' };
+    const fila = (etiqueta: string) => new RegExp(`<td [^>]*>${etiqueta}</td>\\s*<td [^>]*>`);
     for (const t of todas(completo)) {
-      expect(t.html).toContain('WhatsApp: <a href="https://wa.me/5216671234567"');
-      expect(t.html).toContain('Correo: <a href="mailto:hola@ekkostudio.app"');
-      expect(t.html).toContain('Dirección: Av. del Mar 123');
-      expect(t.html).toContain('no recibe respuestas');
+      // Pie estructurado: aviso en su párrafo y una fila (etiqueta | valor) por canal.
+      expect(t.html).toContain('>Este correo se envía automáticamente y no recibe respuestas.</p>');
+      expect(t.html).toMatch(fila('WhatsApp'));
+      expect(t.html).toContain('<a href="https://wa.me/5216671234567"'); // clicable
+      expect(t.html).toMatch(fila('Correo'));
+      expect(t.html).toContain('<a href="mailto:hola@ekkostudio.app"');
+      expect(t.html).toMatch(fila('Dirección'));
+      expect(t.html).toContain('>Av. del Mar 123</td>');
     }
     const soloWa: IdentidadEstudio = { ...ekko, whatsapp: '5216671234567' };
     for (const t of todas(soloWa)) {
       expect(t.html).toContain('wa.me/5216671234567');
-      expect(t.html).not.toContain('Correo:');
-      expect(t.html).not.toContain('Dirección:');
+      expect(t.html).not.toMatch(fila('Correo'));
+      expect(t.html).not.toMatch(fila('Dirección'));
     }
     for (const t of todas(ekko)) {
       expect(t.html).toContain('Este correo se envía automáticamente y no recibe respuestas.');
-      expect(t.html).not.toContain('WhatsApp:');
-      expect(t.html).not.toContain('Correo:');
-      expect(t.html).not.toContain('Dirección:');
-      expect(t.html).not.toContain('Contáctanos');
+      expect(t.html).not.toMatch(fila('WhatsApp'));
+      expect(t.html).not.toMatch(fila('Correo'));
+      expect(t.html).not.toMatch(fila('Dirección'));
+      expect(t.html).not.toContain('<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:12px'); // sin tabla de contacto vacía
       expect(t.html).not.toMatch(/null|undefined|—/);
     }
   });

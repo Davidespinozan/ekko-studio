@@ -85,7 +85,7 @@ describe('cron-email', () => {
     expect(correo.html).toContain('<img src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/ekko/logo-dark.png" alt="EKKO Studio"');
     expect(correo.html).toContain('https://wa.me/5216671234567');
     expect(correo.html).toContain('mailto:hola@ekkostudio.app');
-    expect(correo.html).toContain('Dirección: Av. del Mar 123');
+    expect(correo.html).toMatch(/<td [^>]*>Dirección<\/td>\s*<td [^>]*>Av\. del Mar 123<\/td>/);
     expect(correo.plantilla).toBe('aviso');
     expect(correo.idempotencyKey).toBe('ekko:email:notif:n1');
     expect(correo.ref).toBe('n1');
