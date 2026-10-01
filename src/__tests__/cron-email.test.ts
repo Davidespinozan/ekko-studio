@@ -35,7 +35,7 @@ vi.mock('@supabase/supabase-js', () => ({
       c.in = (col: string, vals: string[]) => {
         if (tabla === 'notificaciones' && col === 'tipo') filtros.tipos = vals;
         if (tabla === 'usuarios') return Promise.resolve({ data: [{ id: 'u1', email: 'ana@e.mx', nombre: 'Ana López' }, { id: 'u2', email: null, nombre: 'Sin Correo' }] });
-        if (tabla === 'tenants') return Promise.resolve({ data: [{ id: 't1', nombre: 'EKKO Studio', config: { landing: { footer: { direccion: 'Av. del Mar 123' } }, contacto: { whatsapp_e164: '5216671234567' } } }] });
+        if (tabla === 'tenants') return Promise.resolve({ data: [{ id: 't1', nombre: 'EKKO Studio', branding: { logo_url_dark: 'https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/ekko/logo-dark.png' }, config: { landing: { footer: { direccion: 'Av. del Mar 123', email: 'hola@ekkostudio.app' } }, contacto: { whatsapp_e164: '5216671234567' } } }] });
         return c;
       };
       c.limit = () => Promise.resolve({ data: pendientes, error: null });
@@ -81,7 +81,11 @@ describe('cron-email', () => {
     expect(correo.html).toContain('/app/qr/res-1');
     expect(correo.html).toContain('Ver mi reserva y QR');
     expect(correo.html).toContain('Dónde: Av. del Mar 123');
+    // Identidad del estudio desde Administración: logo configurado (Admin → Marca), WhatsApp, correo y dirección.
+    expect(correo.html).toContain('<img src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/ekko/logo-dark.png" alt="EKKO Studio"');
     expect(correo.html).toContain('https://wa.me/5216671234567');
+    expect(correo.html).toContain('mailto:hola@ekkostudio.app');
+    expect(correo.html).toContain('Dirección: Av. del Mar 123');
     expect(correo.plantilla).toBe('aviso');
     expect(correo.idempotencyKey).toBe('ekko:email:notif:n1');
     expect(correo.ref).toBe('n1');

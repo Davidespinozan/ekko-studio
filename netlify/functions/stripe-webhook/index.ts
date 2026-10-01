@@ -23,7 +23,7 @@ import {
   type EstadoEventoWebhook,
   type MontoEvento
 } from '../_lib/stripe';
-import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo, emailPaqueteComprado, type EmailRenderizado } from '../_lib/email';
+import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo, emailPaqueteComprado, identidadEstudio, type EmailRenderizado } from '../_lib/email';
 import { reportarErrorServidor } from '../_lib/sentry';
 import { avisarStaff } from '../_lib/avisosStaff';
 
@@ -472,15 +472,14 @@ async function avisos(
   }
 
   if (!email) return;
-  let estudio = 'EKKO Studio';
-  let whatsapp: string | null = null;
+  // Identidad del estudio (logo, nombre, contacto) desde Administración.
+  let tenantFila: { nombre?: unknown; branding?: unknown; config?: unknown } | null = null;
   if (tenantIdPago) {
-    const { data: t } = await admin.from('tenants').select('nombre, config').eq('id', tenantIdPago).maybeSingle();
-    if (t?.nombre) estudio = t.nombre;
-    const wa = (t?.config as { contacto?: { whatsapp_e164?: string } } | null)?.contacto?.whatsapp_e164;
-    if (typeof wa === 'string' && wa) whatsapp = wa;
+    const { data: t } = await admin.from('tenants').select('nombre, branding, config').eq('id', tenantIdPago).maybeSingle();
+    tenantFila = t ?? null;
   }
-  const base = { estudio, nombre: u?.nombre ?? null, montoCentavos: monto.monto_centavos, moneda: monto.moneda, whatsapp };
+  const estudio = identidadEstudio(tenantFila);
+  const base = { estudio, nombre: u?.nombre ?? null, montoCentavos: monto.monto_centavos, moneda: monto.moneda };
   let tpl: EmailRenderizado | null = null;
   if (monto.status === 'failed') {
     tpl = emailPagoFallido(base);

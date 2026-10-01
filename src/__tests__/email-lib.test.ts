@@ -7,8 +7,12 @@ import {
   emailRecibo,
   emailPaqueteComprado,
   emailAviso,
+  identidadEstudio,
+  urlHttpsSegura,
   REMITENTE_EKKO,
-  type EmailPayload
+  EKKO_LOGO_URL,
+  type EmailPayload,
+  type IdentidadEstudio
 } from '../../netlify/functions/_lib/email';
 
 /**
@@ -163,8 +167,66 @@ describe('enviarEmail · contrato veraz', () => {
   });
 });
 
+describe('identidadEstudio · fuente de verdad = configuración del estudio en Administración', () => {
+  it('nombre desde tenants.nombre; logo oficial de la web como fallback (URL https absoluta, misma que BrandLogo)', () => {
+    const e = identidadEstudio({ nombre: 'EKKO Studio', branding: { logo_url: null }, config: {} });
+    expect(e.nombre).toBe('EKKO Studio');
+    expect(e.logoUrl).toBe(EKKO_LOGO_URL);
+    expect(EKKO_LOGO_URL).toBe('https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_STUDIO_logo_transparente.png');
+    expect(e.logoUrl).toMatch(/^https:\/\//);
+    expect(e.whatsapp).toBeNull();
+    expect(e.email).toBeNull();
+    expect(e.direccion).toBeNull();
+  });
+
+  it('otro estudio: nombre y logo propios (Admin → Marca: logo_url_dark → logo_url), nunca asume EKKO', () => {
+    const e = identidadEstudio({
+      nombre: '  Casa Sonora  ',
+      branding: { logo_url_dark: 'https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/casa/logo-dark.png', logo_url: 'https://x.test/claro.png' },
+      config: {}
+    });
+    expect(e.nombre).toBe('Casa Sonora');
+    expect(e.logoUrl).toBe('https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/casa/logo-dark.png');
+    expect(identidadEstudio({ nombre: 'Casa', branding: { logo_url: 'https://x.test/claro.png' }, config: {} }).logoUrl).toBe('https://x.test/claro.png');
+  });
+
+  it('logo configurado inválido (path relativo de la SPA, http, javascript:, data:) → cae al logo oficial', () => {
+    for (const malo of ['/assets/logo.png', 'http://inseguro.test/logo.png', 'javascript:alert(1)', 'data:image/png;base64,AAAA', '', '   ', 42]) {
+      expect(identidadEstudio({ nombre: 'X', branding: { logo_url_dark: malo }, config: {} }).logoUrl).toBe(EKKO_LOGO_URL);
+    }
+    expect(urlHttpsSegura('https://ok.test/a.png')).toBe('https://ok.test/a.png');
+    expect(urlHttpsSegura('ftp://no.test/a.png')).toBeNull();
+  });
+
+  it('contacto: WhatsApp (Admin → Contacto), correo y dirección (Admin → Landing) solo si están configurados y son válidos', () => {
+    const e = identidadEstudio({
+      nombre: 'EKKO Studio',
+      branding: {},
+      config: { contacto: { whatsapp_e164: '5216671234567' }, landing: { footer: { direccion: ' Av. del Mar 123 ', email: 'hola@ekkostudio.app' } } }
+    });
+    expect(e).toMatchObject({ whatsapp: '5216671234567', direccion: 'Av. del Mar 123', email: 'hola@ekkostudio.app' });
+    const vacio = identidadEstudio({ nombre: 'EKKO Studio', branding: {}, config: { contacto: { whatsapp_e164: '' }, landing: { footer: { direccion: null, email: '' } } } });
+    expect(vacio).toMatchObject({ whatsapp: null, direccion: null, email: null });
+    const invalido = identidadEstudio({ nombre: 'E', branding: {}, config: { contacto: { whatsapp_e164: '12' }, landing: { footer: { email: 'no-es-correo' } } } });
+    expect(invalido).toMatchObject({ whatsapp: null, email: null });
+  });
+
+  it('sin fila de tenant → identidad neutra (EKKO Studio + logo oficial), sin romper', () => {
+    expect(identidadEstudio(null)).toMatchObject({ nombre: 'EKKO Studio', logoUrl: EKKO_LOGO_URL, whatsapp: null, email: null, direccion: null });
+    expect(identidadEstudio(undefined).nombre).toBe('EKKO Studio');
+  });
+});
+
 describe('plantillas', () => {
-  const base = { estudio: 'EKKO Studio', nombre: 'David Espinoza', montoCentavos: 29900, moneda: 'mxn' };
+  const ekko: IdentidadEstudio = { nombre: 'EKKO Studio', logoUrl: EKKO_LOGO_URL, whatsapp: null, direccion: null, email: null };
+  const base = { estudio: ekko, nombre: 'David Espinoza', montoCentavos: 29900, moneda: 'mxn' };
+  const todas = (estudio: IdentidadEstudio, nombre: string | null = 'David Espinoza') => [
+    emailPagoFallido({ ...base, estudio, nombre }),
+    emailBienvenida({ ...base, estudio, nombre }),
+    emailRecibo({ ...base, estudio, nombre }),
+    emailPaqueteComprado({ ...base, estudio, nombre, creditos: 1, venceEl: null }),
+    emailAviso({ estudio, nombre, titulo: 't', mensaje: 'm' })
+  ];
 
   it('pago fallido: asunto claro + monto + link a perfil + identificador', () => {
     const t = emailPagoFallido(base);
@@ -215,54 +277,81 @@ describe('plantillas', () => {
     expect(emailAviso({ ...base, nombre: '   ', titulo: 't', mensaje: 'm' }).html).toContain('Hola,');
   });
 
-  it('escapa nombre y nombre del estudio en LAS CINCO plantillas (los escribe un usuario / un admin)', () => {
-    const malicioso = { ...base, nombre: '<img src=x onerror=alert(1)> Pérez', estudio: 'EKKO <script>alert(2)</script>' };
-    const todas = [
-      emailPagoFallido(malicioso),
-      emailBienvenida(malicioso),
-      emailRecibo(malicioso),
-      emailPaqueteComprado({ ...malicioso, creditos: 1, venceEl: null }),
-      emailAviso({ ...malicioso, titulo: '<b>t</b>', mensaje: '<i>m</i>', pie: '<u>p</u>' })
-    ];
-    for (const t of todas) {
-      expect(t.html).not.toContain('<img');
+  it('LAS CINCO: cabecera con el logo (img https absoluta, alt = nombre) y el nombre del estudio desde su configuración', () => {
+    const casa: IdentidadEstudio = { ...ekko, nombre: 'Casa Sonora', logoUrl: 'https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/casa/logo-dark.png' };
+    for (const t of todas(casa)) {
+      expect(t.html).toContain('<img src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/casa/logo-dark.png" alt="Casa Sonora"');
+      expect(t.html).toContain('>Casa Sonora</span>');
+      expect(t.html).not.toContain('EKKO');
+    }
+    for (const t of todas(ekko)) {
+      expect(t.html).toContain(`<img src="${EKKO_LOGO_URL}" alt="EKKO Studio"`);
+      expect(t.html).not.toMatch(/src="\/[a-z]/); // nunca un path relativo de la SPA
+      expect(t.html).not.toMatch(/<script/i);
+    }
+  });
+
+  it('LAS CINCO: pie con SOLO los canales configurados; sin etiquetas vacías cuando no hay contacto', () => {
+    const completo: IdentidadEstudio = { ...ekko, whatsapp: '5216671234567', email: 'hola@ekkostudio.app', direccion: 'Av. del Mar 123' };
+    for (const t of todas(completo)) {
+      expect(t.html).toContain('WhatsApp: <a href="https://wa.me/5216671234567"');
+      expect(t.html).toContain('Correo: <a href="mailto:hola@ekkostudio.app"');
+      expect(t.html).toContain('Dirección: Av. del Mar 123');
+      expect(t.html).toContain('no recibe respuestas');
+    }
+    const soloWa: IdentidadEstudio = { ...ekko, whatsapp: '5216671234567' };
+    for (const t of todas(soloWa)) {
+      expect(t.html).toContain('wa.me/5216671234567');
+      expect(t.html).not.toContain('Correo:');
+      expect(t.html).not.toContain('Dirección:');
+    }
+    for (const t of todas(ekko)) {
+      expect(t.html).toContain('Este correo se envía automáticamente y no recibe respuestas.');
+      expect(t.html).not.toContain('WhatsApp:');
+      expect(t.html).not.toContain('Correo:');
+      expect(t.html).not.toContain('Dirección:');
+      expect(t.html).not.toContain('Contáctanos');
+      expect(t.html).not.toMatch(/null|undefined|—/);
+    }
+  });
+
+  it('copia de EKKO (tú, no vos) y sin promesa de responder al correo', () => {
+    for (const t of todas(ekko)) {
+      expect(t.html).not.toMatch(/respond[eé] a este/i);
+      expect(t.html).not.toMatch(/\b(tenés|podés|ignorá|respondé|necesitás)\b/);
+    }
+    expect(emailPagoFallido(base).html).toContain('necesitas actualizar tu tarjeta');
+    expect(emailBienvenida(base).html).toContain('Ya puedes reservar');
+  });
+
+  it('escapa nombre del miembro y TODO lo que controla el admin (nombre del estudio, dirección, correo) en las cinco', () => {
+    const malicioso: IdentidadEstudio = {
+      nombre: 'EKKO <script>alert(2)</script>',
+      logoUrl: 'https://ok.test/logo.png" onerror="alert(3)',
+      whatsapp: '5216671234567',
+      direccion: 'Calle <b>1</b>',
+      email: 'a@b.mx'
+    };
+    for (const t of todas(malicioso, '<img src=x onerror=alert(1)> Pérez')) {
+      expect(t.html).not.toContain('<img src=x');
       expect(t.html).not.toContain('<script>');
+      expect(t.html).not.toContain('<b>1</b>');
+      expect(t.html).not.toContain('onerror="alert(3)"');
       expect(t.html).toContain('&lt;img'); // el saludo usa el primer nombre: "<img" escapado
       expect(t.html).toContain('&lt;script&gt;');
+      expect(t.html).toContain('&quot; onerror=&quot;alert(3)'); // la comilla no cierra el atributo src
     }
-    const aviso = todas[4].html;
+    const aviso = emailAviso({ estudio: ekko, nombre: 'Ana', titulo: '<b>t</b>', mensaje: '<i>m</i>', pie: '<u>p</u>' }).html;
     expect(aviso).not.toContain('<b>t</b>');
     expect(aviso).not.toContain('<i>m</i>');
     expect(aviso).not.toContain('<u>p</u>');
   });
 
-  it('copia de EKKO (tú, no vos) y sin promesa de responder: el pie dice que no recibe respuestas', () => {
-    const todas = [
-      emailPagoFallido(base),
-      emailBienvenida(base),
-      emailRecibo(base),
-      emailPaqueteComprado({ ...base, creditos: 1, venceEl: null }),
-      emailAviso({ ...base, titulo: 't', mensaje: 'm' })
-    ];
-    for (const t of todas) {
-      expect(t.html).toContain('no recibe respuestas');
-      expect(t.html).not.toMatch(/respond[eé] a este/i);
-      expect(t.html).not.toMatch(/\b(tenés|podés|ignorá|respondé|necesitás)\b/);
-    }
-    expect(todas[0].html).toContain('necesitas actualizar tu tarjeta');
-    expect(todas[1].html).toContain('Ya puedes reservar');
-  });
-
-  it('con WhatsApp del estudio, el pie lo ofrece como canal (wa.me) ; sin él, solo avisa que no recibe respuestas', () => {
-    const con = emailAviso({ ...base, titulo: 't', mensaje: 'm', whatsapp: '5216671234567' });
-    expect(con.html).toContain('https://wa.me/5216671234567');
-    expect(con.html).toContain('Escríbenos por WhatsApp');
-    const sin = emailAviso({ ...base, titulo: 't', mensaje: 'm', whatsapp: null });
-    expect(sin.html).not.toContain('wa.me');
-    expect(sin.html).toContain('no recibe respuestas');
-    // Un WhatsApp "sucio" no inyecta: solo dígitos van al enlace.
-    const sucio = emailRecibo({ ...base, whatsapp: '+52 (667) 123-4567" onclick="x' });
-    expect(sucio.html).toContain('https://wa.me/526671234567"');
-    expect(sucio.html).not.toContain('onclick');
+  it('un WhatsApp "sucio" no llega a la plantilla (identidadEstudio lo normaliza) y el enlace solo lleva dígitos', () => {
+    const e = identidadEstudio({ nombre: 'E', branding: {}, config: { contacto: { whatsapp_e164: '+52 (667) 123-4567" onclick="x' } } });
+    expect(e.whatsapp).toBe('526671234567');
+    const html = emailRecibo({ ...base, estudio: e }).html;
+    expect(html).toContain('https://wa.me/526671234567"');
+    expect(html).not.toContain('onclick');
   });
 });

@@ -630,15 +630,31 @@ describe('stripe-webhook', () => {
       expect(llamadas[0].ref).not.toContain('@');
     });
 
-    it('PKG-00F: el pie lleva el WhatsApp del estudio cuando está configurado', async () => {
+    it('PKG-00F: el correo lleva la identidad del estudio configurada en Administración (logo, nombre, WhatsApp)', async () => {
       mockConstructEvent.mockReturnValue(pagoFallido);
       filaPorTabla.membresias = { usuario_id: 'u1', tenant_id: 't1' };
       filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana' };
-      mockTenantMaybeSingle.mockResolvedValue({ data: { id: 't1', nombre: 'EKKO Studio', config: { contacto: { whatsapp_e164: '5216671234567' } } }, error: null });
+      mockTenantMaybeSingle.mockResolvedValue({
+        data: { id: 't1', nombre: 'Casa Sonora', branding: { logo_url_dark: 'https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/casa/logo-dark.png' }, config: { contacto: { whatsapp_e164: '5216671234567' } } },
+        error: null
+      });
       await invocar();
       const correo = mockEnviarEmail.mock.calls[0][0] as { html: string };
+      expect(correo.html).toContain('<img src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/logos/casa/logo-dark.png" alt="Casa Sonora"');
       expect(correo.html).toContain('https://wa.me/5216671234567');
       expect(correo.html).toContain('no recibe respuestas');
+      expect(correo.html).not.toContain('EKKO');
+    });
+
+    it('PKG-00F: sin logo configurado, el correo usa el mismo logo oficial de la web de EKKO (https absoluta)', async () => {
+      mockConstructEvent.mockReturnValue(pagoFallido);
+      filaPorTabla.membresias = { usuario_id: 'u1', tenant_id: 't1' };
+      filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana' };
+      mockTenantMaybeSingle.mockResolvedValue({ data: { id: 't1', nombre: 'EKKO Studio', branding: { logo_url: null }, config: {} }, error: null });
+      await invocar();
+      const correo = mockEnviarEmail.mock.calls[0][0] as { html: string };
+      expect(correo.html).toContain('<img src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_STUDIO_logo_transparente.png" alt="EKKO Studio"');
+      expect(correo.html).not.toContain('WhatsApp:');
     });
 
     it('compra de paquete: correo de confirmación con saldo y vigencia', async () => {

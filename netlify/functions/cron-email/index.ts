@@ -7,7 +7,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { enviarEmail, emailAviso, emailConfigurado } from '../_lib/email';
+import { enviarEmail, emailAviso, emailConfigurado, identidadEstudio } from '../_lib/email';
 import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
@@ -90,10 +90,10 @@ export const handler: Handler = async () => {
     // Una consulta por tabla, no una por fila.
     const [{ data: usuarios }, { data: tenants }] = await Promise.all([
       supabase.from('usuarios').select('id, email, nombre').in('id', [...new Set(filas.map((f) => f.usuario_id))]),
-      supabase.from('tenants').select('id, nombre, config').in('id', [...new Set(filas.map((f) => f.tenant_id))])
+      supabase.from('tenants').select('id, nombre, branding, config').in('id', [...new Set(filas.map((f) => f.tenant_id))])
     ]);
     const usuarioPorId = new Map((usuarios ?? []).map((u) => [u.id as string, u as { email: string | null; nombre: string | null }]));
-    const tenantPorId = new Map((tenants ?? []).map((t) => [t.id as string, t as { nombre: string | null; config: unknown }]));
+    const tenantPorId = new Map((tenants ?? []).map((t) => [t.id as string, t as { nombre: string | null; branding: unknown; config: unknown }]));
 
     const conteo = { aceptados: 0, fallidos: 0, sin_correo: 0 };
     for (const n of filas) {
@@ -103,19 +103,17 @@ export const handler: Handler = async () => {
         if (!u?.email) {
           marca = { email_resultado: 'sin_correo' };
         } else {
-          const t = tenantPorId.get(n.tenant_id);
-          const cfg = t?.config as { landing?: { footer?: { direccion?: string } }; contacto?: { whatsapp_e164?: string } } | null;
-          const direccion = cfg?.landing?.footer?.direccion;
+          // Identidad del estudio (logo, nombre, contacto) desde Administración.
+          const estudio = identidadEstudio(tenantPorId.get(n.tenant_id));
           const tpl = emailAviso({
-            estudio: t?.nombre ?? 'EKKO Studio',
+            estudio,
             nombre: u.nombre,
             titulo: n.titulo,
             mensaje: n.mensaje,
             url: typeof n.metadata?.url === 'string' ? n.metadata.url : '/app',
             botonTexto: TIPOS_POR_CORREO[n.tipo]?.boton,
             // La dirección solo aporta cuando hay que LLEGAR al estudio.
-            pie: (n.tipo === 'reserva_confirmada' || n.tipo === 'reserva_reprogramada') && direccion ? `Dónde: ${direccion}` : null,
-            whatsapp: cfg?.contacto?.whatsapp_e164 ?? null
+            pie: (n.tipo === 'reserva_confirmada' || n.tipo === 'reserva_reprogramada') && estudio.direccion ? `Dónde: ${estudio.direccion}` : null
           });
           const r = await enviarEmail({
             to: u.email,
