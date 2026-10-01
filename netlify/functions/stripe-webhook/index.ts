@@ -23,7 +23,7 @@ import {
   type EstadoEventoWebhook,
   type MontoEvento
 } from '../_lib/stripe';
-import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo, emailPaqueteComprado } from '../_lib/email';
+import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo, emailPaqueteComprado, type EmailRenderizado } from '../_lib/email';
 import { reportarErrorServidor } from '../_lib/sentry';
 import { avisarStaff } from '../_lib/avisosStaff';
 
@@ -438,7 +438,7 @@ async function registrarDiario(
  */
 async function avisos(
   admin: any,
-  stripeEvent: { type: string; data: { object: unknown } },
+  stripeEvent: { id: string; type: string; data: { object: unknown } },
   monto: MontoEvento,
   ids: { tenantIdPago: string | null; usuarioIdPago: string | null },
   paqueteActivado: Efecto['paqueteActivado']
@@ -473,12 +473,15 @@ async function avisos(
 
   if (!email) return;
   let estudio = 'EKKO Studio';
+  let whatsapp: string | null = null;
   if (tenantIdPago) {
-    const { data: t } = await admin.from('tenants').select('nombre').eq('id', tenantIdPago).maybeSingle();
+    const { data: t } = await admin.from('tenants').select('nombre, config').eq('id', tenantIdPago).maybeSingle();
     if (t?.nombre) estudio = t.nombre;
+    const wa = (t?.config as { contacto?: { whatsapp_e164?: string } } | null)?.contacto?.whatsapp_e164;
+    if (typeof wa === 'string' && wa) whatsapp = wa;
   }
-  const base = { estudio, nombre: u?.nombre ?? null, montoCentavos: monto.monto_centavos, moneda: monto.moneda };
-  let tpl: { subject: string; html: string } | null = null;
+  const base = { estudio, nombre: u?.nombre ?? null, montoCentavos: monto.monto_centavos, moneda: monto.moneda, whatsapp };
+  let tpl: EmailRenderizado | null = null;
   if (monto.status === 'failed') {
     tpl = emailPagoFallido(base);
   } else if (monto.status === 'succeeded' && stripeEvent.type === 'invoice.paid') {
@@ -487,7 +490,19 @@ async function avisos(
   } else if (monto.status === 'succeeded' && paqueteActivado) {
     tpl = emailPaqueteComprado({ ...base, creditos: paqueteActivado.creditos, venceEl: paqueteActivado.periodo_fin });
   }
-  if (tpl) await enviarEmail({ to: email, subject: tpl.subject, html: tpl.html });
+  // PKG-00F: identidad determinista (evento Stripe + plantilla) → Resend descarta
+  // el duplicado si el evento se reprocesa. El resultado se registra en el
+  // adapter (sin PII); aquí no se persiste ni se actúa: el dinero ya quedó.
+  if (tpl) {
+    await enviarEmail({
+      to: email,
+      subject: tpl.subject,
+      html: tpl.html,
+      plantilla: tpl.plantilla,
+      idempotencyKey: `ekko:email:stripe:${stripeEvent.id}:${tpl.plantilla}`,
+      ref: stripeEvent.id
+    });
+  }
 }
 
 export const handler: Handler = async (event) => {

@@ -62,7 +62,7 @@ const mockAvisarStaff = vi.fn().mockResolvedValue(1);
 vi.mock('../../netlify/functions/_lib/avisosStaff', () => ({
   avisarStaff: (...a: unknown[]) => mockAvisarStaff(...a)
 }));
-const mockEnviarEmail = vi.fn().mockResolvedValue({ sent: true });
+const mockEnviarEmail = vi.fn().mockResolvedValue({ estado: 'aceptado', id: 're_test' });
 vi.mock('../../netlify/functions/_lib/email', async (orig) => ({
   ...(await orig<typeof import('../../netlify/functions/_lib/email')>()),
   enviarEmail: (...a: unknown[]) => mockEnviarEmail(...a)
@@ -566,6 +566,22 @@ describe('stripe-webhook', () => {
       expect(res.statusCode).toBe(200);
       expect(ultimaTransicion()).toMatchObject({ estado: 'procesado' });
     });
+
+    it('PKG-00F: un `fallo` veraz del proveedor tampoco altera el resultado financiero ni el estado del evento', async () => {
+      mockConstructEvent.mockReturnValue(pagoPaquete);
+      mockRpc.mockResolvedValue({ data: { success: true, creditos: 12, periodo_fin: '2027-01-18T12:00:00Z' }, error: null });
+      filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana', tenant_id: 't1' };
+      mockEnviarEmail.mockResolvedValueOnce({ estado: 'fallo', motivo: 'http_5xx', status: 503 });
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(mockEnviarEmail).toHaveBeenCalledTimes(1);
+      // El diario y la transición a procesado ocurrieron ANTES del correo y no se tocan.
+      expect(mockUpsertFila.mock.calls.some((c) => c[0] === 'payment_events')).toBe(true);
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado' });
+      const idxProcesado = mockUpdate.mock.calls.findIndex((c) => c[0] === 'stripe_webhook_events' && (c[1] as { estado?: string }).estado === 'procesado');
+      expect(idxProcesado).toBeGreaterThanOrEqual(0);
+      expect(mockEnviarEmail.mock.invocationCallOrder[0]).toBeGreaterThan(mockUpdate.mock.invocationCallOrder[idxProcesado]);
+    });
   });
 
   describe('avisos', () => {
@@ -596,8 +612,33 @@ describe('stripe-webhook', () => {
       filaPorTabla.membresias = { usuario_id: 'u1', tenant_id: 't1' };
       filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana' };
       await invocar();
-      expect(mockEnviarEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'ana@e.mx' }));
+      expect(mockEnviarEmail).toHaveBeenCalledWith(expect.objectContaining({ to: 'ana@e.mx', plantilla: 'pago_fallido' }));
       expect(mockAvisarStaff).toHaveBeenCalledTimes(1);
+    });
+
+    it('PKG-00F: Idempotency-Key determinista = evento Stripe + plantilla, ref = id del evento (sin PII)', async () => {
+      mockConstructEvent.mockReturnValue(pagoFallido);
+      filaPorTabla.membresias = { usuario_id: 'u1', tenant_id: 't1' };
+      filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana' };
+      await invocar();
+      await invocar();
+      const llamadas = mockEnviarEmail.mock.calls.map((c) => c[0] as { idempotencyKey: string; ref: string; plantilla: string });
+      expect(llamadas).toHaveLength(2);
+      expect(llamadas[0].idempotencyKey).toBe('ekko:email:stripe:evt_1:pago_fallido');
+      expect(llamadas[1].idempotencyKey).toBe(llamadas[0].idempotencyKey);
+      expect(llamadas[0].ref).toBe('evt_1');
+      expect(llamadas[0].ref).not.toContain('@');
+    });
+
+    it('PKG-00F: el pie lleva el WhatsApp del estudio cuando está configurado', async () => {
+      mockConstructEvent.mockReturnValue(pagoFallido);
+      filaPorTabla.membresias = { usuario_id: 'u1', tenant_id: 't1' };
+      filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana' };
+      mockTenantMaybeSingle.mockResolvedValue({ data: { id: 't1', nombre: 'EKKO Studio', config: { contacto: { whatsapp_e164: '5216671234567' } } }, error: null });
+      await invocar();
+      const correo = mockEnviarEmail.mock.calls[0][0] as { html: string };
+      expect(correo.html).toContain('https://wa.me/5216671234567');
+      expect(correo.html).toContain('no recibe respuestas');
     });
 
     it('compra de paquete: correo de confirmación con saldo y vigencia', async () => {
