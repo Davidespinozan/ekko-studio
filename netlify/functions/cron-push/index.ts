@@ -33,7 +33,9 @@ const URL_POR_TIPO: Record<string, string> = {
   membresia_reactivada: '/app/perfil',
   cambiar_password: '/app/perfil',
   cobro_rechazado: '/admin/miembros',
-  reembolso: '/admin/miembros'
+  reembolso: '/admin/cobros',
+  disputa: '/admin/cobros',
+  stripe_desconectado: '/admin/cobros'
 };
 
 export const handler: Handler = async () => {

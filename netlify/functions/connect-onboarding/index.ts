@@ -70,11 +70,15 @@ export const handler: Handler = async (event) => {
     // Get-or-create de la cuenta conectada del tenant.
     const { data: tenant } = await adminDb
       .from('tenants')
-      .select('stripe_account_id')
+      .select('stripe_account_id, stripe_desconectado_at')
       .eq('id', admin.tenant_id)
       .maybeSingle();
 
-    let accountId = tenant?.stripe_account_id ?? null;
+    // PKG-01G: tras una desautorización la cuenta anterior ya no sirve para
+    // cobrar; se crea una nueva y se limpia la marca. El id anterior queda en
+    // audit_log / stripe_webhook_events / reversales_pago.
+    const desconectada = Boolean(tenant?.stripe_desconectado_at);
+    let accountId = desconectada ? null : (tenant?.stripe_account_id ?? null);
     if (!accountId) {
       // PKG-01C (C16): key estable por tenant. Si la respuesta se pierde o el
       // guardado falla, el reintento devuelve LA MISMA cuenta Express (no otra).
@@ -92,7 +96,10 @@ export const handler: Handler = async (event) => {
         { idempotencyKey: llaveCuentaConectada(admin.tenant_id) }
       );
       accountId = account.id;
-      const { error: errGuardar } = await adminDb.from('tenants').update({ stripe_account_id: accountId }).eq('id', admin.tenant_id);
+      const { error: errGuardar } = await adminDb
+        .from('tenants')
+        .update({ stripe_account_id: accountId, stripe_desconectado_at: null, stripe_charges_enabled: false, stripe_details_submitted: false })
+        .eq('id', admin.tenant_id);
       if (errGuardar) {
         // Sin guardar, el siguiente intento vuelve a crear con la MISMA key → misma cuenta.
         console.error(JSON.stringify({ evento: 'connect_cuenta_no_guardada', tenant_id: admin.tenant_id, codigo: errGuardar.code ?? null }));

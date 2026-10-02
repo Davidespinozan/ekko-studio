@@ -7,7 +7,8 @@ import {
   suscripcionDeFactura,
   paymentIntentDeFactura,
   esDeOtraApp,
-  llavePrecio
+  llavePrecio,
+  resumenEvento
 } from '../../netlify/functions/_lib/stripe';
 
 /**
@@ -295,22 +296,51 @@ describe('account.updated (Connect)', () => {
   });
 });
 
-describe('charge.refunded (reembolsos)', () => {
-  it('clasifica como reembolso con el monto devuelto y el PI original', () => {
+describe('PKG-01G · reversals (reembolsos y disputas con identidad propia)', () => {
+  it('charge.refunded ya NO es un monto: solo reconciliación contra los Refund registrados', () => {
     const r = clasificarEvento(ev('charge.refunded', {
       id: 'ch_1', payment_intent: 'pi_1', amount_refunded: 85000, currency: 'mxn', customer: 'cus_1', metadata: { app: 'ekko' }
     }));
-    expect(r).toMatchObject({ kind: 'reembolso', charge_id: 'ch_1', payment_intent_id: 'pi_1', amount_refunded: 85000, currency: 'mxn', customer_id: 'cus_1' });
+    expect(r).toEqual({ kind: 'reconciliar-reembolso', charge_id: 'ch_1', amount_refunded: 85000, event_at: expect.any(String) });
+    // Y no entra al diario de cobranza (antes creaba una fila `refunded` acumulada por evento).
+    expect(extraerMontoDeEvento(ev('charge.refunded', { id: 'ch_1', payment_intent: 'pi_1', amount_refunded: 85000, currency: 'mxn' }))).toBeNull();
   });
 
   it('de otra app → ignore', () => {
     expect(clasificarEvento(ev('charge.refunded', { id: 'ch_1', metadata: { app: 'sala' } }))).toEqual({ kind: 'ignore', reason: 'app_ajena' });
   });
 
-  it('extraerMontoDeEvento lo registra como refunded (positivo) y no como ingreso', () => {
-    const m = extraerMontoDeEvento(ev('charge.refunded', { id: 'ch_1', payment_intent: 'pi_1', amount_refunded: 85000, currency: 'mxn', customer: 'cus_1' }));
-    expect(m).toMatchObject({ status: 'refunded', monto_centavos: 85000, stripe_payment_intent_id: 'pi_1', stripe_customer_id: 'cus_1' });
-    expect(extraerMontoDeEvento(ev('charge.refunded', { id: 'ch_2', amount_refunded: 0 }))).toBeNull();
+  it('refund.created / updated / failed → reversal reembolso con id re_, cargo, PI, monto EXACTO y estado', () => {
+    const base = { object: 'refund', id: 're_1', charge: 'ch_1', payment_intent: 'pi_1', amount: 10000, currency: 'mxn', status: 'pending', reason: 'requested_by_customer', created: 1700000000 };
+    expect(clasificarEvento(ev('refund.created', base))).toMatchObject({
+      kind: 'reversal', tipo: 'reembolso', object_id: 're_1', charge_id: 'ch_1', payment_intent_id: 'pi_1', amount: 10000, currency: 'mxn',
+      estado: 'pending', motivo: 'requested_by_customer', object_created_at: '2023-11-14T22:13:20.000Z'
+    });
+    expect(clasificarEvento(ev('refund.updated', { ...base, status: 'succeeded' }))).toMatchObject({ kind: 'reversal', estado: 'succeeded' });
+    expect(clasificarEvento(ev('refund.failed', { ...base, status: 'failed', failure_reason: 'lost_or_stolen_card' }))).toMatchObject({ kind: 'reversal', estado: 'failed' });
+    // Sin identidad o sin monto: revisión, nunca ignorado (hay dinero en juego).
+    expect(clasificarEvento(ev('refund.created', { ...base, id: undefined }))).toEqual({ kind: 'revision', motivo: 'refund_sin_identidad' });
+    expect(clasificarEvento(ev('refund.created', { ...base, amount: 0 }))).toEqual({ kind: 'revision', motivo: 'refund_sin_monto' });
+    expect(clasificarEvento(ev('refund.created', { ...base, metadata: { app: 'sala' } }))).toEqual({ kind: 'ignore', reason: 'app_ajena' });
+  });
+
+  it('charge.dispute.* → reversal disputa con id dp_, monto exacto y status de Stripe', () => {
+    const base = { object: 'dispute', id: 'dp_1', charge: 'ch_1', payment_intent: 'pi_1', amount: 85000, currency: 'mxn', status: 'needs_response', reason: 'fraudulent', created: 1700000000 };
+    for (const t of ['charge.dispute.created', 'charge.dispute.updated', 'charge.dispute.closed', 'charge.dispute.funds_withdrawn', 'charge.dispute.funds_reinstated'] as const) {
+      expect(clasificarEvento(ev(t, base)), t).toMatchObject({ kind: 'reversal', tipo: 'disputa', object_id: 'dp_1', charge_id: 'ch_1', amount: 85000, estado: 'needs_response', motivo: 'fraudulent' });
+    }
+    expect(clasificarEvento(ev('charge.dispute.closed', { ...base, status: 'lost' }))).toMatchObject({ kind: 'reversal', estado: 'lost' });
+    expect(clasificarEvento(ev('charge.dispute.created', { ...base, id: undefined }))).toEqual({ kind: 'revision', motivo: 'dispute_sin_identidad' });
+  });
+
+  it('account.application.deauthorized → cuenta-desautorizada (la cuenta viene en event.account, no en el objeto)', () => {
+    expect(clasificarEvento(ev('account.application.deauthorized', { object: 'application', id: 'ca_1', name: 'EKKO' }))).toEqual({ kind: 'cuenta-desautorizada', event_at: expect.any(String) });
+  });
+
+  it('resumenEvento de un Refund/Dispute: ids, monto, estado y razón; nunca PII', () => {
+    const r = resumenEvento(ev('refund.created', { object: 'refund', id: 're_1', charge: 'ch_1', payment_intent: 'pi_1', amount: 10000, currency: 'mxn', status: 'succeeded', reason: 'duplicate', receipt_number: '1234-5678' }));
+    expect(r).toMatchObject({ objeto: 'refund', id: 're_1', charge: 'ch_1', payment_intent: 'pi_1', monto: 10000, status: 'succeeded', reason: 'duplicate' });
+    expect(JSON.stringify(r)).not.toContain('1234-5678');
   });
 });
 

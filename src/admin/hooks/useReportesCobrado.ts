@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { inicioDeMesEnZona } from '@shared/lib/timezone';
-import { calcularCobrado, type CobradoResult, type PagoEvento } from '../logic/reportesCobrado';
+import { calcularCobrado, type CobradoResult, type PagoEvento, type ReembolsoEvento } from '../logic/reportesCobrado';
 
 /**
  * Lo COBRADO de verdad (payment_events de Stripe) del mes actual vs. anterior,
@@ -31,7 +31,22 @@ export function useReportesCobrado() {
         .order('created_at', { ascending: false })
         .limit(2000);
       if (err) throw err;
-      setData(calcularCobrado((filas ?? []) as PagoEvento[], inicioMes, inicioMesAnterior, ahora));
+      // PKG-01G: reembolsos por objeto Refund (reversales_pago), no por evento acumulado.
+      const { data: rv, error: errRv } = await supabase
+        .from('reversales_pago')
+        .select('stripe_object_id, monto_centavos, estado_proveedor, stripe_created_at, created_at')
+        .eq('tenant_id', tenant.id)
+        .eq('tipo', 'reembolso')
+        .gte('created_at', desde.toISOString())
+        .limit(2000);
+      if (errRv) throw errRv;
+      const reembolsos: ReembolsoEvento[] = (rv ?? []).map((r) => ({
+        stripe_object_id: r.stripe_object_id,
+        monto_centavos: r.monto_centavos,
+        estado_proveedor: r.estado_proveedor,
+        fecha: r.stripe_created_at ?? r.created_at
+      }));
+      setData(calcularCobrado((filas ?? []) as PagoEvento[], inicioMes, inicioMesAnterior, ahora, reembolsos));
     } catch (e) {
       console.error('[useReportesCobrado]', e);
       setError(true);

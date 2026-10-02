@@ -80,7 +80,7 @@ describe('clasificarError', () => {
 describe('accionIdempotente', () => {
   it('solo invitados-extra NO es re-ejecutable tras un crash a medias', () => {
     expect(accionIdempotente('invitados-extra')).toBe(false);
-    for (const k of ['activar', 'activar-sub', 'sync', 'reembolso', 'cuenta-conectada', 'ignore', 'revision'] as const) {
+    for (const k of ['activar', 'activar-sub', 'sync', 'reversal', 'reconciliar-reembolso', 'cuenta-desautorizada', 'cuenta-conectada', 'ignore', 'revision'] as const) {
       expect(accionIdempotente(k), k).toBe(true);
     }
   });

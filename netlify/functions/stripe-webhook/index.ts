@@ -170,7 +170,30 @@ type Efecto = {
   membresiaIdPago: string | null;
   paqueteActivado: { creditos: number | null; periodo_fin: string | null } | null;
   reportes: Array<{ error: Error; extra: Record<string, unknown> }>;
+  /** PKG-01G: reversal registrado (para avisar a admins después de `procesado`). */
+  reversal?: { tipo: 'reembolso' | 'disputa'; nuevo: boolean; estado: string; monto: number; moneda: string; origen: string | null; objectId: string } | null;
+  /** PKG-01G: desautorización de Connect aplicada (null si fue idempotente). */
+  cuentaDesautorizada?: { tenantId: string } | null;
 };
+
+/** Tenant por el pago original (cuando el evento no trae `account`). */
+async function tenantPorPaymentIntent(admin: any, paymentIntentId: string | null): Promise<string | null> {
+  if (!paymentIntentId) return null;
+  const { data } = await admin
+    .from('payment_events')
+    .select('tenant_id')
+    .eq('stripe_payment_intent_id', paymentIntentId)
+    .eq('status', 'succeeded')
+    .not('tenant_id', 'is', null)
+    .limit(1)
+    .maybeSingle();
+  return data?.tenant_id ?? null;
+}
+
+async function tenantPorCharge(admin: any, chargeId: string): Promise<string | null> {
+  const { data } = await admin.from('reversales_pago').select('tenant_id').eq('stripe_charge_id', chargeId).limit(1).maybeSingle();
+  return data?.tenant_id ?? null;
+}
 
 const rpcOk = <T>(origen: string, r: { data: unknown; error: { message?: string; code?: string | null } | null }): T => {
   if (r.error) throw new ErrorRpcWebhook(origen, r.error);
@@ -182,8 +205,9 @@ async function ejecutarAccion(
   admin: any,
   stripe: ReturnType<typeof getStripe>,
   acctOpt: { stripeAccount: string } | undefined,
-  stripeEvent: { id: string; type: string },
-  accion: Exclude<EventoClasificado, { kind: 'ignore' } | { kind: 'revision' }>
+  stripeEvent: { id: string; type: string; created?: number },
+  accion: Exclude<EventoClasificado, { kind: 'ignore' } | { kind: 'revision' }>,
+  cuenta: { connectedAccount: string | null; tenantIdCuenta: string | null } = { connectedAccount: null, tenantIdCuenta: null }
 ): Promise<Efecto> {
   const ef: Efecto = { resultado: accion.kind, usuarioIdPago: null, membresiaIdPago: null, paqueteActivado: null, reportes: [] };
 
@@ -316,33 +340,82 @@ async function ejecutarAccion(
     return ef;
   }
 
-  if (accion.kind === 'reembolso') {
-    // Resolver al miembro por el cobro original (payment_events) y avisar al
-    // equipo: un reembolso hecho desde el dashboard de Stripe no revierte
-    // créditos ni membresía solo; alguien tiene que decidir (PKG-01G).
-    if (accion.payment_intent_id) {
-      const { data: original } = await admin
-        .from('payment_events')
-        .select('usuario_id, tenant_id')
-        .eq('stripe_payment_intent_id', accion.payment_intent_id)
-        .eq('status', 'succeeded')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      ef.usuarioIdPago = original?.usuario_id ?? null;
-      if (original?.tenant_id) {
-        await avisarStaff(admin, {
-          tenant_id: original.tenant_id,
-          tipo: 'reembolso',
-          titulo: 'Reembolso en Stripe',
-          mensaje: `Se reembolsaron ${(accion.amount_refunded / 100).toLocaleString('es-MX', { style: 'currency', currency: accion.currency.toUpperCase() })} de un cobro. Revisa si hay que ajustar créditos o la membresía del miembro.`,
-          metadata: { charge_id: accion.charge_id, payment_intent_id: accion.payment_intent_id, usuario_id: ef.usuarioIdPago },
-          url: ef.usuarioIdPago ? `/admin/miembros/${ef.usuarioIdPago}` : '/admin/miembros',
-          soloAdmins: true
-        });
-      }
+  if (accion.kind === 'reversal') {
+    // PKG-01G (D7=A, D8=A): evidencia durable con identidad (re_/dp_) + revisión
+    // humana. CERO mutación de derechos: aquí no se llama a activar/sync/ajustar
+    // créditos ni se toca usuarios/reservas/suscripciones. La atribución al
+    // pago de origen la decide la RPC (único → enlaza; ninguno/ambiguo → revisión).
+    const tenantId = cuenta.tenantIdCuenta ?? (await tenantPorPaymentIntent(admin, accion.payment_intent_id));
+    if (!tenantId) {
+      throw new DivergenciaWebhook('reversal_sin_tenant', `${accion.tipo} ${accion.object_id} sin estudio resoluble`);
     }
-    ef.resultado = 'reembolso:avisado';
+    const r = rpcOk<{ success?: boolean; reversal_id?: string; nuevo?: boolean; origen?: string; usuario_id?: string | null; estado_proveedor?: string } | null>(
+      'registrar_reversal_pago',
+      await admin.rpc('registrar_reversal_pago', {
+        p_tipo: accion.tipo,
+        p_stripe_object_id: accion.object_id,
+        p_stripe_charge_id: accion.charge_id,
+        p_stripe_payment_intent_id: accion.payment_intent_id,
+        p_stripe_account: cuenta.connectedAccount,
+        p_tenant_id: tenantId,
+        p_monto_centavos: accion.amount,
+        p_moneda: accion.currency,
+        p_estado_proveedor: accion.estado,
+        p_motivo_proveedor: accion.motivo,
+        p_stripe_created_at: accion.object_created_at,
+        p_evento_at: accion.event_at,
+        p_stripe_event_id: stripeEvent.id,
+        p_resumen: resumenEvento(stripeEvent as unknown as Parameters<typeof resumenEvento>[0])
+      })
+    );
+    ef.usuarioIdPago = r?.usuario_id ?? null;
+    ef.reversal = { tipo: accion.tipo, nuevo: r?.nuevo === true, estado: accion.estado, monto: accion.amount, moneda: accion.currency, origen: r?.origen ?? null, objectId: accion.object_id };
+    ef.resultado = `${accion.tipo}:${r?.nuevo ? 'registrado' : 'actualizado'}:${accion.estado}`;
+    return ef;
+  }
+
+  if (accion.kind === 'reconciliar-reembolso') {
+    // charge.refunded: acumulado → solo se compara con los Refund registrados.
+    // No crea monto. Si no cuadra, revisión 'reconciliacion_reembolso' (se
+    // cierra sola cuando llegan los refund.* que faltan).
+    const tenantId = cuenta.tenantIdCuenta ?? (await tenantPorCharge(admin, accion.charge_id));
+    if (!tenantId) {
+      ef.ignorar = 'reconciliacion_sin_tenant';
+      ef.resultado = ef.ignorar;
+      return ef;
+    }
+    const r = rpcOk<{ cuadra?: boolean; suma_centavos?: number } | null>(
+      'reconciliar_reembolsos_cargo',
+      await admin.rpc('reconciliar_reembolsos_cargo', {
+        p_tenant_id: tenantId,
+        p_stripe_charge_id: accion.charge_id,
+        p_amount_refunded: accion.amount_refunded,
+        p_stripe_event_id: stripeEvent.id
+      })
+    );
+    ef.resultado = r?.cuadra ? 'reconciliacion:cuadra' : 'reconciliacion:pendiente';
+    return ef;
+  }
+
+  if (accion.kind === 'cuenta-desautorizada') {
+    // D-01G-3: apaga el gate de cobro del estudio y conserva stripe_account_id.
+    // No toca membresías ni suscripciones.
+    if (!cuenta.connectedAccount) {
+      throw new DivergenciaWebhook('deauthorized_sin_cuenta', 'account.application.deauthorized sin event.account');
+    }
+    const r = rpcOk<{ success?: boolean; reason?: string; idempotente?: boolean; tenant_id?: string } | null>(
+      'marcar_cuenta_desautorizada',
+      await admin.rpc('marcar_cuenta_desautorizada', {
+        p_stripe_account: cuenta.connectedAccount,
+        p_stripe_event_id: stripeEvent.id,
+        p_evento_at: accion.event_at
+      })
+    );
+    if (r?.success === false) {
+      throw new DivergenciaWebhook(r.reason ?? 'cuenta_no_encontrada', `cuenta ${cuenta.connectedAccount}`);
+    }
+    ef.cuentaDesautorizada = r?.idempotente ? null : { tenantId: r?.tenant_id ?? cuenta.tenantIdCuenta ?? '' };
+    ef.resultado = r?.idempotente ? 'cuenta:desautorizada:idempotente' : 'cuenta:desautorizada';
     return ef;
   }
 
@@ -429,6 +502,23 @@ async function registrarDiario(
     { onConflict: 'stripe_event_id', ignoreDuplicates: true }
   );
   if (error) throw new ErrorRpcWebhook('payment_events.upsert', error);
+
+  // PKG-01G · vínculos tardíos DENTRO del paso verificado (HARDENING B): si
+  // fallan, el evento queda `error_reintentable` y Stripe reintenta (ambas RPC
+  // son idempotentes). Y aunque nunca corrieran, lo pendiente es consultable:
+  // reversales sin origen (+ revisión 'origen_no_resuelto') y la vista
+  // `movimientos_sin_vinculo`.
+  if (monto.status === 'succeeded') {
+    if (monto.stripe_payment_intent_id) {
+      rpcOk('reatribuir_reversales', await admin.rpc('reatribuir_reversales', { p_stripe_payment_intent_id: monto.stripe_payment_intent_id }));
+    }
+    if (membresiaIdPago) {
+      const { data: pe } = await admin.from('payment_events').select('id').eq('stripe_event_id', stripeEvent.id).maybeSingle();
+      if (pe?.id) {
+        rpcOk('vincular_origen_valor', await admin.rpc('vincular_origen_valor', { p_membresia_id: membresiaIdPago, p_payment_event_id: pe.id }));
+      }
+    }
+  }
   return { tenantIdPago, usuarioIdPago };
 }
 
@@ -500,6 +590,54 @@ async function avisos(
       plantilla: tpl.plantilla,
       idempotencyKey: `ekko:email:stripe:${stripeEvent.id}:${tpl.plantilla}`,
       ref: stripeEvent.id
+    });
+  }
+}
+
+/**
+ * PKG-01G · Avisos a ADMINS (nunca a recepción ni al miembro) cuando se registra
+ * un reembolso o disputa nuevos, cuando una disputa se pierde, o cuando el
+ * estudio desautorizó Connect. Best-effort, después de `procesado`. El enlace
+ * lleva a la lista de revisiones en /admin/cobros.
+ */
+async function avisosReversal(admin: any, ef: Efecto, tenantIdCuenta: string | null): Promise<void> {
+  if (ef.reversal) {
+    const r = ef.reversal;
+    const dinero = (r.monto / 100).toLocaleString('es-MX', { style: 'currency', currency: r.moneda.toUpperCase() });
+    let tenantId = tenantIdCuenta;
+    if (!tenantId) {
+      const { data } = await admin.from('reversales_pago').select('tenant_id').eq('stripe_object_id', r.objectId).maybeSingle();
+      tenantId = data?.tenant_id ?? null;
+    }
+    if (!tenantId) return;
+    const perdida = r.tipo === 'disputa' && r.estado === 'lost';
+    if (!r.nuevo && !perdida) return; // actualizaciones intermedias no avisan
+    const titulo = r.tipo === 'reembolso' ? 'Reembolso en Stripe' : perdida ? 'Disputa perdida en Stripe' : 'Disputa abierta en Stripe';
+    const mensaje =
+      r.tipo === 'reembolso'
+        ? `Stripe registró un reembolso de ${dinero}. Revisa el caso: el sistema no quita créditos ni cancela membresías por su cuenta.`
+        : perdida
+          ? `Se perdió una disputa por ${dinero}. Revisa el caso: el sistema no quita créditos ni cancela membresías por su cuenta.`
+          : `Un miembro disputó un cobro de ${dinero}. Su acceso sigue igual mientras se resuelve; revisa el caso.`;
+    await avisarStaff(admin, {
+      tenant_id: tenantId,
+      tipo: r.tipo === 'reembolso' ? 'reembolso' : 'disputa',
+      titulo,
+      mensaje,
+      metadata: { stripe_object_id: r.objectId, origen: r.origen, usuario_id: ef.usuarioIdPago },
+      url: '/admin/cobros',
+      soloAdmins: true
+    });
+  }
+  if (ef.cuentaDesautorizada?.tenantId) {
+    await avisarStaff(admin, {
+      tenant_id: ef.cuentaDesautorizada.tenantId,
+      tipo: 'stripe_desconectado',
+      titulo: 'Cobros desconectados de Stripe',
+      mensaje: 'El estudio desautorizó la conexión con Stripe. No se pueden iniciar cobros nuevos hasta reconectar en Cobros. Las membresías vigentes no cambian.',
+      metadata: {},
+      url: '/admin/cobros',
+      soloAdmins: true
     });
   }
 }
@@ -626,7 +764,7 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const ef = await ejecutarAccion(admin, stripe, acctOpt, stripeEvent, accion);
+    const ef = await ejecutarAccion(admin, stripe, acctOpt, stripeEvent, accion, { connectedAccount, tenantIdCuenta });
 
     if (ef.ignorar) {
       await finalizar(admin, stripeEvent.id, 'ignorado', { accion: accion.kind, motivo: ef.ignorar });
@@ -648,6 +786,12 @@ export const handler: Handler = async (event) => {
       } catch (avisoErr) {
         console.error('[stripe-webhook] avisos/email', avisoErr);
       }
+    }
+    // PKG-01G: avisos a admins por reversal nuevo / disputa perdida / cuenta desautorizada.
+    try {
+      await avisosReversal(admin, ef, tenantIdCuenta);
+    } catch (avisoErr) {
+      console.error('[stripe-webhook] avisos reversal', avisoErr);
     }
     return ok({ received: true });
   } catch (err) {

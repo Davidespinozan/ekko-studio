@@ -110,15 +110,34 @@ export type EventoClasificado =
       event_at: string;
     }
   | {
-      // Reembolso (desde el dashboard Express del estudio o por API): registrar
-      // en payment_events y avisar al equipo. No revierte créditos/membresía
-      // automáticamente: el estudio decide (queda en el historial del miembro).
-      kind: 'reembolso';
+      // PKG-01G · Reversal con identidad propia: un objeto Refund (re_…) o
+      // Dispute (dp_…). Se registra como evidencia durable + revisión humana.
+      // NUNCA muta créditos, membresía, cuenta, tier, reservas ni suscripción
+      // (D7=A, D8=A).
+      kind: 'reversal';
+      tipo: 'reembolso' | 'disputa';
+      object_id: string;
       charge_id: string;
       payment_intent_id: string | null;
-      amount_refunded: number;
+      amount: number;
       currency: string;
-      customer_id: string | null;
+      estado: string;
+      motivo: string | null;
+      object_created_at: string | null;
+      event_at: string;
+    }
+  | {
+      // PKG-01G · charge.refunded trae `amount_refunded` ACUMULADO: no es monto
+      // de un reembolso. Solo sirve para reconciliar contra los Refund registrados.
+      kind: 'reconciliar-reembolso';
+      charge_id: string;
+      amount_refunded: number;
+      event_at: string;
+    }
+  | {
+      // PKG-01G · Connect: el estudio desautorizó la plataforma. Afecta la
+      // capacidad de cobro del ESTUDIO, nunca el derecho de un miembro.
+      kind: 'cuenta-desautorizada';
       event_at: string;
     }
   | {
@@ -316,15 +335,59 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
       const ch = event.data.object as Stripe.Charge;
       if (esDeOtraApp(ch.metadata)) return { kind: 'ignore', reason: 'app_ajena' };
       if (!ch.id) return { kind: 'ignore', reason: 'charge_sin_id' };
+      return { kind: 'reconciliar-reembolso', charge_id: ch.id, amount_refunded: ch.amount_refunded ?? 0, event_at };
+    }
+
+    case 'refund.created':
+    case 'refund.updated':
+    case 'refund.failed': {
+      const rf = event.data.object as Stripe.Refund;
+      if (esDeOtraApp(rf.metadata as { app?: string } | null)) return { kind: 'ignore', reason: 'app_ajena' };
+      const charge_id = typeof rf.charge === 'string' ? rf.charge : rf.charge?.id ?? null;
+      if (!rf.id || !charge_id) return { kind: 'revision', motivo: 'refund_sin_identidad' };
+      if (typeof rf.amount !== 'number' || rf.amount <= 0) return { kind: 'revision', motivo: 'refund_sin_monto' };
       return {
-        kind: 'reembolso',
-        charge_id: ch.id,
-        payment_intent_id: typeof ch.payment_intent === 'string' ? ch.payment_intent : ch.payment_intent?.id ?? null,
-        amount_refunded: ch.amount_refunded ?? 0,
-        currency: ch.currency ?? 'mxn',
-        customer_id: typeof ch.customer === 'string' ? ch.customer : ch.customer?.id ?? null,
+        kind: 'reversal',
+        tipo: 'reembolso',
+        object_id: rf.id,
+        charge_id,
+        payment_intent_id: typeof rf.payment_intent === 'string' ? rf.payment_intent : rf.payment_intent?.id ?? null,
+        amount: rf.amount,
+        currency: rf.currency ?? 'mxn',
+        estado: rf.status ?? 'pending',
+        motivo: rf.reason ?? null,
+        object_created_at: typeof rf.created === 'number' ? new Date(rf.created * 1000).toISOString() : null,
         event_at
       };
+    }
+
+    case 'charge.dispute.created':
+    case 'charge.dispute.updated':
+    case 'charge.dispute.closed':
+    case 'charge.dispute.funds_withdrawn':
+    case 'charge.dispute.funds_reinstated': {
+      const dp = event.data.object as Stripe.Dispute;
+      const charge_id = typeof dp.charge === 'string' ? dp.charge : dp.charge?.id ?? null;
+      if (!dp.id || !charge_id) return { kind: 'revision', motivo: 'dispute_sin_identidad' };
+      if (typeof dp.amount !== 'number' || dp.amount <= 0) return { kind: 'revision', motivo: 'dispute_sin_monto' };
+      return {
+        kind: 'reversal',
+        tipo: 'disputa',
+        object_id: dp.id,
+        charge_id,
+        payment_intent_id: typeof dp.payment_intent === 'string' ? dp.payment_intent : dp.payment_intent?.id ?? null,
+        amount: dp.amount,
+        currency: dp.currency ?? 'mxn',
+        estado: dp.status,
+        motivo: dp.reason ?? null,
+        object_created_at: typeof dp.created === 'number' ? new Date(dp.created * 1000).toISOString() : null,
+        event_at
+      };
+    }
+
+    case 'account.application.deauthorized': {
+      // `data.object` es la Application; la cuenta viene en `event.account`.
+      return { kind: 'cuenta-desautorizada', event_at };
     }
 
     case 'account.updated': {
@@ -401,22 +464,9 @@ export function extraerMontoDeEvento(event: Stripe.Event): MontoEvento | null {
     };
   }
 
-  // Reembolso: se registra como `refunded` con el monto devuelto (positivo).
-  // Los ingresos leen status='succeeded', así que no se netea solo: el admin lo
-  // ve en el historial del miembro y en cobranza.
-  if (event.type === 'charge.refunded') {
-    const ch = event.data.object as Stripe.Charge;
-    if (typeof ch.amount_refunded !== 'number' || ch.amount_refunded <= 0) return null;
-    return {
-      monto_centavos: ch.amount_refunded,
-      moneda: ch.currency ?? 'mxn',
-      status: 'refunded',
-      stripe_invoice_id: (() => { const inv = (ch as unknown as { invoice?: string | { id?: string } | null }).invoice; return typeof inv === 'string' ? inv : inv?.id ?? null; })(),
-      stripe_payment_intent_id: typeof ch.payment_intent === 'string' ? ch.payment_intent : ch.payment_intent?.id ?? null,
-      stripe_subscription_id: null,
-      stripe_customer_id: typeof ch.customer === 'string' ? ch.customer : ch.customer?.id ?? null
-    };
-  }
+  // PKG-01G: los reembolsos YA NO entran al diario de cobranza. `charge.refunded`
+  // trae un acumulado (sumarlo por evento duplicaba parciales); la evidencia
+  // exacta vive en `reversales_pago` (un Refund = una fila, vía refund.*).
 
   // Cobro fallido: se registra como `failed` con el monto que se intentó cobrar
   // (amount_due). NO suma a ingresos (esos leen status='succeeded'), pero le da
@@ -587,10 +637,12 @@ export function resumenEvento(event: Stripe.Event): Record<string, unknown> {
     customer: idODef(o.customer),
     invoice: idODef(o.invoice),
     payment_intent: idODef(o.payment_intent),
-    charge: o.object === 'charge' ? idODef(o.id) : idODef(o.latest_charge),
+    charge: o.object === 'charge' ? idODef(o.id) : idODef(o.latest_charge) ?? idODef(o.charge),
     monto: o.amount_paid ?? o.amount_due ?? o.amount_refunded ?? o.amount_total ?? o.amount ?? null,
     currency: o.currency ?? null,
     status: o.status ?? null,
+    // PKG-01G: Refund/Dispute: razón del proveedor (código, no texto libre).
+    reason: typeof o.reason === 'string' ? o.reason : null,
     // PKG-01B: evidencia de si la sesión de Checkout estaba pagada al completarse.
     payment_status: o.payment_status ?? null,
     billing_reason: o.billing_reason ?? null,

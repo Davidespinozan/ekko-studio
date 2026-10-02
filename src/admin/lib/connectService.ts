@@ -11,6 +11,9 @@ export interface ConnectStatus {
   details_submitted: boolean;
   payouts_enabled: boolean;
   reason?: string;
+  /** PKG-01G: el estudio desautorizó la plataforma en Stripe; hay que reconectar. */
+  desconectada?: boolean;
+  desconectada_at?: string | null;
   // Enriquecidos (solo cuando connected):
   account_id?: string | null;
   business_name?: string | null;

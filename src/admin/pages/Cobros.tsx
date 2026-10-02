@@ -3,6 +3,7 @@ import { CreditCard, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-reac
 import { useToast } from '@shared/hooks/useToast';
 import { Spinner } from '@shared/components/Spinner';
 import { iniciarOnboardingConnect, obtenerEstadoConnect, type ConnectStatus } from '../lib/connectService';
+import { RevisionesFinancieras } from '../components/cobros/RevisionesFinancieras';
 
 /**
  * Cobros — Stripe Connect del estudio. El admin activa los cobros (onboarding
@@ -78,8 +79,9 @@ export default function Cobros() {
     }
   }
 
-  const listo = status?.charges_enabled === true;
-  const enProceso = status?.connected === true && !listo;
+  const desconectada = status?.desconectada === true;
+  const listo = status?.charges_enabled === true && !desconectada;
+  const enProceso = status?.connected === true && !listo && !desconectada;
   const cuentaMask = status?.account_id ? `acct ···· ${status.account_id.slice(-4)}` : '—';
 
   return (
@@ -101,18 +103,20 @@ export default function Cobros() {
               : <AlertCircle size={24} style={{ color: 'var(--ek-warning)', flexShrink: 0 }} aria-hidden="true" />}
             <div style={{ flex: 1 }}>
               <p style={{ margin: 0, fontWeight: 600, fontSize: '15px' }}>
-                {listo ? 'Cobros activados' : enProceso ? 'Activación pendiente' : 'Cobros no activados'}
+                {desconectada ? 'Cuenta de Stripe desconectada' : listo ? 'Cobros activados' : enProceso ? 'Activación pendiente' : 'Cobros no activados'}
               </p>
               <p className="ek-body-muted" style={{ margin: '4px 0 14px', fontSize: '13.5px' }}>
-                {listo
-                  ? 'Ya puedes recibir pagos online. Los depósitos llegan solos a tu banco.'
-                  : enProceso
-                    ? 'Empezaste el formulario de Stripe pero falta completarlo. Continúa para poder cobrar.'
-                    : 'Conecta tu cuenta para empezar a cobrar online (un formulario corto, una sola vez).'}
+                {desconectada
+                  ? 'El estudio desautorizó la conexión con Stripe. No se pueden iniciar cobros nuevos hasta reconectar; las membresías vigentes no cambian.'
+                  : listo
+                    ? 'Ya puedes recibir pagos online. Los depósitos llegan solos a tu banco.'
+                    : enProceso
+                      ? 'Empezaste el formulario de Stripe pero falta completarlo. Continúa para poder cobrar.'
+                      : 'Conecta tu cuenta para empezar a cobrar online (un formulario corto, una sola vez).'}
               </p>
               {!listo && (
                 <button type="button" className="ek-cta ek-cta--gold" onClick={activar} disabled={activando}>
-                  {activando ? <Spinner size={16} /> : <><CreditCard size={16} aria-hidden="true" /> {enProceso ? 'Continuar activación' : 'Activar cobros'} <ExternalLink size={14} aria-hidden="true" /></>}
+                  {activando ? <Spinner size={16} /> : <><CreditCard size={16} aria-hidden="true" /> {desconectada ? 'Reconectar cuenta' : enProceso ? 'Continuar activación' : 'Activar cobros'} <ExternalLink size={14} aria-hidden="true" /></>}
                 </button>
               )}
               {status?.reason === 'stripe_pendiente' && (
@@ -123,7 +127,10 @@ export default function Cobros() {
             </div>
           </div>
 
-          {status?.connected && (
+          {/* PKG-01G: reembolsos / disputas / desconexión → revisión humana, sin mutar derechos. */}
+          <RevisionesFinancieras />
+
+          {status?.connected && !desconectada && (
             <>
               {/* Cuenta vinculada */}
               <div className="ek-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

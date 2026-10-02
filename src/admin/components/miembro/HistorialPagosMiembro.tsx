@@ -16,8 +16,28 @@ interface Pago {
 const LABEL_STATUS: Record<string, { texto: string; color: string }> = {
   succeeded: { texto: 'Cobrado', color: 'var(--ek-success)' },
   failed: { texto: 'Rechazado', color: 'var(--ek-danger)' },
-  refunded: { texto: 'Reembolsado', color: 'var(--ek-mustard)' }
+  refunded: { texto: 'Reembolsado', color: 'var(--ek-mustard)' },
+  // PKG-01G: reversals con identidad propia (reversales_pago).
+  'reembolso:pending': { texto: 'Reembolso en proceso', color: 'var(--ek-mustard)' },
+  'reembolso:succeeded': { texto: 'Reembolsado', color: 'var(--ek-mustard)' },
+  'reembolso:failed': { texto: 'Reembolso fallido', color: 'var(--ek-danger)' },
+  'reembolso:canceled': { texto: 'Reembolso cancelado', color: 'var(--ek-ink-muted)' },
+  'reembolso:requires_action': { texto: 'Reembolso requiere acción', color: 'var(--ek-warning)' },
+  'disputa:won': { texto: 'Disputa ganada', color: 'var(--ek-success)' },
+  'disputa:lost': { texto: 'Disputa perdida', color: 'var(--ek-danger)' },
+  'disputa:warning_closed': { texto: 'Alerta de disputa cerrada', color: 'var(--ek-ink-muted)' }
 };
+
+/** Fila unificada: cobro (payment_events) o reversal (reversales_pago). */
+interface Fila {
+  id: string;
+  fecha: string;
+  concepto: string;
+  monto_centavos: number | null;
+  moneda: string | null;
+  statusKey: string;
+  statusFallback: string;
+}
 
 function pesos(centavos: number | null, moneda: string | null): string {
   if (centavos === null) return '—';
@@ -38,27 +58,55 @@ function concepto(tipo: string): string {
  * stripe-billing-info; el admin no tenía ninguna vista. (SALA a49c0a8.)
  */
 export function HistorialPagosMiembro({ usuarioId }: { usuarioId: string }) {
-  const [pagos, setPagos] = useState<Pago[] | null>(null);
+  const [pagos, setPagos] = useState<Fila[] | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const { data, error: err } = await supabase
-          .from('payment_events')
-          .select('id, created_at, monto_centavos, moneda, status, stripe_event_type, stripe_invoice_id, stripe_payment_intent_id')
-          .eq('usuario_id', usuarioId)
-          .order('created_at', { ascending: false })
-          .limit(24);
+        const [{ data, error: err }, { data: reversales, error: errRv }] = await Promise.all([
+          supabase
+            .from('payment_events')
+            .select('id, created_at, monto_centavos, moneda, status, stripe_event_type, stripe_invoice_id, stripe_payment_intent_id')
+            .eq('usuario_id', usuarioId)
+            .order('created_at', { ascending: false })
+            .limit(24),
+          supabase
+            .from('reversales_pago')
+            .select('id, tipo, monto_centavos, moneda, estado_proveedor, stripe_created_at, created_at')
+            .eq('usuario_id', usuarioId)
+            .order('created_at', { ascending: false })
+            .limit(24)
+        ]);
         if (!mounted) return;
-        if (err) {
-          console.error('[HistorialPagosMiembro]', err);
+        if (err || errRv) {
+          console.error('[HistorialPagosMiembro]', err ?? errRv);
           setError(true);
           setPagos([]);
           return;
         }
-        setPagos((data ?? []) as Pago[]);
+        const filas: Fila[] = [
+          ...((data ?? []) as Pago[]).map((p) => ({
+            id: p.id,
+            fecha: p.created_at,
+            concepto: concepto(p.stripe_event_type),
+            monto_centavos: p.monto_centavos,
+            moneda: p.moneda,
+            statusKey: p.status ?? '',
+            statusFallback: p.status ?? '—'
+          })),
+          ...((reversales ?? []) as Array<{ id: string; tipo: string; monto_centavos: number; moneda: string; estado_proveedor: string; stripe_created_at: string | null; created_at: string }>).map((r) => ({
+            id: `rv-${r.id}`,
+            fecha: r.stripe_created_at ?? r.created_at,
+            concepto: r.tipo === 'reembolso' ? 'Reembolso (Stripe)' : 'Disputa del cobro',
+            monto_centavos: r.monto_centavos,
+            moneda: r.moneda,
+            statusKey: `${r.tipo}:${r.estado_proveedor}`,
+            statusFallback: r.tipo === 'disputa' ? `Disputa: ${r.estado_proveedor}` : r.estado_proveedor
+          }))
+        ].sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+        setPagos(filas);
       } catch (e) {
         if (!mounted) return;
         console.error('[HistorialPagosMiembro]', e instanceof Error ? e.message : e);
@@ -90,13 +138,13 @@ export function HistorialPagosMiembro({ usuarioId }: { usuarioId: string }) {
         </thead>
         <tbody>
           {pagos.map((p) => {
-            const st = LABEL_STATUS[p.status ?? ''] ?? { texto: p.status ?? '—', color: 'var(--ek-ink-muted)' };
+            const st = LABEL_STATUS[p.statusKey] ?? { texto: p.statusFallback, color: 'var(--ek-ink-muted)' };
             return (
               <tr key={p.id}>
                 <td style={{ whiteSpace: 'nowrap', color: 'var(--ek-ink-muted)', fontSize: '13px' }}>
-                  {formatFechaHoraEnZona(p.created_at, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  {formatFechaHoraEnZona(p.fecha, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </td>
-                <td>{concepto(p.stripe_event_type)}</td>
+                <td>{p.concepto}</td>
                 <td style={{ fontFamily: 'var(--ek-font-mono)' }}>{pesos(p.monto_centavos, p.moneda)}</td>
                 <td style={{ color: st.color, fontWeight: 600, fontSize: '13px' }}>{st.texto}</td>
               </tr>

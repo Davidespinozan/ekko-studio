@@ -227,6 +227,9 @@ export type Database = {
           id: string
           membresia_id: string
           motivo: string | null
+          origen: string
+          origen_payment_event_id: string | null
+          origen_venta_id: string | null
           reserva_id: string | null
           saldo_after: number | null
           tenant_id: string
@@ -315,6 +318,107 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reversales_pago: {
+        Row: {
+          created_at: string
+          estado_proveedor: string
+          id: string
+          membresia_origen_id: string | null
+          moneda: string
+          monto_centavos: number
+          motivo_proveedor: string | null
+          pago_origen_id: string | null
+          resumen: Json
+          stripe_account: string | null
+          stripe_charge_id: string
+          stripe_created_at: string | null
+          stripe_object_id: string
+          stripe_payment_intent_id: string | null
+          tenant_id: string
+          tipo: string
+          ultimo_evento_at: string
+          ultimo_stripe_event_id: string
+          updated_at: string
+          usuario_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          estado_proveedor: string
+          id?: string
+          membresia_origen_id?: string | null
+          moneda: string
+          monto_centavos: number
+          motivo_proveedor?: string | null
+          pago_origen_id?: string | null
+          resumen?: Json
+          stripe_account?: string | null
+          stripe_charge_id: string
+          stripe_created_at?: string | null
+          stripe_object_id: string
+          stripe_payment_intent_id?: string | null
+          tenant_id: string
+          tipo: string
+          ultimo_evento_at: string
+          ultimo_stripe_event_id: string
+          updated_at?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          estado_proveedor?: string
+          motivo_proveedor?: string | null
+          resumen?: Json
+          ultimo_evento_at?: string
+          ultimo_stripe_event_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      revisiones_financieras: {
+        Row: {
+          abierta_at: string
+          actor_rol: string | null
+          actor_usuario_id: string | null
+          created_at: string
+          detalle: Json
+          estado: string
+          id: string
+          nota: string | null
+          reabierta_at: string | null
+          referencia: string | null
+          resolucion: string | null
+          resuelta_at: string | null
+          reversal_id: string | null
+          tenant_id: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          abierta_at?: string
+          actor_rol?: string | null
+          actor_usuario_id?: string | null
+          created_at?: string
+          detalle?: Json
+          estado?: string
+          id?: string
+          nota?: string | null
+          reabierta_at?: string | null
+          referencia?: string | null
+          resolucion?: string | null
+          resuelta_at?: string | null
+          reversal_id?: string | null
+          tenant_id: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          estado?: string
+          nota?: string | null
+          resolucion?: string | null
+          resuelta_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       payment_events: {
         Row: {
@@ -651,6 +755,7 @@ export type Database = {
           stripe_account_id: string | null
           stripe_charges_enabled: boolean
           stripe_details_submitted: boolean
+          stripe_desconectado_at: string | null
           stripe_subscription_product_id: string | null
           updated_at: string
           vertical: string
@@ -668,6 +773,7 @@ export type Database = {
           stripe_account_id?: string | null
           stripe_charges_enabled?: boolean
           stripe_details_submitted?: boolean
+          stripe_desconectado_at?: string | null
           stripe_subscription_product_id?: string | null
           updated_at?: string
           vertical?: string
@@ -685,6 +791,7 @@ export type Database = {
           stripe_account_id?: string | null
           stripe_charges_enabled?: boolean
           stripe_details_submitted?: boolean
+          stripe_desconectado_at?: string | null
           stripe_subscription_product_id?: string | null
           updated_at?: string
           vertical?: string
@@ -920,6 +1027,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      resolver_revision_financiera: {
+        Args: { p_revision_id: string; p_resolucion: string; p_nota: string }
+        Returns: Json
+      }
       cumpleanos_proximos: {
         Args: { p_dias?: number }
         Returns: { usuario_id: string; nombre: string | null; avatar_url: string | null; dia: string; en_dias: number }[]

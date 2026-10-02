@@ -851,6 +851,166 @@ describe('stripe-webhook', () => {
       expect(mockReportar).not.toHaveBeenCalled();
     });
   });
+
+  // ── PKG-01G · reembolsos / disputas / desautorización: evidencia + revisión, CERO mutación de derechos ──
+  describe('PKG-01G · reversals', () => {
+    const RPC_DERECHOS = ['activar_membresia', 'sync_membresia_stripe', 'cambiar_tier_membresia', 'registrar_venta_mostrador', 'staff_ajustar_creditos', 'staff_cancelar_membresia', 'registrar_invitados_extra_pagados'];
+    const rpcsLlamadas = () => mockRpc.mock.calls.map((c) => c[0] as string);
+    const refundEv = (over: Record<string, unknown> = {}, type = 'refund.created', id = 'evt_rf') => ({
+      id, type, created: 1700000000, account: 'acct_ekko',
+      data: { object: { object: 'refund', id: 're_1', charge: 'ch_1', payment_intent: 'pi_1', amount: 10000, currency: 'mxn', status: 'succeeded', reason: 'requested_by_customer', created: 1699999000, ...over } }
+    });
+    const disputeEv = (status: string, type = 'charge.dispute.created', id = 'evt_dp') => ({
+      id, type, created: 1700000000, account: 'acct_ekko',
+      data: { object: { object: 'dispute', id: 'dp_1', charge: 'ch_1', payment_intent: 'pi_1', amount: 85000, currency: 'mxn', status, reason: 'fraudulent', created: 1699999000 } }
+    });
+
+    it('refund.created → registrar_reversal_pago con identidad re_, monto EXACTO, tenant de la cuenta; procesado; aviso a admins DESPUÉS; ninguna RPC de derechos', async () => {
+      mockConstructEvent.mockReturnValue(refundEv());
+      mockRpc.mockResolvedValue({ data: { success: true, reversal_id: 'rv1', nuevo: true, origen: 'unico', usuario_id: 'u1' }, error: null });
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith('registrar_reversal_pago', expect.objectContaining({
+        p_tipo: 'reembolso', p_stripe_object_id: 're_1', p_stripe_charge_id: 'ch_1', p_stripe_payment_intent_id: 'pi_1',
+        p_stripe_account: 'acct_ekko', p_tenant_id: 'tenant-1', p_monto_centavos: 10000, p_moneda: 'mxn', p_estado_proveedor: 'succeeded',
+        p_motivo_proveedor: 'requested_by_customer', p_stripe_event_id: 'evt_rf'
+      }));
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'reembolso:registrado:succeeded' });
+      for (const r of RPC_DERECHOS) expect(rpcsLlamadas()).not.toContain(r);
+      // Sin diario: charge/refund no son cobros.
+      expect(mockUpsertFila.mock.calls.some((c) => c[0] === 'payment_events')).toBe(false);
+      // Aviso a admins después de procesado, con enlace a Cobros.
+      expect(mockAvisarStaff).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tipo: 'reembolso', tenant_id: 'tenant-1', soloAdmins: true, url: '/admin/cobros' }));
+      const idxProc = mockUpdate.mock.calls.findIndex((c) => c[0] === 'stripe_webhook_events' && (c[1] as { estado?: string }).estado === 'procesado');
+      expect(mockAvisarStaff.mock.invocationCallOrder[0]).toBeGreaterThan(mockUpdate.mock.invocationCallOrder[idxProc]);
+    });
+
+    it('refund.updated sobre un objeto ya registrado (nuevo:false) → procesado sin segundo aviso', async () => {
+      mockConstructEvent.mockReturnValue(refundEv({ status: 'succeeded' }, 'refund.updated', 'evt_rf2'));
+      mockRpc.mockResolvedValue({ data: { success: true, reversal_id: 'rv1', nuevo: false, idempotente: true, usuario_id: 'u1' }, error: null });
+      await invocar();
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'reembolso:actualizado:succeeded' });
+      expect(mockAvisarStaff).not.toHaveBeenCalled();
+    });
+
+    it('la RPC de evidencia falla (DB) → error_reintentable + 500: sin evidencia no hay "procesado"', async () => {
+      mockConstructEvent.mockReturnValue(refundEv());
+      mockRpc.mockResolvedValue({ data: null, error: { message: 'fetch failed' } });
+      const res = await invocar();
+      expect(res.statusCode).toBe(500);
+      expect(ultimaTransicion()).toMatchObject({ estado: 'error_reintentable' });
+      expect(mockAvisarStaff).not.toHaveBeenCalled();
+    });
+
+    it('sin cuenta en el evento y sin pago de origen → revisión (nunca una fila sin estudio)', async () => {
+      const ev = refundEv(); delete (ev as { account?: string }).account;
+      mockConstructEvent.mockReturnValue(ev);
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(ultimaTransicion()).toMatchObject({ estado: 'revision', motivo: 'reversal_sin_tenant' });
+      expect(mockRpc).not.toHaveBeenCalledWith('registrar_reversal_pago', expect.anything());
+    });
+
+    it('charge.refunded → reconciliar_reembolsos_cargo con el acumulado; nunca crea monto ni diario', async () => {
+      mockConstructEvent.mockReturnValue({ id: 'evt_chr', type: 'charge.refunded', created: 1700000000, account: 'acct_ekko',
+        data: { object: { object: 'charge', id: 'ch_1', payment_intent: 'pi_1', amount: 85000, amount_refunded: 15000, currency: 'mxn', metadata: { app: 'ekko' } } } });
+      mockRpc.mockResolvedValue({ data: { success: true, cuadra: false, suma_centavos: 10000 }, error: null });
+      await invocar();
+      expect(mockRpc).toHaveBeenCalledWith('reconciliar_reembolsos_cargo', { p_tenant_id: 'tenant-1', p_stripe_charge_id: 'ch_1', p_amount_refunded: 15000, p_stripe_event_id: 'evt_chr' });
+      expect(mockRpc).not.toHaveBeenCalledWith('registrar_reversal_pago', expect.anything());
+      expect(mockUpsertFila.mock.calls.some((c) => c[0] === 'payment_events')).toBe(false);
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'reconciliacion:pendiente' });
+      expect(mockAvisarStaff).not.toHaveBeenCalled();
+    });
+
+    it('disputa created → evidencia dp_ + aviso "disputa"; updated no avisa; closed lost avisa "perdida"; won no avisa; ninguna RPC de derechos', async () => {
+      mockConstructEvent.mockReturnValue(disputeEv('needs_response'));
+      mockRpc.mockResolvedValue({ data: { success: true, nuevo: true, origen: 'unico', usuario_id: 'u1' }, error: null });
+      await invocar();
+      expect(mockRpc).toHaveBeenCalledWith('registrar_reversal_pago', expect.objectContaining({ p_tipo: 'disputa', p_stripe_object_id: 'dp_1', p_monto_centavos: 85000, p_estado_proveedor: 'needs_response' }));
+      expect(mockAvisarStaff).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tipo: 'disputa', titulo: 'Disputa abierta en Stripe' }));
+      for (const r of RPC_DERECHOS) expect(rpcsLlamadas()).not.toContain(r);
+
+      vi.clearAllMocks(); claimDevuelve('nuevo'); mockTenantMaybeSingle.mockResolvedValue({ data: { id: 'tenant-1' }, error: null });
+      mockConstructEvent.mockReturnValue(disputeEv('under_review', 'charge.dispute.updated', 'evt_dp2'));
+      mockRpc.mockResolvedValue({ data: { success: true, nuevo: false, usuario_id: 'u1' }, error: null });
+      await invocar();
+      expect(mockAvisarStaff).not.toHaveBeenCalled();
+
+      vi.clearAllMocks(); claimDevuelve('nuevo'); mockTenantMaybeSingle.mockResolvedValue({ data: { id: 'tenant-1' }, error: null });
+      mockConstructEvent.mockReturnValue(disputeEv('lost', 'charge.dispute.closed', 'evt_dp3'));
+      mockRpc.mockResolvedValue({ data: { success: true, nuevo: false, usuario_id: 'u1' }, error: null });
+      await invocar();
+      expect(mockAvisarStaff).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tipo: 'disputa', titulo: 'Disputa perdida en Stripe' }));
+      for (const r of RPC_DERECHOS) expect(rpcsLlamadas()).not.toContain(r);
+
+      vi.clearAllMocks(); claimDevuelve('nuevo'); mockTenantMaybeSingle.mockResolvedValue({ data: { id: 'tenant-1' }, error: null });
+      mockConstructEvent.mockReturnValue(disputeEv('won', 'charge.dispute.closed', 'evt_dp4'));
+      mockRpc.mockResolvedValue({ data: { success: true, nuevo: false, usuario_id: 'u1' }, error: null });
+      await invocar();
+      expect(mockAvisarStaff).not.toHaveBeenCalled();
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'disputa:actualizado:won' });
+    });
+
+    it('account.application.deauthorized → marcar_cuenta_desautorizada con la cuenta del evento; aviso stripe_desconectado; sin RPC de derechos', async () => {
+      mockConstructEvent.mockReturnValue({ id: 'evt_de', type: 'account.application.deauthorized', created: 1700000000, account: 'acct_ekko',
+        data: { object: { object: 'application', id: 'ca_1', name: 'EKKO' } } });
+      mockRpc.mockResolvedValue({ data: { success: true, idempotente: false, tenant_id: 'tenant-1' }, error: null });
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith('marcar_cuenta_desautorizada', expect.objectContaining({ p_stripe_account: 'acct_ekko', p_stripe_event_id: 'evt_de' }));
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'cuenta:desautorizada' });
+      expect(mockAvisarStaff).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ tipo: 'stripe_desconectado', tenant_id: 'tenant-1', url: '/admin/cobros' }));
+      for (const r of RPC_DERECHOS) expect(rpcsLlamadas()).not.toContain(r);
+      // Nunca se toca tenants por REST desde el webhook para esto (lo hace la RPC, que conserva stripe_account_id).
+      expect(mockTenantUpdate).not.toHaveBeenCalled();
+    });
+
+    it('deauthorized idempotente (ya estaba marcado) → procesado sin segundo aviso', async () => {
+      mockConstructEvent.mockReturnValue({ id: 'evt_de2', type: 'account.application.deauthorized', created: 1700000000, account: 'acct_ekko', data: { object: { object: 'application', id: 'ca_1' } } });
+      mockRpc.mockResolvedValue({ data: { success: true, idempotente: true, tenant_id: 'tenant-1' }, error: null });
+      await invocar();
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'cuenta:desautorizada:idempotente' });
+      expect(mockAvisarStaff).not.toHaveBeenCalled();
+    });
+
+    it('HARDENING B · payment_intent.succeeded: reatribuir_reversales + vincular_origen_valor corren DENTRO del paso verificado (antes de procesado); si fallan → error_reintentable', async () => {
+      const pago = {
+        id: 'evt_pi', type: 'payment_intent.succeeded', created: 1700000000,
+        data: { object: { id: 'pi_9', customer: 'cus_1', amount: 199000, currency: 'mxn', metadata: { app: 'ekko', usuario_id: 'u1', tier_id: 't1' } } }
+      };
+      mockConstructEvent.mockReturnValue(pago);
+      filaPorTabla.usuarios = { email: null, nombre: 'Ana', tenant_id: 't1' };
+      filaPorTabla.payment_events = { id: 'pe_9' };
+      mockRpc.mockImplementation(async (name: string) => {
+        if (name === 'activar_membresia') return { data: { success: true, membresia_id: 'mem_9', creditos: 12, periodo_fin: null }, error: null };
+        if (name === 'reatribuir_reversales') return { data: { success: true, reatribuidos: 1 }, error: null };
+        if (name === 'vincular_origen_valor') return { data: { success: true, vinculados: 1 }, error: null };
+        return { data: {}, error: null };
+      });
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith('reatribuir_reversales', { p_stripe_payment_intent_id: 'pi_9' });
+      expect(mockRpc).toHaveBeenCalledWith('vincular_origen_valor', { p_membresia_id: 'mem_9', p_payment_event_id: 'pe_9' });
+      const orden = mockRpc.mock.calls.map((c) => c[0]);
+      const idxProc = mockUpdate.mock.calls.findIndex((c) => c[0] === 'stripe_webhook_events' && (c[1] as { estado?: string }).estado === 'procesado');
+      const idxReat = orden.indexOf('reatribuir_reversales');
+      expect(mockRpc.mock.invocationCallOrder[idxReat]).toBeLessThan(mockUpdate.mock.invocationCallOrder[idxProc]);
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado' });
+
+      // Fallo del vínculo tardío → NO se da por procesado: Stripe reintenta (ambas RPC son idempotentes).
+      vi.clearAllMocks(); claimDevuelve('nuevo'); mockTenantMaybeSingle.mockResolvedValue({ data: { id: 'tenant-1' }, error: null });
+      mockConstructEvent.mockReturnValue(pago);
+      mockRpc.mockImplementation(async (name: string) => {
+        if (name === 'activar_membresia') return { data: { success: true, membresia_id: 'mem_9' }, error: null };
+        if (name === 'reatribuir_reversales') return { data: null, error: { message: 'fetch failed' } };
+        return { data: {}, error: null };
+      });
+      const res2 = await invocar();
+      expect(res2.statusCode).toBe(500);
+      expect(ultimaTransicion()).toMatchObject({ estado: 'error_reintentable', ultimo_error: expect.stringMatching(/reatribuir_reversales/) });
+    });
+  });
 });
 
 // ── PKG-01B · Checkout solo activa si está pagado (C17) ─────────────────────

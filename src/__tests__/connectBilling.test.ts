@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type Stripe from 'stripe';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getOrCreateSocioCustomer } from '../../netlify/functions/_lib/connectBilling';
+import { getOrCreateSocioCustomer, resolverCuentaConectada } from '../../netlify/functions/_lib/connectBilling';
 import { crearPresupuesto, PresupuestoAgotado } from '../../netlify/functions/_lib/operacionPago';
 
 /**
@@ -60,5 +60,24 @@ describe('getOrCreateSocioCustomer (PKG-01C)', () => {
     t = 7000;
     await expect(getOrCreateSocioCustomer(stripe, admin(null), SOCIO, 'acct_1', { presupuesto: p })).rejects.toBeInstanceOf(PresupuestoAgotado);
     expect(create).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolverCuentaConectada · gate de cobro (PKG-01G)', () => {
+  const adminGate = (fila: Record<string, unknown> | null) =>
+    ({ from: vi.fn(() => ({ select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: vi.fn(async () => ({ data: fila, error: null })) })) })) })) }) as unknown as SupabaseClient;
+
+  it('cuenta activa → puede cobrar', async () => {
+    const r = await resolverCuentaConectada(adminGate({ stripe_account_id: 'acct_1', stripe_charges_enabled: true, stripe_desconectado_at: null }), 't1');
+    expect(r).toEqual({ accountId: 'acct_1', chargesEnabled: true, desconectada: false });
+  });
+
+  it('cuenta DESAUTORIZADA: conserva el id (trazabilidad) pero NO puede cobrar aunque el flag quedara en true', async () => {
+    const r = await resolverCuentaConectada(adminGate({ stripe_account_id: 'acct_1', stripe_charges_enabled: true, stripe_desconectado_at: '2026-10-02T10:00:00Z' }), 't1');
+    expect(r).toEqual({ accountId: 'acct_1', chargesEnabled: false, desconectada: true });
+  });
+
+  it('sin cuenta → sin cobro', async () => {
+    expect(await resolverCuentaConectada(adminGate(null), 't1')).toEqual({ accountId: null, chargesEnabled: false, desconectada: false });
   });
 });

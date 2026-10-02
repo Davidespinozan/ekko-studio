@@ -524,7 +524,7 @@ function BloqueCobrado({ data }: { data: CobradoResult }) {
       <KpiCard label="Cobrado este mes" valor={pesos(data.cobradoMesCentavos)} nota={desglose || variacion} ayuda={AYUDA.cobrado} />
       <KpiCard label="Variación mensual" valor={data.cobradoMesPorcentaje === null ? '—' : `${data.cobradoMesPorcentaje >= 0 ? '+' : ''}${data.cobradoMesPorcentaje}%`} nota={variacion} alerta={(data.cobradoMesPorcentaje ?? 0) < -20} />
       <KpiCard label="Cobros rechazados · 30 d" valor={String(data.cobrosFallidos30d)} nota={data.cobrosFallidos30d ? `${pesos(data.montoFallido30dCentavos)} sin cobrar` : 'ninguno'} alerta={data.cobrosFallidos30d > 0} ayuda={AYUDA.fallidos} />
-      <KpiCard label="Reembolsado este mes" valor={pesos(data.reembolsadoMesCentavos)} nota={data.reembolsadoMesCentavos ? 'revisa créditos/membresías' : 'sin reembolsos'} alerta={data.reembolsadoMesCentavos > 0} ayuda={AYUDA.reembolsos} />
+      <KpiCard label="Reembolsado este mes" valor={pesos(data.reembolsadoMesCentavos)} nota={data.reembolsadoMesCentavos ? `${data.reembolsosMes} reembolso${data.reembolsosMes === 1 ? '' : 's'} · revisa en Cobros` : 'sin reembolsos'} alerta={data.reembolsadoMesCentavos > 0} ayuda={AYUDA.reembolsos} />
     </div>
   );
 }

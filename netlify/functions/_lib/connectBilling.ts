@@ -12,20 +12,29 @@ import { llaveCustomer, PresupuestoAgotado, type Presupuesto } from './operacion
 export interface CuentaConectada {
   accountId: string | null;
   chargesEnabled: boolean;
+  /** PKG-01G: el estudio desautorizó la plataforma (account.application.deauthorized). */
+  desconectada: boolean;
 }
 
+/**
+ * Gate de cobro del estudio. PKG-01G (D-01G-3): una cuenta desautorizada
+ * conserva `stripe_account_id` (trazabilidad) pero NO puede cobrar aunque el
+ * flag `stripe_charges_enabled` quedara desactualizado.
+ */
 export async function resolverCuentaConectada(
   admin: SupabaseClient,
   tenantId: string
 ): Promise<CuentaConectada> {
   const { data } = await admin
     .from('tenants')
-    .select('stripe_account_id, stripe_charges_enabled')
+    .select('stripe_account_id, stripe_charges_enabled, stripe_desconectado_at')
     .eq('id', tenantId)
     .maybeSingle();
+  const desconectada = Boolean(data?.stripe_desconectado_at);
   return {
     accountId: data?.stripe_account_id ?? null,
-    chargesEnabled: data?.stripe_charges_enabled === true
+    chargesEnabled: data?.stripe_charges_enabled === true && !desconectada,
+    desconectada
   };
 }
 

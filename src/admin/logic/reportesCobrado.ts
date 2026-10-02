@@ -11,11 +11,20 @@ export interface PagoEvento {
   stripe_event_type: string;
 }
 
+/** PKG-01G: un Refund de Stripe (re_…), monto EXACTO. Nunca charge.amount_refunded. */
+export interface ReembolsoEvento {
+  stripe_object_id: string;
+  monto_centavos: number;
+  estado_proveedor: string; // solo 'succeeded' cuenta
+  fecha: string; // stripe_created_at ?? created_at
+}
+
 export interface CobradoResult {
   cobradoMesCentavos: number;
   cobradoMesAnteriorCentavos: number;
   cobradoMesPorcentaje: number | null; // vs mes anterior; null si no hay base
   reembolsadoMesCentavos: number;
+  reembolsosMes: number;
   cobrosFallidos30d: number;
   montoFallido30dCentavos: number;
   porConcepto: { concepto: string; centavos: number; cobros: number }[];
@@ -37,7 +46,8 @@ export function calcularCobrado(
   eventos: PagoEvento[],
   inicioMes: Date,
   inicioMesAnterior: Date,
-  ahora: Date = new Date()
+  ahora: Date = new Date(),
+  reembolsos: ReembolsoEvento[] = []
 ): CobradoResult {
   const hace30d = ahora.getTime() - 30 * 24 * 60 * 60 * 1000;
   let cobradoMes = 0;
@@ -61,13 +71,25 @@ export function calcularCobrado(
       } else if (t >= inicioMesAnterior.getTime()) {
         cobradoMesAnterior += monto;
       }
-    } else if (e.status === 'refunded') {
-      if (t >= inicioMes.getTime()) reembolsadoMes += monto;
     } else if (e.status === 'failed') {
       if (t >= hace30d) {
         fallidos30d += 1;
         montoFallido += monto;
       }
+    }
+  }
+
+  // PKG-01G: cada objeto Refund cuenta UNA vez (identidad re_…). Antes se sumaban
+  // las filas `refunded` de charge.refunded, que traen el ACUMULADO: dos parciales
+  // de 100 y 50 reportaban 250 en vez de 150.
+  const vistos = new Set<string>();
+  let reembolsosMes = 0;
+  for (const r of reembolsos) {
+    if (r.estado_proveedor !== 'succeeded' || vistos.has(r.stripe_object_id)) continue;
+    vistos.add(r.stripe_object_id);
+    if (new Date(r.fecha).getTime() >= inicioMes.getTime()) {
+      reembolsadoMes += r.monto_centavos;
+      reembolsosMes += 1;
     }
   }
 
@@ -79,6 +101,7 @@ export function calcularCobrado(
     cobradoMesAnteriorCentavos: cobradoMesAnterior,
     cobradoMesPorcentaje,
     reembolsadoMesCentavos: reembolsadoMes,
+    reembolsosMes,
     cobrosFallidos30d: fallidos30d,
     montoFallido30dCentavos: montoFallido,
     porConcepto: Array.from(porConcepto.entries())

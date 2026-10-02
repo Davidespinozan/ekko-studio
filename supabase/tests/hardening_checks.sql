@@ -72,7 +72,8 @@ SELECT 'P2', 'radar: ninguna columna nueva de tenants fuera de la lista conocida
            AND column_name NOT IN (
              'id','slug','nombre','vertical','branding','config','dominio_principal','dominio_app',
              'status','created_at','updated_at',
-             'stripe_account_id','stripe_subscription_product_id','stripe_charges_enabled','stripe_details_submitted'
+             'stripe_account_id','stripe_subscription_product_id','stripe_charges_enabled','stripe_details_submitted',
+             'stripe_desconectado_at' -- PKG-01G: privada (solo service_role), como el resto de stripe_*
            )
        ) THEN '✅ PASS' ELSE '⚠️ REVISAR — hay columnas nuevas: decidir si son públicas (GRANT) o privadas' END;
 

@@ -57,12 +57,17 @@ export const handler: Handler = async (event) => {
     });
     const { data: tenant } = await adminDb
       .from('tenants')
-      .select('stripe_account_id')
+      .select('stripe_account_id, stripe_desconectado_at')
       .eq('id', admin.tenant_id)
       .maybeSingle();
 
     const accountId = tenant?.stripe_account_id ?? null;
     if (!accountId) return ok(base);
+    // PKG-01G: cuenta desautorizada → no se consulta Stripe (ya no autoriza);
+    // se informa el estado para que el admin reconecte desde Cobros.
+    if (tenant?.stripe_desconectado_at) {
+      return ok({ ...base, has_account: true, desconectada: true, desconectada_at: tenant.stripe_desconectado_at, charges_enabled: false });
+    }
 
     const stripe = getStripe();
     const account = await stripe.accounts.retrieve(accountId);

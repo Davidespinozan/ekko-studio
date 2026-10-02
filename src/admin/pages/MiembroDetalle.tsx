@@ -12,6 +12,7 @@ import { formatFechaEnZona } from '@shared/lib/timezone';
 import type { AccionMembresia } from '@shared/lib/membresiaAcciones';
 import type { MembresiaVigente } from '@shared/hooks/useMembresiaVigente';
 import { HistorialPagosMiembro } from '../components/miembro/HistorialPagosMiembro';
+import { AvisoRevisionFinanciera } from '../components/miembro/AvisoRevisionFinanciera';
 import { PausarMembresiaModal } from '@shared/components/PausarMembresiaModal';
 import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
@@ -219,8 +220,9 @@ export default function MiembroDetalle() {
       <section className="adm-section">
         <h2 className="ek-h3">Cobros</h2>
         <p className="adm-body" style={{ marginBottom: '0.75rem', fontSize: '13px' }}>
-          Lo que Stripe cobró (o rechazó) a este miembro. Los pagos en mostrador no pasan por aquí.
+          Lo que Stripe cobró, rechazó, reembolsó o disputó a este miembro. Los pagos en mostrador no pasan por aquí.
         </p>
+        <AvisoRevisionFinanciera usuarioId={miembro.id} />
         <HistorialPagosMiembro usuarioId={miembro.id} />
       </section>
 

@@ -9,6 +9,7 @@ const mockGetUser = vi.fn();
 const mockAdminMaybe = vi.fn();
 const mockTenantMaybe = vi.fn();
 const mockTenantUpdateEq = vi.fn().mockResolvedValue({ error: null });
+const mockTenantUpdate = vi.fn(() => ({ eq: mockTenantUpdateEq }));
 const mockAccountsCreate = vi.fn();
 const mockAccountLinksCreate = vi.fn();
 
@@ -21,7 +22,7 @@ vi.mock('@supabase/supabase-js', () => ({
       }
       return {
         select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockTenantMaybe })) })),
-        update: vi.fn(() => ({ eq: mockTenantUpdateEq }))
+        update: mockTenantUpdate
       };
     })
   }))
@@ -107,5 +108,18 @@ describe('connect-onboarding', () => {
     expect(res.statusCode).toBe(200);
     expect(mockAccountsCreate).not.toHaveBeenCalled();
     expect(mockAccountLinksCreate).toHaveBeenCalledWith(expect.objectContaining({ account: 'acct_existing' }));
+  });
+
+  it('PKG-01G · cuenta desautorizada → se crea una nueva, se limpia la marca y el gate arranca apagado (el id viejo queda en audit/eventos)', async () => {
+    mockAdminMaybe.mockResolvedValue({ data: { tenant_id: 't1', rol: 'admin', status: 'activo' }, error: null });
+    mockTenantMaybe.mockResolvedValue({ data: { stripe_account_id: 'acct_viejo', stripe_desconectado_at: '2026-10-02T10:00:00Z' }, error: null });
+    mockAccountsCreate.mockResolvedValue({ id: 'acct_nuevo' });
+    mockAccountLinksCreate.mockResolvedValue({ url: 'https://connect.stripe/new' });
+
+    const res = await invocar();
+    expect(res.statusCode).toBe(200);
+    expect(mockAccountsCreate).toHaveBeenCalledTimes(1);
+    expect(mockTenantUpdate).toHaveBeenCalledWith({ stripe_account_id: 'acct_nuevo', stripe_desconectado_at: null, stripe_charges_enabled: false, stripe_details_submitted: false });
+    expect(mockAccountLinksCreate).toHaveBeenCalledWith(expect.objectContaining({ account: 'acct_nuevo' }));
   });
 });
