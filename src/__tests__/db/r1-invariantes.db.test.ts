@@ -434,7 +434,12 @@ describe('auditoría del ciclo de vida (estado real persistido)', () => {
     expect(rev.some((a) => a.actor_rol === 'admin' && a.despues?.status === 'revocado')).toBe(true);
 
     const s = await b.crearPersona();
-    await b.como(admin, () => b.fila("UPDATE usuarios SET rol = 'recepcionista' WHERE id = $1", [s.id]));
+    // R2-A (01L): el admin ya no cambia `rol` por REST directo; el cambio de rol
+    // real va por admin-update-role (service_role). El auditor sigue igual.
+    await expect(
+      b.como(admin, () => b.fila("UPDATE usuarios SET rol = 'recepcionista' WHERE id = $1", [s.id]))
+    ).rejects.toThrow(/EKKO_CAMPO_PROTEGIDO/);
+    await b.fila("UPDATE usuarios SET rol = 'recepcionista' WHERE id = $1", [s.id]);
     const rol = await auditDe(s, 'cuenta_estado_cambio');
     expect(rol.some((a) => a.antes?.rol === 'miembro' && a.despues?.rol === 'recepcionista')).toBe(true);
   });

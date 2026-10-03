@@ -116,15 +116,14 @@ describe('CrearReservaModal · wiring', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('reprogramar: muestra el contexto y al confirmar orquesta crear + cancelar', async () => {
-    h.rpc.mockResolvedValue({ error: null });
+  it('reprogramar: muestra el contexto y al confirmar llama UNA vez a la RPC atómica reprogramar_reserva', async () => {
+    h.rpc.mockResolvedValue({ data: { success: true, reserva_id: 'res-nueva' }, error: null });
     const onCreada = vi.fn();
     const onClose = vi.fn();
     const reprogramarDe = {
       id: 'res-vieja',
       recurso_id: 'rec-1',
       recurso_nombre: 'Estudio A',
-      // Lejos del slot nuevo → orden crear→cancelar.
       slot_inicio: '2026-06-20T12:00:00.000Z',
       slot_fin: '2026-06-20T13:00:00.000Z'
     };
@@ -144,14 +143,32 @@ describe('CrearReservaModal · wiring', () => {
     fireEvent.click(await screen.findByRole('button', { name: '10:00' }));
     fireEvent.click(screen.getByRole('button', { name: 'Reprogramar' }));
 
-    // Orquesta los dos RPCs de RP-1: crear la nueva + cancelar la vieja.
-    // crear + cancelar + UN aviso de "cambio de horario" (en vez del par agendada/cancelada).
-    await waitFor(() => expect(h.rpc).toHaveBeenCalledTimes(3));
-    const fns = h.rpc.mock.calls.map((c) => c[0]);
-    expect(fns).toContain('staff_avisar_reprogramacion');
-    expect(fns).toContain('reservar_para_miembro_atomic');
-    expect(fns).toContain('cancelar_reserva_atomic');
+    // R2-A (PKG-01J): cancelar + crear + traslado + aviso ocurren en el servidor,
+    // en una transacción. El navegador ya no orquesta crear/cancelar/avisar.
+    await waitFor(() => expect(h.rpc).toHaveBeenCalledTimes(1));
+    expect(h.rpc.mock.calls[0][0]).toBe('reprogramar_reserva');
+    expect(h.rpc.mock.calls[0][1]).toMatchObject({ p_reserva_id: 'res-vieja', p_recurso_id: 'rec-1' });
     await waitFor(() => expect(onCreada).toHaveBeenCalled());
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('reprogramar rechazado → toast con "sigue en pie", el modal NO se cierra y no se refresca', async () => {
+    h.rpc.mockResolvedValue({ data: null, error: { message: 'EKKO_SLOT_OCUPADO: tomado' } });
+    const onCreada = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <CrearReservaModal
+        miembro={MIEMBRO}
+        reprogramarDe={{ id: 'res-vieja', recurso_id: 'rec-1', recurso_nombre: 'Estudio A', slot_inicio: '2026-06-20T12:00:00.000Z', slot_fin: '2026-06-20T13:00:00.000Z' }}
+        onClose={onClose}
+        onCreada={onCreada}
+      />
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '10:00' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reprogramar' }));
+    await waitFor(() => expect(h.toast.error).toHaveBeenCalledWith(expect.stringMatching(/sigue en pie/)));
+    expect(onCreada).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
 

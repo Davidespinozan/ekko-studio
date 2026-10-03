@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { traducirErrorTier } from '../lib/traducirErrorTier';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { backendPost } from '@shared/lib/backend';
@@ -200,17 +201,9 @@ export function useMembresiaActualAdmin(usuarioId: string | undefined) {
   return { membresia, isLoading, error, refetch };
 }
 
-/**
- * Actualizar campos arbitrarios de un miembro.
- * RLS valida que solo admin del tenant puede hacerlo.
- */
-export async function updateMiembro(
-  miembroId: string,
-  patch: Partial<Pick<Usuario, 'rol' | 'status' | 'membresia_tier' | 'nombre' | 'telefono'>>
-): Promise<{ error: string | null }> {
-  const { error } = await supabase.from('usuarios').update(patch).eq('id', miembroId);
-  return { error: error?.message ?? null };
-}
+// R2-A (PKG-01L): se retiró `updateMiembro` (código muerto que escribía rol /
+// membresia_tier por REST). El admin ya no muta esos campos directo: rol va por
+// admin-update-role y el plan por las RPC de membresía.
 
 /**
  * Recursos del tenant (admin ve todos, incluso inactivos).
@@ -315,7 +308,7 @@ export async function updateTier(
   patch: Partial<Pick<Tier, 'nombre' | 'descripcion' | 'precio_centavos' | 'beneficios' | 'reglas' | 'activo' | 'en_venta' | 'orden' | 'slug' | 'tipo' | 'clases_incluidas' | 'duracion_dias' | 'stripe_price_id'>>
 ): Promise<{ error: string | null }> {
   const { error } = await supabase.from('tiers').update(patch).eq('id', tierId);
-  return { error: error?.message ?? null };
+  return { error: error ? traducirErrorTier(error.message) : null };
 }
 
 export async function insertTier(
@@ -326,7 +319,7 @@ export async function insertTier(
     .insert(payload)
     .select('*')
     .single();
-  return { error: error?.message ?? null, data: (data as Tier | null) ?? null };
+  return { error: error ? traducirErrorTier(error.message) : null, data: (data as Tier | null) ?? null };
 }
 
 /**

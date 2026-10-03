@@ -1,54 +1,40 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * `reception-marcar-asistio`: corrige la asistencia de un no_show/cancelada ya
- * iniciada → completada con check-in manual; si era no_show revierte la falta y
- * levanta el bloqueo si se debía a ella. Motivo obligatorio + audit_log.
+ * `reception-marcar-asistio` (R2-A · PKG-01I): autentica al staff y delega TODA
+ * la corrección en la RPC `staff_corregir_asistencia` (accion 'asistio'). Ya no
+ * escribe reservas / usuarios / audit_log desde Netlify. Los errores EKKO_* de
+ * la RPC se traducen a HTTP. La transición y la penalización se prueban contra
+ * Postgres real en src/__tests__/db/r2a-reservas.db.test.ts.
  */
 
 const mockGetUser = vi.fn();
 const mockMaybeSingle = vi.fn();
-const mockUpdate = vi.fn();
-const mockAuditInsert = vi.fn();
+const mockRpc = vi.fn();
+const mockFromWrite = vi.fn();
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
     auth: { getUser: mockGetUser },
-    from: vi.fn((table: string) => {
-      if (table === 'audit_log') return { insert: mockAuditInsert };
-      return {
-        select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockMaybeSingle })) })),
-        update: mockUpdate
-      };
-    })
+    rpc: (...a: unknown[]) => mockRpc(...a),
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockMaybeSingle })) })),
+      update: mockFromWrite,
+      insert: mockFromWrite
+    }))
   }))
 }));
 
 import { handler } from '../../netlify/functions/reception-marcar-asistio/index';
 
 type AnyEvent = Parameters<typeof handler>[0];
-function evento(body: unknown): AnyEvent {
-  return { httpMethod: 'POST', headers: { authorization: 'Bearer tok' }, body: JSON.stringify(body) } as unknown as AnyEvent;
-}
-async function invocar(event: AnyEvent) {
-  const res = await handler(event, {} as never, () => {});
-  return res as { statusCode: number; body: string };
-}
+const evento = (body: unknown) =>
+  ({ httpMethod: 'POST', headers: { authorization: 'Bearer tok' }, body: JSON.stringify(body) }) as unknown as AnyEvent;
+const invocar = async (event: AnyEvent) => (await handler(event, {} as never, () => {})) as { statusCode: number; body: string };
 
 const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo' };
-const PASADO = '2020-01-01T10:00:00.000Z';
-const FUTURO = '2999-01-01T10:00:00.000Z';
-const DIA = 24 * 60 * 60 * 1000;
-const RESERVA_NO_SHOW = { id: 'r1', tenant_id: 't1', usuario_id: 'm1', status: 'no_show', slot_inicio: PASADO, folio: 'EKK-000001' };
 
-function seq(...vals: unknown[]) {
-  vals.forEach((v) => mockMaybeSingle.mockResolvedValueOnce({ data: v, error: null }));
-}
-function updates(): Record<string, unknown>[] {
-  return mockUpdate.mock.calls.map((c) => c[0] as Record<string, unknown>);
-}
-
-describe('reception-marcar-asistio', () => {
+describe('reception-marcar-asistio (R2-A)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockMaybeSingle.mockReset();
@@ -56,58 +42,50 @@ describe('reception-marcar-asistio', () => {
     process.env.VITE_SUPABASE_ANON_KEY = 'anon';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
     mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-caller' } }, error: null });
-    mockAuditInsert.mockResolvedValue({ error: null });
-    mockUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+    mockMaybeSingle.mockResolvedValue({ data: CALLER, error: null });
+    mockRpc.mockResolvedValue({ data: { success: true, status: 'completada', penalizacion: { no_shows_count: 2, bloqueado_hasta: null } }, error: null });
   });
 
-  it('no_show pasado → completada con check-in manual, revierte la falta y levanta el bloqueo que causó', async () => {
-    // 3 faltas (umbral 3) con bloqueo vigente → al revertir queda en 2 → se levanta.
-    seq(CALLER, RESERVA_NO_SHOW, { id: 'm1', no_shows_count: 3, bloqueado_hasta: new Date(Date.now() + 5 * DIA).toISOString() }, { config: {} });
-    const res = await invocar(evento({ reserva_id: 'r1', motivo: 'Sí vino, no le hicieron check-in' }));
+  it('delega en staff_corregir_asistencia(asistio) con actor, reserva y motivo; sin escrituras directas', async () => {
+    const res = await invocar(evento({ reserva_id: 'r1', motivo: '  Sí vino, no le hicieron check-in ' }));
     expect(res.statusCode).toBe(200);
-    const [upReserva, upMiembro] = updates();
-    expect(upReserva).toMatchObject({ status: 'completada', check_in_by: 'u-recep', check_in_method: 'manual' });
-    expect(upReserva.check_in_at).toBeTruthy();
-    expect(upMiembro).toEqual({ no_shows_count: 2, bloqueado_hasta: null });
-    const audit = mockAuditInsert.mock.calls[0][0] as Record<string, unknown>;
-    expect(audit.accion).toBe('asistencia_correction');
-    expect(audit.target_id).toBe('m1');
-    expect(audit.motivo).toBe('Sí vino, no le hicieron check-in');
+    expect(mockRpc).toHaveBeenCalledWith('staff_corregir_asistencia', {
+      p_actor_id: 'u-recep', p_reserva_id: 'r1', p_accion: 'asistio', p_motivo: 'Sí vino, no le hicieron check-in'
+    });
+    expect(JSON.parse(res.body)).toMatchObject({ success: true, status: 'completada', penalizacion: { no_shows_count: 2 } });
+    expect(mockFromWrite).not.toHaveBeenCalled();
   });
 
-  it('no_show con bloqueo que NO se debe a esta falta (sigue sobre el umbral) → conserva el bloqueo', async () => {
-    const hasta = new Date(Date.now() + 5 * DIA).toISOString();
-    seq(CALLER, RESERVA_NO_SHOW, { id: 'm1', no_shows_count: 5, bloqueado_hasta: hasta }, { config: {} });
-    const res = await invocar(evento({ reserva_id: 'r1', motivo: 'Sí vino' }));
-    expect(res.statusCode).toBe(200);
-    expect(updates()[1]).toEqual({ no_shows_count: 4, bloqueado_hasta: hasta });
-  });
-
-  it('cancelada pasada → completada sin tocar penalización', async () => {
-    seq(CALLER, { ...RESERVA_NO_SHOW, status: 'cancelada_admin' });
+  it('cancelada → 409 transicion_invalida (ya no se revive una cancelada)', async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: 'EKKO_TRANSICION_INVALIDA: Una reserva cancelada no se revive; crea una reserva nueva' } });
     const res = await invocar(evento({ reserva_id: 'r1', motivo: 'Vino igual' }));
-    expect(res.statusCode).toBe(200);
-    expect(updates()).toHaveLength(1);
-    expect(updates()[0]).toMatchObject({ status: 'completada' });
+    expect(res.statusCode).toBe(409);
+    expect(JSON.parse(res.body)).toEqual({ code: 'transicion_invalida', error: 'Una reserva cancelada no se revive; crea una reserva nueva' });
   });
 
-  it('sesión futura → 400; confirmada → 400; completada → 400', async () => {
-    seq(CALLER, { ...RESERVA_NO_SHOW, slot_inicio: FUTURO });
-    expect((await invocar(evento({ reserva_id: 'r1', motivo: 'xxx' }))).statusCode).toBe(400);
-    seq(CALLER, { ...RESERVA_NO_SHOW, status: 'confirmada' });
-    expect((await invocar(evento({ reserva_id: 'r1', motivo: 'xxx' }))).statusCode).toBe(400);
-    seq(CALLER, { ...RESERVA_NO_SHOW, status: 'completada' });
-    expect((await invocar(evento({ reserva_id: 'r1', motivo: 'xxx' }))).statusCode).toBe(400);
-    expect(mockUpdate).not.toHaveBeenCalled();
+  it('errores de la RPC: futura/completada → 400; otro estudio → 403; no existe → 404; revocada → 403; identidad → 400', async () => {
+    const casos: Array<[string, number]> = [
+      ['EKKO_SESION_NO_INICIA: x', 400],
+      ['EKKO_YA_COMPLETADA: x', 400],
+      ['EKKO_OTRO_ESTUDIO: x', 403],
+      ['EKKO_RESERVA_NO_EXISTE: x', 404],
+      ['EKKO_CUENTA_REVOCADA: El acceso de esta cuenta fue revocado', 403],
+      ['EKKO_IDENTIDAD_INCOMPLETA: Falta la foto', 400],
+      ['boom', 500]
+    ];
+    for (const [message, status] of casos) {
+      mockRpc.mockResolvedValueOnce({ data: null, error: { message } });
+      expect((await invocar(evento({ reserva_id: 'r1', motivo: 'xxx' }))).statusCode, message).toBe(status);
+    }
   });
 
-  it('sin motivo → 400 (antes de tocar la DB); cross-tenant → 403; miembro → 403', async () => {
+  it('sin motivo → 400 antes de tocar nada; miembro → 403 sin llamar la RPC', async () => {
     expect((await invocar(evento({ reserva_id: 'r1' }))).statusCode).toBe(400);
     expect(mockMaybeSingle).not.toHaveBeenCalled();
-    seq(CALLER, { ...RESERVA_NO_SHOW, tenant_id: 'otro' });
+    mockMaybeSingle.mockResolvedValueOnce({ data: { ...CALLER, rol: 'miembro' }, error: null });
     expect((await invocar(evento({ reserva_id: 'r1', motivo: 'xxx' }))).statusCode).toBe(403);
-    seq({ ...CALLER, rol: 'miembro' });
+    mockMaybeSingle.mockResolvedValueOnce({ data: { ...CALLER, status: 'revocado' }, error: null });
     expect((await invocar(evento({ reserva_id: 'r1', motivo: 'xxx' }))).statusCode).toBe(403);
-    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 });

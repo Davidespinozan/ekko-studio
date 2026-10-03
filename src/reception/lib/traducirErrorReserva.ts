@@ -36,6 +36,26 @@ export function traducirErrorReserva(message: string): string {
     return 'La duración no es válida: entre 15 minutos y 8 horas, sin pasar de la medianoche.';
   }
 
+  // R2-A (PKG-01J) · reprogramación atómica.
+  if (message.includes('EKKO_REPROGRAMAR_NO_VIGENTE')) {
+    return 'Solo se reprograma una reserva confirmada.';
+  }
+  if (message.includes('EKKO_REPROGRAMAR_PASADA')) {
+    return 'Esa sesión ya empezó; no se puede reprogramar.';
+  }
+  if (message.includes('EKKO_MISMO_HORARIO')) {
+    return 'Ese es el horario actual de la reserva. Elige uno distinto.';
+  }
+  if (message.includes('EKKO_EXTRAS_EXCEDEN_TOPE')) {
+    return 'La reserva tiene invitados extra pagados y ese estudio admite menos. Elige otro estudio.';
+  }
+  if (message.includes('EKKO_FICHAS_EXCEDEN')) {
+    return 'La reserva ya tiene más invitados registrados de los que cubriría la nueva. Ajusta los invitados.';
+  }
+  if (message.includes('EKKO_EXTRAS_INCONSISTENTES')) {
+    return 'Los invitados extra pagados de esta reserva no cuadran con sus pagos. Pide a administración que lo revise antes de reprogramar.';
+  }
+
   // Códigos compartidos (slot ocupado, reserva no cancelable, etc.).
   // `traducirErrorRPC` ya trae su propio fallback genérico (ERROR-UI-FIX
   // E-04): nunca devuelve el mensaje crudo del servidor, así que se puede

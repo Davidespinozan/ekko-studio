@@ -15,6 +15,7 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { useTiersAdmin, updateTier, insertTier } from '../hooks/useAdminData';
+import { traducirErrorTier } from '../lib/traducirErrorTier';
 import {
   archiveRecord,
   restoreRecord,
@@ -124,7 +125,7 @@ export default function Tiers() {
     if (!archivar || archivar.status !== 'ready' || archivar.activeMembers > 0) return;
     const { error } = await archiveRecord('tiers', archivar.tier.id);
     if (error) {
-      toast.error(`No se pudo eliminar: ${error}`);
+      toast.error(`No se pudo eliminar: ${traducirErrorTier(error)}`);
       return;
     }
     setArchivar(null);

@@ -639,6 +639,7 @@ export type Database = {
           id: string
           invitados_count: number
           invitados_extra_pagados: number
+          reprogramada_desde: string | null
           notas: string | null
           observaciones: string | null
           qr_token_hash: string | null
@@ -665,6 +666,7 @@ export type Database = {
           id?: string
           invitados_count?: number
           invitados_extra_pagados?: number
+          reprogramada_desde?: string | null
           notas?: string | null
           observaciones?: string | null
           qr_token_hash?: string | null
@@ -691,6 +693,7 @@ export type Database = {
           id?: string
           invitados_count?: number
           invitados_extra_pagados?: number
+          reprogramada_desde?: string | null
           notas?: string | null
           observaciones?: string | null
           qr_token_hash?: string | null

@@ -11,6 +11,7 @@ import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 import { MarcarNoShowModal, type ReservaInfo } from './MarcarNoShowModal';
 import { CorregirCheckinModal } from './CorregirCheckinModal';
 import { MarcarAsistioModal } from './MarcarAsistioModal';
+import { esCorregibleAsistencia } from '../lib/accionesReserva';
 import { CancelarReservaRecepcionModal } from './CancelarReservaRecepcionModal';
 import { AvatarMiembro } from './AvatarMiembro';
 import { clasificarReservasHoy } from '../lib/clasificarReservasHoy';
@@ -633,12 +634,6 @@ export function ReservasHoyView({ onManualCheckInSuccess, pausarPolling = false 
 }
 
 /** ¿Se puede marcar "sí asistió"? no_show/cancelada con sesión ya iniciada. */
-function esCorregibleAsistencia(r: Pick<ReservaConJoin, 'status' | 'slot_inicio'>): boolean {
-  return (
-    (r.status === 'no_show' || r.status === 'cancelada' || r.status === 'cancelada_admin') &&
-    new Date(r.slot_inicio).getTime() <= Date.now()
-  );
-}
 
 function toReservaInfo(r: ReservaConJoin): ReservaInfo {
   return {
@@ -688,8 +683,8 @@ function ReservaCard({
     reserva.status === 'confirmada' &&
     reserva.usuario != null &&
     (reserva.usuario.identidad_completa === false || reserva.usuario.contrato_firmado === false);
-  // Disabled solo si está cancelada/no-show y la sesión aún NO empieza. Una ya
-  // iniciada se puede abrir para corregir la asistencia ("sí asistió").
+  // Cancelada: siempre deshabilitada (no se revive). No-show: deshabilitado hasta
+  // que la sesión empiece; después se abre para corregir ("sí asistió").
   // completada permite abrir el modal (muestra "ya hizo check-in").
   const disabled =
     (reserva.status === 'cancelada' || reserva.status === 'cancelada_admin' || reserva.status === 'no_show') &&

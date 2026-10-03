@@ -231,7 +231,7 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
     if (!recursoSel || !slotSel || submitting) return;
     setSubmitting(true);
 
-    // ---- Modo reprogramar (RP-3b): orquesta crear + cancelar. ----
+    // ---- Modo reprogramar: UNA RPC atómica (R2-A · PKG-01J). ----
     if (reprogramarDe) {
       const mismoSlot =
         recursoSel.id === reprogramarDe.recurso_id &&
@@ -244,12 +244,6 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
 
       const resultado = await reprogramarReserva({
         reservaOriginalId: reprogramarDe.id,
-        usuarioId: miembro.id,
-        original: {
-          recursoId: reprogramarDe.recurso_id,
-          inicio: new Date(reprogramarDe.slot_inicio),
-          fin: new Date(reprogramarDe.slot_fin)
-        },
         nuevo: {
           recursoId: recursoSel.id,
           slotInicio: slotSel.inicio,
@@ -263,17 +257,11 @@ export function CrearReservaModal({ miembro, onClose, onCreada, reprogramarDe }:
         toast.success(resultado.mensaje);
         onCreada();
         onClose();
-      } else if (resultado.estado === 'error_crear' || resultado.estado === 'error_cancelar') {
-        // Nada cambió — la reserva original sigue en pie. El modal queda
-        // abierto para reintentar con otro horario.
+      } else {
+        // R2-A: la reprogramación es atómica → si falla, NADA cambió y la
+        // original sigue en pie. El modal queda abierto para elegir otro horario.
         toast.error(resultado.mensaje);
         setSubmitting(false);
-      } else {
-        // Fallo parcial: refrescar el perfil para reflejar la realidad y
-        // cerrar. El toast lleva la instrucción — nunca en silencio.
-        toast.error(resultado.mensaje);
-        onCreada();
-        onClose();
       }
       return;
     }

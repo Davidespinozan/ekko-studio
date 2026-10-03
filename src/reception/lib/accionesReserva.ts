@@ -32,9 +32,18 @@ export interface AsistioResult {
   penalizacion: { no_shows_count: number; bloqueado_hasta: string | null } | null;
 }
 
-/** "Sí asistió": corrige un no_show/cancelada ya iniciada → completada (revierte la falta). */
+/** "Sí asistió": corrige un no_show ya iniciado → completada (revierte la falta). R2-A: una cancelada no se revive. */
 export function marcarAsistio(reserva_id: string, motivo: string): Promise<AsistioResult> {
   return backendPost<AsistioResult>('reception-marcar-asistio', { reserva_id, motivo });
+}
+
+/**
+ * R2-A (PKG-01I): "sí asistió" corrige SOLO un no_show ya iniciado. Una reserva
+ * cancelada ya devolvió su crédito y liberó el horario: no se revive (el servidor
+ * lo rechaza); si el miembro sí usó el estudio, se le crea una reserva nueva.
+ */
+export function esCorregibleAsistencia(r: { status: string; slot_inicio: string }, ahora: Date = new Date()): boolean {
+  return r.status === 'no_show' && new Date(r.slot_inicio).getTime() <= ahora.getTime();
 }
 
 // Motivos predefinidos (Bloque D). David puede ajustarlos.
@@ -52,6 +61,5 @@ export const MOTIVOS_CORREGIR_CHECKIN = [
 
 export const MOTIVOS_ASISTIO = [
   'Sí vino, no le hicieron check-in',
-  'El cron lo marcó no-show por error',
-  'Cancelación por error, el miembro sí usó la sesión'
+  'El cron lo marcó no-show por error'
 ];

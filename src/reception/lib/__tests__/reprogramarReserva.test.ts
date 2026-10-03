@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Orquestación de reprogramar (Sprint RP-3b). Lo crítico: el ORDEN seguro
- * (crear→cancelar vs cancelar→crear según si el nuevo horario choca) y que
- * NINGÚN fallo parcial quede en silencio.
- *
- * Mock estable de supabase (vi.hoisted) — referencia fija, como el cliente
- * real (lección del bucle infinito de RP-3a).
+ * R2-A (PKG-01J) · reprogramar = UNA RPC atómica (`reprogramar_reserva`).
+ * Ya no hay orden crear→cancelar / cancelar→crear ni estados parciales: si el
+ * servidor rechaza, NADA cambió. El comportamiento transaccional (rollback,
+ * créditos, traslado de extras, fichas, aviso) se prueba contra Postgres real en
+ * src/__tests__/db/r2a-reservas.db.test.ts.
  */
 
 const h = vi.hoisted(() => ({ rpc: vi.fn() }));
@@ -15,162 +14,61 @@ vi.mock('@shared/lib/supabase', () => ({
   supabase: { rpc: (...a: unknown[]) => h.rpc(...a) }
 }));
 
-import { reprogramarReserva, debeCancelarPrimero } from '../reprogramarReserva';
+import { reprogramarReserva } from '../reprogramarReserva';
 
-function params(overrides: Record<string, unknown> = {}) {
-  return {
-    reservaOriginalId: 'res-vieja',
-    usuarioId: 'm-1',
-    original: {
-      recursoId: 'rec-1',
-      inicio: new Date('2026-07-01T10:00:00.000Z'),
-      fin: new Date('2026-07-01T11:00:00.000Z')
-    },
-    nuevo: {
-      recursoId: 'rec-1',
-      // Otro día → NO choca con la vieja.
-      slotInicio: new Date('2026-07-03T15:00:00.000Z'),
-      duracionMin: 60,
-      notas: null
-    },
-    ...overrides
-  };
-}
-
-// Nuevo horario contiguo a la vieja (vieja 10-11 → nuevo 11-12) → choca.
-const nuevoContiguo = {
-  recursoId: 'rec-1',
-  slotInicio: new Date('2026-07-01T11:00:00.000Z'),
-  duracionMin: 60,
-  notas: null
-};
+const params = (invitados?: number) => ({
+  reservaOriginalId: 'res-vieja',
+  nuevo: {
+    recursoId: 'rec-2',
+    slotInicio: new Date('2026-07-03T15:00:00.000Z'),
+    duracionMin: 90,
+    notas: 'trae tripié',
+    ...(invitados === undefined ? {} : { invitados })
+  }
+});
 
 beforeEach(() => {
   h.rpc.mockReset();
 });
 
-describe('debeCancelarPrimero', () => {
-  const original = { recursoId: 'rec-1', inicio: 1000, fin: 2000 };
-
-  it('horario lejano → false (crear primero es seguro)', () => {
-    expect(debeCancelarPrimero(original, { recursoId: 'rec-1', inicio: 5000, fin: 6000 })).toBe(false);
-  });
-
-  it('horario contiguo → true (cualquier recurso: EKKO_CONTINUA)', () => {
-    expect(debeCancelarPrimero(original, { recursoId: 'rec-2', inicio: 2000, fin: 3000 })).toBe(true);
-    expect(debeCancelarPrimero(original, { recursoId: 'rec-1', inicio: 0, fin: 1000 })).toBe(true);
-  });
-
-  it('solape en el MISMO recurso → true (EKKO_SLOT_OCUPADO)', () => {
-    expect(debeCancelarPrimero(original, { recursoId: 'rec-1', inicio: 1500, fin: 2500 })).toBe(true);
-  });
-
-  it('solape en DISTINTO recurso → true: con "un solo set a la vez" la vieja bloquea todos los sets (EKKO_ESTUDIO_EN_USO)', () => {
-    expect(debeCancelarPrimero(original, { recursoId: 'rec-2', inicio: 1500, fin: 2500 })).toBe(true);
-    // Mover de set a la MISMA hora: el caso típico.
-    expect(debeCancelarPrimero(original, { recursoId: 'rec-2', inicio: 1000, fin: 2000 })).toBe(true);
-  });
-});
-
-describe('reprogramarReserva · no choca (crear → cancelar)', () => {
-  it('éxito: crea la nueva y después cancela la vieja', async () => {
-    h.rpc.mockResolvedValue({ error: null });
-
-    const r = await reprogramarReserva(params());
-
-    expect(r.estado).toBe('ok');
-    expect(h.rpc.mock.calls.map((c) => c[0])).toEqual([
-      'reservar_para_miembro_atomic',
-      'cancelar_reserva_atomic',
-      // …y al final UN aviso de "cambio de horario" en vez del par agendada + cancelada.
-      'staff_avisar_reprogramacion'
-    ]);
-    expect(h.rpc.mock.calls[1][1]).toMatchObject({ p_reserva_id: 'res-vieja' });
-    expect(h.rpc.mock.calls[2][1]).toEqual({ p_reserva_vieja: 'res-vieja' });
-  });
-
-  it('si el aviso de cambio de horario falla, la reprogramación SIGUE siendo un éxito', async () => {
-    h.rpc.mockImplementation((fn: string) =>
-      fn === 'staff_avisar_reprogramacion' ? Promise.reject(new Error('red caída')) : Promise.resolve({ error: null })
-    );
-    const r = await reprogramarReserva(params());
-    expect(r.estado).toBe('ok');
-  });
-
-  it('falla crear → NO toca la vieja, error_crear', async () => {
-    h.rpc.mockImplementation((fn: string) =>
-      Promise.resolve(
-        fn === 'reservar_para_miembro_atomic'
-          ? { error: { message: 'EKKO_SLOT_OCUPADO: tomado' } }
-          : { error: null }
-      )
-    );
-
-    const r = await reprogramarReserva(params());
-
-    expect(r.estado).toBe('error_crear');
-    expect(r.mensaje).toMatch(/original sigue en pie/i);
-    // cancelar_reserva_atomic NUNCA se llamó.
+describe('reprogramarReserva (R2-A)', () => {
+  it('una sola llamada a reprogramar_reserva con todos los parámetros; ok con la reserva nueva', async () => {
+    h.rpc.mockResolvedValue({ data: { success: true, reserva_id: 'res-nueva', folio: 'EKK-000010' }, error: null });
+    const r = await reprogramarReserva(params(2));
     expect(h.rpc).toHaveBeenCalledTimes(1);
-    expect(h.rpc.mock.calls[0][0]).toBe('reservar_para_miembro_atomic');
+    expect(h.rpc).toHaveBeenCalledWith('reprogramar_reserva', {
+      p_reserva_id: 'res-vieja',
+      p_recurso_id: 'rec-2',
+      p_slot_inicio: '2026-07-03T15:00:00.000Z',
+      p_duracion_min: 90,
+      p_invitados: 2,
+      p_notas: 'trae tripié'
+    });
+    expect(r).toEqual({ estado: 'ok', mensaje: 'Reserva reprogramada.', reservaId: 'res-nueva' });
   });
 
-  it('crear OK pero cancelar falla → parcial_sin_cancelar (avisa: cancelar manual)', async () => {
-    h.rpc.mockImplementation((fn: string) =>
-      Promise.resolve(
-        fn === 'cancelar_reserva_atomic'
-          ? { error: { message: 'EKKO_RESERVA_NO_EXISTE' } }
-          : { error: null }
-      )
-    );
-
-    const r = await reprogramarReserva(params());
-
-    expect(r.estado).toBe('parcial_sin_cancelar');
-    expect(r.mensaje).toMatch(/cancela la reserva original manualmente/i);
-  });
-});
-
-describe('reprogramarReserva · choca (cancelar → crear)', () => {
-  it('éxito: cancela la vieja primero y después crea la nueva', async () => {
-    h.rpc.mockResolvedValue({ error: null });
-
-    const r = await reprogramarReserva(params({ nuevo: nuevoContiguo }));
-
-    expect(r.estado).toBe('ok');
-    expect(h.rpc.mock.calls[0][0]).toBe('cancelar_reserva_atomic');
-    expect(h.rpc.mock.calls[1][0]).toBe('reservar_para_miembro_atomic');
+  it('sin invitados explícitos → null: el servidor conserva los de la original', async () => {
+    h.rpc.mockResolvedValue({ data: { success: true, reserva_id: 'x' }, error: null });
+    await reprogramarReserva(params());
+    expect(h.rpc.mock.calls[0][1]).toMatchObject({ p_invitados: null });
   });
 
-  it('cancelar OK pero crear falla → parcial_sin_recrear (avisa: miembro sin reserva)', async () => {
-    h.rpc.mockImplementation((fn: string) =>
-      Promise.resolve(
-        fn === 'reservar_para_miembro_atomic'
-          ? { error: { message: 'EKKO_SLOT_OCUPADO: tomado' } }
-          : { error: null }
-      )
-    );
-
-    const r = await reprogramarReserva(params({ nuevo: nuevoContiguo }));
-
-    expect(r.estado).toBe('parcial_sin_recrear');
-    expect(r.mensaje).toMatch(/sin reserva/i);
-  });
-
-  it('falla cancelar → NO intenta crear, error_cancelar', async () => {
-    h.rpc.mockImplementation((fn: string) =>
-      Promise.resolve(
-        fn === 'cancelar_reserva_atomic'
-          ? { error: { message: 'EKKO_RESERVA_NO_CANCELABLE' } }
-          : { error: null }
-      )
-    );
-
-    const r = await reprogramarReserva(params({ nuevo: nuevoContiguo }));
-
-    expect(r.estado).toBe('error_cancelar');
-    expect(r.mensaje).toMatch(/original sigue en pie/i);
-    expect(h.rpc).toHaveBeenCalledTimes(1);
-    expect(h.rpc.mock.calls[0][0]).toBe('cancelar_reserva_atomic');
+  it('error → estado error, traducido, y "la reserva original sigue en pie" (no hay parciales)', async () => {
+    const casos: Array<[string, RegExp]> = [
+      ['EKKO_SLOT_OCUPADO: Este horario ya está reservado', /sigue en pie/],
+      ['EKKO_EXTRAS_EXCEDEN_TOPE: x', /invitados extra pagados/],
+      ['EKKO_FICHAS_EXCEDEN: x', /invitados registrados/],
+      ['EKKO_REPROGRAMAR_PASADA: x', /ya empezó/],
+      ['EKKO_MISMO_HORARIO: x', /horario actual/]
+    ];
+    for (const [message, re] of casos) {
+      h.rpc.mockResolvedValueOnce({ data: null, error: { message } });
+      const r = await reprogramarReserva(params());
+      expect(r.estado).toBe('error');
+      expect(r.mensaje).toMatch(re);
+      expect(r.mensaje).toMatch(/La reserva original sigue en pie\./);
+    }
+    expect(h.rpc).toHaveBeenCalledTimes(casos.length);
+    expect(h.rpc.mock.calls.every((c) => c[0] === 'reprogramar_reserva')).toBe(true);
   });
 });

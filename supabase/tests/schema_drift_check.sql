@@ -215,8 +215,10 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
         THEN '✅ PASS' ELSE '❌ FALTA — la tabla no tiene las 4 columnas (SEC-FIX H1 no aplicada)' END),
 ('8 · datos_privados', 'SEC-FIX 21100000 (H1)', 'policy udp_select_self (dueño lee lo suyo)',
  CASE WHEN EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='usuarios_datos_privados' AND policyname='udp_select_self') THEN '✅ PASS' ELSE '❌ FALTA' END),
-('8 · datos_privados', 'SEC-FIX 21100000 (H1)', 'policy udp_admin_all (admin del tenant)',
- CASE WHEN EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='usuarios_datos_privados' AND policyname='udp_admin_all') THEN '✅ PASS' ELSE '❌ FALTA' END);
+('8 · datos_privados', 'R2-A 20261004100000 (01L)', 'policy udp_admin_read (admin del tenant LEE; sin FOR ALL)',
+ CASE WHEN EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='usuarios_datos_privados' AND policyname='udp_admin_read' AND cmd='SELECT')
+       AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='usuarios_datos_privados' AND policyname='udp_admin_all')
+      THEN '✅ PASS' ELSE '❌ FALTA' END);
 
 
 -- ////////////////////////////////////////////////////////////////////////////
@@ -268,12 +270,15 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
         THEN '✅ PASS' ELSE '❌ FALTA — rls_policies no aplicada (' ||
             (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='usuarios'
              AND policyname IN ('usuarios_read_self','usuarios_read_admin','usuarios_update_self','usuarios_update_admin'))::text || ' de 4)' END),
-('11 · Grants/RLS', '100800_rls_policies', 'reservas: policies read_self / read_admin / admin_all',
+('11 · Grants/RLS', '100800_rls_policies + R2-A (01L)', 'reservas: policies read_self / read_admin; SIN admin_all (escrituras por RPC)',
  CASE WHEN (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='reservas'
-            AND policyname IN ('reservas_read_self','reservas_read_admin','reservas_admin_all')) = 3
+            AND policyname IN ('reservas_read_self','reservas_read_admin')) = 2
+       AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='reservas' AND policyname='reservas_admin_all')
         THEN '✅ PASS' ELSE '❌ FALTA' END),
-('11 · Grants/RLS', '100800_rls_policies', 'membresias: policy membresias_admin_all',
- CASE WHEN EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='membresias' AND policyname='membresias_admin_all') THEN '✅ PASS' ELSE '❌ FALTA' END),
+('11 · Grants/RLS', '100800_rls_policies + R2-A (01L)', 'membresias: admin solo LEE (membresias_read_admin; sin admin_all)',
+ CASE WHEN EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='membresias' AND policyname='membresias_read_admin')
+       AND NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='membresias' AND policyname='membresias_admin_all')
+      THEN '✅ PASS' ELSE '❌ FALTA' END),
 ('11 · Grants/RLS', '100800_rls_policies', 'payment_events: policy payment_events_admin_read',
  CASE WHEN EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='payment_events' AND policyname='payment_events_admin_read') THEN '✅ PASS' ELSE '❌ FALTA' END),
 ('11 · Grants/RLS', '17600000_cancelar_reservas', 'notificaciones: 3 policies (lee/marca/admin crea)',

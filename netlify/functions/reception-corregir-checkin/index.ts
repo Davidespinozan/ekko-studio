@@ -1,15 +1,14 @@
 import ws from 'ws';
-
 if (!globalThis.WebSocket) {
   (globalThis as any).WebSocket = ws;
 }
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
+import { badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { writeAuditLog } from '../_lib/auditLog';
 import { esStaffActivo } from '../_lib/staff';
+import { corregirAsistencia } from '../_lib/corregirAsistencia';
 
 /**
  * POST /reception-corregir-checkin
@@ -17,22 +16,17 @@ import { esStaffActivo } from '../_lib/staff';
  * Body: { reserva_id, motivo }   // motivo OBLIGATORIO
  *
  * Deshace un check-in mal hecho (miembro equivocado, marcado sin presentarse):
- * status vuelve a 'confirmada' y se limpian check_in_at / check_in_by /
- * check_in_method. Limitado al MISMO DÍA (zona America/Mazatlan) — algo más
- * viejo se escala a admin (no es el caso común; recepción corrige en caliente).
+ * completada → confirmada y se limpian check_in_at / check_in_by /
+ * check_in_method. Limitado al MISMO DÍA (zona America/Mazatlan).
  *
- * Gobernanza (Bloque A): rol admin/recepcionista, mismo tenant (H3), motivo
- * obligatorio, audit_log inmutable (targeteado al usuario → historial).
+ * R2-A (PKG-01I): la transición la hace la RPC `staff_corregir_asistencia`
+ * (reserva bloqueada, solo desde `completada`, audit_log 'checkin_correction'
+ * en la misma transacción). Mismo tenant, rol staff activo, motivo obligatorio.
  */
 
 interface Body {
   reserva_id?: string;
   motivo?: string;
-}
-
-/** Día de pared (YYYY-MM-DD) en America/Mazatlan, para el límite "mismo día". */
-function diaMazatlan(iso: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mazatlan' }).format(new Date(iso));
 }
 
 export const handler: Handler = async (event) => {
@@ -72,48 +66,12 @@ export const handler: Handler = async (event) => {
       auth: { persistSession: false }
     });
 
-    const { data: reserva, error: reservaErr } = await supabaseAdmin
-      .from('reservas')
-      .select('id, tenant_id, usuario_id, status, check_in_at, check_in_method, folio')
-      .eq('id', body.reserva_id)
-      .maybeSingle();
-    if (reservaErr) return serverError(reservaErr.message);
-    if (!reserva) return notFound('Reserva no encontrada');
-    if (reserva.tenant_id !== caller.tenant_id) {
-      return forbidden('La reserva pertenece a otro estudio');
-    }
-    if (!reserva.check_in_at) {
-      return badRequest('La reserva no tiene check-in que corregir');
-    }
-    if (diaMazatlan(reserva.check_in_at) !== diaMazatlan(new Date().toISOString())) {
-      return badRequest('Solo se puede corregir un check-in del mismo día. Escalá a admin.');
-    }
-
-    const { error: upErr } = await supabaseAdmin
-      .from('reservas')
-      .update({
-        status: 'confirmada',
-        check_in_at: null,
-        check_in_by: null,
-        check_in_method: null
-      })
-      .eq('id', reserva.id);
-    if (upErr) return serverError(upErr.message);
-
-    await writeAuditLog(supabaseAdmin, {
-      tenant_id: reserva.tenant_id,
-      actor_usuario_id: caller.id,
-      actor_rol: caller.rol,
-      accion: 'checkin_correction',
-      target_tipo: 'usuario',
-      target_id: reserva.usuario_id,
-      antes: { status: reserva.status, check_in_at: reserva.check_in_at, check_in_method: reserva.check_in_method },
-      despues: { status: 'confirmada', check_in_at: null, check_in_method: null },
-      motivo,
-      metadata: { reserva_id: reserva.id, folio: reserva.folio }
+    return await corregirAsistencia(supabaseAdmin, {
+      actorId: caller.id,
+      reservaId: body.reserva_id,
+      accion: 'deshacer_checkin',
+      motivo
     });
-
-    return ok({ success: true, status: 'confirmada' });
   } catch (e) {
     console.error('[reception-corregir-checkin]', e);
     return serverError(e instanceof Error ? e.message : 'Error desconocido');

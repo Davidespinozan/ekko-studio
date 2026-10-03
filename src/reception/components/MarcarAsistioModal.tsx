@@ -18,15 +18,15 @@ function hora(iso: string): string {
 }
 
 /**
- * "Sí asistió": corrige un no_show del cron (o una cancelada por error) cuando
- * el miembro sí vino y nadie le hizo el check-in. Revierte la falta y, si el
- * bloqueo se debía a ella, lo levanta. Motivo obligatorio → audit_log.
+ * "Sí asistió": corrige un no_show cuando el miembro sí vino y nadie le hizo el
+ * check-in. Revierte la falta y, si el bloqueo se debía a ella, lo levanta.
+ * Motivo obligatorio → audit_log. R2-A: solo desde no_show (una cancelada no se
+ * revive); la transición completa la hace el servidor en una transacción.
  */
 export function MarcarAsistioModal({ reserva, onClose, onDone }: Props) {
   const toast = useToast();
   const [motivo, setMotivo] = useState('');
   const [saving, setSaving] = useState(false);
-  const eraNoShow = reserva.status === 'no_show';
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -37,7 +37,7 @@ export function MarcarAsistioModal({ reserva, onClose, onDone }: Props) {
     setSaving(true);
     try {
       await marcarAsistio(reserva.id, motivo.trim());
-      toast.success(eraNoShow ? 'Asistencia corregida: la falta se revirtió.' : 'Asistencia registrada.');
+      toast.success('Asistencia corregida: la falta se revirtió.');
       onDone();
       onClose();
     } catch (err) {
@@ -91,10 +91,8 @@ export function MarcarAsistioModal({ reserva, onClose, onDone }: Props) {
         >
           <UserCheck size={16} style={{ color: 'var(--ek-mustard)', flexShrink: 0, marginTop: '1px' }} aria-hidden="true" />
           <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: 0, lineHeight: 1.45 }}>
-            La reserva pasa a <strong>asistió</strong> con check-in de ahora.
-            {eraNoShow
-              ? ' La falta se revierte y, si el bloqueo era por esta falta, se levanta.'
-              : ' El crédito devuelto al cancelar no se vuelve a cobrar.'}
+            La reserva pasa a <strong>asistió</strong> con check-in de ahora. La falta se revierte y, si el
+            bloqueo era por esta falta, se levanta. No se cobra ni se devuelve ningún crédito.
           </p>
         </div>
 

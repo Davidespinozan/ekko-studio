@@ -71,11 +71,12 @@ BEGIN
        CASE WHEN v_count = 1 THEN '✅ PASS' ELSE '❌ FAIL — sin RLS' END);
   END IF;
 
-  -- H1 — solo dueño (udp_select_self) y admin (udp_admin_all); recepción no
+  -- H1 — solo dueño (udp_select_self) y admin (udp_admin_read; R2-A/01L quitó
+  -- el FOR ALL: el admin lee, no escribe por REST); recepción no
   SELECT count(*) INTO v_count
   FROM pg_policies
   WHERE tablename = 'usuarios_datos_privados'
-    AND policyname IN ('udp_select_self', 'udp_admin_all');
+    AND policyname IN ('udp_select_self', 'udp_admin_read');
   INSERT INTO _sec_fix_resultado (area, caso, resultado) VALUES
     ('H1', 'Policies dueño+admin presentes (recepción no entra)',
      CASE WHEN v_count = 2 THEN '✅ PASS'
