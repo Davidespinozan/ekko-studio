@@ -21,9 +21,12 @@ import { esStaffActivo } from '../_lib/staff';
  *   POST { action: 'add',    reserva_id, nombre, foto?: { base64, contentType } }
  *   POST { action: 'remove', reserva_id, invitado_id }
  *
- * es_extra se calcula al agregar: si ya hay >= max_invitados del plan, el nuevo
- * va "arriba del tope" (cobrado en recepción). El precio por extra sale de
- * config.reserva.precio_invitado_extra_centavos.
+ * PKG-01H (W-3=A): la RESERVA es la fuente de verdad. Cubiertos =
+ * invitados_count (incluidos al reservar) + invitados_extra_pagados (extras que
+ * el miembro pagó en la app). El alta pasa por la RPC `registrar_ficha_invitado`,
+ * que bloquea la reserva, rechaza fichas por encima de lo cubierto o fuera de la
+ * ventana de asistencia, y decide es_extra con el snapshot de la reserva (no con
+ * el plan cacheado del miembro). En recepción no se cobra nada.
  */
 
 interface Body {
@@ -33,6 +36,12 @@ interface Body {
   nombre?: string;
   foto?: { base64?: string; contentType?: string };
 }
+
+const conflicto = (code: string, error: string) => ({
+  statusCode: 409,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ error, code })
+});
 
 function extFromContentType(ct: string): string {
   if (ct.includes('png')) return 'png';
@@ -76,35 +85,18 @@ export const handler: Handler = async (event) => {
     // Reserva del MISMO tenant (H3).
     const { data: reserva } = await admin
       .from('reservas')
-      .select('id, tenant_id, usuario_id, invitados_extra_pagados')
+      .select('id, tenant_id, usuario_id, invitados_count, invitados_extra_pagados')
       .eq('id', body.reserva_id)
       .maybeSingle();
     if (!reserva) return notFound('Reserva no encontrada');
     if (reserva.tenant_id !== caller.tenant_id) return forbidden('Esa reserva es de otro estudio');
 
-    // Extras que el miembro ya pagó en la app (Stripe). Amplían la cobertura.
+    // Snapshot de la reserva (PKG-01H): incluidos al reservar + extras pagados.
+    const incluidos = Number(reserva.invitados_count) || 0;
     const prepagados = Number(reserva.invitados_extra_pagados) || 0;
-
-    // Precio por invitado extra (config del tenant) + tope del plan del miembro.
     const { data: tenant } = await admin.from('tenants').select('config').eq('id', caller.tenant_id).maybeSingle();
     const cfgReserva = ((tenant?.config as Record<string, unknown> | null)?.reserva ?? {}) as Record<string, unknown>;
     const precioExtra = Number(cfgReserva.precio_invitado_extra_centavos) || 0;
-
-    const { data: miembro } = await admin
-      .from('usuarios')
-      .select('membresia_tier')
-      .eq('id', reserva.usuario_id)
-      .maybeSingle();
-    let maxIncluidos = 0;
-    if (miembro?.membresia_tier) {
-      const { data: tier } = await admin
-        .from('tiers')
-        .select('reglas')
-        .eq('tenant_id', caller.tenant_id)
-        .eq('slug', miembro.membresia_tier)
-        .maybeSingle();
-      maxIncluidos = Number((tier?.reglas as Record<string, unknown> | null)?.max_invitados) || 0;
-    }
 
     async function listar() {
       const { data: rows } = await admin
@@ -123,17 +115,15 @@ export const handler: Handler = async (event) => {
         })
       );
       const total = invitados.length;
-      const cubiertos = maxIncluidos + prepagados;
-      // Arriba del plan (info) y lo que falta pagar (el miembro lo paga en su app).
-      const extras = Math.max(0, total - maxIncluidos);
-      const pendientes_pago = Math.max(0, total - cubiertos);
+      const cubiertos = incluidos + prepagados;
       return ok({
         invitados,
-        max_incluidos: maxIncluidos,
+        max_incluidos: incluidos,
         invitados_extra_pagados: prepagados,
         precio_invitado_extra_centavos: precioExtra,
-        extras,
-        pendientes_pago,
+        extras: Math.max(0, total - incluidos),
+        cubiertos,
+        disponibles: Math.max(0, cubiertos - total),
         total
       });
     }
@@ -145,14 +135,6 @@ export const handler: Handler = async (event) => {
     if (body.action === 'add') {
       const nombre = body.nombre?.trim();
       if (!nombre) return badRequest('El nombre del invitado es requerido');
-
-      // ¿Este invitado va arriba del tope del plan? (los ya registrados + este)
-      const { count } = await admin
-        .from('reserva_invitados')
-        .select('id', { count: 'exact', head: true })
-        .eq('reserva_id', body.reserva_id);
-      const yaRegistrados = count ?? 0;
-      const esExtra = yaRegistrados >= maxIncluidos;
 
       let fotoPath: string | null = null;
       if (body.foto?.base64 && body.foto.contentType) {
@@ -167,19 +149,26 @@ export const handler: Handler = async (event) => {
         fotoPath = path;
       }
 
-      const { data: inserted, error: insErr } = await admin
-        .from('reserva_invitados')
-        .insert({
-          tenant_id: caller.tenant_id,
-          reserva_id: body.reserva_id,
-          nombre,
-          foto_path: fotoPath,
-          es_extra: esExtra,
-          created_by: caller.id
-        })
-        .select('id')
-        .single();
-      if (insErr) return serverError(insErr.message);
+      // El servidor decide (lock de la reserva, tope, ventana, es_extra).
+      const { data: alta, error: altaErr } = await admin.rpc('registrar_ficha_invitado', {
+        p_actor_id: caller.id,
+        p_reserva_id: body.reserva_id,
+        p_nombre: nombre,
+        p_foto_path: fotoPath
+      });
+      if (altaErr) {
+        if (fotoPath) await admin.storage.from('identidad').remove([fotoPath]);
+        const m = altaErr.message ?? '';
+        if (m.includes('EKKO_INVITADOS_NO_CUBIERTOS')) return conflicto('invitados_no_cubiertos', 'La reserva ya tiene registrados todos los invitados que cubre (incluidos + extras pagados).');
+        if (m.includes('EKKO_RESERVA_NO_VIGENTE')) return conflicto('reserva_no_vigente', 'La reserva no está vigente: no se registran invitados.');
+        if (m.includes('EKKO_RESERVA_PASADA')) return conflicto('reserva_pasada', 'La sesión ya terminó: no se registran invitados.');
+        if (m.includes('EKKO_TENANT_DIFERENTE')) return forbidden('Esa reserva es de otro estudio');
+        if (m.includes('EKKO_NO_AUTORIZADO')) return forbidden('Solo recepción o admin pueden hacer esto');
+        if (m.includes('EKKO_INVITADO_NOMBRE')) return badRequest('El nombre del invitado es requerido');
+        return serverError('No se pudo registrar al invitado');
+      }
+      const inserted = { id: (alta as { invitado_id: string }).invitado_id };
+      const esExtra = (alta as { es_extra: boolean }).es_extra;
 
       await writeAuditLog(admin, {
         tenant_id: caller.tenant_id,

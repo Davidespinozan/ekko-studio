@@ -257,6 +257,7 @@ export async function updateRecurso(
     | 'foto_url'
     | 'capacidad_personas'
     | 'costo_creditos'
+    | 'max_invitados_extra'
     | 'tipo_contenido'
     | 'equipo_incluido'
     | 'estilo_visual'

@@ -662,6 +662,8 @@ function EditarRecursoModal({
       foto_url: fotoUrl || null,
       capacidad_personas: capacidadPersonas || null,
       costo_creditos: Math.max(1, costoCreditos),
+      // PKG-01H (S-9): antes solo se mandaba al crear; editarlo no se guardaba.
+      max_invitados_extra: Math.max(0, maxInvitadosExtra),
       tipo_contenido: tipoContenido,
       equipo_incluido: equipoIncluido,
       estilo_visual: estiloVisual || null

@@ -78,8 +78,8 @@ describe('clasificarError', () => {
 });
 
 describe('accionIdempotente', () => {
-  it('solo invitados-extra NO es re-ejecutable tras un crash a medias', () => {
-    expect(accionIdempotente('invitados-extra')).toBe(false);
+  it('PKG-01H: todas las acciones son re-ejecutables; invitados-extra es idempotente por PaymentIntent', () => {
+    expect(accionIdempotente('invitados-extra')).toBe(true);
     for (const k of ['activar', 'activar-sub', 'sync', 'reversal', 'reconciliar-reembolso', 'cuenta-desautorizada', 'cuenta-conectada', 'ignore', 'revision'] as const) {
       expect(accionIdempotente(k), k).toBe(true);
     }

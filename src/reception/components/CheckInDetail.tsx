@@ -29,6 +29,8 @@ interface ReservaData {
   slot_fin: string;
   duracion_min: number;
   invitados_count: number;
+  /** PKG-01H: extras pagados en la app (row_to_json de la reserva los trae). */
+  invitados_extra_pagados?: number | null;
 }
 
 interface StatsData {
@@ -49,6 +51,16 @@ interface Props {
 }
 
 const AUTO_CLOSE_MS = 15_000;
+
+/** PKG-01H: titular + incluidos + extras pagados, con desglose. */
+export function desglosePersonas(incluidos: number, extras: number): string {
+  const total = 1 + incluidos + extras;
+  if (incluidos === 0 && extras === 0) return `${total}`;
+  const partes = ['titular'];
+  if (incluidos > 0) partes.push(`${incluidos} incluido${incluidos === 1 ? '' : 's'}`);
+  if (extras > 0) partes.push(`${extras} extra${extras === 1 ? '' : 's'} pagado${extras === 1 ? '' : 's'}`);
+  return `${total} (${partes.join(' + ')})`;
+}
 
 export function CheckInDetail({ kind, miembro, recurso, reserva, stats, membresiaEstado, errorMessage, onClose }: Props) {
   const [secondsLeft, setSecondsLeft] = useState(Math.ceil(AUTO_CLOSE_MS / 1000));
@@ -134,7 +146,7 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, membresi
         <Cell label="HORA" value={`${hora(reserva.slot_inicio)} – ${hora(reserva.slot_fin)}`} />
         <Cell label="DURACIÓN" value={`${reserva.duracion_min} min`} />
         <Cell label="FOLIO" value={reserva.folio} mono />
-        <Cell label="PERSONAS" value={`${1 + reserva.invitados_count}`} />
+        <Cell label="PERSONAS" value={desglosePersonas(reserva.invitados_count, reserva.invitados_extra_pagados ?? 0)} />
       </div>
 
       <div className="rec-detail-divider" />

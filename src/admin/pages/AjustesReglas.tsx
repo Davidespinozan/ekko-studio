@@ -279,7 +279,7 @@ export default function AjustesReglas() {
       <Section title="INVITADOS">
         <FormField
           label="Precio por invitado extra (pesos)"
-          helper="Cuánto cobra recepción por cada invitado que el miembro traiga ARRIBA del tope de su plan. Se cobra en caja al registrar al invitado. Pon 0 si no cobras extras."
+          helper="Precio por cada invitado extra (arriba de los incluidos en su plan). El miembro lo paga con tarjeta desde su app antes de la sesión; recepción solo registra a los invitados que la reserva ya cubre. Pon 0 si no vendes extras."
         >
           <input
             type="number"

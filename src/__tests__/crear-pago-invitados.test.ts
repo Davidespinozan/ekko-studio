@@ -64,7 +64,7 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
   mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-1' } }, error: null });
   mockSocioMaybe.mockResolvedValue({ data: { id: 'u1', tenant_id: 't1', rol: 'miembro', email: 'm@e.com' }, error: null });
-  mockReservaMaybe.mockResolvedValue({ data: { id: 'res_1', tenant_id: 't1', usuario_id: 'u1', status: 'confirmada', recurso_id: 'rec_1', invitados_extra_pagados: 0 }, error: null });
+  mockReservaMaybe.mockResolvedValue({ data: { id: 'res_1', tenant_id: 't1', usuario_id: 'u1', status: 'confirmada', recurso_id: 'rec_1', invitados_extra_pagados: 0, slot_fin: new Date(Date.now() + 86_400_000).toISOString() }, error: null });
   mockRecursoMaybe.mockResolvedValue({ data: { max_invitados_extra: 4 }, error: null });
   mockTenantMaybe.mockResolvedValue({ data: { config: { reserva: { precio_invitado_extra_centavos: 10000 } } }, error: null });
   mockCustomerSessionCreate.mockResolvedValue({ client_secret: 'cs_secret' });
@@ -101,7 +101,7 @@ describe('crear-pago-invitados', () => {
 
   it('excede el tope del estudio (ya pagados + cantidad > max) → 400', async () => {
     mockRecursoMaybe.mockResolvedValue({ data: { max_invitados_extra: 4 }, error: null });
-    mockReservaMaybe.mockResolvedValue({ data: { id: 'res_1', tenant_id: 't1', usuario_id: 'u1', status: 'confirmada', recurso_id: 'rec_1', invitados_extra_pagados: 3 }, error: null });
+    mockReservaMaybe.mockResolvedValue({ data: { id: 'res_1', tenant_id: 't1', usuario_id: 'u1', status: 'confirmada', recurso_id: 'rec_1', invitados_extra_pagados: 3, slot_fin: new Date(Date.now() + 86_400_000).toISOString() }, error: null });
     const res = await invocar({ reserva_id: 'res_1', cantidad: 2 }); // 3 + 2 > 4
     expect(res.statusCode).toBe(400);
     expect(mockPICreate).not.toHaveBeenCalled();
@@ -127,5 +127,44 @@ describe('crear-pago-invitados', () => {
       }),
       { stripeAccount: 'acct_1' }
     );
+  });
+
+  // ── PKG-01H ──────────────────────────────────────────────────────────────
+  const reservaCon = (extra: Record<string, unknown>) =>
+    mockReservaMaybe.mockResolvedValue({ data: { id: 'res_1', tenant_id: 't1', usuario_id: 'u1', status: 'confirmada', recurso_id: 'rec_1', invitados_extra_pagados: 0, slot_fin: new Date(Date.now() + 86_400_000).toISOString(), ...extra }, error: null });
+
+  it('PKG-01H · el PI lleva snapshot del precio y el tenant (el webhook valida contra esto, no contra la config)', async () => {
+    await invocar({ reserva_id: 'res_1', cantidad: 2 });
+    expect(mockPICreate.mock.calls[0][0]).toMatchObject({
+      amount: 20000,
+      currency: 'mxn',
+      metadata: { tenant_id: 't1', precio_unitario_centavos: '10000', cantidad: '2', reserva_id: 'res_1', usuario_id: 'u1' }
+    });
+  });
+
+  it('PKG-01H · reserva cuya sesión ya terminó (slot_fin pasado) → 400 sin PaymentIntent', async () => {
+    reservaCon({ slot_fin: new Date(Date.now() - 60_000).toISOString() });
+    const res = await invocar({ reserva_id: 'res_1', cantidad: 1 });
+    expect(res.statusCode).toBe(400);
+    expect(mockPICreate).not.toHaveBeenCalled();
+  });
+
+  it('PKG-01H · completada (ya hizo check-in) y la sesión sigue en curso → se puede pagar', async () => {
+    reservaCon({ status: 'completada', slot_fin: new Date(Date.now() + 30 * 60_000).toISOString() });
+    const res = await invocar({ reserva_id: 'res_1', cantidad: 1 });
+    expect(res.statusCode).toBe(200);
+    expect(mockPICreate).toHaveBeenCalledTimes(1);
+  });
+
+  it('PKG-01H · estados fuera de la allowlist (cancelada, cancelada_admin, no_show) → 400', async () => {
+    for (const status of ['cancelada', 'cancelada_admin', 'no_show']) {
+      vi.clearAllMocks();
+      mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-1' } }, error: null });
+      mockSocioMaybe.mockResolvedValue({ data: { id: 'u1', tenant_id: 't1', rol: 'miembro', email: 'm@e.com' }, error: null });
+      reservaCon({ status });
+      const res = await invocar({ reserva_id: 'res_1', cantidad: 1 });
+      expect(res.statusCode, status).toBe(400);
+      expect(mockPICreate).not.toHaveBeenCalled();
+    }
   });
 });

@@ -14,10 +14,6 @@ interface Props {
 
 type Captura = { base64: string; contentType: string; preview: string };
 
-function pesos(centavos: number): string {
-  return `$${Math.round(centavos / 100).toLocaleString('es-MX')}`;
-}
-
 /**
  * Invitados de una reserva (recepción): registra nombre + foto de cada invitado.
  * Muestra la cobertura (incluidos del plan + extras que el miembro pagó en la
@@ -53,9 +49,11 @@ export function InvitadosModal({ reservaId, miembroNombre, onClose, onCambio }: 
   }
 
   const prepagados = data?.invitados_extra_pagados ?? 0;
-  const pendientes = data?.pendientes_pago ?? 0;
-  const precioExtra = data?.precio_invitado_extra_centavos ?? 0;
-  const totalPendiente = pendientes * precioExtra;
+  const incluidos = data?.max_incluidos ?? 0;
+  const cubiertos = data?.cubiertos ?? incluidos + prepagados;
+  const disponibles = data?.disponibles ?? Math.max(0, cubiertos - (data?.total ?? 0));
+  // PKG-01H: el servidor rechaza fichas por encima de lo cubierto; aquí solo se refleja.
+  const lleno = disponibles <= 0;
 
   return (
     <div className="ek-backdrop" onClick={onClose} role="dialog" aria-modal="true">
@@ -86,14 +84,10 @@ export function InvitadosModal({ reservaId, miembroNombre, onClose, onCambio }: 
           <>
             {/* Resumen: cobertura (incluidos + pagados en la app) vs pendientes */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '14px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '13px', color: 'var(--ek-ink-muted)' }}>
-                <strong style={{ color: 'var(--ek-ink)' }}>{data?.total ?? 0}</strong> registrados · {data?.max_incluidos ?? 0} del plan{prepagados > 0 ? ` + ${prepagados} pagados` : ''}
+              <span style={{ fontSize: '13px', color: 'var(--ek-ink-muted)' }} data-testid="cobertura-invitados">
+                <strong style={{ color: 'var(--ek-ink)' }}>{data?.total ?? 0}</strong> de {cubiertos} registrados · {incluidos} incluido{incluidos === 1 ? '' : 's'}{prepagados > 0 ? ` + ${prepagados} extra${prepagados === 1 ? '' : 's'} pagado${prepagados === 1 ? '' : 's'}` : ''}
               </span>
-              {pendientes > 0 ? (
-                <span className="ek-badge" style={{ background: 'var(--ek-warning-soft)', color: 'var(--ek-warning)', fontWeight: 700, fontSize: '12px', padding: '4px 10px' }}>
-                  {pendientes} sin pagar{precioExtra > 0 ? ` · ${pesos(totalPendiente)}` : ''}
-                </span>
-              ) : (data?.total ?? 0) > 0 ? (
+              {lleno && cubiertos > 0 ? (
                 <span className="ek-badge" style={{ background: 'var(--ek-mustard-soft)', color: 'var(--ek-mustard)', fontWeight: 700, fontSize: '12px', padding: '4px 10px' }}>
                   Todo cubierto
                 </span>
@@ -101,9 +95,9 @@ export function InvitadosModal({ reservaId, miembroNombre, onClose, onCambio }: 
             </div>
 
             {/* Los extras se pagan en la app del miembro (Stripe), no en mostrador. */}
-            {pendientes > 0 && (
-              <p style={{ fontSize: '12px', color: 'var(--ek-warning)', margin: '-6px 0 14px', lineHeight: 1.45 }}>
-                {pendientes} invitado{pendientes > 1 ? 's' : ''} arriba de lo cubierto. El miembro los paga desde su app (Mis reservas → Pagar invitados extra); al pagar, se marca como cubierto.
+            {lleno && (
+              <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '-6px 0 14px', lineHeight: 1.45 }}>
+                {cubiertos === 0 ? 'Esta reserva no incluye invitados.' : 'Ya están registrados todos los invitados que cubre la reserva.'} Si viene alguien más, el miembro puede pagar invitados extra desde su app (Mis reservas → Pagar invitados extra).
               </p>
             )}
 
@@ -134,7 +128,7 @@ export function InvitadosModal({ reservaId, miembroNombre, onClose, onCambio }: 
               </div>
             )}
 
-            <button type="button" className="ek-cta ek-cta--gold ek-cta--full" onClick={() => setModo('agregar')}>
+            <button type="button" className="ek-cta ek-cta--gold ek-cta--full" onClick={() => setModo('agregar')} disabled={lleno}>
               <UserPlus size={16} aria-hidden="true" /> Agregar invitado
             </button>
           </>

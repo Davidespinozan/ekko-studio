@@ -336,30 +336,45 @@ describe('stripe-webhook', () => {
       expect(ultimaTransicion()).toMatchObject({ estado: 'procesado' });
     });
 
-    it('lease vencido con invitados-extra (NO idempotente) → revision sin re-ejecutar el RPC', async () => {
-      mockConstructEvent.mockReturnValue({
-        id: 'evt_1', type: 'payment_intent.succeeded', created: 1700000000,
-        data: { object: { id: 'pi_1', amount: 20000, currency: 'mxn', metadata: { app: 'ekko', tipo: 'invitados_extra', reserva_id: 'r1', cantidad: '2', usuario_id: 'u1' } } }
-      });
-      claimDevuelve('reclamado', { estado_previo: 'en_proceso', accion_previa: 'invitados-extra', intentos: 2 });
-      const res = await invocar();
-      expect(res.statusCode).toBe(200);
-      expect(JSON.parse(res.body).revision).toBe('reentrada_sobre_efecto_no_idempotente');
-      expect(mockRpc).not.toHaveBeenCalled();
-      expect(mockUpsertFila).not.toHaveBeenCalled();
-      expect(ultimaTransicion()).toMatchObject({ estado: 'revision', accion: 'invitados-extra', motivo: 'reentrada_sobre_efecto_no_idempotente', ultimo_error: expect.stringMatching(/intento 2/) });
-      expect(claseReportada()).toBe('revision');
+    // PKG-01H: invitados-extra es idempotente por PaymentIntent (aplicar_invitados_extra_pago).
+    const PI_EXTRAS = (over: Record<string, unknown> = {}, id = 'evt_1') => ({
+      id, type: 'payment_intent.succeeded', created: 1700000000, account: 'acct_ekko',
+      data: { object: { id: 'pi_1', amount: 20000, amount_received: 20000, currency: 'mxn',
+        metadata: { app: 'ekko', tipo: 'invitados_extra', reserva_id: 'r1', cantidad: '2', usuario_id: 'u1', tenant_id: '7a0c3c1e-0000-4000-8000-000000000001', precio_unitario_centavos: '10000' }, ...over } }
     });
 
-    it('primera entrega de invitados-extra → sí ejecuta registrar_invitados_extra_pagados', async () => {
-      mockConstructEvent.mockReturnValue({
-        id: 'evt_1', type: 'payment_intent.succeeded', created: 1700000000,
-        data: { object: { id: 'pi_1', amount: 20000, currency: 'mxn', metadata: { app: 'ekko', tipo: 'invitados_extra', reserva_id: 'r1', cantidad: '2', usuario_id: 'u1' } } }
-      });
+    it('PKG-01H · lease vencido con invitados-extra → SE re-ejecuta (la RPC es idempotente por PI), no va a revisión', async () => {
+      mockConstructEvent.mockReturnValue(PI_EXTRAS());
+      claimDevuelve('reclamado', { estado_previo: 'en_proceso', accion_previa: 'invitados-extra', intentos: 2 });
+      mockRpc.mockResolvedValue({ data: { success: true, estado: 'aplicado', idempotente: true }, error: null });
       const res = await invocar();
       expect(res.statusCode).toBe(200);
-      expect(mockRpc).toHaveBeenCalledWith('registrar_invitados_extra_pagados', { p_reserva_id: 'r1', p_cantidad: 2 });
-      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'invitados_extra:sumados' });
+      expect(mockRpc).toHaveBeenCalledWith('aplicar_invitados_extra_pago', expect.objectContaining({ p_payment_intent_id: 'pi_1' }));
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'invitados_extra:idempotente' });
+    });
+
+    it('PKG-01H · primera entrega → aplicar_invitados_extra_pago con PI, cuenta, tenant del evento, monto cobrado, snapshot, moneda y tiempo del evento', async () => {
+      mockConstructEvent.mockReturnValue(PI_EXTRAS());
+      mockRpc.mockResolvedValue({ data: { success: true, estado: 'aplicado', idempotente: false }, error: null });
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(mockRpc).toHaveBeenCalledWith('aplicar_invitados_extra_pago', {
+        p_payment_intent_id: 'pi_1',
+        p_stripe_account: 'acct_ekko',
+        p_tenant_id: 'tenant-1',
+        p_stripe_event_id: 'evt_1',
+        p_reserva_id: 'r1',
+        p_usuario_id: 'u1',
+        p_cantidad: 2,
+        p_monto_centavos: 20000,
+        p_precio_unitario_centavos: 10000,
+        p_moneda: 'mxn',
+        p_pagado_at: new Date(1700000000 * 1000).toISOString(),
+        p_tenant_id_metadata: '7a0c3c1e-0000-4000-8000-000000000001'
+      });
+      expect(mockRpc).not.toHaveBeenCalledWith('registrar_invitados_extra_pagados', expect.anything());
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'invitados_extra:aplicado' });
+      expect(mockAvisarStaff).not.toHaveBeenCalled();
     });
 
     it('re-entrega desde revision (humano corrigió y reenvió desde Stripe) → se procesa', async () => {
@@ -849,6 +864,80 @@ describe('stripe-webhook', () => {
       expect(res.statusCode).toBe(200);
       expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'sync:evento_viejo' });
       expect(mockReportar).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── PKG-01H · invitados extra: una aplicación por PaymentIntent ─────────────
+  describe('PKG-01H · invitados extra', () => {
+    const PI = (id = 'evt_x', account: string | null = 'acct_ekko') => ({
+      id, type: 'payment_intent.succeeded', created: 1700000000, ...(account ? { account } : {}),
+      data: { object: { id: 'pi_7', amount: 30000, amount_received: 30000, currency: 'mxn',
+        metadata: { app: 'ekko', tipo: 'invitados_extra', reserva_id: 'r1', cantidad: '3', usuario_id: 'u1', precio_unitario_centavos: '10000' } } }
+    });
+    const llamadasAplicar = () => mockRpc.mock.calls.filter((c) => c[0] === 'aplicar_invitados_extra_pago');
+
+    it('no_aplicado → procesado (la discrepancia ya es durable) + aviso a admins con el motivo', async () => {
+      mockConstructEvent.mockReturnValue(PI());
+      mockRpc.mockResolvedValue({ data: { success: true, estado: 'no_aplicado', motivo: 'excede_tope', idempotente: false, revision_creada: true }, error: null });
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'invitados_extra:no_aplicado:excede_tope' });
+      expect(mockAvisarStaff).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+        tipo: 'invitados_extra_no_aplicado', tenant_id: 'tenant-1', soloAdmins: true, url: '/admin/cobros',
+        metadata: expect.objectContaining({ stripe_payment_intent_id: 'pi_7', motivo: 'excede_tope' })
+      }));
+    });
+
+    it('mismo PI ya registrado como no_aplicado (otro evento / re-entrega) → procesado SIN segundo aviso', async () => {
+      mockConstructEvent.mockReturnValue(PI('evt_y'));
+      mockRpc.mockResolvedValue({ data: { success: true, estado: 'no_aplicado', motivo: 'excede_tope', idempotente: true }, error: null });
+      await invocar();
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'invitados_extra:no_aplicado:excede_tope:idempotente' });
+      expect(mockAvisarStaff).not.toHaveBeenCalled();
+    });
+
+    it('S-1 · falla un paso POSTERIOR (diario) tras aplicar → error_reintentable; el reintento llama a la RPC con el MISMO PI y obtiene idempotente (sin segunda suma)', async () => {
+      mockConstructEvent.mockReturnValue(PI('evt_s1'));
+      mockRpc.mockResolvedValueOnce({ data: { success: true, estado: 'aplicado', idempotente: false }, error: null });
+      upsertResultado.payment_events = { data: null, error: { message: 'fetch failed' } };
+      const r1 = await invocar();
+      expect(r1.statusCode).toBe(500);
+      expect(ultimaTransicion()).toMatchObject({ estado: 'error_reintentable' });
+
+      // Stripe reintenta el MISMO evento: el claim lo re-reclama desde error_reintentable.
+      delete upsertResultado.payment_events;
+      claimDevuelve('reclamado', { estado_previo: 'error_reintentable', accion_previa: 'invitados-extra', intentos: 2 });
+      mockRpc.mockResolvedValueOnce({ data: { success: true, estado: 'aplicado', idempotente: true }, error: null });
+      const r2 = await invocar();
+      expect(r2.statusCode).toBe(200);
+      const llamadas = llamadasAplicar();
+      expect(llamadas).toHaveLength(2);
+      expect((llamadas[0][1] as { p_payment_intent_id: string }).p_payment_intent_id).toBe('pi_7');
+      expect((llamadas[1][1] as { p_payment_intent_id: string }).p_payment_intent_id).toBe('pi_7');
+      expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'invitados_extra:idempotente' });
+    });
+
+    it('evento sin cuenta conectada resoluble → revisión (01A), sin llamar a la RPC ni inventar tenant', async () => {
+      mockConstructEvent.mockReturnValue(PI('evt_z', null));
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(llamadasAplicar()).toHaveLength(0);
+      expect(ultimaTransicion()).toMatchObject({ estado: 'revision', motivo: 'invitados_extra_sin_cuenta' });
+    });
+
+    it('reserva inexistente → revisión (no hay a qué atar la evidencia)', async () => {
+      mockConstructEvent.mockReturnValue(PI('evt_w'));
+      mockRpc.mockResolvedValue({ data: { success: false, reason: 'reserva_no_encontrada' }, error: null });
+      await invocar();
+      expect(ultimaTransicion()).toMatchObject({ estado: 'revision', motivo: 'reserva_no_encontrada' });
+    });
+
+    it('error de base en la RPC → error_reintentable (Stripe reintenta; la RPC es idempotente)', async () => {
+      mockConstructEvent.mockReturnValue(PI('evt_v'));
+      mockRpc.mockResolvedValue({ data: null, error: { message: 'fetch failed' } });
+      const res = await invocar();
+      expect(res.statusCode).toBe(500);
+      expect(ultimaTransicion()).toMatchObject({ estado: 'error_reintentable' });
     });
   });
 

@@ -13,9 +13,10 @@ const h = vi.hoisted(() => ({
   recursos: { recursos: [] as Record<string, unknown>[], isLoading: false, error: false, refetch: vi.fn() },
   tiers: { data: [] as unknown, error: null as unknown }
 }));
+const mockUpdateRecurso = vi.hoisted(() => vi.fn());
 vi.mock('../../hooks/useAdminData', () => ({
   useRecursosAdmin: () => h.recursos,
-  updateRecurso: vi.fn(),
+  updateRecurso: (...a: unknown[]) => mockUpdateRecurso(...a),
   insertRecurso: vi.fn()
 }));
 vi.mock('@shared/lib/supabase', () => ({
@@ -72,5 +73,25 @@ describe('Recursos (PKG-02A)', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/No pudimos cargar los planes/);
     expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled();
     expect(document.body.textContent).not.toMatch(/permission denied/);
+  });
+  it('PKG-01H (S-9) · editar un estudio GUARDA "Máx. invitados extra" (antes solo se mandaba al crear)', async () => {
+    mockUpdateRecurso.mockResolvedValue({ error: null });
+    h.recursos = {
+      recursos: [{
+        id: 'rec-1', nombre: 'Estudio 1', slug: 'estudio-1', descripcion: null, activo: true, tiers_permitidos: [],
+        horarios: [{ dia: 'lunes', inicio: '09:00', fin: '18:00' }], foto_url: null, fotos_urls: [], capacidad_personas: 3,
+        costo_creditos: 1, max_invitados_extra: 4, tipo_contenido: [], equipo_incluido: [], estilo_visual: null,
+        fuera_de_servicio: false, fuera_de_servicio_motivo: null, orden: 1, tipo: 'estudio_individual', cupos: 1
+      }],
+      isLoading: false, error: false, refetch: vi.fn()
+    };
+    montar();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Acciones' })[0]);
+    fireEvent.click(await screen.findByText('Editar'));
+    const campo = (await screen.findByText('Máx. invitados extra')).parentElement!.querySelector('input')!;
+    fireEvent.change(campo, { target: { value: '2' } });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => expect(mockUpdateRecurso).toHaveBeenCalledWith('rec-1', expect.objectContaining({ max_invitados_extra: 2 })));
   });
 });

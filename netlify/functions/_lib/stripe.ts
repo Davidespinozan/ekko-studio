@@ -107,6 +107,20 @@ export type EventoClasificado =
       reserva_id: string;
       cantidad: number;
       usuario_id: string | null;
+      /** PKG-01H: identidad de negocio. Un PI aplica invitados como máximo una vez. */
+      payment_intent_id: string;
+      /** Lo cobrado de verdad (amount_received; si no viene, amount). */
+      monto_centavos: number;
+      moneda: string;
+      /** Snapshot del precio con el que EKKO creó el PI; null si el PI no lo trae (anterior a 01H). */
+      precio_unitario_centavos: number | null;
+      /** tenant que EKKO puso en la metadata (se coteja; no es autoridad). */
+      tenant_id_metadata: string | null;
+      /**
+       * Momento económico del pago: `created` del evento payment_intent.succeeded.
+       * Stripe emite ese evento una vez por PI al pasar a succeeded y una
+       * re-entrega conserva el mismo `created`; la RPC fija la primera evaluación.
+       */
       event_at: string;
     }
   | {
@@ -314,7 +328,23 @@ export function clasificarEvento(event: Stripe.Event): EventoClasificado {
         if (!reserva_id || !Number.isInteger(cantidad) || cantidad <= 0) {
           return { kind: 'revision', motivo: 'invitados_extra_sin_datos' };
         }
-        return { kind: 'invitados-extra', reserva_id, cantidad, usuario_id: pi.metadata?.usuario_id ?? null, event_at };
+        const recibido = typeof pi.amount_received === 'number' && pi.amount_received > 0 ? pi.amount_received : pi.amount;
+        if (!pi.id || typeof recibido !== 'number' || recibido <= 0) {
+          return { kind: 'revision', motivo: 'invitados_extra_sin_datos' };
+        }
+        const precio = Number.parseInt(pi.metadata?.precio_unitario_centavos ?? '', 10);
+        return {
+          kind: 'invitados-extra',
+          reserva_id,
+          cantidad,
+          usuario_id: pi.metadata?.usuario_id ?? null,
+          payment_intent_id: pi.id,
+          monto_centavos: recibido,
+          moneda: pi.currency ?? 'mxn',
+          precio_unitario_centavos: Number.isInteger(precio) && precio > 0 ? precio : null,
+          tenant_id_metadata: pi.metadata?.tenant_id ?? null,
+          event_at
+        };
       }
       // Paquete pagado in-app (pago único con Elements). El metadata lo pusimos
       // en crear-pago-intent. (Los PI de suscripción no llevan este metadata.)
@@ -610,10 +640,13 @@ export function clasificarError(err: unknown): 'permanente' | 'transitorio' {
  * NO: un reclamo de lease vencido con esa acción va a revisión, no se repite.
  */
 export function accionIdempotente(kind: EventoClasificado['kind']): boolean {
-  return kind !== 'invitados-extra';
+  // PKG-01H: invitados-extra pasó a ser idempotente por PaymentIntent
+  // (aplicar_invitados_extra_pago): re-ejecutarla no vuelve a sumar.
+  void kind;
+  return true;
 }
 
-const METADATA_EKKO = ['app', 'usuario_id', 'tier_id', 'reserva_id', 'cantidad', 'tipo'] as const;
+const METADATA_EKKO = ['app', 'usuario_id', 'tier_id', 'reserva_id', 'cantidad', 'tipo', 'precio_unitario_centavos', 'tenant_id'] as const;
 
 const idODef = (v: unknown): string | null =>
   typeof v === 'string' ? v : v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'string' ? (v as { id: string }).id : null;

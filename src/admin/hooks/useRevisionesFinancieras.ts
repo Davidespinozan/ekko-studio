@@ -50,7 +50,8 @@ export const LABEL_TIPO_REVISION: Record<string, string> = {
   origen_ambiguo: 'Reembolso con origen ambiguo',
   reconciliacion_reembolso: 'Reembolso por reconciliar',
   cuenta_desautorizada: 'Cuenta de Stripe desconectada',
-  vinculo_valor_pendiente: 'Vínculo de valor pendiente'
+  vinculo_valor_pendiente: 'Vínculo de valor pendiente',
+  invitados_extra_no_aplicado: 'Pago de invitados extra sin aplicar'
 };
 
 export const LABEL_RESOLUCION: Record<string, string> = {

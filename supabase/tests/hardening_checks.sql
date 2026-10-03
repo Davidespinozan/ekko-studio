@@ -29,7 +29,9 @@ BEGIN
     'marcar_no_shows()',
     'generar_recordatorios_reservas()',
     'sync_membresia_stripe(text, text, timestamptz, boolean, timestamptz)',
-    'registrar_invitados_extra_pagados(uuid, integer)'
+    -- PKG-01H: reemplazan a registrar_invitados_extra_pagados (ver abajo).
+    'aplicar_invitados_extra_pago(text, text, uuid, text, uuid, uuid, integer, integer, integer, text, timestamptz, uuid)',
+    'registrar_ficha_invitado(uuid, uuid, text, text)'
   ] LOOP
     BEGIN
       INSERT INTO _hardening_resultado (area, caso, resultado) VALUES
@@ -43,6 +45,15 @@ BEGIN
     END;
   END LOOP;
 END $$;
+
+-- PKG-01H: la firma vieja (sumaba sin llave por PaymentIntent) no la ejecuta
+-- NADIE de la app, ni service_role. Existe (sin DROP) pero está revocada.
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P1', 'registrar_invitados_extra_pagados(uuid, integer) revocada para todos',
+  CASE WHEN NOT has_function_privilege('authenticated', 'registrar_invitados_extra_pagados(uuid, integer)', 'EXECUTE')
+            AND NOT has_function_privilege('anon', 'registrar_invitados_extra_pagados(uuid, integer)', 'EXECUTE')
+            AND NOT has_function_privilege('service_role', 'registrar_invitados_extra_pagados(uuid, integer)', 'EXECUTE')
+       THEN '✅ PASS' ELSE '❌ FAIL — la firma vieja sigue ejecutable' END;
 
 -- ── P2: tenants por columnas ─────────────────────────────────────────────────
 INSERT INTO _hardening_resultado (area, caso, resultado)

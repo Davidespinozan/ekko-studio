@@ -49,6 +49,8 @@ interface Body {
 }
 
 const FUNCION = 'crear-pago-invitados';
+/** PKG-01H: estados de reserva en los que un invitado extra pagado puede aplicarse. */
+const ESTADOS_APLICABLES = ['confirmada', 'completada'];
 const KIND = 'pi_invitados' as const;
 
 export const handler: Handler = async (event) => {
@@ -92,15 +94,18 @@ export const handler: Handler = async (event) => {
     // La reserva debe ser del miembro y de su tenant.
     const { data: reserva } = await admin
       .from('reservas')
-      .select('id, tenant_id, usuario_id, status, recurso_id, invitados_extra_pagados')
+      .select('id, tenant_id, usuario_id, status, recurso_id, invitados_extra_pagados, slot_fin')
       .eq('id', body.reserva_id)
       .maybeSingle();
     if (!reserva) return notFound('Reserva no encontrada');
     if (reserva.usuario_id !== socio.id || reserva.tenant_id !== socio.tenant_id) {
       return forbidden('Esa reserva no es tuya');
     }
-    if (reserva.status !== 'confirmada') {
-      return badRequest('Solo puedes pagar invitados de una reserva vigente');
+    // PKG-01H · allowlist explícita del ciclo de vida de la reserva: confirmada
+    // (aún no llega) o completada (ya hizo check-in y la sesión sigue en curso).
+    // Mismo tiempo canónico que la grilla "en curso": la sesión termina en slot_fin.
+    if (!ESTADOS_APLICABLES.includes(reserva.status) || !(new Date(reserva.slot_fin).getTime() > Date.now())) {
+      return badRequest('Solo puedes pagar invitados de una reserva vigente que no haya terminado');
     }
 
     // Tope de invitados extra del estudio (fuente de verdad). No permitir pasar
@@ -159,6 +164,8 @@ export const handler: Handler = async (event) => {
             reserva_id: reserva.id,
             cantidad: String(cantidad),
             usuario_id: socio.id,
+            tenant_id: socio.tenant_id,
+            precio_unitario_centavos: String(precioExtra),
             ekko_op: 'legacy'
           }
         },
@@ -200,7 +207,16 @@ export const handler: Handler = async (event) => {
       amount,
       currency: 'mxn',
       fee,
-      metadata: { tipo: 'invitados_extra', reserva_id: reserva.id, cantidad: String(cantidad), usuario_id: socio.id }
+      // PKG-01H: snapshot del precio y del tenant con el que se cobró. El webhook
+      // valida contra esto (no contra la config, que puede cambiar).
+      metadata: {
+        tipo: 'invitados_extra',
+        reserva_id: reserva.id,
+        cantidad: String(cantidad),
+        usuario_id: socio.id,
+        tenant_id: socio.tenant_id,
+        precio_unitario_centavos: String(precioExtra)
+      }
     };
 
     let res;
@@ -227,6 +243,8 @@ export const handler: Handler = async (event) => {
                   reserva_id: reserva.id,
                   cantidad: String(cantidad),
                   usuario_id: socio.id,
+                  tenant_id: socio.tenant_id,
+                  precio_unitario_centavos: String(precioExtra),
                   operation_id: operationId,
                   ekko_target: target
                 }

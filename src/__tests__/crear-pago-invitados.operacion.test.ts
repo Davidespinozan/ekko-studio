@@ -43,7 +43,7 @@ const invocar = async (body: Record<string, unknown>) => {
 beforeEach(() => {
   vi.clearAllMocks();
   h.stripe = crearStripeFalso();
-  h.reserva = { id: 'res_1', tenant_id: 't1', usuario_id: 'u1', status: 'confirmada', recurso_id: 'rec_1', invitados_extra_pagados: 0 };
+  h.reserva = { id: 'res_1', tenant_id: 't1', usuario_id: 'u1', status: 'confirmada', recurso_id: 'rec_1', invitados_extra_pagados: 0, slot_fin: new Date(Date.now() + 86_400_000).toISOString() };
   process.env.STRIPE_SECRET_KEY = 'sk_test';
   process.env.VITE_SUPABASE_URL = 'http://supabase.test';
   process.env.VITE_SUPABASE_ANON_KEY = 'anon';
@@ -60,7 +60,10 @@ describe('crear-pago-invitados · operation_id', () => {
     expect(h.stripe.estado.pis).toHaveLength(1);
     expect(h.stripe.paymentIntents.create.mock.calls[0][1]).toMatchObject({ idempotencyKey: `ekko:v1:pi_invitados:acct_1:u1:${OP}`, stripeAccount: 'acct_1' });
     expect(h.stripe.estado.pis[0].metadata).toEqual({
-      app: 'ekko', tipo: 'invitados_extra', reserva_id: 'res_1', cantidad: '2', usuario_id: 'u1', operation_id: OP, ekko_target: 'invitados:res_1'
+      app: 'ekko', tipo: 'invitados_extra', reserva_id: 'res_1', cantidad: '2', usuario_id: 'u1',
+      // PKG-01H: snapshot del precio y del tenant con el que se cobró.
+      tenant_id: 't1', precio_unitario_centavos: '10000',
+      operation_id: OP, ekko_target: 'invitados:res_1'
     });
   });
 

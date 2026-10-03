@@ -174,6 +174,8 @@ type Efecto = {
   reversal?: { tipo: 'reembolso' | 'disputa'; nuevo: boolean; estado: string; monto: number; moneda: string; origen: string | null; objectId: string } | null;
   /** PKG-01G: desautorización de Connect aplicada (null si fue idempotente). */
   cuentaDesautorizada?: { tenantId: string } | null;
+  /** PKG-01H: pago de invitados extra que no pudo aplicarse (primera vez). */
+  extrasNoAplicados?: { tenantId: string; motivo: string; paymentIntentId: string; cantidad: number; monto: number; moneda: string } | null;
 };
 
 /** Tenant por el pago original (cuando el evento no trae `account`). */
@@ -434,13 +436,44 @@ async function ejecutarAccion(
     return ef;
   }
 
-  // invitados-extra: invitados extra pagados en la app → sumarlos a la reserva.
-  rpcOk('registrar_invitados_extra_pagados', await admin.rpc('registrar_invitados_extra_pagados', {
-    p_reserva_id: accion.reserva_id,
-    p_cantidad: accion.cantidad
-  }));
+  // invitados-extra (PKG-01H): aplicar UNA vez por PaymentIntent, validando en
+  // servidor estado/fecha/tenant/cuenta/tope/monto. Un pago que no puede aplicarse
+  // queda como evidencia `no_aplicado` + revisión financiera (W-2=A): el evento se
+  // da por procesado (la discrepancia ya es durable) y se avisa a los admins.
+  if (!cuenta.connectedAccount || !cuenta.tenantIdCuenta) {
+    throw new DivergenciaWebhook('invitados_extra_sin_cuenta', `PI ${accion.payment_intent_id} sin cuenta conectada resoluble`);
+  }
+  const r = rpcOk<{ success?: boolean; reason?: string; estado?: string; motivo?: string | null; idempotente?: boolean; revision_creada?: boolean } | null>(
+    'aplicar_invitados_extra_pago',
+    await admin.rpc('aplicar_invitados_extra_pago', {
+      p_payment_intent_id: accion.payment_intent_id,
+      p_stripe_account: cuenta.connectedAccount,
+      p_tenant_id: cuenta.tenantIdCuenta,
+      p_stripe_event_id: stripeEvent.id,
+      p_reserva_id: accion.reserva_id,
+      p_usuario_id: accion.usuario_id,
+      p_cantidad: accion.cantidad,
+      p_monto_centavos: accion.monto_centavos,
+      p_precio_unitario_centavos: accion.precio_unitario_centavos,
+      p_moneda: accion.moneda,
+      p_pagado_at: accion.event_at,
+      // Se coteja contra el tenant de la cuenta del evento (no es autoridad).
+      p_tenant_id_metadata: accion.tenant_id_metadata && /^[0-9a-f-]{36}$/i.test(accion.tenant_id_metadata) ? accion.tenant_id_metadata : null
+    })
+  );
+  if (r?.success === false) {
+    // Reserva inexistente: no hay a qué atar la evidencia → revisión 01A.
+    throw new DivergenciaWebhook(r.reason ?? 'invitados_extra_sin_reserva', `PI ${accion.payment_intent_id} → reserva ${accion.reserva_id}`);
+  }
   ef.usuarioIdPago = accion.usuario_id;
-  ef.resultado = 'invitados_extra:sumados';
+  if (r?.estado === 'aplicado') {
+    ef.resultado = r.idempotente ? 'invitados_extra:idempotente' : 'invitados_extra:aplicado';
+  } else {
+    ef.resultado = `invitados_extra:no_aplicado:${r?.motivo ?? 'desconocido'}${r?.idempotente ? ':idempotente' : ''}`;
+    if (!r?.idempotente) {
+      ef.extrasNoAplicados = { tenantId: cuenta.tenantIdCuenta, motivo: r?.motivo ?? 'desconocido', paymentIntentId: accion.payment_intent_id, cantidad: accion.cantidad, monto: accion.monto_centavos, moneda: accion.moneda };
+    }
+  }
   return ef;
 }
 
@@ -625,6 +658,19 @@ async function avisosReversal(admin: any, ef: Efecto, tenantIdCuenta: string | n
       titulo,
       mensaje,
       metadata: { stripe_object_id: r.objectId, origen: r.origen, usuario_id: ef.usuarioIdPago },
+      url: '/admin/cobros',
+      soloAdmins: true
+    });
+  }
+  if (ef.extrasNoAplicados) {
+    const x = ef.extrasNoAplicados;
+    const dinero = (x.monto / 100).toLocaleString('es-MX', { style: 'currency', currency: x.moneda.toUpperCase() });
+    await avisarStaff(admin, {
+      tenant_id: x.tenantId,
+      tipo: 'invitados_extra_no_aplicado',
+      titulo: 'Pago de invitados extra sin aplicar',
+      mensaje: `Un miembro pagó ${dinero} por ${x.cantidad} invitado${x.cantidad === 1 ? '' : 's'} extra, pero no se pudo aplicar a su reserva. Revisa el caso en Cobros: el sistema no reembolsa solo.`,
+      metadata: { stripe_payment_intent_id: x.paymentIntentId, motivo: x.motivo, usuario_id: ef.usuarioIdPago },
       url: '/admin/cobros',
       soloAdmins: true
     });

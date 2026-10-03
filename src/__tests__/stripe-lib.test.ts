@@ -153,17 +153,29 @@ describe('clasificarEvento', () => {
     expect(r.kind).toBe('ignore');
   });
 
-  it('payment_intent.succeeded tipo=invitados_extra → invitados-extra con reserva y cantidad', () => {
+  it('payment_intent.succeeded tipo=invitados_extra → invitados-extra con PI, monto cobrado, snapshot y tiempo del evento (PKG-01H)', () => {
     const r = clasificarEvento(ev('payment_intent.succeeded', {
-      customer: 'cus_1',
-      metadata: { app: 'ekko', tipo: 'invitados_extra', reserva_id: 'res_1', cantidad: '3', usuario_id: 'u1' }
+      id: 'pi_x', customer: 'cus_1', amount: 30000, amount_received: 30000, currency: 'mxn',
+      metadata: { app: 'ekko', tipo: 'invitados_extra', reserva_id: 'res_1', cantidad: '3', usuario_id: 'u1', tenant_id: 't1', precio_unitario_centavos: '10000' }
     }));
-    expect(r.kind).toBe('invitados-extra');
-    if (r.kind === 'invitados-extra') {
-      expect(r.reserva_id).toBe('res_1');
-      expect(r.cantidad).toBe(3);
-      expect(r.usuario_id).toBe('u1');
-    }
+    expect(r).toEqual({
+      kind: 'invitados-extra', reserva_id: 'res_1', cantidad: 3, usuario_id: 'u1',
+      payment_intent_id: 'pi_x', monto_centavos: 30000, moneda: 'mxn', precio_unitario_centavos: 10000,
+      tenant_id_metadata: 't1',
+      // created del EVENTO payment_intent.succeeded (estable en re-entregas), no la hora de recepción.
+      event_at: new Date(1_700_000_000 * 1000).toISOString()
+    });
+  });
+
+  it('PKG-01H · PI anterior a 01H (sin snapshot de precio) → precio null (la RPC lo deja no_aplicado/sin_snapshot_precio)', () => {
+    const r = clasificarEvento(ev('payment_intent.succeeded', {
+      id: 'pi_y', amount: 10000, amount_received: 10000, currency: 'mxn',
+      metadata: { app: 'ekko', tipo: 'invitados_extra', reserva_id: 'res_1', cantidad: '1', usuario_id: 'u1' }
+    }));
+    expect(r).toMatchObject({ kind: 'invitados-extra', precio_unitario_centavos: null, tenant_id_metadata: null });
+    // Sin id o sin monto → revisión (dinero de EKKO sin identidad).
+    expect(clasificarEvento(ev('payment_intent.succeeded', { amount: 10000, metadata: { app: 'ekko', tipo: 'invitados_extra', reserva_id: 'r', cantidad: '1' } })))
+      .toEqual({ kind: 'revision', motivo: 'invitados_extra_sin_datos' });
   });
 
   it('invitados_extra sin reserva_id / cantidad inválida → revision (PKG-01A: pago de EKKO sin datos para aplicarlo)', () => {
