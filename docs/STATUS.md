@@ -4,11 +4,15 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-05 · tras cerrar R2-B.
+Última actualización: 2026-10-05 · tras el fix de material (46ecd0a).
 
 ## Producción (verificado 2026-10-05)
-- Commit publicado: `f3ee401ca5b7e4d10064297439132056ab7f7fef` (main = origin/main).
-- Netlify deploy `6ac3d0ac59e1180008cb9eb8`, publicado 2026-10-05 16:32:18 UTC.
+- Commit publicado: `46ecd0af9dfd95dc4222f0098b7fb3ac556c8533` (main = origin/main):
+  "fix(material): clean storage object on record failure", DEPLOYED (otra sesión
+  autorizada; verificación en vivo del comportamiento: pendiente, no bloqueante).
+- Netlify deploy `6ac3fc765e255000087b3cff`, publicado 2026-10-05 19:39 UTC.
+- Antes: `24e0a8d` (contexto fases 1–3) y `f3ee401` (R2-B, último cambio de negocio
+  verificado en producción).
 - Supabase: 102/102 migraciones; última `20261005110000_r2b_terminacion_cancelacion_y_cobro.sql`.
 - Datos de negocio: 0 membresías vivas, 0 suscripciones de Stripe vivas, 0 reservas
   futuras, 0 sancionados/revocados. Stripe en modo live (cuenta de plataforma
@@ -16,14 +20,19 @@ Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
 ## Cerrado en producción (no se reabre sin regresión concreta)
 R1 · PKG-00A, 00C, 00E, 00F, 00G · PKG-01A–01H · R2-A (01I–01M) · R2-B (01N–01Q) ·
-PKG-02A, 02B. Qué decidió cada uno: `docs/DECISIONS_INDEX.md` → `DECISIONS.md`.
+PKG-02A, 02B · Arquitectura de contexto fases 1–3 (PUBLICADA / VALIDADA / CERRADA).
+Qué decidió cada uno: `docs/DECISIONS_INDEX.md` → `DECISIONS.md`.
 Evidencia: migraciones `supabase/migrations/`, pruebas `src/__tests__/db/`.
 
 ## Solo en local
-- Nada de negocio. La arquitectura de contexto (fases 1–3: `CLAUDE.md`, este archivo,
-  `docs/DECISIONS_INDEX.md`, EKKO-105…135, `.claude/skills/*`, `scripts/db-*.mjs`) se
-  introduce en el cambio de contexto que contiene este archivo; si está commiteada,
-  pusheada o desplegada se lee en git y Netlify, no aquí.
+- Nada de negocio. Arquitectura de contexto fase 4 (`docs/ARCHITECTURE.md`, notas en
+  `docs/arquitectura/`, archivo de históricos en `docs/archive/`, ruteo de skills): en
+  curso en el árbol de trabajo; su publicación se lee en git y Netlify, no aquí.
+
+## Escritor único
+Un solo agente o sesión escribe en este árbol a la vez; las demás son de solo lectura.
+Antes de commit/push/deploy se re-verifica HEAD, origin/main, árbol y lo stageado; una
+deriva sin explicar detiene todo (ya pasó una vez el 2026-10-05).
 
 ## Estado local que se preserva
 - Stash `pre-pkg-00f-local-ui-tests` (3 archivos: enlace "Volver a EKKO" en Login y
@@ -45,13 +54,13 @@ Evidencia: migraciones `supabase/migrations/`, pruebas `src/__tests__/db/`.
   anulación; `stripe_price_id` sin uso; default de 2 invitados en
   `reservas_incompatibles_con_tier`.
 - Si staff reanuda a mano una membresía pausada por sanción, el cobro vuelve.
-- Hook `beforeAll` de `stripe-eventos.db.test.ts` con límite por defecto (10 s).
+- Hook `beforeAll` de `stripe-eventos.db.test.ts` con límite por defecto (10 s); carrera
+  intermitente en `usePlanesActivos.test.tsx` (PKG-02A; 1 fallo en 17 gates), sin tocar.
 - 2 usuarios con caché de plan divergente (evidencia de que el caché no decide).
 
 ## Siguiente paso
-Publicación de la arquitectura de contexto (fases 1–3) cuando el dueño lo autorice. Fase 4 (notas de
-arquitectura) y archivo de documentos históricos: NO autorizados todavía. Ningún
-paquete de remediación (02C+) está autorizado.
+Revisión del dueño de la fase 4 de la arquitectura de contexto. Ningún paquete de
+remediación (02C+) está autorizado; un backlog o una auditoría antigua no es autorización.
 
 ## Reglas de este archivo
 - Cambia solo tras verificar: IMPLEMENTADO LOCALMENTE (código + gate verde),

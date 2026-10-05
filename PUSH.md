@@ -1,5 +1,9 @@
 # Notificaciones Push (Web Push / PWA)
 
+> Revisado 2026-10-05: el código descrito sigue vigente (`netlify/functions/_lib/push.ts`,
+> `cron-push`). Si las VAPID keys ya están cargadas en Netlify no se verificó desde el repo;
+> "los pasos que faltan" pueden estar hechos.
+
 Entrega de avisos **fuera de la app** (aunque esté cerrada), sobre las
 notificaciones IN-APP que EKKO ya tenía (tabla `notificaciones`). Patrón tomado
 de HSC. El **código está implementado**; faltan las VAPID keys (pasos de David).

@@ -1,0 +1,169 @@
+> **DOCUMENTO HISTÓRICO (archivado 2026-10-05).** Es evidencia de cómo se pensó o auditó algo en su momento; no describe el estado actual ni autoriza trabajo. Vigente: `docs/STATUS.md` (estado), `DECISIONS.md` (decisiones), `docs/ARCHITECTURE.md` (arquitectura).
+
+# Backlog — EKKO Studio
+
+Lista viva de pendientes. Marcá `[x]` lo hecho. Orden = prioridad sugerida.
+El detalle de decisiones está en `DECISIONS.md`; la arquitectura en `KERNEL.md`.
+
+---
+
+## 1. Pagos / Stripe — andamiaje HECHO, falta conectar la llave
+
+> D4 decidido (suscripción mensual por tier · sin trial · self-serve +
+> recepción). El andamiaje plug-and-play ya está; ver `STRIPE.md`.
+
+- [x] **D4 definido.**
+- [x] RPC keystone `activar_membresia` (escribe `membresias` + `status='activo'`).
+      **B3 cerrado.**
+- [x] `reception-activar-membresia` + botón "Activar membresía" en el perfil
+      (cobro en mostrador — funciona HOY).
+- [x] `suscribir-membresia` (self-serve → `stripe_pendiente` sin Stripe).
+- [x] `stripe-webhook` esqueleto + `checkout.ts` + `STRIPE.md` + `TODO STRIPE`.
+- [x] **Código de Stripe implementado** (Checkout Session + webhook idempotente
+      con guardia de orden + Customer Portal + `getOrCreateCustomer`). Patrones
+      de HSC. Migración `stripe_billing` (tabla de eventos + `cancel_at_period_end`
+      + `last_sub_event_at` + RPC `sync_membresia_stripe`). Dep `stripe` instalada.
+- [x] UI del miembro (`MiSuscripcion`) → `iniciarCheckout` + "Gestionar
+      suscripción" (portal) + banner de pago vencido (`past_due`).
+- [x] **Stripe Connect (STRYV plataforma)** — pago in-app con Embedded Checkout
+      sobre la cuenta conectada del estudio (direct charges, plata directa al
+      estudio). Fundación (`connect-onboarding`/`connect-status` + admin "Cobros")
+      + ruteo (`suscribir-membresia` embebido con `{stripeAccount}` + precio inline)
+      + webhook de Connect (`event.account` → `activar_membresia`). Cuentas Express.
+      Reemplazó el intento de Elements/`crear-pago-intent`. **Requiere probar en test.**
+- [ ] **Env nuevas**: `VITE_STRIPE_PUBLISHABLE_KEY` (pk de la plataforma),
+      `STRIPE_CONNECT_WEBHOOK_SECRET` (webhook de Connect), opcional `EKKO_FEE_PERCENT`.
+- [ ] Stripe dashboard: habilitar **Connect** (plataforma) + webhook de Connect
+      apuntando a `/.netlify/functions/stripe-webhook` con `event.account`.
+- [ ] **Conectar Stripe — pasos de David** (cuando quiera cobrar online): crear
+      cuenta + productos/precios, cargar `tiers.stripe_price_id`, env vars
+      `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` en Netlify, registrar el webhook
+      + habilitar el Customer Portal. Ver `STRIPE.md`.
+- [ ] Aplicar la migración `20260620120000_stripe_billing.sql` al Supabase de
+      EKKO (+ regenerar tipos, opcional).
+- [ ] (con pagos vivos) Registrar cada cobro en `payment_events` desde el
+      webhook para el "Historial de pagos" del miembro.
+
+## 1b. Planes por créditos / paquetes (HECHO — falta aplicar migración)
+
+- [x] **Planes por créditos/clases** (además del mensual): `tiers.tipo` +
+      `clases_incluidas`/`duracion_dias`, `membresias.creditos_restantes`, ledger
+      `membresia_movimientos`, triggers de descuento/devolución en `reservas`,
+      `activar_membresia` con créditos, Stripe `mode:'payment'` para paquetes,
+      editor admin con toggle de tipo, banner de saldo del miembro, pricing.
+      Decisiones: una membresía a la vez · no-show quema · paquetes suman. SALA.
+- [ ] **Aplicar** `20260620150000_planes_creditos.sql` al Supabase de EKKO.
+- [ ] Cargar `stripe_price_id` de **pago único** para los tiers de paquete.
+- [x] **Costo variable en créditos por estudio** — `recursos.costo_creditos`
+      (default 1) + triggers usan el costo del estudio; la devolución lee el
+      débito real del ledger. Admin (campo "Costo en créditos") + miembro (badge
+      "Cuesta N créditos" en Reservar).
+- [ ] **Aplicar** `20260702120000_costo_creditos_por_estudio.sql` al Supabase de
+      EKKO (+ regenerar tipos, opcional — hoy se lee `costo_creditos` de forma
+      defensiva por cast).
+- [ ] (abierto) ¿Cron que marque `status='expirada'` para dashboards? Hoy el
+      vencimiento es lazy (se chequea al reservar).
+- [ ] (abierto, feedback cliente #4) "Compras extra" (horas/invitados/servicios)
+      podrían modelarse como consumibles/paquetes sobre este mismo motor.
+
+## 1c. Feedback del cliente (web)
+
+- [x] **#1 FAQ cancelación** dividida en dos (grabación vs membresía).
+- [x] **#2 Tabla "qué incluye / qué no"** por tier (beneficios ✓/✗ configurables).
+- [x] **#3 Expediente en el detalle de reserva** (v1): observaciones del estudio
+      por reserva (`reservas.observaciones` + `reception-observar-reserva` + audit)
+      y "Personas" (titular + invitados). Falta aplicar migración
+      `20260620160000_reserva_observaciones.sql`.
+- [ ] #3 (fase 2) vista de expediente agregada en el perfil del miembro
+      (historial de observaciones de sus reservas).
+- [ ] **#4 Compras extra** (horas/invitados/servicios) — modelar sobre el motor
+      de créditos/paquetes (pago único). Requiere Stripe conectado.
+- [ ] **#5 Directorio de invitados** (nombre+correo para marketing) — feature
+      nueva; definir consentimiento/aviso de privacidad primero.
+
+## 1d. Identidad / prevención (renta de espacios)
+
+- [x] **Ficha de identidad + gate de ingreso**: recepción captura foto + fecha
+      nac + domicilio + INE (foto, bucket privado) + contrato firmado; el check-in
+      se bloquea hasta que esté completa (trigger, cubre QR y manual). Ver EKKO-010.
+- [ ] **Aplicar** `20260620170000_ficha_identidad.sql` al Supabase de EKKO.
+- [x] Signup: **sacados los campos de tarjeta** (PCI). Ahora crea la cuenta →
+      `iniciarCheckout` (redirige a Stripe si está conectado; si no, pantalla de
+      bienvenida + "activá en recepción"). Consentimiento (términos + aviso de
+      privacidad) obligatorio + pantalla de bienvenida con próximos pasos.
+- [ ] Crear las **páginas reales** de `términos y condiciones` y `aviso de
+      privacidad` (hoy el consentimiento las nombra como texto). Necesita el
+      contenido legal del cliente.
+- [ ] Ojo migración: miembros existentes quedan con `identidad_completa=false`
+      (no podrán check-in hasta completar ficha). Para un estudio nuevo está bien.
+- [ ] (prevención, futuro) check-out con estado del equipo; tarjeta en archivo
+      para cobrar daños (cuando haya Stripe).
+
+## 2. Deudas técnicas conocidas
+
+- [x] **B3 — cambiar tier no activa la cuenta** — cerrado 2026-08-21: la ficha
+      admin lee `membresias`, cambia el plan por `reception-update-member` y activa
+      por `activar_membresia` (EKKO-018).
+- [ ] **D6 — reprogramar no atómico**: revisar si vale un RPC atómico (hoy
+      maneja parciales con avisos, pero puede dejar al miembro sin reserva).
+- [ ] **Comentario obsoleto** en `PerfilMiembroRecepcion.tsx` ("READ-ONLY") — ya
+      es un hub de gestión.
+- [x] **Timezone centralizado (JS)** — `shared/lib/timezone.ts` (Intl, sin dep) con
+      `ZONA_ESTUDIO='America/Mazatlan'`. Métricas del admin (bordes día/mes) y el
+      heatmap ahora en zona del estudio → arregla el off-by-one. Culiacán = Mazatlan.
+- [ ] (opcional) `agruparReservas` del miembro sigue en hora local; el SQL usa
+      `America/Mazatlan` inline (correcto, no centralizado en una constante).
+
+## 3. CI / testing
+
+- [ ] **Habilitar el job e2e** del CI: cargar secrets `VITE_SUPABASE_*` +
+      `vars.RUN_E2E=true` en el repo. (El smoke `e2e/tests/smoke-landing.spec.ts`
+      ya existe.)
+- [ ] **E2E Fase 2** (con login, mutan datos) — requiere Supabase de **staging**
+      aislado + 3 cuentas de test. Flujos: reservar→cancelar, check-in, comprar
+      plan, reportes.
+- [ ] Borrar `.github/workflows/e2e-smokes.yml` (placeholder noop, redundante con
+      `ci.yml`).
+
+## 4. Madurez visual (aprendido de SALA — ver `docs/audit/ekko-vs-sala-madurez.md`)
+
+- [x] **Recepción a la altura de miembros** — header unificado (título de sección
+      dinámico), ReservaCard usa las clases `.rec-card*`, ocupación → stat-cards,
+      `SegmentedToggle` compartido, y `PerfilMiembroRecepcion` componentizado
+      (828 → 353 líneas, cajas grises → `ek-card`). Ver commits jul-2026.
+- [x] **ConexionBanner** — banner global offline (montado en App.tsx).
+- [x] **PwaInstallBanner** — invita a instalar la PWA (Android/Chrome vía
+      beforeinstallprompt, iOS con instrucciones; dismissible, montado en App.tsx).
+- [x] **Notificaciones push (Web Push)** — infra completa: tabla
+      `push_subscriptions`, SW `public/push-sw.js`, cliente + toggle en Perfil,
+      helper `_lib/push.ts` (web-push), enganche a aviso manual + recurso fuera
+      de servicio, y **cron de recordatorio de reserva ~1h antes**. Patrón de HSC.
+      Falta: VAPID keys + env vars + aplicar migraciones (ver `PUSH.md`).
+- [ ] **Push — pasos de David**: `npx web-push generate-vapid-keys`, cargar
+      `VAPID_*` + `VITE_VAPID_PUBLIC_KEY` en Netlify, aplicar migraciones
+      `20260620130000_push_subscriptions` + `20260620140000_recordatorios_reservas`.
+- [ ] Push del caso "cancelación por miembro/modal recepción" (hoy pasa por RPC
+      client-side): cubrir con trigger `AFTER INSERT ON notificaciones` + pg_net,
+      o moviendo ese cancel a una función Node.
+- [ ] (cosmético) `MagneticButton` / `HeroCarousel` en el landing.
+- [ ] (opcional) Hero mobile dedicado en la landing.
+
+## 5. Refactors (con red de tests)
+
+- [ ] Archivos grandes: `ReservasHoyView.tsx` (835), `PerfilMiembroRecepcion.tsx`
+      (733), `CrearReservaModal.tsx` (494), `RegistrarMiembroModal.tsx` (442).
+- [ ] Constantes de rutas (`routes.ts`) en vez de paths hardcodeados.
+
+---
+
+## Hecho (referencia)
+
+- **Rediseño de recepción A–F** completo (gobernanza/audit, agenda + panel Hoy +
+  nueva IA, no-show manual + corregir check-in, notas + aviso, recurso fuera de
+  servicio).
+- **Alta de miembro reconectada** (estaba huérfana tras el rediseño de IA).
+- **Logos** (logo real + tamaño unificado a 88px en member/recepción/admin).
+- **Pulido visual** — ramp de tokens + transiciones premium.
+- **CI** (`ci.yml`) — gate automatizado en cada push/PR.
+- **DECISIONS.md + BACKLOG.md** (este ordenamiento).
+- Análisis internos en `docs/audit/` (recepción + comparativa de madurez vs SALA).

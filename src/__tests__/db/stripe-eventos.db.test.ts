@@ -35,7 +35,9 @@ const fila = (id: string) => b.fila<Fila>('SELECT * FROM stripe_webhook_events W
 
 beforeAll(async () => {
   b = await levantarBase();
-});
+  // Mismo margen de arranque que las demás suites de base (el gate levanta ~20
+  // bases en paralelo; aislada tarda 2–4 s). Solo tolera tiempo, no errores.
+}, 120_000);
 afterAll(async () => {
   await b.db.close();
 });

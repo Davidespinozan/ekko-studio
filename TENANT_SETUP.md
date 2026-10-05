@@ -1,5 +1,10 @@
 # Cómo onboardear un tenant nuevo en EKKO
 
+> **Guía de mayo de 2026, parcialmente desactualizada (revisado 2026-10-05).** El esquema
+> creció mucho (102 migraciones) y el paso 7 ("Stripe cuando esté implementado") ya no
+> aplica: Stripe Connect funciona. Úsala como lista de pasos, no como verdad del esquema;
+> la estructura vigente está en `docs/ARCHITECTURE.md`.
+
 > Checklist operativo para activar un cliente nuevo. Asume que
 > ya hubo venta y firma de contrato.
 

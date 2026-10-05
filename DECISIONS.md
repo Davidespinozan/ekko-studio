@@ -3,8 +3,9 @@
 Índice de decisiones de producto/arquitectura durables. Históricamente vivían
 **dispersas en comentarios** del código y migraciones (marcadas `D1`, `H3`,
 `L-01`, `R6`, etc.); este archivo las junta para que sean rastreables. Cada
-entrada apunta a dónde vive el detalle. El detalle largo de cada bloque está en
-`KERNEL.md`.
+entrada apunta a dónde vive el detalle. La historia larga de los primeros bloques
+está archivada en `docs/archive/KERNEL.md`; la arquitectura vigente, en
+`docs/ARCHITECTURE.md`.
 
 > Convención: `EKKO-NNN` para decisiones nuevas a partir de acá. Las históricas
 > conservan su marcador original (`D1`, `H3`...) para no romper los comentarios
@@ -94,7 +95,7 @@ entrada apunta a dónde vive el detalle. El detalle largo de cada bloque está e
 
 `A` gobernanza · `B+C` agenda + panel Hoy + nueva IA · `D` no-show manual +
 corregir check-in · `E` notas + aviso · `F` recurso fuera de servicio. Detalle
-completo en `KERNEL.md`.
+completo en `docs/archive/KERNEL.md` (histórico).
 
 ---
 
@@ -185,11 +186,11 @@ completo en `KERNEL.md`.
   `cron-recordatorios` (RPC `generar_recordatorios_reservas`, recordatorio de
   reserva ~1h antes con dedupe por `reservas.recordatorio_enviado_at`). Patrones
   de HSC. Faltan VAPID keys + env + migraciones (ver `PUSH.md`). Pendiente: el
-  cancel client-side no dispara push (ver `BACKLOG.md`).
+  cancel client-side no dispara push (ver `docs/archive/BACKLOG.md`).
 
 ## Paridad con SALA — Sprint 0/1 (2026-08-21)
 
-Bugs y endurecimientos portados de SALA (ver `SALA_PARITY_AUDIT.md`, commits de
+Bugs y endurecimientos portados de SALA (ver `docs/archive/SALA_PARITY_AUDIT.md`, commits de
 la rama `sprint-0-hotfixes`). Cada uno deja un self-test en su migración o un
 test en `src/__tests__`.
 
@@ -286,7 +287,7 @@ test en `src/__tests__`.
 
 ## Paridad con SALA — Auditoría #2, Sprint A (2026-09-20)
 
-Detalle y evidencia en `SALA_PARITY_AUDIT_2.md` §2 y §7.
+Detalle y evidencia en `docs/archive/SALA_PARITY_AUDIT_2.md` §2 y §7.
 
 - **EKKO-035 — Tests conductuales de la base (`src/__tests__/db`).** Un Postgres
   real embebido (PGlite, sin Docker ni psql) aplica TODAS las migraciones y
@@ -426,7 +427,7 @@ Detalle y evidencia en `SALA_PARITY_AUDIT_2.md` §2 y §7.
 
 ## Solicitud de cambios del cliente (2026-09-20)
 
-Detalle en `SOLICITUD_CLIENTE.md`.
+Detalle en `docs/archive/SOLICITUD_CLIENTE.md`.
 
 - **EKKO-069 — La disponibilidad se pide a `slots_ocupados()`, nunca a `reservas`.**
   RLS no deja a un miembro ver reservas ajenas (correcto), así que leer la tabla

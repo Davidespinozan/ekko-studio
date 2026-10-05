@@ -1,3 +1,5 @@
+> **DOCUMENTO HISTÓRICO (archivado 2026-10-05).** Es evidencia de cómo se pensó o auditó algo en su momento; no describe el estado actual ni autoriza trabajo. Vigente: `docs/STATUS.md` (estado), `DECISIONS.md` (decisiones), `docs/ARCHITECTURE.md` (arquitectura).
+
 # SALA → EKKO — Auditoría de paridad #2 (2026-09-20)
 
 > Continuación de `SALA_PARITY_AUDIT.md` (2026-08-21). Las §0–§6 son el análisis, hecho

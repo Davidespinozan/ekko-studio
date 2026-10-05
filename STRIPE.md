@@ -1,5 +1,11 @@
 # Conectar Stripe (membresías del miembro)
 
+> **Parcialmente desactualizado (revisado 2026-10-05).** Stripe Connect ya está conectado
+> y en modo live; los "3 pasos que faltan" ya se hicieron. Los precios se mandan inline
+> (`price_data`), así que `tiers.stripe_price_id` NO es requisito aunque abajo lo diga.
+> Para la arquitectura vigente del cobro lee `docs/arquitectura/membresia.md` y
+> `docs/arquitectura/dinero.md`; este documento queda como guía de puesta en marcha.
+
 D4 (decidido): **suscripción mensual por tier · sin trial · self-serve +
 recepción**. El **código de Stripe ya está implementado** (Checkout + webhook
 robusto + Customer Portal). Lo que falta para cobrar online son **3 pasos de tu

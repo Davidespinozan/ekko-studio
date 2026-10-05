@@ -10,11 +10,20 @@ alcance (qué paquetes), qué autoriza (auditar / diseñar / implementar en loca
 las decisiones ya tomadas. Lo demás está aquí, en `CLAUDE.md`, en
 `docs/STATUS.md` y en `docs/DECISIONS_INDEX.md`.
 
+Qué más cargar y CUÁNDO (no antes):
+- `docs/ARCHITECTURE.md` → solo la nota del dominio que toca el paquete.
+- `ekko-foto-produccion` → solo cuando necesites evidencia de producción (baseline
+  operativo de un dominio, hashes de funciones).
+- `ekko-gate` → al llegar a la validación local (paso 4), no antes.
+- `ekko-activar` → NO en este skill. Se abre solo cuando el dueño autorice una
+  activación en producción, en otra ejecución.
+- `docs/archive/` → nunca por defecto; solo si un hallazgo exige la historia.
+
 ## 0. Antes de empezar
 - Lee `docs/STATUS.md`: qué corre en producción, qué está cerrado, qué hay en local
   sin commit y qué se preserva (stash). Verifícalo contra `git status`,
-  `git rev-parse HEAD origin/main` y, si importa, una lectura de producción
-  (skill `ekko-foto-produccion`). Si STATUS está viejo, repórtalo.
+  `git rev-parse HEAD origin/main` y, si de verdad importa el estado de producción,
+  una lectura con `ekko-foto-produccion`. Si STATUS está viejo, repórtalo.
 - Confirma el alcance. Si el prompt nombra algo que no es de EKKO, detente.
 - Busca en `docs/DECISIONS_INDEX.md` las decisiones del dominio y léelas en
   `DECISIONS.md`. No las rediscutas; constrúyelas.
@@ -58,9 +67,12 @@ servidor; no la define.
   Stripe simulado. Nunca llamadas reales a Stripe.
 - Actualiza las pruebas de contrato existentes solo si el contrato cambió a
   propósito, y explica cada una.
-- Gate completo con la skill `ekko-gate`. Luego `git diff --check`.
+- Gate completo con la skill `ekko-gate` (es el momento de abrirla). Luego `git diff --check`.
 
 ## 5. Límites por defecto (salvo autorización explícita y por separado)
+Antes de declarar algo implementado y al cerrar: `git fetch` y re-verifica HEAD,
+origin/main y el árbol; si otra sesión movió el repo, repórtalo y detente
+(escritor único, `CLAUDE.md`).
 NO migración en producción · NO commit · NO push · NO deploy · NO mutación de
 Stripe, Resend ni Netlify · NO datos artificiales en producción · NO tocar el stash
 ni trabajo local ajeno · NO empezar el paquete siguiente.
@@ -72,7 +84,8 @@ migraciones con md5, funciones nuevas y cambiadas con hash viejo→nuevo y motiv
 pruebas (N de N, gate completo), compatibilidad con cada paquete cerrado tocado,
 foto de producción, estado de git (sin commit/push/deploy, stash intacto),
 residuales y UNA recomendación: LISTO PARA ACTIVACIÓN / LISTO PARA DECISIONES DEL
-DUEÑO / IMPLEMENTACIÓN INCOMPLETA / STOP — P0.
+DUEÑO / IMPLEMENTACIÓN INCOMPLETA / STOP — P0. La activación es otra skill
+(`ekko-activar`) y otra autorización: no la describas ni la prepares aquí.
 `docs/STATUS.md` se actualiza solo con lo VERIFICADO (p. ej. "implementado
 localmente, gate verde, sin commit"); nunca "cerrado" por haber terminado el código.
 Después: STOP y espera.

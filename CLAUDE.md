@@ -32,6 +32,10 @@ Si un documento contradice la realidad, repórtalo; no elijas la versión cómod
 - Autorizar código no autoriza migrar; autorizar migrar no autoriza desplegar; nada
   autoriza mutar Stripe. Cada paso de producción se pide y se otorga por separado.
 - Un commit por paquete, solo con sus archivos. Sin amend, force ni rebase.
+- Escritor único: en este árbol compartido solo una sesión escribe a la vez; otra
+  sesión concurrente es de solo lectura salvo en un worktree o rama aislados con
+  integración acordada. Antes de commit, push o deploy re-verifica HEAD, origin/main,
+  árbol y lo stageado; ante deriva sin explicar, DETENTE (no rebases ni absorbas).
 - Al recrear una función SQL parte de su ÚLTIMA definición (`scripts/db-ultima-def.mjs`).
 - Toda verificación deja pruebas; dinero y derecho se prueban contra Postgres real
   (`src/__tests__/db`, PGlite). Gate: `npm run ci:gate`.
@@ -49,7 +53,8 @@ autoriza mutar sus invariantes.
 ## Carga progresiva
 - Tarea simple de interfaz: este archivo + el código. Nada más.
 - Estado actual, continuar o activar un paquete: lee `docs/STATUS.md`.
-- Dinero, membresía, reservas, cobro: lee solo las decisiones del tema en el índice.
+- Dinero, membresía, reservas, cobro: lee solo las decisiones del tema en el índice
+  y, si vas a tocar cómo está armado el dominio, su nota vía `docs/ARCHITECTURE.md`.
 - Procedimientos repetidos: skills `ekko-paquete`, `ekko-activar`,
-  `ekko-foto-produccion`, `ekko-gate`. La historia larga (`KERNEL.md`, auditorías)
-  solo si la tarea lo exige.
+  `ekko-foto-produccion`, `ekko-gate`. La historia (`docs/archive/`) solo para
+  saber por qué algo fue así; nunca para el estado o una regla vigente.

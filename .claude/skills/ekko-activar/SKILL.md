@@ -54,7 +54,10 @@ Si una migración falla: STOP; no aplicar las siguientes; no commitear ni desple
 - Stagea solo los archivos del paquete; muestra el inventario; `git diff --cached
   --check`. UN commit por paquete, mensaje `tipo(ámbito): …`, con la línea de
   coautoría vigente. Sin amend, force ni rebase.
-- Antes del push: origin/main no se movió. Push normal. HEAD = origin/main.
+- Antes de stagear y otra vez antes del push: `git fetch`; HEAD y origin/main siguen
+  siendo el baseline del preflight y el árbol no cambió. Otra sesión pudo escribir
+  (escritor único, `CLAUDE.md`): ante deriva, STOP sin rebase ni merge automático.
+  Push normal. HEAD = origin/main.
 
 ## 6. Deploy y verificación
 - Netlify construye con el mismo gate. Espera `ready`, contexto `production`,
