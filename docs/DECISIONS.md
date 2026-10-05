@@ -1,5 +1,10 @@
 # Decisiones arquitectónicas — EKKO Studio
 
+> **OBSOLETO (2026-10-05).** Este archivo es la fundación de mayo de 2026 y no se
+> actualiza. El libro de decisiones autoritativo es [`../DECISIONS.md`](../DECISIONS.md)
+> (raíz) y su índice por tema, [`DECISIONS_INDEX.md`](DECISIONS_INDEX.md). Se
+> conserva por historia; se archivará en una fase posterior. No se reescribe.
+
 ## D-001: Multi-tenant desde día 1
 
 **Decisión**: toda la BD lleva `tenant_id`, los RPCs leen `tenants.config jsonb`

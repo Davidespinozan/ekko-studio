@@ -38,7 +38,7 @@ entrada apunta a dónde vive el detalle. El detalle largo de cada bloque está e
 - **D5 — Contrato acotado de alta:** `reception-create-member` fija
   `rol='miembro'` hardcodeado (recepción nunca crea staff) y `tenant` del caller;
   distinto de `admin-create-user`.
-- **D6 — Reprogramar no es atómico:** = cancelar la vieja + crear la nueva (dos
+- **D6 — Reprogramar no es atómico:** **[SUSTITUIDA por EKKO-122: hoy SÍ es atómico]** = cancelar la vieja + crear la nueva (dos
   RPCs), con manejo explícito de fallos parciales (`reprogramarReserva.ts`).
 - **R3 — Perfil de recepción NO reusa `MiembroDetalle` de admin:** se hizo una
   vista propia para no arrastrar acciones peligrosas (borrar/rol). *(El
@@ -202,7 +202,7 @@ test en `src/__tests__`.
   `config.penalizaciones.{no_show_bloqueo_dias (0 = solo registrar), no_show_umbral}`
   la leen el cron (`marcar_no_shows`) y recepción vía `_lib/noShow.ts`; el miembro
   recibe aviso in-app/push (`tipo='no_show'`).
-- **EKKO-015 — La devolución de créditos usa la ventana de CANCELACIÓN**
+- **EKKO-015 — La devolución de créditos usa la ventana de CANCELACIÓN** **[default 0 SUSTITUIDO por EKKO-133: 24 h, igualdad = tarde]**
   (`cancelacion_min_horas_antes`, 0 = sin ventana), igual que
   `cancelar_reserva_atomic`. Sustituye la regla de EKKO-009 que usaba
   `anticipacion_min_horas`.
@@ -246,7 +246,7 @@ test en `src/__tests__`.
   `tiers.reglas`. Sigue **sin** anticipación mínima (D1) y sin tope diario.
   `trg_anticipacion_maxima` valida `anticipacion_max_dias` en la base solo para
   miembros. Recepción lee `membresias` (`membresias_read_staff`).
-- **EKKO-025 — Corregir asistencia:** `reception-marcar-asistio` pasa un
+- **EKKO-025 — Corregir asistencia:** **[SUSTITUIDA por EKKO-121: una cancelada no se revive]** `reception-marcar-asistio` pasa un
   no_show/cancelada ya iniciada a `completada`, revierte la falta y levanta el
   bloqueo si se debía a ella; los créditos no se re-cobran.
 - **EKKO-026 — `tiers.en_venta`** separa "se vende" de "está activo". La venta
@@ -258,7 +258,7 @@ test en `src/__tests__`.
   desde la ficha de identidad; `cumpleanos_proximos` para la card de staff.
   Cobro rechazado y reembolso avisan al equipo (`_lib/avisosStaff.ts`) y la
   campana vive en los 3 layouts.
-- **EKKO-028 — Reembolsos:** `charge.refunded` se registra como `refunded` en
+- **EKKO-028 — Reembolsos:** **[SUSTITUIDA por EKKO-112]** `charge.refunded` se registra como `refunded` en
   `payment_events` y NO revierte créditos/membresía automáticamente: decide el
   estudio desde la ficha.
 - **EKKO-029 — Fee de plataforma** (`EKKO_FEE_PERCENT`) aplica en todos los
@@ -280,7 +280,7 @@ test en `src/__tests__`.
   (cada minuto) reparte lo pendiente de cualquier origen. Las functions que
   empujan inline marcan la fila al insertar; las RPC no empujan (lo hace el
   cron). Reemplaza el cableado disparador por disparador de EKKO-008.
-- **EKKO-034 — Reportes "cobrado · dinero real"** desde `payment_events`
+- **EKKO-034 — Reportes "cobrado · dinero real"** **[SUSTITUIDA por EKKO-126]** desde `payment_events`
   (mes actual vs. anterior, por concepto, reembolsos, cobros rechazados 30 d),
   separado del MRR (ingreso contratado).
 
@@ -450,7 +450,7 @@ Detalle en `SOLICITUD_CLIENTE.md`.
 
 ## Restos de la solicitud del cliente + Sprint E (2026-09-20)
 
-- **EKKO-076 — Reprogramar = un solo aviso de "cambio de horario".**
+- **EKKO-076 — Reprogramar = un solo aviso de "cambio de horario".** **[SUSTITUIDA por EKKO-122]**
   `staff_avisar_reprogramacion` retira el par agendada + cancelada recién creado y
   deja uno con de-dónde-a-dónde. Best-effort: si falla, quedan los dos originales.
 - **EKKO-077 — La ficha ADMIN del miembro usa la misma tarjeta y modales de
@@ -652,3 +652,167 @@ migración).
   membresía vencida sin expirar, varias vivas, contradicción de Stripe, customer
   distinto. `restricciones`: revocado o sancionado con membresía viva (la membresía
   se conserva). No repara nada.
+
+## Remediación por paquetes — dinero y evidencia (PKG-01A a 01H, 00F, 02A, 02B · 2026-09-28 a 10-03)
+
+Desde aquí el trabajo va por paquetes (`PKG-…`). Cada entrada conserva la etiqueta
+con la que el dueño tomó la decisión (`D7`, `W-1`, `D-01F-4`…): así aparece en los
+comentarios del código, las migraciones y las pruebas.
+
+- **EKKO-105 — PKG-01A · Un evento de Stripe tiene estado durable.**
+  `stripe_webhook_events` responde qué llegó, qué debía pasar y cómo terminó
+  (`en_proceso | procesado | ignorado | error_reintentable | revision`).
+  `claim_stripe_event` es la única puerta: un `event.id` → una sola reclamación
+  activa. `D-01A-1`: ante la duda el error es transitorio; `revision` no es un
+  cajón de sastre. Lo histórico queda marcado `legacy_backfill_*`, no reinterpretado.
+  Migración `20260928100000`; `src/__tests__/db/stripe-eventos.db.test.ts`.
+- **EKKO-106 — PKG-01B · Crear un Checkout no da derecho.** El derecho nace del
+  evento FINANCIERO: `checkout.session.completed` solo activa con
+  `payment_status = 'paid'`; si no, llega por `payment_intent.succeeded` (paquete)
+  o `invoice.paid` (mensual). Un `subscription.updated` sin membresía todavía no es
+  divergencia. `netlify/functions/suscribir-membresia`, `stripe-webhook`.
+- **EKKO-107 — PKG-01C · Idempotencia de lo que EKKO le pide a Stripe.** Cada
+  operación saliente lleva un `operation_id` del cliente y una llave estable
+  (`ekko:v1:…`); un reintento encuentra y clasifica el objeto ya creado en vez de
+  crear otro. `netlify/functions/_lib/operacionPago.ts`.
+- **EKKO-108 — PKG-01D · Venta de mostrador con evidencia.** Ningún éxito
+  financiero sin evidencia durable: `ventas_mostrador` guarda el precio aplicado y
+  `registrar_venta_mostrador` es atómica e idempotente por `operation_id`. `D9`:
+  efectivo/transferencia/terminal cobran el precio de lista, cortesía cobra 0.
+  `D-01D-3`: una suscripción de Stripe viva rechaza la venta (no se cancela nada).
+  `D-01D-5`: sin `operation_id` o sin método no hay venta; nada de defaults.
+  Migración `20260930100000`; `ventas-mostrador.db.test.ts`.
+- **EKKO-109 — PKG-01E · Tarjeta en mostrador = mismo cobro de Stripe.** El
+  servidor deriva el importe del catálogo (el cliente no manda montos) y marca el
+  pago con `metadata.origen = 'mostrador'`. `D-01E-4`: una suscripción viva no se
+  sustituye ni se duplica desde mostrador. `netlify/functions/mostrador-crear-pago`.
+- **EKKO-110 — PKG-01F · Cambio de plan con guard y transición atómica.**
+  `D12 / D-01F-4`: si el plan destino deja inválidas reservas futuras, el cambio se
+  RECHAZA y se listan; no se cancela ni se reembolsa nada automáticamente.
+  `cambiar_tier_membresia` mueve membresía y caché juntos, idempotente por
+  `operation_id`, con rastro en `audit_log`. `D-01F-5`: mensual con suscripción →
+  paquete sustituye la mensualidad y pierde el resto del periodo, sin reembolso, con
+  aviso previo. `D-01F-6`: perder créditos exige consentimiento en el servidor al
+  crear el cobro. `D-01F-7`: solo una membresía `activa` se re-precia.
+  Migración `20260930120000`; `cambio-de-plan.db.test.ts`.
+- **EKKO-111 — PKG-00F · El correo dice la verdad.** `email_resultado` distingue
+  `aceptado` (Resend aceptó, hay id), `sin_correo` y `fallo`. ACEPTADO POR EL
+  PROVEEDOR ≠ ENTREGADO. Sin reintentos aquí. Lo anterior a 00F queda con
+  resultado NULL, sin reinterpretar. Migración `20261001100000`;
+  `email-resultado.db.test.ts`.
+- **EKKO-112 — PKG-01G · `D7`: un reembolso no muta derechos.** Deja evidencia
+  exacta con identidad propia (`reversales_pago`, una fila por objeto `re_…`,
+  inmutable), atribuida a su pago de origen solo si se puede demostrar, abre una
+  revisión humana (`revisiones_financieras`) y avisa al admin. CERO cambio
+  automático de créditos, membresía, cuenta, plan, reservas o suscripción. Origen
+  ambiguo → revisión, nunca adivinado. **Sustituye a EKKO-028.**
+  Migración `20261002100000`; `reversales.db.test.ts`.
+- **EKKO-113 — PKG-01G · `D8`: disputas.** Abierta: evidencia + revisión + aviso.
+  Ganada: se asienta y cierra la revisión. Perdida: se asienta y queda en revisión.
+  Sin mutación automática de derechos.
+- **EKKO-114 — PKG-01G · `D-01G-3`: desautorización de Connect.** Apaga la
+  capacidad de COBRO del estudio y conserva `stripe_account_id`
+  (`tenants.stripe_desconectado_at`). Nunca toca el derecho de un miembro.
+- **EKKO-115 — PKG-01G · `D-01G-4`: proveniencia del valor, hacia adelante.**
+  `membresia_movimientos.origen` se clasifica al nacer el movimiento; lo histórico
+  queda explícitamente `desconocido`. No se fabrica atribución con backfill.
+- **EKKO-116 — PKG-01H · `W-1 = B`: `capacidad_personas` es informativa.** No
+  limita reservas ni invitados.
+- **EKKO-117 — PKG-01H · `W-2 = A`: un pago de extras que no puede aplicarse no
+  desaparece.** Queda como evidencia `no_aplicado` con motivo + una revisión
+  financiera; el evento se da por procesado. Sin reembolso ni derecho automáticos.
+- **EKKO-118 — PKG-01H · `W-3 = A`: la RESERVA es la verdad de sus invitados.** Un
+  PaymentIntent → a lo más una aplicación (`invitados_extra_pagos`, inmutable);
+  `reservas.invitados_extra_pagados` es caché de esa evidencia; las fichas de
+  recepción no pasan de incluidos + extras pagados. Migración `20261003100000`;
+  `invitados.db.test.ts`.
+- **EKKO-119 — PKG-02A · Estados de error honestos.** Un fallo al cargar nunca se
+  muestra como "vacío" ni como éxito: se dice que no se pudo comprobar y se ofrece
+  reintentar; no se asume 0 ni "sin datos".
+- **EKKO-120 — PKG-02B · La interfaz no afirma dinero ni derecho antes de verlo.**
+  Tras un pago se OBSERVA el efecto en el servidor (activación, extras); no se suma
+  en memoria ni se declara "pagado". El plan "actual" sale de la membresía viva.
+
+## R2-A — reservas, asistencia y autoridad (PKG-01I a 01M · 2026-10-03)
+
+Migración `20261004100000`; `src/__tests__/db/r2a-reservas.db.test.ts`.
+
+- **EKKO-121 — PKG-01I · Las transiciones de asistencia son del servidor.** "Sí
+  asistió" solo desde `no_show` con la sesión ya iniciada; "deshacer check-in" solo
+  desde `completada` y el mismo día (`staff_corregir_asistencia`). Una reserva
+  CANCELADA no se revive: se crea otra. La corrección no mueve créditos. La guarda
+  de identidad aplica a cualquier entrada a `completada`. **Sustituye a EKKO-025.**
+- **EKKO-122 — PKG-01J · Reprogramar es UNA operación atómica.**
+  `reprogramar_reserva` cancela, recrea, traslada extras pagados (con rastro en
+  `invitados_extra_traslados`; la evidencia del pago no se reescribe) y fichas, deja
+  un solo aviso y audita. Si algo falla, la original queda intacta. El navegador no
+  orquesta transiciones de varios pasos. **Sustituye a D6 y a EKKO-076.**
+- **EKKO-123 — PKG-01K · El plan que da derechos es el de la membresía VIVA.**
+  `usuarios.membresia_tier` es caché de display; las RPC usan `_tier_vivo`.
+- **EKKO-124 — PKG-01L · Ser admin de la fila no autoriza a mutar sus invariantes.**
+  Sin escritura directa por REST en reservas, membresías ni datos privados; el
+  admin no cambia por REST plan, puntero de membresía, penalización, sanción, rol,
+  correo ni contrato de un usuario. Esos cambios van por RPC o función de servidor.
+- **EKKO-125 — PKG-01M · Semántica de planes protegida.** El slug es inmutable;
+  tipo y "activo" no cambian con membresías vivas; `reglas.max_invitados` es
+  obligatorio (entero ≥ 0), sin defaults por slug.
+
+## R2-B — libro económico, terminación, cobro y cancelación (PKG-01N a 01Q · 2026-10-05)
+
+Migraciones `20261005100000` y `20261005110000`; pruebas
+`r2b-libro-economico.db.test.ts`, `r2b-terminacion.db.test.ts` y
+`src/__tests__/operacionesSuscripcion.test.ts`.
+
+- **EKKO-126 — PKG-01N · Libro económico: una lectura, no otra contabilidad.**
+  `v_libro_economico` compone la evidencia existente. BRUTO = cobros firmes, una
+  vez cada uno (Stripe y mostrador). REVERSADO = reembolso efectuado o disputa
+  perdida, por su monto exacto, solo con pago de origen resuelto y firme. NETO =
+  suma de efectos. Lo no atribuible queda `sin_resolver`, visible y fuera del neto;
+  no se fabrica atribución histórica. No resta comisiones de Stripe (no se guardan).
+  **Sustituye a EKKO-034.**
+- **EKKO-127 — PKG-01O · `D-01O-1 = B`: crédito que no se puede restaurar.** Si
+  al cancelar hay que devolver un crédito y ya no existe membresía viva con saldo
+  donde ponerlo, NO se pierde en silencio, no se crea ni se resucita una membresía
+  y no se reembolsa dinero: queda evidencia + UNA revisión `credito_no_restaurado`
+  + aviso al admin. La resolución es humana.
+- **EKKO-128 — PKG-01O · `D-01O-2 = A`: no se reserva después del fin efectivo
+  conocido del derecho.** Lo rechaza el servidor (`trg_reserva_dentro_de_vigencia`).
+  Aplica a planes por TIEMPO con fin conocido (baja al fin de periodo, o mensual de
+  mostrador). Una suscripción que se renueva no tiene fin conocido. Una sesión
+  pagada con crédito queda pagada al reservar y no se bloquea. Y no se penaliza una
+  falta que EKKO mismo hizo imposible (cuenta sancionada o revocada, derecho
+  terminado): la reserva queda `no_show` sin contador, bloqueo ni aviso.
+  La baja sigue SIN cancelar reservas futuras (EKKO-057).
+- **EKKO-129 — PKG-01P · `D-01P-1 = B`: la sanción suspende el cobro.** Sanción =
+  temporal: se pausa el cobro de Stripe con el mecanismo reversible existente
+  (`pause_collection`) y se reanuda al levantarla solo si la cuenta no está
+  revocada y la membresía y la suscripción siguen vigentes. Nunca se cancela una
+  suscripción solo por sanción. Sin reembolso automático.
+- **EKKO-130 — PKG-01P · `D-01P-1 = B`: la revocación cancela de inmediato.**
+  Revocación = terminal: la suscripción se cancela en Stripe ya, no al fin del
+  periodo, sin reembolso automático. La revocación sigue siendo persistente
+  (EKKO-100) y ningún cobro posterior la revierte (EKKO-101).
+- **EKKO-131 — PKG-01P · Lo que EKKO debe hacer en Stripe queda escrito.** Cada
+  suspensión, reanudación o cancelación es una fila de
+  `stripe_operaciones_suscripcion`, creada en la MISMA transacción que la sanción,
+  la revocación o la baja, con identidad de negocio única y llave por intento. Si
+  Stripe falla, el estado de EKKO no se deshace: la operación queda `fallida`, se
+  avisa al admin y se reintenta. **Complementa a EKKO-057** (antes: solo Sentry).
+- **EKKO-132 — PKG-01Q · `D-01Q-1 = A`: la cancelación dice quién la causó.**
+  `cancelar_reserva_atomic(…, p_causa)`: el equipo debe indicar `miembro` o
+  `estudio`. Miembro a tiempo → crédito devuelto. Miembro tarde → se cancela y el
+  crédito NO vuelve; el aviso lo dice. Estudio → el crédito vuelve (o EKKO-127).
+  El miembro, por su cuenta, solo cancela a tiempo. Plan mensual: no se fabrica
+  ningún movimiento. Ninguna cancelación genera reembolso en dinero.
+- **EKKO-133 — PKG-01Q · Una sola ventana de cancelación.** Fuente única en el
+  servidor (`_cancelacion_min_horas`): la configuración del estudio; si falta, 24
+  horas. A tiempo = faltan MÁS de N horas; exactamente N o menos = tarde. La
+  interfaz representa esa regla, no la define. **Sustituye el default de EKKO-015.**
+- **EKKO-134 — PKG-01Q · `D-01Q-2 = A`: extras pagados en una reserva cancelada.**
+  UNA revisión financiera `extras_pagados_reserva_cancelada`; sin reembolso
+  automático; pagos, traslados y reversales no se tocan. Reprogramar traslada los
+  extras y no abre revisión. **Extiende a EKKO-090.**
+- **EKKO-135 — `D-R2B-GATE-1 = A`: una prueba que levanta una base lleva límite
+  explícito.** La prueba del backfill de eventos de Stripe usa el mismo límite de
+  120 s que las demás suites que levantan una base. No se inflan timeouts de forma
+  general ni se debilitan pruebas para obtener verde.
