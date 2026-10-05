@@ -9,8 +9,11 @@ export const TIPO_NOTIF_CAMBIAR_PASSWORD = 'cambiar_password';
 /**
  * Aviso EN PANTALLA para que el dueño de la cuenta cambie la contraseña
  * TEMPORAL que le dictó recepción/admin (alta o reset). Se dispara con la
- * notificación `cambiar_password` que insertan esas funciones; al cambiarla se
- * marca leída y desaparece. "Ahora no" deja seguir usando la app, pero vuelve
+ * notificación `cambiar_password` que insertan esas funciones. PKG-02C: el aviso
+ * lo cierra el SERVIDOR cuando la contraseña cambia de verdad (trigger en
+ * auth.users); este componente solo vuelve a consultar. Si el aviso sigue
+ * abierto, el gate sigue en pantalla: nunca se oculta por decisión del cliente.
+ * "Ahora no" deja seguir usando la app, pero vuelve
  * en la siguiente entrada. Montado en los 3 layouts (miembro, admin, recepción):
  * en EKKO la cuenta tiene tarjeta guardada, créditos y reservas de equipo caro —
  * una clave dictada por un tercero no puede quedarse como definitiva.
@@ -51,12 +54,8 @@ export function CambiarPasswordGate() {
   if (!avisoId || pospuesto) return null;
 
   async function alCambiar() {
-    if (!avisoId) return;
-    await supabase
-      .from('notificaciones')
-      .update({ leida: true, leida_at: new Date().toISOString() })
-      .eq('id', avisoId);
-    setAvisoId(null);
+    // El servidor marca el aviso al cambiar la contraseña; aquí solo se observa.
+    await buscar();
   }
 
   return (

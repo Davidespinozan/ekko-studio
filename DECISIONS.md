@@ -817,3 +817,15 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   explícito.** La prueba del backfill de eventos de Stripe usa el mismo límite de
   120 s que las demás suites que levantan una base. No se inflan timeouts de forma
   general ni se debilitan pruebas para obtener verde.
+- **EKKO-136 — PKG-02C · El gate `cambiar_password` es del servidor.** El aviso
+  `cambiar_password` lo cierra únicamente el cambio REAL de contraseña en
+  `auth.users` (trigger `on_auth_user_password_changed`). El cliente no lo apaga
+  marcándolo leído, ni uno a uno ni con "marcar todas" (se conserva sin error); el
+  frontend no escribe ese estado, solo vuelve a consultar. Si el mecanismo falla, el
+  cambio de contraseña no se revierte y el aviso queda abierto: nunca un falso
+  "contraseña cambiada". El resto de avisos: el cliente solo marca leído/no leído lo
+  propio; contenido y evidencia de envío son del servidor y nadie crea avisos por
+  REST. Notas de miembro: autor y rol se derivan de la sesión y de `usuarios`, y
+  son inmutables. `anon` (y PUBLIC) sin escritura ni EXECUTE en funciones de
+  aplicación; `authenticated` sin DML donde ninguna política lo autoriza y sin
+  TRUNCATE. **Extiende a EKKO-124 y EKKO-039.**

@@ -66,6 +66,7 @@ rediscute sin evidencia nueva.
 
 ## Seguridad y autorización
 - EKKO-124 — ser admin de la fila no autoriza a mutar invariantes por REST.
+- EKKO-136 (PKG-02C) — gate `cambiar_password` del servidor; avisos solo leído/no leído; autor de notas del servidor; anon sin escritura ni EXECUTE.
 - EKKO-083 — nunca dejar el estudio sin admin activo. EKKO-039, EKKO-040 — staff inactivo sin poderes; alcance de recepción.
 - EKKO-020 — privilegios de funciones y columnas. EKKO-042 — cuentas demo sin contraseña fija.
 - EKKO-092, EKKO-093, EKKO-094, EKKO-095, EKKO-096, EKKO-097 — ficha de identidad por PATCH, contrato como evento, avatar como identidad, alta en Auth, correo único, sin `membresia_tier` por recepción.

@@ -51,13 +51,14 @@ export function useNotasMiembro(miembroId: string | undefined) {
   const createNota = useCallback(
     async (contenido: string) => {
       if (!miembroId || !usuario) throw new Error('No autenticado');
+      // PKG-02C: autor_id y autor_rol los fija el servidor desde la sesión; el
+      // valor que se mande se ignora, así que no se manda.
       const { error } = await supabase.from('notas_miembro').insert({
         tenant_id: usuario.tenant_id,
         miembro_id: miembroId,
         autor_id: usuario.id,
-        autor_rol: usuario.rol,
         contenido
-      });
+      } as never);
       if (error) throw new Error(error.message);
       await recargar();
     },

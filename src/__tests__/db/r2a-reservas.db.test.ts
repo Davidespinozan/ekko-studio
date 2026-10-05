@@ -478,19 +478,24 @@ describe('01K · el plan que da derechos es el de la membresía VIVA', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════════════
+// PKG-02C (20261006100000): en estas tablas ninguna política autoriza escribir, así
+// que el GRANT de INSERT/UPDATE/DELETE a authenticated se retiró. El rechazo ahora
+// es "permission denied" (antes del RLS) en vez de 0 filas / violación de RLS. El
+// resultado de 01L es el mismo: el admin lee y no escribe estado de negocio.
+const SIN_PERMISO = /permission denied|row-level security/;
 describe('01L · admin: lee, no escribe estado de negocio por REST', () => {
-  it('reservas: admin lee; UPDATE/DELETE no tocan filas; INSERT rechazado por RLS', async () => {
+  it('reservas: admin lee; UPDATE/DELETE/INSERT rechazados (sin GRANT ni policy)', async () => {
     const m = await b.crearPersona();
     await b.activar(m, 'premium');
     const id = await reservarRecep(m, await b.crearEstudio(), 2, 7);
     await b.como(admin, async () => {
       expect((await b.filas('SELECT 1 FROM reservas WHERE id = $1', [id])).length).toBe(1);
-      expect((await b.filas(`UPDATE reservas SET status = 'completada' WHERE id = $1 RETURNING id`, [id])).length).toBe(0);
-      expect((await b.filas(`DELETE FROM reservas WHERE id = $1 RETURNING id`, [id])).length).toBe(0);
+      await expect(b.filas(`UPDATE reservas SET status = 'completada' WHERE id = $1 RETURNING id`, [id])).rejects.toThrow(SIN_PERMISO);
+      await expect(b.filas(`DELETE FROM reservas WHERE id = $1 RETURNING id`, [id])).rejects.toThrow(SIN_PERMISO);
       await expect(b.db.query(
         `INSERT INTO reservas (tenant_id, recurso_id, usuario_id, slot_inicio, slot_fin, duracion_min, status, folio)
          SELECT tenant_id, recurso_id, usuario_id, slot_inicio + interval '1 day', slot_fin + interval '1 day', 60, 'confirmada', 'EKK-X' FROM reservas WHERE id = $1`, [id]))
-        .rejects.toThrow(/row-level security/);
+        .rejects.toThrow(SIN_PERMISO);
     });
     expect((await reserva(id)).status).toBe('confirmada');
   });
@@ -500,8 +505,8 @@ describe('01L · admin: lee, no escribe estado de negocio por REST', () => {
     await b.activar(m, 'starter');
     await b.como(admin, async () => {
       expect((await b.filas('SELECT 1 FROM membresias WHERE usuario_id = $1', [m.id])).length).toBe(1);
-      expect((await b.filas(`UPDATE membresias SET creditos_restantes = 99, status = 'activa' WHERE usuario_id = $1 RETURNING id`, [m.id])).length).toBe(0);
-      expect((await b.filas(`DELETE FROM membresias WHERE usuario_id = $1 RETURNING id`, [m.id])).length).toBe(0);
+      await expect(b.filas(`UPDATE membresias SET creditos_restantes = 99, status = 'activa' WHERE usuario_id = $1 RETURNING id`, [m.id])).rejects.toThrow(SIN_PERMISO);
+      await expect(b.filas(`DELETE FROM membresias WHERE usuario_id = $1 RETURNING id`, [m.id])).rejects.toThrow(SIN_PERMISO);
     });
     expect(await b.creditos(m)).toBe(3);
   });
@@ -511,7 +516,10 @@ describe('01L · admin: lee, no escribe estado de negocio por REST', () => {
     await b.db.query(`INSERT INTO usuarios_datos_privados (usuario_id, tenant_id, stripe_customer_id) VALUES ($1, $2, 'cus_real') ON CONFLICT (usuario_id) DO UPDATE SET stripe_customer_id = 'cus_real'`, [m.id, b.tenantId]);
     await b.como(admin, async () => {
       expect((await b.filas('SELECT stripe_customer_id FROM usuarios_datos_privados WHERE usuario_id = $1', [m.id]))).toEqual([{ stripe_customer_id: 'cus_real' }]);
-      expect((await b.filas(`UPDATE usuarios_datos_privados SET stripe_customer_id = 'cus_otro' WHERE usuario_id = $1 RETURNING usuario_id`, [m.id])).length).toBe(0);
+      await expect(b.filas(`UPDATE usuarios_datos_privados SET stripe_customer_id = 'cus_otro' WHERE usuario_id = $1 RETURNING usuario_id`, [m.id])).rejects.toThrow(SIN_PERMISO);
+    });
+    expect((await b.fila<{ c: string }>('SELECT stripe_customer_id AS c FROM usuarios_datos_privados WHERE usuario_id = $1', [m.id])).c).toBe('cus_real');
+    await b.como(admin, async () => {
     });
     expect(await b.como(recep, () => b.filas('SELECT 1 FROM usuarios_datos_privados WHERE usuario_id = $1', [m.id]))).toEqual([]);
   });

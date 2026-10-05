@@ -147,5 +147,42 @@ SELECT 'P4', 'creditos_devolver_al_cancelar NO decide con anticipacion_min_horas
   CASE WHEN NOT pg_temp._fn_contiene('creditos_devolver_al_cancelar', 'anticipacion_min_horas')
        THEN '✅ PASS' ELSE '❌ FAIL' END;
 
+-- ── P5: frontera por REST (PKG-02C) ──────────────────────────────────────────
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'ninguna policy decide por rol crudo sin estado activo',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public'
+         AND (coalesce(qual,'')||coalesce(with_check,'')) ~ 'usuarios\.rol'
+         AND (coalesce(qual,'')||coalesce(with_check,'')) !~ 'status')
+       THEN '✅ PASS' ELSE '❌ FAIL — policy con rol sin status' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'ninguna policy UPDATE/ALL sin WITH CHECK',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND cmd IN ('UPDATE','ALL') AND with_check IS NULL)
+       THEN '✅ PASS' ELSE '❌ FAIL — UPDATE sin WITH CHECK' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'anon sin INSERT/UPDATE/DELETE/TRUNCATE en public',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM information_schema.role_table_grants
+         WHERE table_schema='public' AND grantee='anon' AND privilege_type <> 'SELECT')
+       THEN '✅ PASS' ELSE '❌ FAIL — anon con escritura' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'anon sin EXECUTE en funciones de aplicación',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace
+         AND has_function_privilege('anon', p.oid, 'EXECUTE')
+         AND NOT EXISTS (SELECT 1 FROM pg_depend d JOIN pg_extension e ON e.oid=d.refobjid WHERE d.objid=p.oid AND d.deptype='e'))
+       THEN '✅ PASS' ELSE '❌ FAIL — anon ejecuta funciones' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'authenticated sin DML donde ninguna policy escribe, y sin TRUNCATE',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM information_schema.role_table_grants g
+         WHERE g.table_schema='public' AND g.grantee='authenticated'
+           AND (g.privilege_type IN ('TRUNCATE','REFERENCES','TRIGGER')
+                OR (g.privilege_type IN ('INSERT','UPDATE','DELETE')
+                    AND g.table_name NOT IN (SELECT tablename FROM pg_policies WHERE schemaname='public' AND cmd<>'SELECT'))))
+       THEN '✅ PASS' ELSE '❌ FAIL — grant sin policy' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'gate cambiar_password: trigger en auth.users y frontera de avisos presentes',
+  CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='on_auth_user_password_changed')
+         AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_notificaciones_frontera_cliente')
+         AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_notas_miembro_autor_servidor')
+       THEN '✅ PASS' ELSE '❌ FAIL — falta trigger' END;
+
 -- ── Resultado ────────────────────────────────────────────────────────────────
 SELECT area, caso, resultado FROM _hardening_resultado ORDER BY id;

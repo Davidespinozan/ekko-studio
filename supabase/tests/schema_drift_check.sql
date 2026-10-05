@@ -281,9 +281,13 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
       THEN '✅ PASS' ELSE '❌ FALTA' END),
 ('11 · Grants/RLS', '100800_rls_policies', 'payment_events: policy payment_events_admin_read',
  CASE WHEN EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='payment_events' AND policyname='payment_events_admin_read') THEN '✅ PASS' ELSE '❌ FALTA' END),
-('11 · Grants/RLS', '17600000_cancelar_reservas', 'notificaciones: 3 policies (lee/marca/admin crea)',
- CASE WHEN (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='notificaciones') >= 3
-        THEN '✅ PASS' ELSE '❌ FALTA — 17600000 no aplicada' END);
+-- PKG-02C (20261006100000): el cliente solo lee y marca lo suyo; nadie crea avisos
+-- por REST (la policy "admin crea" se retiró: los avisos los crea el servidor).
+('11 · Grants/RLS', '20261006100000_02c_frontera_rest', 'notificaciones: 2 policies (lee/marca lo propio), sin INSERT por REST',
+ CASE WHEN (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='notificaciones') = 2
+         AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='notificaciones' AND cmd IN ('INSERT','ALL'))
+         AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='notificaciones' AND cmd='UPDATE' AND with_check IS NOT NULL)
+        THEN '✅ PASS' ELSE '❌ FALTA — 02C no aplicada' END);
 
 
 -- ////////////////////////////////////////////////////////////////////////////
