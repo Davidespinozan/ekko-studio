@@ -184,5 +184,22 @@ SELECT 'P5', 'gate cambiar_password: trigger en auth.users y frontera de avisos 
          AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_notas_miembro_autor_servidor')
        THEN '✅ PASS' ELSE '❌ FAIL — falta trigger' END;
 
+-- F-1 (20261008100000): una vista se evalúa con los permisos de su dueño salvo
+-- `security_invoker`; con dueño postgres eso salta la RLS. Toda vista de public debe
+-- ser security_invoker (lista de excepciones intencionales vacía: la landing lee
+-- tablas con RLS, no vistas), y anon no lee ninguna vista de dinero/reconciliación.
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'toda vista de public es security_invoker (excepciones intencionales: ninguna)',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relnamespace='public'::regnamespace AND c.relkind='v'
+         AND c.relname <> ALL (ARRAY[]::text[])
+         AND coalesce((SELECT option_value FROM pg_options_to_table(c.reloptions) WHERE option_name='security_invoker'),'false') NOT IN ('true','on','1'))
+       THEN '✅ PASS' ELSE '❌ FAIL — vista con permisos del dueño' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'anon sin SELECT en vistas de valor, libro y reconciliación',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relnamespace='public'::regnamespace AND c.relkind='v'
+         AND c.relname IN ('valor_por_lote','movimientos_sin_vinculo','v_libro_economico','v_reconciliacion_membresia')
+         AND has_table_privilege('anon', c.oid, 'SELECT'))
+       THEN '✅ PASS' ELSE '❌ FAIL — anon lee una vista financiera' END;
+
 -- ── Resultado ────────────────────────────────────────────────────────────────
 SELECT area, caso, resultado FROM _hardening_resultado ORDER BY id;
