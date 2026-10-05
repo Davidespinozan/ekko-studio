@@ -1,5 +1,34 @@
-import { describe, it, expect } from 'vitest';
-import { formatTamano, nombreSeguro, rutaDeArchivo, diasRestantes, agruparPorSesion, mensajeHumano, type MaterialConSesion } from '../material';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import {
+  formatTamano,
+  nombreSeguro,
+  rutaDeArchivo,
+  diasRestantes,
+  agruparPorSesion,
+  mensajeHumano,
+  subirArchivo,
+  type MaterialConSesion
+} from '../material';
+
+/**
+ * Caso real de producción (2026-10-04): 2 archivos quedaron huérfanos en Storage
+ * porque el registro en la base falló a medio camino y nadie los limpió — el
+ * staff vio el archivo "subido" pero el botón de avisar nunca se activó (no hay
+ * fila en material_sesion). subirArchivo debe limpiar el objeto de Storage sea
+ * cual sea la forma en que falle el registro: un {error} de la RPC o una
+ * excepción (p. ej. conexión cortada a medio camino).
+ */
+const h = vi.hoisted(() => ({
+  upload: vi.fn(),
+  remove: vi.fn(),
+  rpc: vi.fn()
+}));
+vi.mock('../supabase', () => ({
+  supabase: {
+    storage: { from: () => ({ upload: h.upload, remove: h.remove }) },
+    rpc: h.rpc
+  }
+}));
 
 describe('material — utilidades', () => {
   it('formatTamano', () => {
@@ -42,5 +71,40 @@ describe('material — utilidades', () => {
     const g = agruparPorSesion([m('a', 'r-vieja', '2026-08-01T00:00:00Z'), m('b', 'r-nueva', '2026-09-01T00:00:00Z'), m('c', 'r-vieja', '2026-08-01T00:00:00Z')]);
     expect(g.map((x) => x.reservaId)).toEqual(['r-nueva', 'r-vieja']);
     expect(g[1].archivos.map((x) => x.id)).toEqual(['a', 'c']);
+  });
+});
+
+describe('subirArchivo — limpieza del objeto huérfano si el registro no queda', () => {
+  const archivo = new File(['contenido'], 'video.mp4', { type: 'video/mp4' });
+  const p = { tenantId: 't1', usuarioId: 'u1', reservaId: 'r1', archivo, titulo: 'Título', diasDisponible: 30 };
+
+  beforeEach(() => {
+    h.upload.mockReset().mockResolvedValue({ error: null });
+    h.remove.mockReset().mockResolvedValue({ error: null });
+    h.rpc.mockReset();
+  });
+
+  it('feliz: sube y registra sin tocar remove()', async () => {
+    h.rpc.mockResolvedValue({ data: { success: true }, error: null });
+    await subirArchivo(p);
+    expect(h.remove).not.toHaveBeenCalled();
+  });
+
+  it('la RPC responde {error}: limpia el objeto y lanza el mensaje humano', async () => {
+    h.rpc.mockResolvedValue({ data: null, error: { message: 'EKKO_RUTA_INVALIDA: El archivo no está en la carpeta de esta reserva' } });
+    await expect(subirArchivo(p)).rejects.toThrow('El archivo no está en la carpeta de esta reserva');
+    expect(h.remove).toHaveBeenCalledWith([expect.stringContaining('t1/u1/r1/')]);
+  });
+
+  it('la RPC se cae a medio camino (lanza en vez de devolver {error}): también limpia el objeto', async () => {
+    h.rpc.mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(subirArchivo(p)).rejects.toThrow('Failed to fetch');
+    expect(h.remove).toHaveBeenCalledWith([expect.stringContaining('t1/u1/r1/')]);
+  });
+
+  it('si la limpieza también falla, no tapa el error original', async () => {
+    h.rpc.mockResolvedValue({ data: null, error: { message: 'EKKO_SIN_MATERIAL: algo' } });
+    h.remove.mockRejectedValue(new Error('storage caído'));
+    await expect(subirArchivo(p)).rejects.toThrow('algo');
   });
 });

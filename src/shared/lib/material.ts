@@ -110,20 +110,25 @@ export async function subirArchivo(p: {
     .upload(ruta, p.archivo, { contentType: p.archivo.type || 'application/octet-stream', upsert: false });
   if (upErr) throw new Error(`No se pudo subir el archivo: ${upErr.message}`);
 
-  const { error } = await rpc('staff_registrar_material', {
-    p_reserva_id: p.reservaId,
-    p_tipo: 'archivo',
-    p_titulo: p.titulo,
-    p_storage_path: ruta,
-    p_nombre_archivo: p.archivo.name,
-    p_tamano_bytes: p.archivo.size,
-    p_mime: p.archivo.type || null,
-    p_dias_disponible: p.diasDisponible
-  });
-  if (error) {
-    // La fila no quedó: no dejar el objeto huérfano ocupando espacio.
-    await supabase.storage.from(BUCKET_MATERIAL).remove([ruta]);
-    throw new Error(mensajeHumano(error.message));
+  try {
+    const { error } = await rpc('staff_registrar_material', {
+      p_reserva_id: p.reservaId,
+      p_tipo: 'archivo',
+      p_titulo: p.titulo,
+      p_storage_path: ruta,
+      p_nombre_archivo: p.archivo.name,
+      p_tamano_bytes: p.archivo.size,
+      p_mime: p.archivo.type || null,
+      p_dias_disponible: p.diasDisponible
+    });
+    if (error) throw new Error(mensajeHumano(error.message));
+  } catch (e) {
+    // La fila no quedó (por un error de la RPC o por una falla de red/conexión
+    // a medio camino): no dejar el objeto huérfano ocupando espacio. Con
+    // .catch() porque si esta limpieza también falla, no debe tapar el error
+    // original que sí le vamos a mostrar al staff.
+    await supabase.storage.from(BUCKET_MATERIAL).remove([ruta]).catch(() => {});
+    throw e instanceof Error ? e : new Error('No se pudo registrar el archivo.');
   }
 }
 
