@@ -44,8 +44,12 @@ export function mensajeHumano(mensaje: string): string {
 }
 
 // Cast: tabla y RPC nuevas, aún no están en los tipos generados de Supabase.
+// OJO: tiene que llamarse como `supabase.rpc(...)` (method call) y no extraerse
+// aparte — supabase-js implementa rpc() apoyándose en `this.rest`, así que una
+// referencia suelta pierde el `this` y truena con "Cannot read properties of
+// undefined (reading 'rest')" en cada llamada.
 type Rpc = (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
-const rpc = supabase.rpc as unknown as Rpc;
+const rpc: Rpc = (fn, args) => (supabase.rpc as any)(fn, args);
 const tabla = () => (supabase.from as any)('material_sesion');
 
 /** "1.4 GB", "320 MB", "12 KB". */

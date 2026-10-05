@@ -17,6 +17,12 @@ import {
  * fila en material_sesion). subirArchivo debe limpiar el objeto de Storage sea
  * cual sea la forma en que falle el registro: un {error} de la RPC o una
  * excepción (p. ej. conexión cortada a medio camino).
+ *
+ * Causa raíz real (encontrada 2026-10-05, con el usuario reproduciéndola en
+ * vivo): `rpc()` en supabase-js es un método que depende de `this.rest`.
+ * `supabase.rpc` nunca se guarda en una variable suelta: el mock de abajo
+ * imita esa dependencia (igual que la clase real) para que extraer la
+ * referencia truene con el mismo TypeError que en producción.
  */
 const h = vi.hoisted(() => ({
   upload: vi.fn(),
@@ -25,8 +31,15 @@ const h = vi.hoisted(() => ({
 }));
 vi.mock('../supabase', () => ({
   supabase: {
+    rest: {},
     storage: { from: () => ({ upload: h.upload, remove: h.remove }) },
-    rpc: h.rpc
+    // Método real de supabase-js (no una arrow function ligada): depende de
+    // `this.rest`, así que una llamada sin receptor (`const rpc = supabase.rpc;
+    // rpc(...)`) truena igual que en producción.
+    rpc(fn: string, args: Record<string, unknown>) {
+      void this.rest;
+      return h.rpc(fn, args);
+    }
   }
 }));
 
