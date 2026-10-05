@@ -11,12 +11,14 @@ import { MemoryRouter } from 'react-router-dom';
 
 const h = vi.hoisted(() => ({
   miembros: { miembros: [] as Record<string, unknown>[], isLoading: false, error: false, refetch: vi.fn() },
-  membresias: { porUsuario: new Map<string, unknown>(), isLoading: false, error: false, refetch: vi.fn() }
+  membresias: { porUsuario: new Map<string, unknown>(), isLoading: false, error: false, refetch: vi.fn() },
+  material: { usuarioIds: new Set<string>(), isLoading: false, error: false, refetch: vi.fn() }
 }));
 
 vi.mock('../../hooks/useAdminData', () => ({
   useMiembros: () => h.miembros,
-  useMembresiasVigentesPorUsuario: () => h.membresias
+  useMembresiasVigentesPorUsuario: () => h.membresias,
+  useMaterialPendientePorUsuario: () => h.material
 }));
 vi.mock('../../components/NuevaPersonaModal', () => ({ NuevaPersonaModal: () => null }));
 
@@ -29,6 +31,7 @@ describe('Miembros (PKG-02A)', () => {
   beforeEach(() => {
     h.miembros = { miembros: [], isLoading: false, error: false, refetch: vi.fn() };
     h.membresias = { porUsuario: new Map(), isLoading: false, error: false, refetch: vi.fn() };
+    h.material = { usuarioIds: new Set(), isLoading: false, error: false, refetch: vi.fn() };
   });
 
   it('success vacío → "Todavía no hay miembros" (vacío real)', () => {
@@ -76,6 +79,24 @@ describe('Miembros (PKG-02A)', () => {
     h.miembros.miembros = [ANA];
     h.membresias.error = true;
     montar('/admin/miembros?filtro=vencidas');
+    expect(screen.getAllByText('Ana').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Sin resultados')).not.toBeInTheDocument();
+    expect(screen.getByText(/no se puede aplicar/)).toBeInTheDocument();
+  });
+
+  it('filtro ?filtro=material_pendiente: solo pasan los miembros en el set', () => {
+    const BETO = { ...ANA, id: 'u2', nombre: 'Beto' };
+    h.miembros.miembros = [ANA, BETO];
+    h.material.usuarioIds = new Set(['u2']);
+    montar('/admin/miembros?filtro=material_pendiente');
+    expect(screen.getAllByText('Beto').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Ana')).not.toBeInTheDocument();
+  });
+
+  it('filtro ?filtro=material_pendiente con esa consulta en error → no se aplica y se avisa', () => {
+    h.miembros.miembros = [ANA];
+    h.material.error = true;
+    montar('/admin/miembros?filtro=material_pendiente');
     expect(screen.getAllByText('Ana').length).toBeGreaterThan(0);
     expect(screen.queryByText('Sin resultados')).not.toBeInTheDocument();
     expect(screen.getByText(/no se puede aplicar/)).toBeInTheDocument();

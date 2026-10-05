@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Users, ArrowRight, Download, X } from 'lucide-react';
-import { useMiembros, useMembresiasVigentesPorUsuario, type MembresiaResumen } from '../hooks/useAdminData';
+import { useMiembros, useMembresiasVigentesPorUsuario, useMaterialPendientePorUsuario, type MembresiaResumen } from '../hooks/useAdminData';
 import { estadoMembresia, ESTADO_MEMBRESIA_LABEL, esPaqueteDeCreditos } from '@shared/lib/membresiaEstado';
 import { formatFechaEnZona } from '@shared/lib/timezone';
 import { exportarCsv } from '@shared/lib/exportarCsv';
@@ -24,6 +24,7 @@ export default function Miembros() {
   // PKG-02A (C02): si las membresías no cargaron, la columna dice "no disponible"
   // (no "SIN MEMBRESÍA" para todos) y el filtro por vencidas no se evalúa.
   const { porUsuario, error: errorMembresias, refetch: refetchMembresias } = useMembresiasVigentesPorUsuario();
+  const { usuarioIds: conMaterialPendiente, error: errorMaterial, refetch: refetchMaterial } = useMaterialPendientePorUsuario();
 
   const FILTROS: Record<string, { texto: string; pasa: (m: (typeof todos)[number]) => boolean }> = {
     vencidas: {
@@ -33,11 +34,16 @@ export default function Miembros() {
     identidad: {
       texto: 'Identidad por capturar',
       pasa: (m) => m.status === 'activo' && !(m.identidad_completa && m.contrato_firmado)
+    },
+    material_pendiente: {
+      texto: 'Material pendiente de entregar',
+      pasa: (m) => conMaterialPendiente.has(m.id)
     }
   };
   const filtroActivo = filtro ? FILTROS[filtro] : undefined;
-  // El filtro "vencidas" depende de las membresías: con error no se puede calcular.
-  const filtroSinDatos = filtro === 'vencidas' && errorMembresias;
+  // El filtro "vencidas" depende de las membresías; "material_pendiente" de esa
+  // misma consulta: con error no se puede calcular.
+  const filtroSinDatos = (filtro === 'vencidas' && errorMembresias) || (filtro === 'material_pendiente' && errorMaterial);
   const miembros = filtroActivo && !filtroSinDatos ? todos.filter(filtroActivo.pasa) : todos;
   const hayFiltros = Boolean(search || status || filtroActivo);
 
@@ -144,10 +150,19 @@ export default function Miembros() {
       {errorMembresias && !errorMiembros && !isLoading && (
         <div style={{ marginBottom: '12px' }}>
           <ErrorInline
-            mensaje={filtroSinDatos
+            mensaje={filtro === 'vencidas'
               ? 'No pudimos cargar las membresías: el filtro "Membresía vencida" no se puede aplicar. Se muestra la lista completa.'
               : 'No pudimos cargar las membresías. La columna Membresía no está disponible.'}
             onReintentar={() => void refetchMembresias()}
+          />
+        </div>
+      )}
+
+      {errorMaterial && !errorMiembros && !isLoading && (
+        <div style={{ marginBottom: '12px' }}>
+          <ErrorInline
+            mensaje='No pudimos cargar el material pendiente: el filtro no se puede aplicar. Se muestra la lista completa.'
+            onReintentar={() => void refetchMaterial()}
           />
         </div>
       )}

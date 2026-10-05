@@ -9,7 +9,9 @@ export function FilaReserva({
   onCancelar,
   onReprogramar,
   reprogramarBloqueado,
-  onMaterial
+  onMaterial,
+  onToggleMaterialRequerido,
+  guardandoMaterialRequerido
 }: {
   reserva: ReservaPerfil;
   historico?: boolean;
@@ -18,6 +20,9 @@ export function FilaReserva({
   reprogramarBloqueado?: boolean;
   /** Subir / entregar el material de esta sesión (no aplica a canceladas). */
   onMaterial?: () => void;
+  /** Marca si esta sesión requiere material del estudio (excepción: equipo propio). */
+  onToggleMaterialRequerido?: () => void;
+  guardandoMaterialRequerido?: boolean;
 }) {
   const cancelada = reserva.status === 'cancelada' || reserva.status === 'cancelada_admin';
   const conAcciones = onCancelar != null || onReprogramar != null;
@@ -90,6 +95,22 @@ export function FilaReserva({
               }}
             >
               Material
+            </button>
+          )}
+          {onToggleMaterialRequerido && !cancelada && (
+            <button
+              type="button"
+              onClick={onToggleMaterialRequerido}
+              disabled={guardandoMaterialRequerido}
+              style={{
+                minHeight: '44px', padding: '4px 8px', background: 'transparent', border: 'none',
+                color: 'var(--ek-ink-faint)', fontSize: '11px', cursor: 'pointer',
+                textDecoration: 'underline', textUnderlineOffset: '3px'
+              }}
+            >
+              {guardandoMaterialRequerido
+                ? 'Guardando…'
+                : reserva.material_requerido ? 'Requiere material' : 'No requiere material'}
             </button>
           )}
           <StatusBadge status={reserva.status} size={11} />

@@ -8,7 +8,8 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 
 const h = vi.hoisted(() => ({
   // Un resultado por tabla; `usuarios` se consulta dos veces con el mismo mock.
-  porTabla: {} as Record<string, { count: number | null; error: unknown }>
+  porTabla: {} as Record<string, { count: number | null; error: unknown }>,
+  materialPendiente: { data: [] as unknown[] | null, error: null as { message: string } | null }
 }));
 
 vi.mock('@shared/hooks/useTenant', () => ({ useTenant: () => ({ id: 't-1' }) }));
@@ -20,7 +21,8 @@ vi.mock('@shared/lib/supabase', () => ({
       c.then = (cb: (v: unknown) => unknown) =>
         Promise.resolve(h.porTabla[tabla] ?? { count: 0, error: null }).then(cb);
       return c;
-    }
+    },
+    rpc: () => Promise.resolve(h.materialPendiente)
   }
 }));
 
@@ -33,6 +35,7 @@ describe('useCentroPendientes (PKG-02A)', () => {
       membresias: { count: 3, error: null },
       reservas: { count: 1, error: null }
     };
+    h.materialPendiente = { data: [{ reserva_id: 'r-1' }], error: null };
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -40,15 +43,16 @@ describe('useCentroPendientes (PKG-02A)', () => {
     const { result } = renderHook(() => useCentroPendientes());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.error).toBe(false);
-    expect(result.current.conteo).toEqual({ cobrosPendientes: 2, identidadPendiente: 2, membresiasVencidas: 3, noShows7d: 1 });
+    expect(result.current.conteo).toEqual({ cobrosPendientes: 2, identidadPendiente: 2, membresiasVencidas: 3, noShows7d: 1, materialPendiente: 1 });
   });
 
   it('success con todo en 0 → error=false (vacío legítimo: sí es "Todo al día")', async () => {
     h.porTabla = { usuarios: { count: 0, error: null }, membresias: { count: 0, error: null }, reservas: { count: 0, error: null } };
+    h.materialPendiente = { data: [], error: null };
     const { result } = renderHook(() => useCentroPendientes());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.error).toBe(false);
-    expect(result.current.conteo).toEqual({ cobrosPendientes: 0, identidadPendiente: 0, membresiasVencidas: 0, noShows7d: 0 });
+    expect(result.current.conteo).toEqual({ cobrosPendientes: 0, identidadPendiente: 0, membresiasVencidas: 0, noShows7d: 0, materialPendiente: 0 });
   });
 
   it('un count falla → error=true y el conteo NO se completa con parciales ni con 0', async () => {
@@ -56,8 +60,15 @@ describe('useCentroPendientes (PKG-02A)', () => {
     const { result } = renderHook(() => useCentroPendientes());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.error).toBe(true);
-    // conserva el valor inicial (nunca cargó) en vez de {2,2,0,1}
-    expect(result.current.conteo).toEqual({ cobrosPendientes: 0, identidadPendiente: 0, membresiasVencidas: 0, noShows7d: 0 });
+    // conserva el valor inicial (nunca cargó) en vez de {2,2,0,1,1}
+    expect(result.current.conteo).toEqual({ cobrosPendientes: 0, identidadPendiente: 0, membresiasVencidas: 0, noShows7d: 0, materialPendiente: 0 });
+  });
+
+  it('falla justo el conteo de material → error=true (no se completa con 0)', async () => {
+    h.materialPendiente = { data: null, error: { message: 'permission denied' } };
+    const { result } = renderHook(() => useCentroPendientes());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBe(true);
   });
 
   it('refetch vuelve a consultar y limpia el error cuando ya responde', async () => {

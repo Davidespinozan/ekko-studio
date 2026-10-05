@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { construirPendientes, totalPendientes, type ConteoPendientes } from '../centroPendientes';
 
-const CERO: ConteoPendientes = { cobrosPendientes: 0, identidadPendiente: 0, membresiasVencidas: 0, noShows7d: 0 };
+const CERO: ConteoPendientes = { cobrosPendientes: 0, identidadPendiente: 0, membresiasVencidas: 0, noShows7d: 0, materialPendiente: 0 };
 
 describe('construirPendientes', () => {
   it('sin pendientes → lista vacía', () => {
@@ -17,16 +17,22 @@ describe('construirPendientes', () => {
   });
 
   it('cada pendiente lleva a la lista YA filtrada donde se resuelve', () => {
-    const items = construirPendientes({ cobrosPendientes: 1, identidadPendiente: 1, membresiasVencidas: 1, noShows7d: 1 });
+    const items = construirPendientes({ cobrosPendientes: 1, identidadPendiente: 1, membresiasVencidas: 1, noShows7d: 1, materialPendiente: 1 });
     const destino = Object.fromEntries(items.map((i) => [i.key, i.to]));
     expect(destino.vencidas).toBe('/admin/miembros?filtro=vencidas');
     expect(destino.identidad).toBe('/admin/miembros?filtro=identidad');
     expect(destino.cobros).toBe('/admin/miembros?status=pendiente_pago');
+    expect(destino.material).toBe('/admin/miembros?filtro=material_pendiente');
   });
 
   it('ordena por severidad: danger antes que warn antes que neutral', () => {
-    const items = construirPendientes({ cobrosPendientes: 1, identidadPendiente: 1, membresiasVencidas: 1, noShows7d: 1 });
-    expect(items.map((i) => i.key)).toEqual(['vencidas', 'cobros', 'identidad', 'noshow']);
+    const items = construirPendientes({ cobrosPendientes: 1, identidadPendiente: 1, membresiasVencidas: 1, noShows7d: 1, materialPendiente: 1 });
+    expect(items.map((i) => i.key)).toEqual(['vencidas', 'cobros', 'identidad', 'material', 'noshow']);
+  });
+
+  it('singular vs plural en el título de material', () => {
+    expect(construirPendientes({ ...CERO, materialPendiente: 1 })[0].title).toBe('Sesión sin material');
+    expect(construirPendientes({ ...CERO, materialPendiente: 2 })[0].title).toBe('Sesiones sin material');
   });
 
   it('dentro del mismo tono, mayor cantidad primero', () => {
@@ -41,6 +47,6 @@ describe('construirPendientes', () => {
   });
 
   it('totalPendientes suma todo', () => {
-    expect(totalPendientes({ cobrosPendientes: 2, identidadPendiente: 3, membresiasVencidas: 1, noShows7d: 4 })).toBe(10);
+    expect(totalPendientes({ cobrosPendientes: 2, identidadPendiente: 3, membresiasVencidas: 1, noShows7d: 4, materialPendiente: 5 })).toBe(15);
   });
 });

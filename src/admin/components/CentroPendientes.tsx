@@ -4,6 +4,7 @@ import {
   CreditCard,
   Fingerprint,
   UserX,
+  FileVideo,
   CheckCircle2,
   ArrowRight,
   type LucideIcon
@@ -22,7 +23,8 @@ const ICONOS: Record<string, LucideIcon> = {
   'calendar-x': CalendarX,
   'credit-card': CreditCard,
   fingerprint: Fingerprint,
-  'user-x': UserX
+  'user-x': UserX,
+  'file-video': FileVideo
 };
 
 const TONO_COLOR: Record<TonoPendiente, string> = {

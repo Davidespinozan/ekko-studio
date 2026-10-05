@@ -6,6 +6,8 @@ import { playCheckInSuccess, playCheckInError } from '../lib/checkInFeedback';
 import { avisoMembresia } from '../lib/avisoMembresia';
 import { ZONA_ESTUDIO } from '@shared/lib/timezone';
 import { VigenciaMembresia } from '@shared/components/VigenciaMembresia';
+import { marcarMaterialRequerido } from '@shared/lib/material';
+import { useToast } from '@shared/hooks/useToast';
 
 interface MiembroData {
   id: string;
@@ -31,6 +33,8 @@ interface ReservaData {
   invitados_count: number;
   /** PKG-01H: extras pagados en la app (row_to_json de la reserva los trae). */
   invitados_extra_pagados?: number | null;
+  /** Default TRUE (EKKO-075: el estudio entrega). Viene de row_to_json(reserva). */
+  material_requerido?: boolean | null;
 }
 
 interface StatsData {
@@ -63,9 +67,25 @@ export function desglosePersonas(incluidos: number, extras: number): string {
 }
 
 export function CheckInDetail({ kind, miembro, recurso, reserva, stats, membresiaEstado, errorMessage, onClose }: Props) {
+  const toast = useToast();
   const [secondsLeft, setSecondsLeft] = useState(Math.ceil(AUTO_CLOSE_MS / 1000));
   const [invitadosOpen, setInvitadosOpen] = useState(false);
+  const [materialRequerido, setMaterialRequerido] = useState(reserva?.material_requerido ?? true);
+  const [guardandoMaterial, setGuardandoMaterial] = useState(false);
   const aviso = avisoMembresia(membresiaEstado);
+
+  async function cambiarMaterialRequerido(valor: boolean) {
+    if (!reserva || valor === materialRequerido) return;
+    setGuardandoMaterial(true);
+    try {
+      await marcarMaterialRequerido(reserva.id, valor);
+      setMaterialRequerido(valor);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo guardar.');
+    } finally {
+      setGuardandoMaterial(false);
+    }
+  }
 
   // Feedback sonoro + táctil al abrir el detalle (1 vez)
   useEffect(() => {
@@ -196,6 +216,33 @@ export function CheckInDetail({ kind, miembro, recurso, reserva, stats, membresi
           </div>
         </>
       )}
+
+      <div className="rec-detail-divider" />
+      <div>
+        <p className="rec-detail-section-label">¿GRABAMOS NOSOTROS ESTE MATERIAL?</p>
+        <div className="ek-tabs" role="tablist" aria-label="¿Grabamos nosotros?" style={{ marginTop: '6px' }}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={materialRequerido}
+            className={`ek-tab ${materialRequerido ? 'ek-tab--active' : ''}`}
+            disabled={guardandoMaterial}
+            onClick={() => void cambiarMaterialRequerido(true)}
+          >
+            Sí
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!materialRequerido}
+            className={`ek-tab ${!materialRequerido ? 'ek-tab--active' : ''}`}
+            disabled={guardandoMaterial}
+            onClick={() => void cambiarMaterialRequerido(false)}
+          >
+            No, trae su equipo
+          </button>
+        </div>
+      </div>
 
       <div className="rec-detail-footer">
         <button

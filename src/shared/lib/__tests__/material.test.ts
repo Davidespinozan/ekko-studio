@@ -7,6 +7,8 @@ import {
   agruparPorSesion,
   mensajeHumano,
   subirArchivo,
+  marcarMaterialRequerido,
+  listarMaterialPendiente,
   type MaterialConSesion
 } from '../material';
 
@@ -119,5 +121,40 @@ describe('subirArchivo — limpieza del objeto huérfano si el registro no queda
     h.rpc.mockResolvedValue({ data: null, error: { message: 'EKKO_SIN_MATERIAL: algo' } });
     h.remove.mockRejectedValue(new Error('storage caído'));
     await expect(subirArchivo(p)).rejects.toThrow('algo');
+  });
+});
+
+describe('marcarMaterialRequerido', () => {
+  beforeEach(() => h.rpc.mockReset());
+
+  it('llama a la RPC con el valor pedido', async () => {
+    h.rpc.mockResolvedValue({ data: { success: true }, error: null });
+    await marcarMaterialRequerido('r1', false);
+    expect(h.rpc).toHaveBeenCalledWith('staff_marcar_material_requerido', { p_reserva_id: 'r1', p_requerido: false });
+  });
+
+  it('error de la RPC → mensaje humano', async () => {
+    h.rpc.mockResolvedValue({ data: null, error: { message: 'EKKO_NO_AUTORIZADO: Solo el equipo del estudio puede marcar esto' } });
+    await expect(marcarMaterialRequerido('r1', true)).rejects.toThrow('Solo el equipo del estudio puede marcar esto');
+  });
+});
+
+describe('listarMaterialPendiente', () => {
+  beforeEach(() => h.rpc.mockReset());
+
+  it('devuelve las filas de la RPC', async () => {
+    const filas = [{ reserva_id: 'r1', usuario_id: 'u1', folio: 'F-1', slot_inicio: 'x', slot_fin: 'y', recurso_nombre: 'Estudio 1' }];
+    h.rpc.mockResolvedValue({ data: filas, error: null });
+    expect(await listarMaterialPendiente()).toEqual(filas);
+  });
+
+  it('sin datos → []', async () => {
+    h.rpc.mockResolvedValue({ data: null, error: null });
+    expect(await listarMaterialPendiente()).toEqual([]);
+  });
+
+  it('error → mensaje humano', async () => {
+    h.rpc.mockResolvedValue({ data: null, error: { message: 'EKKO_NO_AUTH: Usuario no autenticado' } });
+    await expect(listarMaterialPendiente()).rejects.toThrow('Usuario no autenticado');
   });
 });

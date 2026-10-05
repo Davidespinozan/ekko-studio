@@ -7,14 +7,15 @@ const VACIO: ConteoPendientes = {
   cobrosPendientes: 0,
   identidadPendiente: 0,
   membresiasVencidas: 0,
-  noShows7d: 0
+  noShows7d: 0,
+  materialPendiente: 0
 };
 
 /**
  * Conteos crudos del centro de pendientes del admin. La lógica de qué mostrar
  * y en qué orden vive en `logic/centroPendientes.ts` (pura).
  *
- * PKG-02A (C02): si CUALQUIERA de los 4 counts falla, `error=true` y el conteo
+ * PKG-02A (C02): si CUALQUIERA de los counts falla, `error=true` y el conteo
  * anterior se conserva tal cual (no se suman parciales ni se rellena con 0):
  * un 0 falso aquí se leía como "Todo al día".
  */
@@ -30,7 +31,7 @@ export function useCentroPendientes() {
     const now = new Date();
     const hace7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [cobros, identidad, vencidas, noShows] = await Promise.all([
+    const [cobros, identidad, vencidas, noShows, material] = await Promise.all([
       supabase
         .from('usuarios')
         .select('id', { count: 'exact', head: true })
@@ -58,10 +59,14 @@ export function useCentroPendientes() {
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tenant.id)
         .eq('status', 'no_show')
-        .gte('slot_inicio', hace7d.toISOString())
+        .gte('slot_inicio', hace7d.toISOString()),
+      // Join + anti-join (sin fila vigente en material_sesion): no se expresa
+      // en un solo `.from().select()` de PostgREST, por eso es una RPC. Cast:
+      // RPC nueva, aún no está en los tipos generados de Supabase.
+      (supabase.rpc as any)('staff_listar_material_pendiente') as Promise<{ data: unknown[] | null; error: { message: string } | null }>
     ]);
 
-    const fallo = [cobros, identidad, vencidas, noShows].find((r) => r.error);
+    const fallo = [cobros, identidad, vencidas, noShows, material].find((r) => r.error);
     if (fallo) {
       console.error('[useCentroPendientes]', fallo.error);
       setError(true);
@@ -73,7 +78,8 @@ export function useCentroPendientes() {
       cobrosPendientes: cobros.count ?? 0,
       identidadPendiente: identidad.count ?? 0,
       membresiasVencidas: vencidas.count ?? 0,
-      noShows7d: noShows.count ?? 0
+      noShows7d: noShows.count ?? 0,
+      materialPendiente: (material.data as unknown[] | null)?.length ?? 0
     });
     setIsLoading(false);
   }, [tenant.id]);

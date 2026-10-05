@@ -18,6 +18,8 @@ export interface MiembroRow extends Usuario {
 export interface ReservaConJoin extends Reserva {
   recurso: Pick<Recurso, 'id' | 'slug' | 'nombre'> | null;
   usuario: Pick<Usuario, 'id' | 'nombre' | 'email' | 'membresia_tier'> | null;
+  // Aún no está en los tipos generados de Supabase (columna nueva).
+  material_requerido: boolean;
 }
 
 /**
@@ -150,6 +152,30 @@ export function useMembresiasVigentesPorUsuario() {
 
   useEffect(() => { refetch(); }, [refetch]);
   return { porUsuario, isLoading, error, refetch };
+}
+
+/** IDs de miembro con al menos una sesión pendiente de material (filtro `?filtro=material_pendiente` de Miembros). */
+export function useMaterialPendientePorUsuario() {
+  const [usuarioIds, setUsuarioIds] = useState<Set<string>>(new Set());
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const refetch = useCallback(async () => {
+    setIsLoading(true);
+    setError(false);
+    const { data, error: qErr } = await (supabase.rpc as any)('staff_listar_material_pendiente');
+    if (qErr) {
+      console.error('[useMaterialPendientePorUsuario]', qErr);
+      setError(true); // el conjunto anterior se conserva
+      setIsLoading(false);
+      return;
+    }
+    setUsuarioIds(new Set((data ?? []).map((r: { usuario_id: string }) => r.usuario_id)));
+    setIsLoading(false);
+  }, []);
+
+  useEffect(() => { refetch(); }, [refetch]);
+  return { usuarioIds, isLoading, error, refetch };
 }
 
 export interface MembresiaActualAdmin {

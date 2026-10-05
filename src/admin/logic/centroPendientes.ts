@@ -12,6 +12,7 @@ export interface ConteoPendientes {
   identidadPendiente: number;
   membresiasVencidas: number;
   noShows7d: number;
+  materialPendiente: number;
 }
 
 export interface ItemPendiente {
@@ -77,11 +78,22 @@ export function construirPendientes(c: ConteoPendientes): ItemPendiente[] {
       to: '/admin/calendario'
     });
   }
+  if (c.materialPendiente > 0) {
+    items.push({
+      key: 'material',
+      icon: 'file-video',
+      title: c.materialPendiente === 1 ? 'Sesión sin material' : 'Sesiones sin material',
+      detail: 'Ya pasaron y el estudio todavía no sube ni archivo ni enlace.',
+      count: c.materialPendiente,
+      tono: 'warn',
+      to: '/admin/miembros?filtro=material_pendiente'
+    });
+  }
 
   const peso: Record<TonoPendiente, number> = { dang: 0, warn: 1, neu: 2 };
   return items.sort((a, b) => peso[a.tono] - peso[b.tono] || b.count - a.count);
 }
 
 export function totalPendientes(c: ConteoPendientes): number {
-  return c.cobrosPendientes + c.identidadPendiente + c.membresiasVencidas + c.noShows7d;
+  return c.cobrosPendientes + c.identidadPendiente + c.membresiasVencidas + c.noShows7d + c.materialPendiente;
 }

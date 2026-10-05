@@ -162,6 +162,32 @@ export async function avisarMaterial(reservaId: string): Promise<{ yaAvisado: bo
   return { yaAvisado: Boolean((data as { ya_avisado?: boolean } | null)?.ya_avisado) };
 }
 
+/**
+ * Si esta sesión requiere material del estudio. Por defecto SÍ (EKKO-075: el
+ * estudio entrega, no es autoservicio); se apaga en la excepción (el miembro
+ * trae su propio equipo).
+ */
+export async function marcarMaterialRequerido(reservaId: string, requerido: boolean): Promise<void> {
+  const { error } = await rpc('staff_marcar_material_requerido', { p_reserva_id: reservaId, p_requerido: requerido });
+  if (error) throw new Error(mensajeHumano(error.message));
+}
+
+export interface MaterialPendiente {
+  reserva_id: string;
+  usuario_id: string;
+  folio: string | null;
+  slot_inicio: string;
+  slot_fin: string;
+  recurso_nombre: string;
+}
+
+/** Sesiones que sí requieren material, ya pasaron y no tienen nada subido. Solo staff. */
+export async function listarMaterialPendiente(): Promise<MaterialPendiente[]> {
+  const { data, error } = await rpc('staff_listar_material_pendiente', {});
+  if (error) throw new Error(mensajeHumano(error.message));
+  return (data ?? []) as MaterialPendiente[];
+}
+
 // ── Miembro ─────────────────────────────────────────────────────────────────
 
 /** Todo el material vigente del miembro (RLS lo acota a lo suyo y a lo no vencido). */

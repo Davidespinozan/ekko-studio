@@ -7,6 +7,7 @@ import { AsignarPlanModal } from '@shared/components/membresia/AsignarPlanModal'
 import { AjustarCreditosModal } from '@shared/components/membresia/AjustarCreditosModal';
 import { CancelarMembresiaModal } from '@shared/components/membresia/CancelarMembresiaModal';
 import { MaterialReservaModal } from '@shared/components/material/MaterialReservaModal';
+import { marcarMaterialRequerido } from '@shared/lib/material';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { formatFechaEnZona } from '@shared/lib/timezone';
 import type { AccionMembresia } from '@shared/lib/membresiaAcciones';
@@ -38,6 +39,19 @@ export default function MiembroDetalle() {
   const [accionMembresia, setAccionMembresia] = useState<AccionMembresia | null>(null);
   // Sesión cuyo material se está subiendo/entregando.
   const [materialDe, setMaterialDe] = useState<(typeof reservas)[number] | null>(null);
+  const [guardandoMaterialDe, setGuardandoMaterialDe] = useState<string | null>(null);
+
+  async function toggleMaterialRequerido(reservaId: string, actual: boolean) {
+    setGuardandoMaterialDe(reservaId);
+    try {
+      await marcarMaterialRequerido(reservaId, !actual);
+      await refetch();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo guardar.');
+    } finally {
+      setGuardandoMaterialDe(null);
+    }
+  }
   const [pausaOpen, setPausaOpen] = useState<null | boolean>(null); // true = pausar, false = reanudar
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -280,9 +294,22 @@ export default function MiembroDetalle() {
                     <td><StatusBadge status={r.status} size={11} /></td>
                     <td>
                       {r.status !== 'cancelada' && r.status !== 'cancelada_admin' && (
-                        <button type="button" className="adm-link" onClick={() => setMaterialDe(r)}>
-                          Material
-                        </button>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', alignItems: 'flex-start' }}>
+                          <button type="button" className="adm-link" onClick={() => setMaterialDe(r)}>
+                            Material
+                          </button>
+                          <button
+                            type="button"
+                            className="adm-link"
+                            style={{ fontSize: '11px', color: 'var(--ek-ink-faint)' }}
+                            disabled={guardandoMaterialDe === r.id}
+                            onClick={() => void toggleMaterialRequerido(r.id, r.material_requerido)}
+                          >
+                            {guardandoMaterialDe === r.id
+                              ? 'Guardando…'
+                              : r.material_requerido ? 'Requiere material (clic: no)' : 'No requiere material (clic: sí)'}
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

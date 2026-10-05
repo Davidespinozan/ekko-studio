@@ -34,6 +34,8 @@ import { AjustarCreditosModal } from '@shared/components/membresia/AjustarCredit
 import { CancelarMembresiaModal } from '@shared/components/membresia/CancelarMembresiaModal';
 import type { AccionMembresia } from '@shared/lib/membresiaAcciones';
 import { MaterialReservaModal } from '@shared/components/material/MaterialReservaModal';
+import { marcarMaterialRequerido } from '@shared/lib/material';
+import { useToast } from '@shared/hooks/useToast';
 
 /**
  * Perfil de miembro para recepción — hub de gestión (agenda, no-show, notas,
@@ -52,6 +54,8 @@ export default function PerfilMiembroRecepcion() {
   const [accionMembresia, setAccionMembresia] = useState<AccionMembresia | null>(null);
   // Sesión cuyo material se está subiendo/entregando.
   const [materialDe, setMaterialDe] = useState<ReservaPerfil | null>(null);
+  const [guardandoMaterialDe, setGuardandoMaterialDe] = useState<string | null>(null);
+  const toast = useToast();
   const [miembro, setMiembro] = useState<MiembroPerfil | null>(null);
   const [reservas, setReservas] = useState<ReservaPerfil[]>([]);
   // PKG-02A (C02 · F19): fallo leyendo reservas ≠ "sin reservas". Estado propio,
@@ -81,7 +85,7 @@ export default function PerfilMiembroRecepcion() {
     if (!id) return;
     const { data, error } = await supabase
       .from('reservas')
-      .select('id, slot_inicio, slot_fin, status, folio, recurso_id, invitados_count, recurso:recursos(nombre)')
+      .select('id, slot_inicio, slot_fin, status, folio, recurso_id, invitados_count, material_requerido, recurso:recursos(nombre)')
       .eq('usuario_id', id)
       .order('slot_inicio', { ascending: false })
       .limit(50);
@@ -145,6 +149,18 @@ export default function PerfilMiembroRecepcion() {
     if (a === 'pausar') setPausaOpen(true);
     else if (a === 'reanudar') setPausaOpen(false);
     else setAccionMembresia(a);
+  }
+
+  async function toggleMaterialRequerido(r: ReservaPerfil) {
+    setGuardandoMaterialDe(r.id);
+    try {
+      await marcarMaterialRequerido(r.id, !r.material_requerido);
+      await recargarReservas();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'No se pudo guardar.');
+    } finally {
+      setGuardandoMaterialDe(null);
+    }
   }
 
   if (isLoading) {
@@ -330,7 +346,14 @@ export default function PerfilMiembroRecepcion() {
             <p className="ek-body-faint">Sin reservas anteriores.</p>
           ) : (
             historial.slice(0, 15).map((r) => (
-              <FilaReserva key={r.id} reserva={r} historico onMaterial={() => setMaterialDe(r)} />
+              <FilaReserva
+                key={r.id}
+                reserva={r}
+                historico
+                onMaterial={() => setMaterialDe(r)}
+                onToggleMaterialRequerido={() => void toggleMaterialRequerido(r)}
+                guardandoMaterialRequerido={guardandoMaterialDe === r.id}
+              />
             ))
           )}
         </div>
