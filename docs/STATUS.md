@@ -4,24 +4,26 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-05 (noche) · reconciliación tras dos sesiones que
-escribieron en el mismo día (una activó PKG-02C; otra publicó Login y el paquete de
-material). Todo lo de abajo se verificó en vivo contra git, Netlify y Supabase.
+Última actualización: 2026-10-05 (noche) · hotfix F-1 cerrado en producción (vistas
+de valor aisladas). Antes: reconciliación tras dos sesiones que escribieron el mismo
+día. Todo lo de abajo se verificó en vivo contra git, Netlify y Supabase.
 
-## Producción (verificado 2026-10-05 23:04 UTC)
-- `origin/main` = HEAD = `cf7c3a06b6551a20c4af99ea875b72b354c10b4d`
-  ("feat(material): señal explícita de material pendiente + pendiente en dashboard").
-  Cadena del día: `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0`
-  (link "Volver a EKKO" en Login) → `8d7519d` (fix `supabase.rpc` en material) →
-  `cf7c3a0` (material pendiente).
-- Netlify production: deploy `6ac42883bffec3000847250b`, READY, `commit_ref` =
-  `cf7c3a0`, publicado 2026-10-05 22:47:06 UTC. Cada commit anterior tuvo su deploy
+## Producción (verificado 2026-10-05 23:28 UTC)
+- `origin/main` = HEAD = `6fe3f640ee1002e32de3ebd5dd0d375890afc416`
+  ("fix(security): isolate financial reconciliation views", F-1). Cadena del día:
+  `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
+  en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
+  pendiente) → `c33b750` (STATUS) → `6fe3f64` (F-1).
+- Netlify production: deploy `6ac432095e347500081e187d`, READY, `commit_ref` =
+  `6fe3f64`, publicado 2026-10-05 23:27:39 UTC. Antes: `6ac42df5…` = c33b750 (23:10),
+  `6ac42883…` = cf7c3a0 (22:47 UTC). Cada commit anterior tuvo su deploy
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **104/104 migraciones**; última
-  `20261007100000_material_pendiente_y_requerido.sql`. La 103 es
-  `20261006100000_02c_frontera_rest_avisos_y_grants.sql` (PKG-02C), aplicada.
+- Supabase: **105/105 migraciones**; última
+  `20261008100000_f1_vistas_valor_security_invoker.sql` (F-1). La 104 es
+  `20261007100000_material_pendiente_y_requerido.sql` y la 103
+  `20261006100000_02c_frontera_rest_avisos_y_grants.sql` (PKG-02C), aplicadas.
 - Datos de negocio (lectura 23:04 UTC, sin PII): **1 membresía activa** (alta manual
   por staff con referencia de pago, 21:53 UTC; sin suscripción de Stripe), 1 expirada,
   4 canceladas; **1 reserva futura** confirmada (creada 22:00 UTC para el 2026-10-07,
@@ -46,7 +48,22 @@ en funciones de aplicación; authenticated sin DML donde ninguna policy escribe 
 sin TRUNCATE, con sus 44 EXECUTE intactos; hardening 43/43; drift 64/64; datos de
 negocio intactos (foto antes = después = final). Residual conductual, NO bloqueante:
 `PENDING FIRST LEGITIMATE PASSWORD CHANGE` (ningún aviso `cambiar_password` existía
-ni se fabricó; el trigger se verificó por estructura y por pruebas locales).
+ni se fabricó; el trigger se verificó por estructura y por pruebas locales) ·
+**F-1 "Vistas de valor aisladas" (hotfix de seguridad) — CLOSED IN PRODUCTION.**
+Hallazgo de la auditoría de confiabilidad operativa (2026-10-05): `valor_por_lote` y
+`movimientos_sin_vinculo` (de 20261002100000) se evaluaban con permisos del dueño
+(salta RLS), sin filtro de tenant y con SELECT para anon: la llave pública leía el
+agregado del ledger de valor (7 filas seudónimas, sin nombres ni correos). Cierre
+(2026-10-05 23:24–23:28 UTC): commit `6fe3f64`; migración `20261008100000` aplicada
+(104 → 105, md5 `1386c71f52f7149fd0501a6d7ae14db8`); deploy `6ac432095e347500081e187d`
+READY con ese SHA; ambas vistas `security_invoker=true`; ACL = postgres y service_role
+sin cambio, authenticated solo SELECT, sin anon ni PUBLIC; GET anónimo por REST →
+401 en ambas; en transacciones de solo lectura revertidas, un admin activo ve solo
+su tenant (0 filas de otro) y recepción ve 0 (antes 7); 106/106 funciones con hash
+idéntico; hardening 45/45 (2 checks P5 nuevos); drift 64/64; sin datos tocados.
+Gate local 197 archivos / 1836 pruebas. Producción tiene un solo tenant: el
+aislamiento entre tenants con datos reales queda probado en PGlite
+(`f1-vistas-valor.db.test.ts`), no con datos de producción.
 Qué decidió cada uno: `docs/DECISIONS_INDEX.md` → `DECISIONS.md`.
 Evidencia: migraciones `supabase/migrations/`, pruebas `src/__tests__/db/`.
 
