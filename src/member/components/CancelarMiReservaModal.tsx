@@ -253,7 +253,8 @@ export function CancelarMiReservaModal({ reserva, onClose, onCancelada }: Props)
                 marginBottom: '8px'
               }}
             >
-              Al confirmar, esta reserva se cancelará y el horario quedará libre para otros miembros.
+              Al confirmar, esta reserva se cancelará y el horario quedará libre para otros miembros. Estás
+              cancelando a tiempo: si la pagaste con un crédito, se te devuelve.
             </p>
             {invitadosPagados > 0 && (
               <div

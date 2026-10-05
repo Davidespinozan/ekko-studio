@@ -4,16 +4,23 @@ import { useTenant } from '@shared/hooks/useTenant';
  * Hook para la regla de tiempo mínimo de cancelación del tenant.
  *
  * Lee `tenant.config.reserva.cancelacion_min_horas_antes` (pattern jsonb del
- * resto de reglas operativas). Si no está configurada, default 0 (permisivo:
- * miembro puede cancelar hasta el último minuto).
+ * resto de reglas operativas). Si no está configurada, 24.
+ *
+ * R2-B (PKG-01Q): este hook REPRESENTA la regla del servidor, no la define. La
+ * fuente es `_cancelacion_min_horas` (SQL): misma clave, mismo default (24) y la
+ * misma frontera (`_cancelacion_tardia`): a tiempo si faltan MÁS de N horas;
+ * tarde si faltan N o menos. Antes aquí el default era 0 y en la pantalla de
+ * Reglas 24.
  */
+export const CANCELACION_HORAS_DEFAULT = 24;
+
 export function useReglaCancelacion(): { cancelacionMinHorasAntes: number } {
   const tenant = useTenant();
   const config = (tenant.config ?? {}) as Record<string, unknown>;
   const reserva = (config.reserva ?? {}) as Record<string, unknown>;
   const raw = reserva.cancelacion_min_horas_antes;
 
-  let horas = 0;
+  let horas = CANCELACION_HORAS_DEFAULT;
   if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0) {
     horas = raw;
   } else if (typeof raw === 'string') {
@@ -36,7 +43,8 @@ export interface PuedeCancelarResult {
  *
  * - Reserva pasada → false ("Esta reserva ya pasó")
  * - Regla 0 → siempre se puede (hasta el último minuto)
- * - Horas restantes < regla → false ("Faltan menos de N horas")
+ * - Horas restantes <= regla → false ("Faltan N horas o menos"): la igualdad
+ *   exacta ya es tarde, igual que en el servidor.
  */
 export function puedeCancelarReserva(
   slotInicio: string | Date,
@@ -53,10 +61,10 @@ export function puedeCancelarReserva(
   if (minHorasAntes <= 0) {
     return { puede: true, horasRestantes };
   }
-  if (horasRestantes < minHorasAntes) {
+  if (horasRestantes <= minHorasAntes) {
     return {
       puede: false,
-      razon: `Faltan menos de ${minHorasAntes} horas`,
+      razon: `Faltan ${minHorasAntes} horas o menos`,
       horasRestantes
     };
   }

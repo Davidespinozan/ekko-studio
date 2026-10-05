@@ -77,7 +77,7 @@ describe('subir material a una sesión', () => {
     await expect(registrar(recep, { reserva: s.reservaId, tipo: 'enlace', url: 'javascript:alert(1)' })).rejects.toThrow(/EKKO_ENLACE_INVALIDO/);
     await expect(registrar(s.m, { reserva: s.reservaId, tipo: 'enlace', url: 'https://ejemplo.com' })).rejects.toThrow(/EKKO_NO_AUTORIZADO/);
 
-    await b.como(recep, () => b.fila('SELECT cancelar_reserva_atomic($1, $2)', [s.reservaId, 'se canceló']));
+    await b.como(recep, () => b.fila(`SELECT cancelar_reserva_atomic($1, $2, 'estudio')`, [s.reservaId, 'se canceló']));
     await expect(registrar(recep, { reserva: s.reservaId, tipo: 'enlace', url: 'https://ejemplo.com' })).rejects.toThrow(/EKKO_RESERVA_NO_VALIDA/);
   });
 

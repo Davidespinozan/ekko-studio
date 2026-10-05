@@ -9,6 +9,7 @@ import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/ht
 import { requireEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada } from '../_lib/connectBilling';
+import { ejecutarOperacionesSuscripcion } from '../_lib/operacionesSuscripcion';
 import { esStaffActivo } from '../_lib/staff';
 import { reportarErrorServidor } from '../_lib/sentry';
 
@@ -130,17 +131,21 @@ export const handler: Handler = async (event) => {
     const { data, error } = await llamarRpc();
     if (error) return badRequest(humano(error.message));
 
+    // R2-B (PKG-01P): la RPC dejó la operación "cancelar suscripción" en
+    // stripe_operaciones_suscripcion (misma transacción que la baja). Aquí se
+    // ejecuta; si Stripe falla queda `fallida` con evidencia durable, aviso al
+    // admin y reintento (antes: solo un reporte en Sentry).
     let stripeCancelado: boolean | null = null;
     if (stripe && subId && accountId) {
       try {
-        await stripe.subscriptions.cancel(subId, { stripeAccount: accountId });
-        stripeCancelado = true;
+        const cobro = await ejecutarOperacionesSuscripcion(admin, { usuarioId: body.usuario_id });
+        stripeCancelado = cobro.aplicadas > 0 && cobro.fallidas === 0;
       } catch (e) {
         stripeCancelado = false;
         await reportarErrorServidor('staff-cancelar-membresia', e, {
           usuario_id: body.usuario_id,
           subscription_id: subId,
-          nota: 'La membresía quedó cancelada en la base pero la suscripción de Stripe NO: cancelarla a mano.'
+          nota: 'La membresía quedó cancelada en la base; la cancelación en Stripe quedó pendiente en stripe_operaciones_suscripcion.'
         });
       }
     }

@@ -134,7 +134,7 @@ FROM (VALUES
   ('reservar_para_miembro_atomic', '_recurso_permite_tier'),
   ('reservar_para_miembro_atomic', 'EKKO_NO_AUTORIZADO'),
   ('marcar_no_shows',              'no_show_bloqueo_dias'),
-  ('creditos_devolver_al_cancelar','cancelacion_min_horas_antes'),
+  ('creditos_devolver_al_cancelar','cancelacion_tardia'),
   ('count_active_admins',          'get_my_tenant_id'),
   ('count_admins_activos',         'get_my_tenant_id'),
   ('count_reservas_recurso',       'get_my_tenant_id'),

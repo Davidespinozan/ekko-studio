@@ -70,7 +70,7 @@ describe('cancelación', () => {
     const m = await b.crearPersona();
     await b.activar(m, 'pro-pack');
     const r = await b.reservar(m, await b.crearEstudio(), await b.slot(7, 16)); // 16:00 Mazatlán = 23:00 UTC
-    await b.como(recep, () => b.fila('SELECT cancelar_reserva_atomic($1, $2)', [r.reserva_id, 'Falla eléctrica']));
+    await b.como(recep, () => b.fila(`SELECT cancelar_reserva_atomic($1, $2, 'estudio')`, [r.reserva_id, 'Falla eléctrica']));
 
     const lista = await avisos(m, 'reserva_cancelada');
     expect(lista).toHaveLength(1);
@@ -99,7 +99,7 @@ describe('reprogramar = UN aviso de cambio de horario', () => {
     await b.como(recep, async () =>
       b.fila('SELECT reservar_para_miembro_atomic($1, $2, $3::timestamptz, 60)', [m.id, setB, await b.slot(21, 16)])
     );
-    await b.como(recep, () => b.fila('SELECT cancelar_reserva_atomic($1, $2)', [vieja.reserva_id, 'Reprogramada por recepción']));
+    await b.como(recep, () => b.fila(`SELECT cancelar_reserva_atomic($1, $2, 'estudio')`, [vieja.reserva_id, 'Reprogramada por recepción']));
 
     const r = await b.como(recep, () => b.fila<{ r: { success: boolean } }>('SELECT staff_avisar_reprogramacion($1) AS r', [vieja.reserva_id]));
 

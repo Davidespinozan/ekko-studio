@@ -4,6 +4,7 @@ import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
 import { CopyButton } from '@shared/components/CopyButton';
 import { cancelarReserva } from '../lib/crudHelpers';
+import { CausaCancelacionSelector, type CausaCancelacion } from '@shared/components/reserva/CausaCancelacion';
 
 export interface ReservaParaCancelar {
   id: string;
@@ -39,6 +40,7 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
 
   const [motivo, setMotivo] = useState('');
   const [typed, setTyped] = useState('');
+  const [causa, setCausa] = useState<CausaCancelacion | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,19 +60,25 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
   const fechaFmt = formatearFecha(reserva.slot_inicio);
   const motivoOk = motivo.trim().length >= 5;
   const typedOk = typed === 'CANCELAR';
-  const canSubmit = motivoOk && typedOk && !submitting;
+  const canSubmit = motivoOk && typedOk && causa !== null && !submitting;
 
-  const mensajeWhatsapp = `Hola ${primerNombre(reserva.usuario_nombre)}, te aviso que tuvimos que cancelar tu reserva del ${fechaFmt} en ${reserva.recurso_nombre}. Motivo: ${motivo || '[escribe el motivo arriba]'}. Disculpa las molestias, puedes reservar otra fecha desde la app.`;
+  // R2-B (PKG-01Q): el mensaje sugerido dice quién canceló (antes siempre se
+  // disculpaba como si hubiera sido el estudio).
+  const mensajeWhatsapp =
+    causa === 'miembro'
+      ? `Hola ${primerNombre(reserva.usuario_nombre)}, como nos pediste, cancelamos tu reserva del ${fechaFmt} en ${reserva.recurso_nombre}. En la app verás el detalle de la cancelación y de tu crédito.`
+      : `Hola ${primerNombre(reserva.usuario_nombre)}, te aviso que tuvimos que cancelar tu reserva del ${fechaFmt} en ${reserva.recurso_nombre}. Motivo: ${motivo || '[escribe el motivo arriba]'}. Disculpa las molestias, puedes reservar otra fecha desde la app.`;
 
   async function handleSubmit() {
     if (!usuario) return;
-    if (!canSubmit) return;
+    if (!canSubmit || !causa) return;
     setSubmitting(true);
     setError(null);
 
     const { error: err } = await cancelarReserva({
       reservaId: reserva.id,
-      motivo: motivo.trim()
+      motivo: motivo.trim(),
+      causa
     });
 
     if (err) {
@@ -172,8 +180,10 @@ export default function CancelarReservaModal({ reserva, onClose, onCancelled }: 
           </p>
         </div>
 
+        <CausaCancelacionSelector value={causa} onChange={setCausa} slotInicio={reserva.slot_inicio} disabled={submitting} />
+
         <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', margin: '0 0 20px', lineHeight: 1.45 }}>
-          Al miembro le llega el aviso por la app y por correo, con el motivo. Si usó créditos, se le devuelven.
+          Al miembro le llega el aviso por la app y por correo, con el motivo y lo que pasa con su crédito.
         </p>
 
         <div

@@ -2,12 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
 import { inicioDeMesEnZona } from '@shared/lib/timezone';
-import { calcularCobrado, type CobradoResult, type PagoEvento, type ReembolsoEvento } from '../logic/reportesCobrado';
+import { calcularCobrado, type CobradoResult, type LibroFila, type PagoFallido } from '../logic/reportesCobrado';
 
 /**
- * Lo COBRADO de verdad (payment_events de Stripe) del mes actual vs. anterior,
- * reembolsos y cobros fallidos. Complementa el MRR (ingreso contratado).
- * Lee solo lo necesario (desde el inicio del mes anterior) y delega al cálculo puro.
+ * Lo COBRADO de verdad del mes actual vs. anterior (bruto, reversado y neto,
+ * desde el libro económico) y los cobros fallidos. Complementa el MRR (ingreso
+ * contratado). Lee desde el inicio del mes anterior y delega al cálculo puro.
  */
 export function useReportesCobrado() {
   const tenant = useTenant();
@@ -23,30 +23,27 @@ export function useReportesCobrado() {
     const inicioMesAnterior = inicioDeMesEnZona(-1, ahora);
     const desde = new Date(Math.min(inicioMesAnterior.getTime(), ahora.getTime() - 31 * 24 * 60 * 60 * 1000));
     try {
-      const { data: filas, error: err } = await supabase
-        .from('payment_events')
-        .select('created_at, monto_centavos, status, stripe_event_type')
-        .eq('tenant_id', tenant.id)
-        .gte('created_at', desde.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(2000);
+      // R2-B (PKG-01N): el dinero sale del LIBRO ECONÓMICO (cobros firmes de Stripe
+      // y de mostrador, reversales exactos, lo no atribuible aparte). Cast: la RPC
+      // aún no está en los tipos generados.
+      const { data: filas, error: err } = await (supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>
+      ) => Promise<{ data: LibroFila[] | null; error: { message: string } | null }>)('libro_economico', {
+        p_desde: desde.toISOString(),
+        p_hasta: new Date(ahora.getTime() + 60_000).toISOString()
+      });
       if (err) throw err;
-      // PKG-01G: reembolsos por objeto Refund (reversales_pago), no por evento acumulado.
-      const { data: rv, error: errRv } = await supabase
-        .from('reversales_pago')
-        .select('stripe_object_id, monto_centavos, estado_proveedor, stripe_created_at, created_at')
+      // Cobros fallidos: no son ingreso; siguen saliendo del diario de Stripe.
+      const { data: fallidos, error: errF } = await supabase
+        .from('payment_events')
+        .select('created_at, monto_centavos')
         .eq('tenant_id', tenant.id)
-        .eq('tipo', 'reembolso')
+        .eq('status', 'failed')
         .gte('created_at', desde.toISOString())
         .limit(2000);
-      if (errRv) throw errRv;
-      const reembolsos: ReembolsoEvento[] = (rv ?? []).map((r) => ({
-        stripe_object_id: r.stripe_object_id,
-        monto_centavos: r.monto_centavos,
-        estado_proveedor: r.estado_proveedor,
-        fecha: r.stripe_created_at ?? r.created_at
-      }));
-      setData(calcularCobrado((filas ?? []) as PagoEvento[], inicioMes, inicioMesAnterior, ahora, reembolsos));
+      if (errF) throw errF;
+      setData(calcularCobrado(filas ?? [], inicioMes, inicioMesAnterior, ahora, (fallidos ?? []) as PagoFallido[]));
     } catch (e) {
       console.error('[useReportesCobrado]', e);
       setError(true);

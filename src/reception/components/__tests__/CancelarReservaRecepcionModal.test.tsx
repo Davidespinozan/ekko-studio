@@ -8,6 +8,7 @@ vi.mock('@shared/lib/supabase', () => ({
 
 const toast = { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() };
 vi.mock('@shared/hooks/useToast', () => ({ useToast: () => toast }));
+vi.mock('@shared/hooks/useTenant', () => ({ useTenant: () => ({ id: 't-1', config: { reserva: { cancelacion_min_horas_antes: 24 } } }) }));
 
 import { CancelarReservaRecepcionModal } from '../CancelarReservaRecepcionModal';
 
@@ -38,12 +39,19 @@ describe('CancelarReservaRecepcionModal', () => {
       />
     );
 
+    // R2-B (PKG-01Q): sin decir quién cancela no se puede confirmar.
+    expect(screen.getByRole('button', { name: /cancelar reserva/i })).toBeDisabled();
+    expect(mockRpc).not.toHaveBeenCalled();
+    // La sesión ya pasó respecto a hoy → a petición del miembro sería tardía.
+    expect(screen.getByText(/cancelación tardía\. Si pagó con crédito, NO se le devuelve/)).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/La pidió el miembro/));
     fireEvent.click(screen.getByRole('button', { name: /cancelar reserva/i }));
 
     await waitFor(() => expect(mockRpc).toHaveBeenCalledTimes(1));
     expect(mockRpc).toHaveBeenCalledWith('cancelar_reserva_atomic', {
       p_reserva_id: 'r-1',
-      p_motivo: undefined
+      p_motivo: null,
+      p_causa: 'miembro'
     });
     await waitFor(() => {
       expect(onCancelada).toHaveBeenCalled();
@@ -68,9 +76,11 @@ describe('CancelarReservaRecepcionModal', () => {
       />
     );
 
+    fireEvent.click(screen.getByLabelText(/La cancela el estudio/));
     fireEvent.click(screen.getByRole('button', { name: /cancelar reserva/i }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
+    expect(mockRpc).toHaveBeenCalledWith('cancelar_reserva_atomic', expect.objectContaining({ p_causa: 'estudio' }));
     expect(toast.error.mock.calls[0][0]).toMatch(/ya pasó/i);
     expect(onCancelada).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();

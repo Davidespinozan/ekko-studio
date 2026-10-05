@@ -207,7 +207,7 @@ describe('cancelación de una reserva por el estudio → bitácora', () => {
     const porStaff = await b.reservar(m, estudio, await b.slot(11));
     const porMiembro = await b.reservar(m, estudio, await b.slot(12));
 
-    await b.como(recep, () => b.fila('SELECT cancelar_reserva_atomic($1, $2)', [porStaff.reserva_id, 'Falla del aire acondicionado']));
+    await b.como(recep, () => b.fila(`SELECT cancelar_reserva_atomic($1, $2, 'estudio')`, [porStaff.reserva_id, 'Falla del aire acondicionado']));
     await b.como(m, () => b.fila('SELECT cancelar_reserva_atomic($1, $2)', [porMiembro.reserva_id, 'ya no puedo']));
 
     const asientos = await b.filas<{ actor_usuario_id: string; actor_rol: string; motivo: string; metadata: { reserva_id: string } }>(

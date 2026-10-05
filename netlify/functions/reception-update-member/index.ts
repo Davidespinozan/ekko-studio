@@ -12,6 +12,8 @@ import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog, type AuditEntry } from '../_lib/auditLog';
 import { esStaffActivo, puedeOperarSobre } from '../_lib/staff';
+import { ejecutarOperacionesSuscripcion, type ResumenOperaciones } from '../_lib/operacionesSuscripcion';
+import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
  * POST /reception-update-member
@@ -327,7 +329,21 @@ export const handler: Handler = async (event) => {
       await writeAuditLog(supabaseAdmin, entry);
     }
 
-    return ok({ success: true, cambios, avatar_url: patch.avatar_url ?? null });
+    // R2-B (PKG-01P): sancionar SUSPENDE el cobro de Stripe y levantar la sanción
+    // lo REANUDA (si todo sigue válido). La operación ya quedó en
+    // stripe_operaciones_suscripcion (trigger, misma transacción del UPDATE);
+    // aquí solo se ejecuta. Si Stripe falla, la sanción NO se deshace: la
+    // operación queda `fallida` con aviso al admin y se reintenta.
+    let cobroStripe: ResumenOperaciones | null = null;
+    if (statusNuevo !== null) {
+      try {
+        cobroStripe = await ejecutarOperacionesSuscripcion(supabaseAdmin, { usuarioId: target.id });
+      } catch (e) {
+        await reportarErrorServidor('reception-update-member', e, { paso: 'operaciones_suscripcion', usuario_id: target.id });
+      }
+    }
+
+    return ok({ success: true, cambios, avatar_url: patch.avatar_url ?? null, cobro_stripe: cobroStripe });
   } catch (e) {
     console.error('[reception-update-member]', e);
     return serverError(e instanceof Error ? e.message : 'Error desconocido');

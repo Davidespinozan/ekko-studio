@@ -190,5 +190,8 @@ describe('migración 094: backfill honesto de la historia', () => {
     } finally {
       await legacy.db.close();
     }
-  });
+    // Levanta una SEGUNDA base dentro del test: mismo límite que usan los
+    // `beforeAll(levantarBase)` de las demás suites (el default de 5 s se quedaba
+    // corto bajo la carga paralela del gate; aislado tarda ~1–2 s).
+  }, 120_000);
 });

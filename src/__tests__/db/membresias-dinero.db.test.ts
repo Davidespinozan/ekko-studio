@@ -258,7 +258,7 @@ describe('M4 — la pausa', () => {
     expect(await b.creditos(m)).toBe(11);
     await pausar(recep, m, true);
 
-    await b.como(recep, () => b.fila('SELECT cancelar_reserva_atomic($1, $2)', [r.reserva_id, 'falla de equipo']));
+    await b.como(recep, () => b.fila(`SELECT cancelar_reserva_atomic($1, $2, 'estudio')`, [r.reserva_id, 'falla de equipo']));
 
     expect((await vivas(m))[0]).toMatchObject({ status: 'pausada', creditos_restantes: 12 });
   });

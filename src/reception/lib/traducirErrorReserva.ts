@@ -36,6 +36,12 @@ export function traducirErrorReserva(message: string): string {
     return 'La duración no es válida: entre 15 minutos y 8 horas, sin pasar de la medianoche.';
   }
 
+  // R2-B (PKG-01O): en el mostrador se habla del miembro en tercera persona.
+  if (message.includes('EKKO_FUERA_DE_VIGENCIA')) {
+    const fecha = /termina el (\d{2}\/\d{2}\/\d{4})/.exec(message)?.[1];
+    return `La membresía del miembro termina${fecha ? ` el ${fecha}` : ''}: no se puede reservar después de esa fecha. Renueva su plan primero.`;
+  }
+
   // R2-A (PKG-01J) · reprogramación atómica.
   if (message.includes('EKKO_REPROGRAMAR_NO_VIGENTE')) {
     return 'Solo se reprograma una reserva confirmada.';

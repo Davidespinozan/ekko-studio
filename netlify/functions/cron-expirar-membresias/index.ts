@@ -10,6 +10,7 @@ import { requireEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada } from '../_lib/connectBilling';
 import { reportarErrorServidor, conMonitorCron } from '../_lib/sentry';
+import { ejecutarOperacionesSuscripcion, type ResumenOperaciones } from '../_lib/operacionesSuscripcion';
 
 /**
  * Cron: a diario, marca `expirada` las membresías de paquete (no-Stripe) cuyo
@@ -84,6 +85,16 @@ const run: Handler = async () => {
 
     const subsCanceladas = await reconciliarSubsHuerfanas(supabase);
 
+    // R2-B (PKG-01P): reintenta las operaciones de cobro pendientes o fallidas
+    // (suspender / reanudar / cancelar) sin ventana de tiempo: mientras la fila
+    // siga sin aplicarse, se vuelve a intentar cada día.
+    let operacionesCobro: ResumenOperaciones | null = null;
+    try {
+      operacionesCobro = await ejecutarOperacionesSuscripcion(supabase, { limite: 50 });
+    } catch (e) {
+      await reportarErrorServidor('cron-expirar-membresias', e, { paso: 'operaciones_suscripcion' });
+    }
+
     // Salud del resto de la plataforma (nunca tira el cron principal).
     try {
       await chequeosDeFrescura(supabase);
@@ -91,8 +102,8 @@ const run: Handler = async () => {
       await reportarErrorServidor('salud-plataforma', e, { chequeo: 'chequeos_de_frescura' });
     }
 
-    console.log('[cron-expirar-membresias] OK', { expiradas: data, subsCanceladas });
-    return ok({ expiradas: data, subsCanceladas });
+    console.log('[cron-expirar-membresias] OK', { expiradas: data, subsCanceladas, operacionesCobro });
+    return ok({ expiradas: data, subsCanceladas, operacionesCobro });
   } catch (e) {
     await reportarErrorServidor('cron-expirar-membresias', e);
     return serverError(e instanceof Error ? e.message : 'Unknown error');

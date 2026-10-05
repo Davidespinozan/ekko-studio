@@ -1,4 +1,5 @@
 import { supabase } from '@shared/lib/supabase';
+import { backendPost } from '@shared/lib/backend';
 
 // ============================================================================
 // Soft-delete helpers (Sprint C-CRUD)
@@ -256,6 +257,13 @@ export async function revokeTeamMember(
     .from('usuarios')
     .update({ status: 'revocado' })
     .eq('id', userId);
+  if (!error) {
+    // R2-B (PKG-01P): la revocación deja en la base la operación "cancelar
+    // suscripción" (si la cuenta tenía una). Se ejecuta ya; si falla o no hay
+    // red, la operación sigue pendiente y la reintenta el cron. La revocación
+    // NO depende de esto.
+    void backendPost('staff-sincronizar-cobro', { usuario_id: userId }).catch(() => undefined);
+  }
   return { error: error?.message ?? null };
 }
 
@@ -270,11 +278,14 @@ export async function revokeTeamMember(
 export interface CancelarReservaParams {
   reservaId: string;
   motivo: string;
+  /** R2-B (PKG-01Q): quién causó la cancelación. El servidor la exige. */
+  causa: 'miembro' | 'estudio';
 }
 
 /**
- * Cancela una reserva como ESTUDIO, por la RPC `cancelar_reserva_atomic` — la misma
- * que usa recepción. Antes era un UPDATE directo desde el navegador: sin validar
+ * Cancela una reserva desde el panel, por la RPC `cancelar_reserva_atomic` — la misma
+ * que usa recepción. R2-B: la causa (miembro / estudio) es explícita y el servidor
+ * decide el crédito: tarde a petición del miembro no se devuelve; el estudio sí. Antes era un UPDATE directo desde el navegador: sin validar
  * que siguiera `confirmada` (desde el dashboard se podía "cancelar" una sesión ya
  * completada o un no-show y corromper la asistencia), sin rastro de quién fue, y
  * con la fecha del aviso en la zona del navegador del admin.
@@ -284,12 +295,18 @@ export interface CancelarReservaParams {
 export async function cancelarReserva(
   params: CancelarReservaParams
 ): Promise<{ error: string | null }> {
-  const { error } = await supabase.rpc('cancelar_reserva_atomic', {
+  // Cast: `p_causa` aún no está en los tipos generados de Supabase.
+  const { error } = await (supabase.rpc as unknown as (
+    fn: string,
+    args: Record<string, unknown>
+  ) => Promise<{ error: { message: string } | null }>)('cancelar_reserva_atomic', {
     p_reserva_id: params.reservaId,
-    p_motivo: params.motivo
+    p_motivo: params.motivo,
+    p_causa: params.causa
   });
   if (!error) return { error: null };
   const m = error.message;
+  if (m.includes('EKKO_CAUSA_REQUERIDA')) return { error: 'Indica quién cancela: el miembro o el estudio.' };
   if (m.includes('EKKO_RESERVA_NO_CANCELABLE')) return { error: 'Esta reserva ya no está confirmada (se completó, se canceló o quedó como falta). Recarga la página.' };
   if (m.includes('EKKO_RESERVA_PASADA')) return { error: 'La sesión ya empezó o ya pasó: no se cancela. Si no llegó, márcala como falta desde Recepción → Hoy.' };
   if (m.includes('EKKO_RESERVA_NO_EXISTE')) return { error: 'Reserva no encontrada.' };

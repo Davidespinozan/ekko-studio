@@ -123,9 +123,9 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
  CASE WHEN to_regprocedure('public.reservar_para_miembro_atomic(uuid,uuid,timestamptz,integer,integer,text)') IS NOT NULL
         THEN '✅ PASS' ELSE '❌ FALTA — RP-1 no aplicada' END),
 ('4 · RPCs core', 'SEC-FIX 21100000 (H3)', 'cancelar_reserva_atomic — valida tenant',
- CASE WHEN to_regprocedure('public.cancelar_reserva_atomic(uuid,text)') IS NULL
+ CASE WHEN to_regprocedure('public.cancelar_reserva_atomic(uuid,text,text)') IS NULL
         THEN '❌ FALTA — la función no existe (RP-1 / 17600000 no aplicadas)'
-      WHEN pg_get_functiondef(to_regprocedure('public.cancelar_reserva_atomic(uuid,text)')) LIKE '%EKKO_TENANT_DIFERENTE%'
+      WHEN pg_get_functiondef(to_regprocedure('public.cancelar_reserva_atomic(uuid,text,text)')) LIKE '%EKKO_TENANT_DIFERENTE%'
         THEN '✅ PASS'
       ELSE '⚠️ VERSIÓN VIEJA — existe pero SEC-FIX (H3) no aplicada' END),
 ('4 · RPCs core', 'LOGIC-FIX 22100000 (L-02)', 'check_in_atomic — rechaza estados no-confirmada',

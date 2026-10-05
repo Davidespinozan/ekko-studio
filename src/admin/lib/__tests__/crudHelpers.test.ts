@@ -195,19 +195,23 @@ describe('cancelarReserva (admin)', () => {
 
   it('pasa por la RPC con el motivo, y NO toca la tabla reservas', async () => {
     vi.mocked(supabase.rpc).mockResolvedValue({ data: {}, error: null } as never);
-    const r = await cancelarReserva({ reservaId: 'res-1', motivo: 'Falla eléctrica' });
+    const r = await cancelarReserva({ reservaId: 'res-1', motivo: 'Falla eléctrica', causa: 'estudio' });
     expect(r).toEqual({ error: null });
-    expect(supabase.rpc).toHaveBeenCalledWith('cancelar_reserva_atomic', { p_reserva_id: 'res-1', p_motivo: 'Falla eléctrica' });
+    // R2-B (PKG-01Q): la causa viaja explícita; el servidor decide el crédito.
+    expect(supabase.rpc).toHaveBeenCalledWith('cancelar_reserva_atomic', { p_reserva_id: 'res-1', p_motivo: 'Falla eléctrica', p_causa: 'estudio' });
+    await cancelarReserva({ reservaId: 'res-2', motivo: 'Avisó tarde', causa: 'miembro' });
+    expect(supabase.rpc).toHaveBeenLastCalledWith('cancelar_reserva_atomic', { p_reserva_id: 'res-2', p_motivo: 'Avisó tarde', p_causa: 'miembro' });
     expect(supabase.from).not.toHaveBeenCalled();
   });
 
   it.each([
     ['EKKO_RESERVA_NO_CANCELABLE: La reserva no está confirmada', /ya no está confirmada/],
     ['EKKO_RESERVA_PASADA: No puedes cancelar una reserva que ya pasó', /márcala como falta/],
-    ['EKKO_TENANT_DIFERENTE: La reserva pertenece a otro estudio', /No tienes permiso/]
+    ['EKKO_TENANT_DIFERENTE: La reserva pertenece a otro estudio', /No tienes permiso/],
+    ['EKKO_CAUSA_REQUERIDA: Indica si la cancelación la pidió el miembro o la decide el estudio', /quién cancela/]
   ])('rechazo de la RPC "%s" → mensaje humano', async (mensaje, esperado) => {
     vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: { message: mensaje } } as never);
-    const r = await cancelarReserva({ reservaId: 'res-1', motivo: 'x' });
+    const r = await cancelarReserva({ reservaId: 'res-1', motivo: 'x', causa: 'estudio' });
     expect(r.error).toMatch(esperado);
     expect(r.error).not.toContain('EKKO_');
   });

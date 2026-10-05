@@ -606,7 +606,7 @@ export interface DineroMetrics {
 }
 
 export function useDineroMetrics() {
-  const tenant = useTenant();
+  // El tenant lo fija el servidor (la RPC lee solo el estudio del admin).
   const [metrics, setMetrics] = useState<DineroMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -618,12 +618,19 @@ export function useDineroMetrics() {
     const inicioMes = inicioDeMesEnZona(0, now);
     const inicioMesAnterior = inicioDeMesEnZona(-1, now);
 
-    const { data, error: qErr } = await supabase
-      .from('payment_events')
-      .select('monto_centavos, created_at')
-      .eq('tenant_id', tenant.id)
-      .eq('status', 'succeeded')
-      .gte('created_at', inicioMesAnterior.toISOString());
+    // R2-B (PKG-01N): mismo origen que Reportes → el libro económico (cobros
+    // FIRMES de Stripe y mostrador, por fecha del proveedor). Antes: payment_events
+    // crudo, sin mostrador y con filas históricas no atribuibles.
+    const { data, error: qErr } = await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>
+    ) => Promise<{
+      data: { clase: string; estado_evidencia: string; moneda: string; monto_centavos: number; ocurrido_at: string }[] | null;
+      error: { message: string } | null;
+    }>)('libro_economico', {
+      p_desde: inicioMesAnterior.toISOString(),
+      p_hasta: new Date(now.getTime() + 60_000).toISOString()
+    });
 
     if (qErr) {
       console.error('[useDineroMetrics]', qErr);
@@ -636,19 +643,19 @@ export function useDineroMetrics() {
     let facturadoMesAnterior = 0;
     let cobrosMesActual = 0;
     for (const row of data ?? []) {
-      const monto = row.monto_centavos ?? 0;
-      const fecha = new Date(row.created_at);
+      if (row.clase !== 'cobro' || row.estado_evidencia !== 'firme' || row.moneda !== 'mxn') continue;
+      const fecha = new Date(row.ocurrido_at);
       if (fecha >= inicioMes) {
-        facturadoMesActual += monto;
+        facturadoMesActual += row.monto_centavos;
         cobrosMesActual += 1;
       } else {
-        facturadoMesAnterior += monto;
+        facturadoMesAnterior += row.monto_centavos;
       }
     }
 
     setMetrics({ facturadoMesActual, facturadoMesAnterior, cobrosMesActual });
     setIsLoading(false);
-  }, [tenant.id]);
+  }, []);
 
   useEffect(() => {
     void refetch();

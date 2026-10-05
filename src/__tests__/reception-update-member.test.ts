@@ -47,6 +47,17 @@ vi.mock('@supabase/supabase-js', () => ({
   }))
 }));
 
+// R2-B (PKG-01P): el ejecutor de operaciones de cobro (Stripe) se simula; su
+// comportamiento real se prueba en operacionesSuscripcion.test.ts.
+const mockEjecutar = vi.fn();
+vi.mock('../../netlify/functions/_lib/operacionesSuscripcion', () => ({
+  ejecutarOperacionesSuscripcion: (...a: unknown[]) => mockEjecutar(...a)
+}));
+const mockReportarError = vi.fn().mockResolvedValue(undefined);
+vi.mock('../../netlify/functions/_lib/sentry', () => ({
+  reportarErrorServidor: (...a: unknown[]) => mockReportarError(...a)
+}));
+
 import { handler } from '../../netlify/functions/reception-update-member/index';
 
 type AnyEvent = Parameters<typeof handler>[0];
@@ -108,6 +119,36 @@ describe('reception-update-member · gobernanza (Bloque A)', () => {
     // Por defecto el plan pedido existe y está activo en el tenant.
     mockTierMaybeSingle.mockResolvedValue({ data: { slug: 'pro' }, error: null });
     mockRpc.mockResolvedValue({ data: { success: true, status: 'activo' }, error: null });
+    mockEjecutar.mockResolvedValue({ procesadas: 0, aplicadas: 0, fallidas: 0, descartadas: 0, sin_stripe: false });
+  });
+
+  it('R2-B: sancionar (o levantar la sanción) ejecuta las operaciones de cobro de ESE miembro, después del UPDATE', async () => {
+    setCallerTarget();
+    mockEjecutar.mockResolvedValue({ procesadas: 1, aplicadas: 1, fallidas: 0, descartadas: 0, sin_stripe: false });
+    const res = await invocar(evento({ usuario_id: 'm-1', status: 'suspendido', motivo: 'Daños al equipo' }));
+    expect(res.statusCode).toBe(200);
+    expect(mockEjecutar).toHaveBeenCalledTimes(1);
+    expect(mockEjecutar.mock.calls[0][1]).toEqual({ usuarioId: 'm-1' });
+    expect(mockUpdate.mock.invocationCallOrder[0]).toBeLessThan(mockEjecutar.mock.invocationCallOrder[0]);
+    expect(JSON.parse(res.body).cobro_stripe).toMatchObject({ aplicadas: 1, fallidas: 0 });
+  });
+
+  it('R2-B: si Stripe falla o el ejecutor revienta, la sanción NO se deshace: 200, UPDATE hecho, error reportado', async () => {
+    setCallerTarget();
+    mockEjecutar.mockRejectedValue(new Error('stripe caído'));
+    const res = await invocar(evento({ usuario_id: 'm-1', status: 'suspendido', motivo: 'Daños al equipo' }));
+    expect(res.statusCode).toBe(200);
+    expect(patchEnviado()).toMatchObject({ status: 'suspendido' });
+    expect(patchEnviado().sancionado_at).toBeTruthy();
+    expect(JSON.parse(res.body).cobro_stripe).toBeNull();
+    expect(mockReportarError).toHaveBeenCalledTimes(1);
+  });
+
+  it('R2-B: un cambio de contacto (sin cambio de estado) no toca el cobro', async () => {
+    setCallerTarget();
+    const res = await invocar(evento({ usuario_id: 'm-1', nombre: 'Ana María' }));
+    expect(res.statusCode).toBe(200);
+    expect(mockEjecutar).not.toHaveBeenCalled();
   });
 
   it('cambio de status SIN motivo → 400, sin update ni audit', async () => {

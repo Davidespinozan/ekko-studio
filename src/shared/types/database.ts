@@ -640,6 +640,8 @@ export type Database = {
           invitados_count: number
           invitados_extra_pagados: number
           reprogramada_desde: string | null
+          cancelacion_causa: string | null
+          cancelacion_tardia: boolean | null
           notas: string | null
           observaciones: string | null
           qr_token_hash: string | null
@@ -667,6 +669,8 @@ export type Database = {
           invitados_count?: number
           invitados_extra_pagados?: number
           reprogramada_desde?: string | null
+          cancelacion_causa?: string | null
+          cancelacion_tardia?: boolean | null
           notas?: string | null
           observaciones?: string | null
           qr_token_hash?: string | null
@@ -694,6 +698,8 @@ export type Database = {
           invitados_count?: number
           invitados_extra_pagados?: number
           reprogramada_desde?: string | null
+          cancelacion_causa?: string | null
+          cancelacion_tardia?: boolean | null
           notas?: string | null
           observaciones?: string | null
           qr_token_hash?: string | null
@@ -1047,7 +1053,7 @@ export type Database = {
         Returns: { usuario_id: string; tenant_id: string; titulo: string; mensaje: string }[]
       }
       cancelar_reserva_atomic: {
-        Args: { p_motivo?: string; p_reserva_id: string }
+        Args: { p_causa?: string; p_motivo?: string; p_reserva_id: string }
         Returns: {
           cancelacion_notificada_at: string | null
           cancelada_at: string | null

@@ -51,7 +51,9 @@ export const LABEL_TIPO_REVISION: Record<string, string> = {
   reconciliacion_reembolso: 'Reembolso por reconciliar',
   cuenta_desautorizada: 'Cuenta de Stripe desconectada',
   vinculo_valor_pendiente: 'Vínculo de valor pendiente',
-  invitados_extra_no_aplicado: 'Pago de invitados extra sin aplicar'
+  invitados_extra_no_aplicado: 'Pago de invitados extra sin aplicar',
+  credito_no_restaurado: 'Crédito sin restaurar (membresía terminada)',
+  extras_pagados_reserva_cancelada: 'Reserva cancelada con invitados extra pagados'
 };
 
 export const LABEL_RESOLUCION: Record<string, string> = {

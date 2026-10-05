@@ -55,11 +55,15 @@ const AYUDA = {
   tasaUso:
     'De todos los créditos vendidos, qué % ya se usaron. Bajo (menos de ~50%) significa que muchos pagan paquetes y no los agotan: fuga de valor y señal temprana de churn.',
   cobrado:
-    'Dinero que Stripe cobró de verdad este mes (mensualidades, paquetes e invitados). A diferencia del MRR, esto ya entró. Los pagos en mostrador no pasan por aquí.',
+    'Dinero cobrado de verdad este mes: Stripe (mensualidades, paquetes, invitados extra, tarjeta en mostrador) y ventas de mostrador (efectivo, transferencia, terminal). Es el bruto: antes de restar reembolsos. A diferencia del MRR, esto ya entró.',
+  neto:
+    'Cobrado menos lo que se devolvió este mes: reembolsos efectuados y disputas perdidas, por su monto exacto. No resta reembolsos pendientes o fallidos, ni disputas abiertas, ni comisiones de Stripe.',
+  sinResolver:
+    'Cobros o reembolsos que el sistema no pudo atribuir con certeza (por ejemplo, un reembolso sin pago de origen identificado o un evento de Stripe en revisión). No se suman ni se restan hasta resolverlos: revisa en Cobros.',
   fallidos:
     'Cobros que la tarjeta rechazó en los últimos 30 días. Cada uno es un miembro en riesgo de perder acceso: Stripe reintenta, pero conviene pedirle que actualice su tarjeta.',
   reembolsos:
-    'Dinero devuelto este mes desde Stripe. No se resta solo del cobrado: revisa si hay que ajustar créditos o la membresía del miembro.'
+    'Dinero devuelto este mes desde Stripe (reembolsos efectuados y disputas perdidas). Se resta en "Neto cobrado", pero NO cambia créditos ni membresías por sí solo: revisa cada caso en Cobros.'
 } as const;
 
 export default function Reportes() {
@@ -524,7 +528,11 @@ function BloqueCobrado({ data }: { data: CobradoResult }) {
       <KpiCard label="Cobrado este mes" valor={pesos(data.cobradoMesCentavos)} nota={desglose || variacion} ayuda={AYUDA.cobrado} />
       <KpiCard label="Variación mensual" valor={data.cobradoMesPorcentaje === null ? '—' : `${data.cobradoMesPorcentaje >= 0 ? '+' : ''}${data.cobradoMesPorcentaje}%`} nota={variacion} alerta={(data.cobradoMesPorcentaje ?? 0) < -20} />
       <KpiCard label="Cobros rechazados · 30 d" valor={String(data.cobrosFallidos30d)} nota={data.cobrosFallidos30d ? `${pesos(data.montoFallido30dCentavos)} sin cobrar` : 'ninguno'} alerta={data.cobrosFallidos30d > 0} ayuda={AYUDA.fallidos} />
-      <KpiCard label="Reembolsado este mes" valor={pesos(data.reembolsadoMesCentavos)} nota={data.reembolsadoMesCentavos ? `${data.reembolsosMes} reembolso${data.reembolsosMes === 1 ? '' : 's'} · revisa en Cobros` : 'sin reembolsos'} alerta={data.reembolsadoMesCentavos > 0} ayuda={AYUDA.reembolsos} />
+      <KpiCard label="Reembolsado este mes" valor={pesos(data.reversadoMesCentavos)} nota={data.reversadoMesCentavos ? `${data.reversalesMes} reembolso${data.reversalesMes === 1 ? '' : 's'} o disputa${data.reversalesMes === 1 ? '' : 's'} · revisa en Cobros` : data.enDisputaMesCentavos ? `${pesos(data.enDisputaMesCentavos)} en disputa abierta` : 'sin reembolsos'} alerta={data.reversadoMesCentavos > 0 || data.enDisputaMesCentavos > 0} ayuda={AYUDA.reembolsos} />
+      <KpiCard label="Neto cobrado este mes" valor={pesos(data.netoMesCentavos)} nota="cobrado − reembolsado" ayuda={AYUDA.neto} />
+      {(data.sinResolverMes > 0 || data.otrasMonedas.length > 0) && (
+        <KpiCard label="Sin resolver" valor={pesos(data.sinResolverMesCentavos)} nota={`${data.sinResolverMes} movimiento${data.sinResolverMes === 1 ? '' : 's'} fuera del neto${data.otrasMonedas.length ? ` · otras monedas: ${data.otrasMonedas.join(', ').toUpperCase()}` : ''}`} alerta ayuda={AYUDA.sinResolver} />
+      )}
     </div>
   );
 }

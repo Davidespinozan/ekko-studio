@@ -293,6 +293,12 @@ export function traducirErrorRPC(message: string): string {
   if (message.includes('EKKO_CANCELACION_TARDIA')) return 'Ya no puedes cancelar esta reserva por tu cuenta. Contacta a recepción.';
   if (message.includes('EKKO_RESERVA_NO_CANCELABLE')) return 'Esta reserva no se puede cancelar.';
   if (message.includes('EKKO_RESERVA_PASADA')) return 'No puedes cancelar una reserva que ya pasó.';
+  // R2-B (PKG-01O/01Q)
+  if (message.includes('EKKO_FUERA_DE_VIGENCIA')) {
+    const fecha = /termina el (\d{2}\/\d{2}\/\d{4})/.exec(message)?.[1];
+    return `Tu membresía termina${fecha ? ` el ${fecha}` : ''}: no puedes reservar una sesión después de esa fecha. Renueva tu plan para reservar más adelante.`;
+  }
+  if (message.includes('EKKO_CAUSA_REQUERIDA')) return 'Indica quién cancela: el miembro o el estudio.';
   if (message.includes('EKKO_FUERA_DE_HORARIO')) return 'Ese horario está fuera del horario del estudio.';
   if (message.includes('EKKO_TENANT_DIFERENTE')) return 'Esa reserva pertenece a otro estudio.';
   // EKKO_NO_AUTH va DESPUÉS de EKKO_NO_AUTORIZADO: 'EKKO_NO_AUTH' es

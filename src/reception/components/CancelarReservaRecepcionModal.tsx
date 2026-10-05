@@ -3,6 +3,7 @@ import { supabase } from '@shared/lib/supabase';
 import { useToast } from '@shared/hooks/useToast';
 import { traducirErrorReserva } from '../lib/traducirErrorReserva';
 import { ZONA_ESTUDIO } from '@shared/lib/timezone';
+import { CausaCancelacionSelector, type CausaCancelacion } from '@shared/components/reserva/CausaCancelacion';
 
 export interface ReservaParaCancelar {
   id: string;
@@ -29,10 +30,13 @@ function fechaHora(iso: string): string {
 }
 
 /**
- * Confirmación de cancelación de la reserva de un miembro, desde recepción
- * (Sprint RP-3a). El RPC `cancelar_reserva_atomic` ya hace el resto (D3):
- * como recepción ≠ dueño, setea status='cancelada_admin' + cancelada_por
- * + notifica al miembro "por el estudio". El front solo llama.
+ * Confirmación de cancelación de la reserva de un miembro, desde recepción.
+ *
+ * R2-B (PKG-01Q): recepción DICE quién causó la cancelación y el servidor
+ * (`cancelar_reserva_atomic(p_causa)`) decide lo demás:
+ *   · la pidió el miembro → queda como cancelada por el miembro; si es tardía,
+ *     el crédito no se devuelve y el aviso se lo dice;
+ *   · la cancela el estudio → el crédito se devuelve y el aviso dice "por el estudio".
  */
 export function CancelarReservaRecepcionModal({
   reserva,
@@ -42,15 +46,25 @@ export function CancelarReservaRecepcionModal({
 }: Props) {
   const toast = useToast();
   const [motivo, setMotivo] = useState('');
+  const [causa, setCausa] = useState<CausaCancelacion | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleConfirmar() {
     if (submitting) return;
+    if (!causa) {
+      toast.error('Indica quién cancela: el miembro o el estudio.');
+      return;
+    }
     setSubmitting(true);
 
-    const { error } = await supabase.rpc('cancelar_reserva_atomic', {
+    // Cast: `p_causa` aún no está en los tipos generados de Supabase.
+    const { error } = await (supabase.rpc as unknown as (
+      fn: string,
+      args: Record<string, unknown>
+    ) => Promise<{ error: { message: string } | null }>)('cancelar_reserva_atomic', {
       p_reserva_id: reserva.id,
-      p_motivo: motivo.trim() || undefined
+      p_motivo: motivo.trim() || null,
+      p_causa: causa
     });
 
     if (error) {
@@ -131,8 +145,12 @@ export function CancelarReservaRecepcionModal({
           </p>
         </div>
 
+        <CausaCancelacionSelector value={causa} onChange={setCausa} slotInicio={reserva.slot_inicio} disabled={submitting} />
+
         <p style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', marginBottom: '14px' }}>
-          El miembro recibirá una notificación de que el estudio canceló su reserva.
+          {causa === 'miembro'
+            ? 'El miembro recibirá el aviso de que cancelamos la reserva a su solicitud, con lo que pasa con su crédito.'
+            : 'El miembro recibirá una notificación de que el estudio canceló su reserva.'}
         </p>
 
         <div className="ek-form-field" style={{ marginBottom: '20px' }}>
@@ -161,7 +179,7 @@ export function CancelarReservaRecepcionModal({
           <button
             type="button"
             onClick={handleConfirmar}
-            disabled={submitting}
+            disabled={submitting || !causa}
             className="ek-cta"
             style={{
               flex: 1,
@@ -169,7 +187,7 @@ export function CancelarReservaRecepcionModal({
               background: 'var(--ek-danger-soft)',
               color: 'var(--ek-danger)',
               border: '0.5px solid var(--ek-danger)',
-              opacity: submitting ? 0.6 : 1
+              opacity: submitting || !causa ? 0.6 : 1
             }}
           >
             {submitting ? 'Cancelando…' : 'Cancelar reserva'}

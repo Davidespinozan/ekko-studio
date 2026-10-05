@@ -187,7 +187,7 @@ export default function MiembroDetalle() {
               <option value="pendiente_onboarding">Pendiente de activación</option>
               <option value="pendiente_pago">Pendiente de pago</option>
               <option value="activo">Activo</option>
-              <option value="suspendido">Suspendido (no entra ni reserva)</option>
+              <option value="suspendido">Suspendido (no entra ni reserva; se pausa su cobro)</option>
               <option value="cancelado">Cancelado (puede volver a comprar)</option>
             </select>
           </label>

@@ -35,10 +35,12 @@ describe('puedeCancelarReserva', () => {
     expect(r.razon).toContain('6 horas');
   });
 
-  it('permite si faltan exactamente las horas de la regla', () => {
+  it('R2-B: si faltan EXACTAMENTE las horas de la regla ya es tarde (misma frontera que el servidor)', () => {
     const en6h = new Date('2026-05-18T18:00:00Z');
     const r = puedeCancelarReserva(en6h, 6);
-    expect(r.puede).toBe(true);
+    expect(r.puede).toBe(false);
+    expect(r.razon).toBe('Faltan 6 horas o menos');
+    expect(puedeCancelarReserva(new Date('2026-05-18T18:00:01Z'), 6).puede).toBe(true);
   });
 
   it('permite si faltan más horas que la regla', () => {
