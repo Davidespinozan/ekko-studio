@@ -97,4 +97,17 @@ describe('Login', () => {
     await waitFor(() => expect(h.signOut).toHaveBeenCalled());
     expect(screen.queryByText('APP')).not.toBeInTheDocument();
   });
+
+  it('"Volver a EKKO" manda a la landing ("/")', () => {
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<div>LANDING</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole('link', { name: /volver a ekko/i }));
+    expect(screen.getByText('LANDING')).toBeInTheDocument();
+  });
 });

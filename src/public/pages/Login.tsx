@@ -1,6 +1,6 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { Spinner } from '@shared/components/Spinner';
 import { ContactoEstudio } from '@shared/components/ContactoEstudio';
@@ -103,6 +103,18 @@ export default function Login() {
       paddingBottom: 'calc(48px + env(safe-area-inset-bottom, 0px))'
     }}>
       <div style={{ maxWidth: '400px', width: '100%' }}>
+        <Link to="/" style={{
+          fontSize: '13px',
+          color: 'var(--ek-ink-muted)',
+          textDecoration: 'none',
+          marginBottom: '20px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px'
+        }}>
+          <ArrowLeft size={15} aria-hidden="true" /> Volver a EKKO
+        </Link>
+
         <div className="ek-card">
           <form onSubmit={handleSubmit} className="ek-stack-md">
             <div className="ek-form-field">
