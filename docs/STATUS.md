@@ -4,13 +4,14 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-06 · PKG-06E cerrado en producción (ciclo de vida del
-material; FR-42..46). Antes: PKG-06C (alta pública con correo verificado; FR-24). Todo lo de
+Última actualización: 2026-10-06 · PKG-06F cerrado en producción (agregados en el
+servidor; FR-62, FR-63). REMEDIACIÓN CANÓNICA: 0 hallazgos de implementación abiertos y
+0 paquetes pendientes. Antes: PKG-06E (ciclo de vida del material). Todo lo de
 abajo se verificó en vivo contra git, Netlify y Supabase.
 
-## Producción (verificado 2026-10-06 19:16 UTC)
-- Código de negocio publicado: `6b2e086a2e9f079a612940459ac9f78a5a6e7ea8`
-  ("fix(material): make storage lifecycle recoverable", PKG-06E); el commit docs-only
+## Producción (verificado 2026-10-06 21:40 UTC)
+- Código de negocio publicado: `dba3e9aebfb733c3d61d68b94e90674f4a8b2ca6`
+  ("fix(scale): move authoritative aggregates server-side", PKG-06F); el commit docs-only
   de este archivo va encima (ver `git log`). Cadena:
   `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
   en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
@@ -20,10 +21,12 @@ abajo se verificó en vivo contra git, Netlify y Supabase.
   → `50c3a4c` (PKG-02H) → `82604ef` (STATUS) → `b12fe4f` (PKG-06A) → `c02532b` (STATUS)
   → `fdecdbb` (PKG-06D) → `06d27b8` (STATUS) → `3649842` (PKG-06G) → `cf1cfc0` (STATUS)
   → `33b44d2` (PKG-06B) → `6d456a4` (STATUS) → `7927fb5` (PKG-06C) → `13d2d11` (STATUS)
-  → `6b2e086` (PKG-06E).
-- Netlify production: deploy `6ac5480b642ade0008efd97d`, READY, `commit_ref` =
-  `6b2e086`, publicado 2026-10-06 19:14:26 UTC; 47 funciones, las 9 programadas sin
-  cambio (`netlify.toml` intacto). Antes `6ac5424b7e7cd40008d8ff0a` = 13d2d11,
+  → `6b2e086` (PKG-06E) → `4764ea1` (STATUS) → `dba3e9a` (PKG-06F).
+- Netlify production: deploy `6ac569a74233380008c0cd7a`, READY, `commit_ref` =
+  `dba3e9a`, publicado 2026-10-06 21:38:09 UTC; 47 funciones, las 9 programadas sin
+  cambio (`netlify.toml` y `netlify/` intactos). Antes `6ac549250fa6be0008f5204c` =
+  4764ea1, `6ac5480b642ade0008efd97d` = 6b2e086 (19:14:26 UTC, PKG-06E),
+  `6ac5424b7e7cd40008d8ff0a` = 13d2d11,
   `6ac540f8e7755100085bc98d` = 7927fb5 (18:44:11 UTC, PKG-06C; +`alta-publica`,
   `fake-signup` inerte con 410), `6ac53720ff4a4f00081dd047` = 6d456a4, `6ac535d7ff4a4f00081d51eb` =
   `33b44d2`, publicado 2026-10-06 17:56:34 UTC; antes `6ac52f4a4ccb810008ff86b9` =
@@ -44,8 +47,10 @@ abajo se verificó en vivo contra git, Netlify y Supabase.
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **116/116 migraciones**; última
-  `20261018100000_06e_ciclo_material.sql` (PKG-06E, md5
+- Supabase: **117/117 migraciones**; última
+  `20261019100000_06f_agregados_servidor.sql` (PKG-06F, md5
+  `419500e13b0e2a514fe04cc47938197b`, aplicada 2026-10-06 21:34 UTC, ANTES del
+  deploy); la 116 es `20261018100000_06e_ciclo_material.sql` (PKG-06E, md5
   `24aa22fac47895fb3c50c9e23e77545c`, aplicada 2026-10-06 19:11 UTC, ANTES del
   deploy); la 115 es `20261017100000_06c_alta_publica_verificada.sql` (PKG-06C, md5
   `0949ae3beed41862afdaf47bedf65b5d`, aplicada 2026-10-06 18:41 UTC, ANTES del
@@ -94,7 +99,9 @@ la sección "PKG-06G" de abajo) ·
 **PKG-06C "Alta pública con correo verificado" — CLOSED IN PRODUCTION** (EKKO-146;
 FR-24; D-FIN-6 = A; detalle en la sección "PKG-06C" de abajo) ·
 **PKG-06E "Ciclo de vida del material" — CLOSED IN PRODUCTION** (EKKO-147; FR-42..46;
-detalle en la sección "PKG-06E" de abajo).
+detalle en la sección "PKG-06E" de abajo) ·
+**PKG-06F "Agregados en el servidor" — CLOSED IN PRODUCTION** (EKKO-148; FR-62, FR-63;
+FR-65 ya estaba resuelto; detalle en la sección "PKG-06F" de abajo).
 Alcance final tras deduplicar contra R1, R2-A/B, EKKO-138, 03A y 03B: pausar, reactivar y
 dar de baja al fin del periodo escriben su operación en `stripe_operaciones_suscripcion`
 en la misma transacción que la transición local (causas `pausa_staff`,
@@ -207,27 +214,49 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- **PKG-06F "Agregados en el servidor" — IMPLEMENTADO LOCALMENTE, en un commit local
-  SIN PUSH** (EKKO-148; FR-62, FR-63; FR-65 ya estaba resuelto). Migración
-  `20261019100000_06f_agregados_servidor.sql` (NO aplicada en producción): 5 RPC
-  nuevas, todas SECURITY INVOKER con estudio de `get_my_tenant_id()` —
-  `reporte_creditos`, `libro_economico_agregado`, `cobros_fallidos_resumen`,
-  `membresias_vivas_por_tier` (las de admin exigen admin) y `reservas_por_dia_estudio`.
-  Ninguna función existente cambia; sin índice nuevo (FR-65: `mov_tenant_fecha_idx`
-  existe desde 20260921110000 y está en producción). App: créditos, cobrado, dinero del
-  dashboard, MRR y la gráfica de 30 días consumen agregados; ocupación, engagement,
-  padrón de miembros y membresías vivas por miembro se leen COMPLETOS por páginas con
-  conteo exacto (`leerTodo`; incompleto = error). Ningún KPI cambia de significado
-  (D-FIN-10 no se toca). Funciones: 140 → 145 en la base local (la base local sin 06F
-  = producción salvo `rls_auto_enable()`). Pruebas: `db/06f-agregados-servidor.db.test.ts`
-  (11, con 1,100–1,500 filas reales por fuente; 10 muerden sin la migración; la de
-  FR-65 pasa con o sin ella), `leerTodo` (8), `useReportesAgregados` (8),
-  `useAdminData.errores` (+2, listas de 2,500 y 1,500), `useDashboardData` (+2).
-  Hardening 64/64 (antes 62); drift 77/77 (antes 75). Gate completo: 1.ª corrida con 1
-  fallo en el intermitente conocido `ekko138-pausa-comercial` 5b (residual registrado,
-  ajeno a 06F, no se tocó); 2.ª corrida verde: 226 archivos / 2232 pruebas, build OK,
-  `git diff --check` OK (61 s, máquina en reposo). Activación: migración (aditiva) →
-  deploy; pendiente de autorización del dueño (`ekko-activar`).
+Nada.
+
+## PKG-06F — cerrado en producción (detalle; la línea corta está en "Cerrado")
+- **PKG-06F "Agregados en el servidor"** (EKKO-148; FR-62, FR-63) — commit `dba3e9a`
+  ("fix(scale): move authoritative aggregates server-side"), migración
+  `20261019100000_06f_agregados_servidor.sql` (md5 `419500e13b0e2a514fe04cc47938197b`;
+  Supabase 116 → 117, 21:34 UTC), deploy Netlify `6ac569a74233380008c0cd7a` READY =
+  dba3e9a (21:38 UTC). Orden: migración (aditiva: 5 funciones nuevas) → push → deploy.
+- Qué quedó: FR-62 y FR-63 CLOSED IN PRODUCTION. PostgREST sigue con `max_rows = 1000`
+  (no se tocó; no hay `.limit()` gigante). Los totales y conteos de reportes se calculan
+  en la base: `reporte_creditos()`, `libro_economico_agregado(desde, inicio_mes_anterior,
+  inicio_mes, hasta)`, `cobros_fallidos_resumen(desde)`, `membresias_vivas_por_tier()` y
+  `reservas_por_dia_estudio(desde, hasta)` — SECURITY INVOKER, estudio de
+  `get_my_tenant_id()`, sin parámetro de estudio, search_path fijo, sin SQL dinámico, sin
+  anon; los de admin exigen admin y fallan (error, nunca cero); el libro agrupado hereda
+  la autoridad de `libro_economico`; la serie diaria hereda la RLS de reservas
+  (America/Mazatlan, igual que `ZONA_ESTUDIO`). Las listas acotadas (ocupación y
+  engagement de 90 días, padrón de miembros, membresías vivas por miembro) se leen
+  completas por páginas con conteo exacto (`leerTodo`; incompleto = error). Ningún KPI
+  cambió de significado: D-FIN-10 no se tocó.
+- FR-65: ALREADY RESOLVED IN PRODUCTION antes de 06F — `mov_tenant_fecha_idx
+  (tenant_id, created_at DESC)` (de 20260921110000) sigue igual y es el único índice de
+  `membresia_movimientos` que empieza por `tenant_id`; 06F no agregó índice.
+- Verificación: 146 funciones en producción (141 + 5 nuevas, idénticas al build local
+  probado); 0 funciones existentes cambiadas. En producción, cada agregado es IGUAL al
+  cálculo independiente sobre las filas crudas completas actuales (créditos, 3 grupos
+  del libro de 4 filas, fallidos, membresías por plan, reservas por día). Recepción y
+  miembro: los agregados de admin responden EKKO_NO_AUTORIZADO; un miembro cuenta solo
+  sus reservas (16 de 17 del estudio); anon 401 en las 5. Hardening 64/64 y drift 77/77
+  tras migrar y al final. Instantáneas antes/después de la migración: solo cambian la
+  migración y las 5 RPC; los 14 hashes de negocio idénticos antes de activar, tras
+  migrar y al final. Bundle: las 5 RPC llamadas, `leerTodo` con conteo exacto y error de
+  lectura incompleta, sin lectura cruda del ledger ni `.limit(2000)`, sin llaves.
+  Evidencia local con más de 1000 filas reales por fuente (1,100–1,500) y el modelo
+  recortado demostrado distinto. Gate local: 1.ª corrida con 1 fallo en el intermitente
+  conocido `ekko138-pausa-comercial` 5b (residual registrado; sin evidencia de
+  regresión); 2.ª corrida verde: 226 archivos / 2232 pruebas.
+- Actividad NATURAL del estudio entre el cierre de 06E y esta activación (no la causó la
+  activación): una venta de mostrador, una membresía nueva con su movimiento de
+  créditos, reservas nuevas, un material subido, avisos y auditoría; resolvió el
+  `activo_sin_derecho` que estaba en Operación.
+- Cero mutaciones de negocio, Auth, Stripe o Storage causadas por la activación; sin
+  datos artificiales de escala.
 
 ## PKG-06E — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06E "Ciclo de vida del material"** (EKKO-147, FR-42..46) — commit `6b2e086`
@@ -576,6 +605,9 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   dos pruebas). No se aplica, no se borra, no se commitea. Ver nota de `57b9af0`.
 
 ## Diferido / pendiente no bloqueante
+- Primera corrida registrada (06G) de `cron-expirar-membresias` (07:00 UTC) y
+  `cron-material-vencido` (10:30 UTC): todavía "nunca" al cierre de 06F; se vigilan desde
+  2026-10-06 17:24 UTC, así que su primera corrida natural es el 2026-10-07.
 - PKG-06E, evidencia natural (no se fabrica): primer retiro real con su borrado (o su
   limpieza pendiente y la convergencia en la siguiente corrida del cron), primera
   corrida registrada de `cron-material-vencido` y primer vencimiento barrido.
@@ -656,22 +688,20 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 - 2 usuarios con caché de plan divergente (evidencia de que el caché no decide).
 
 ## Siguiente paso
-Resolver desde el panel los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
-`activo_sin_derecho`). El backlog canónico final (reconciliación post-R1/R2/01/02/03)
-deja 1 paquete (06B, 06C y 06E cerrados; ya no quedan P0, P1 ni P2): 06F (agregación
-en el servidor; implementado en local, ver "Solo en local"); el siguiente paso es su
-activación controlada. Corrección de conteo: la tabla canónica tiene 16 P3; 13 están
-cerrados en producción (06A, 06B, 06D, 06E, 06G) y quedan 3 (FR-62, FR-63, FR-65, este
-último ya resuelto en producción). El "5" de los reportes anteriores arrastraba un
-error de aritmética de +2 (se contaron 17 P3 al inicio y se restaron 4 en vez de 5 al
-cerrar 06A/06D); no hay otros 2 hallazgos abiertos.
-Aparte, el hallazgo nuevo del correo de recuperación sin SMTP propio (ver
-"Residuales") requiere revisión del dueño antes de salir en vivo. Decisiones del dueño pendientes: D-FIN-2 (DSN de
-Sentry en producción: hoy no hay), D-FIN-3 (deploy previews con secretos LIVE),
-D-FIN-4 (cuentas demo al salir), D-FIN-8 (2 objetos huérfanos de Storage), respaldo y
-simulacro de restauración, cuál versión del enlace de Login queda (publicada vs stash).
-Ningún paquete nuevo está autorizado; un backlog o una auditoría antigua no es
-autorización.
+REMEDIACIÓN CANÓNICA CERRADA EN PRODUCCIÓN: 0 hallazgos de implementación abiertos y 0
+paquetes pendientes (P0 = P1 = P2 = P3 = 0). Corrección de conteo: la tabla canónica tuvo
+16 P3; los reportes arrastraron un "+2" de aritmética (17 al inicio; −4 en vez de −5 al
+cerrar 06A/06D); nunca hubo otros 2 hallazgos. P3 = 0 NO significa que no quede nada:
+quedan residuales aceptados, decisiones del dueño (D-FIN-2 Sentry, D-FIN-3 deploy
+previews con secretos LIVE, D-FIN-4 cuentas demo al salir, D-FIN-5 material de un
+miembro sancionado/revocado, D-FIN-7 identidad fase 2, D-FIN-8 los 2 huérfanos de
+Storage, D-FIN-10 maestro de KPIs, D-FIN-11 versión del enlace de Login, SMTP propio
+para la recuperación de contraseña), trabajo humano (evento de Stripe en `revision`
+desde 2026-10-02; 1 usuario con caché de plan sin membresía viva; confirmar
+`QR_JWT_SECRET`; respaldo y simulacro de restauración), trabajo previo a salir en vivo y
+evidencia natural pendiente (ver "Diferido"). La siguiente fase recomendada es la
+reconciliación final del sistema / go-live; no está autorizada. Ningún paquete nuevo
+está autorizado; un backlog o una auditoría antigua no es autorización.
 
 ## Reglas de este archivo
 - Cambia solo tras verificar: IMPLEMENTADO LOCALMENTE (código + gate verde),
