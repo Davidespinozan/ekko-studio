@@ -4,28 +4,30 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-06 · EKKO-138 / D-03A-1 cerrado en producción (pausa
-comercial durable). Antes: PKG-03A (pendientes operativos) y F-1. Todo lo de abajo se
+Última actualización: 2026-10-06 · PKG-03B fase A (infraestructura del reconciliador
+Stripe) en producción, reconciliador APAGADO. Antes: EKKO-138, PKG-03A y F-1. Todo lo de abajo se
 verificó en vivo contra git, Netlify y Supabase.
 
-## Producción (verificado 2026-10-06 01:35 UTC)
-- Código de negocio publicado: `0890adb461749a7348c62982f294cff1b41fae84`
-  ("fix(billing): preserve independent staff pause intent", EKKO-138); el commit
-  docs-only de este archivo va encima (ver `git log`). Cadena:
+## Producción (verificado 2026-10-06 02:00 UTC)
+- Código de negocio publicado: `0ffe13d65f0bbe0235450d36b3abb87400361d0b`
+  ("feat(stripe): add detect-only reconciliation", PKG-03B); el commit docs-only de
+  este archivo va encima (ver `git log`). Cadena:
   `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
   en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
   pendiente) → `c33b750` (STATUS) → `6fe3f64` (F-1) → `762dbe4` (STATUS) → `890498a` (PKG-03A)
-  → `1d42079` (STATUS) → `0890adb` (EKKO-138).
-- Netlify production: deploy `6ac44ea7bb615e00082cbf73`, READY, `commit_ref` =
-  `0890adb`, publicado 2026-10-06 01:30:10 UTC. Antes: `6ac43df1…` = 1d42079,
+  → `1d42079` (STATUS) → `0890adb` (EKKO-138) → `0b23ca7` (STATUS) → `0ffe13d` (PKG-03B).
+- Netlify production: deploy `6ac4548dfd7f11000901f1a6`, READY, `commit_ref` =
+  `0ffe13d`, publicado 2026-10-06 01:55:16 UTC. Antes: `6ac44f67…` = 0b23ca7,
+  `6ac44ea7…` = 0890adb (01:30 UTC), `6ac43df1…` = 1d42079,
   `6ac43c90…` = 890498a (00:12 UTC), `6ac432a4…` = 762dbe4,
   `6ac43209…` = 6fe3f64 (23:27 UTC), `6ac42df5…` = c33b750 (23:10),
   `6ac42883…` = cf7c3a0 (22:47 UTC). Cada commit anterior tuvo su deploy
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **107/107 migraciones**; última
-  `20261010100000_ekko138_pausa_comercial.sql` (EKKO-138). La 106 es
+- Supabase: **108/108 migraciones**; última
+  `20261011100000_03b_reconciliacion_stripe.sql` (PKG-03B). La 107 es
+  `20261010100000_ekko138_pausa_comercial.sql` (EKKO-138), la 106
   `20261009100000_03a_pendientes_operativos.sql` (PKG-03A), la 105
   `20261008100000_f1_vistas_valor_security_invoker.sql` (F-1), la 104
   `20261007100000_material_pendiente_y_requerido.sql` y la 103
@@ -131,14 +133,33 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- **PKG-03B "Reconciliador Stripe (detect-only)"** (EKKO-140) — COMMITTED en local
-  (un commit, ver `git log`), gate verde, SIN PUSH / SIN DEPLOY / MIGRACIÓN NO
-  APLICADA / SIN CORRIDA EN PRODUCCIÓN / SIN HORARIO. Migración
-  `20261011100000_03b_reconciliacion_stripe.sql` (`discrepancias_stripe`,
-  `reconciliacion_stripe_corridas`, 2 RPC nuevas, 2 ramas nuevas en
-  `v_pendientes_operativos`; ninguna función existente cambia). Función manual
-  `reconciliar-stripe`, deshabilitada sin `RECONCILIAR_STRIPE_TOKEN`. Pruebas:
-  `src/__tests__/reconciliacion-stripe.test.ts`, `src/__tests__/db/03b-reconciliacion-stripe.db.test.ts`.
+- Nada.
+
+## Desplegado, pendiente de fases (no cerrado)
+- **PKG-03B "Reconciliador Stripe (detect-only)"** (EKKO-140, D-03B-1 = A) —
+  **FASE A CERRADA EN PRODUCCIÓN; PKG-03B = DEPLOYED / INFRAESTRUCTURA VERIFICADA /
+  PRIMERA RECONCILIACIÓN EN VIVO PENDIENTE; RECONCILIADOR APAGADO.**
+  Evidencia fase A (2026-10-06 01:50–02:00 UTC): commit `0ffe13d`; migración
+  `20261011100000` (107 → 108, md5 `decf6fdc14ea490f053f2300eb396bce`) antes del
+  código; deploy `6ac4548dfd7f11000901f1a6` READY con ese SHA. Funciones 116 → 118:
+  2 nuevas (`registrar_reconciliacion_stripe` solo service_role;
+  `revisar_discrepancia_stripe` authenticated con guarda de admin y estudio), 0
+  cambiadas, 0 quitadas; idénticas al build probado. `discrepancias_stripe` y
+  `reconciliacion_stripe_corridas`: RLS, lectura admin de su estudio, sin DML de
+  cliente, **0 filas**. `v_pendientes_operativos` sigue security_invoker con sus 2
+  ramas nuevas. anon 401 en tablas, vista y RPC; sin EXECUTE de anon/PUBLIC.
+  Hardening 49/49; drift 64/64; datos de negocio intactos. Gate local 205 archivos /
+  1928 pruebas. Código publicado: la fachada de Stripe del reconciliador solo usa
+  `accounts.retrieve` y `subscriptions.list`; Operación muestra discrepancias con
+  "Marcar como revisada" y ningún botón de reparar.
+  **Apagado verificado:** `RECONCILIAR_STRIPE_TOKEN` no está configurado (esta
+  activación no lo configuró); `POST /reconciliar-stripe` → 403 "Reconciliación
+  deshabilitada"; sin `cron-reconciliar-stripe` ni horario (8 funciones programadas,
+  ninguna del reconciliador); ninguna lectura de Stripe por el reconciliador, ninguna
+  corrida, ninguna mutación de Stripe.
+  **Siguiente fase (requiere autorización explícita del dueño):** fase B = primera
+  corrida en vivo de solo lectura (configurar el token y un POST); fase C = revisar
+  lo generado; fase D = horario diario.
 - (Corrección histórica: la versión anterior de este archivo, dentro del commit
   `890498a`, decía "SIN COMMIT"; se escribió antes de commitear. PKG-03A ya está
   publicado y cerrado, ver "Cerrado en producción".)
@@ -193,7 +214,7 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 - 2 usuarios con caché de plan divergente (evidencia de que el caché no decide).
 
 ## Siguiente paso
-Decisión del dueño sobre el siguiente bloque. En Operación hay trabajo real esperando
+Autorizar (o no) la fase B de PKG-03B: primera reconciliación en vivo, solo lectura. En Operación hay trabajo real esperando
 una decisión: el evento de Stripe en `revision` desde 2026-10-02 y una divergencia
 `activo_sin_derecho`. PKG-03B y 02H no están autorizados. En Operación hay trabajo real
 esperando una decisión del dueño: el evento de Stripe en `revision` desde 2026-10-02
