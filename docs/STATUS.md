@@ -188,7 +188,26 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- Nada.
+- **PKG-06B "Operaciones de cobro del miembro y del webhook" — IMPLEMENTADO
+  LOCALMENTE, en un commit local SIN PUSH** (EKKO-145). Migración
+  `20261016100000_06b_operaciones_cobro_miembro.sql` (md5
+  `91e48dea5680ba8fe400265494f639dd`, NO aplicada en producción): tipos/causas
+  nuevos y columna `contexto` en `stripe_operaciones_suscripcion`; RPC nuevas
+  `cambio_plan_registrar`, `cambio_plan_resultado`, `registrar_cancelacion_suscripcion_anterior`
+  (service_role) y `miembro_programar_renovacion` (el miembro); recreadas desde su
+  última definición `operacion_suscripcion_preparar`, `operacion_suscripcion_resultado`
+  y `staff_reintentar_operacion_cobro`; `v_pendientes_operativos` igual que 06G salvo
+  la rama de cobro (sub anterior = ALTA; cambio de plan = revisar). Netlify:
+  `cambiar-plan-suscripcion` (intención durable + cierre honesto),
+  `stripe-cancelar-suscripcion` (RPC del miembro → ejecutor común),
+  `stripe-webhook` (operación por suscripción anterior antes de activar),
+  ejecutor con filtro de tipos y `reanudar_renovacion`. Pruebas:
+  `db/06b-operaciones-cobro-miembro.db.test.ts` (24; 22 muerden sin la migración),
+  `cambiar-plan-suscripcion` (+8), `stripe-webhook` (+4), `operacionesSuscripcion`
+  (+3), `stripe-cancelar-suscripcion` (6, nuevo), `Operacion` (+1). Hardening
+  58/58 (antes 56); drift 72/72 (antes 70). Gate completo verde a la primera: 217
+  archivos / 2116 pruebas, build OK, `git diff --check` OK (56 s, máquina en reposo). Activación: migración
+  (aditiva) → deploy; pendiente de autorización del dueño (`ekko-activar`).
 
 ## PKG-06G — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06G "Señales operativas durables"** (EKKO-144) — commit `3649842`

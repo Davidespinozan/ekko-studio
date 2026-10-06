@@ -58,6 +58,9 @@ let finalizarResultado: () => { data: unknown; error: unknown } = () => ({ data:
 /** Resultado del upsert por tabla (payment_events). */
 const upsertResultado: Record<string, { data: unknown; error: unknown }> = {};
 const filaPorTabla: Record<string, unknown> = {};
+/** PKG-06B: filas de una consulta de lista (await sobre la cadena) por tabla. */
+const listaPorTabla: Record<string, unknown[]> = {};
+const mockEjecutarOps = vi.fn().mockResolvedValue({ procesadas: 0, aplicadas: 0, fallidas: 0, descartadas: 0, sin_stripe: false });
 const mockAvisarStaff = vi.fn().mockResolvedValue(1);
 vi.mock('../../netlify/functions/_lib/avisosStaff', () => ({
   avisarStaff: (...a: unknown[]) => mockAvisarStaff(...a)
@@ -102,11 +105,16 @@ vi.mock('@supabase/supabase-js', () => ({
           const c = makeChain();
           // Fila por tabla para los lookups con .maybeSingle() (default: null).
           if (filaPorTabla[table]) c.maybeSingle = () => Promise.resolve({ data: filaPorTabla[table], error: null });
+          if (listaPorTabla[table]) c.then = (cb: (v: unknown) => unknown) => Promise.resolve({ data: listaPorTabla[table], error: null }).then(cb);
           return c;
         })
       };
     })
   }))
+}));
+
+vi.mock('../../netlify/functions/_lib/operacionesSuscripcion', () => ({
+  ejecutarOperacionesSuscripcion: (...a: unknown[]) => mockEjecutarOps(...a)
 }));
 
 import { handler } from '../../netlify/functions/stripe-webhook/index';
@@ -1328,5 +1336,66 @@ describe('PKG-01B · checkout.session.completed: NO FINANCIAL SUCCESS → NO ENT
     expect(mockUpsertFila.mock.calls.find((c) => c[0] === 'payment_events')).toBeUndefined();
     expect(mockInsert.mock.calls.find((c) => c[0] === 'membresias')).toBeUndefined();
     expect(mockUpdate.mock.calls.find((c) => c[0] === 'membresias')).toBeUndefined();
+  });
+});
+
+describe('PKG-06B (FR-17) · suscripción anterior tras activar otra', () => {
+  const PRIMERA_FACTURA = {
+    id: 'evt_06b', type: 'invoice.paid', created: 1700000000,
+    data: { object: { subscription: 'sub_nueva', billing_reason: 'subscription_create' } }
+  };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRpc.mockReset();
+    for (const k of Object.keys(filaPorTabla)) delete filaPorTabla[k];
+    for (const k of Object.keys(upsertResultado)) delete upsertResultado[k];
+    finalizarResultado = () => ({ data: [{ id: 'evt_06b' }], error: null });
+    process.env.STRIPE_SECRET_KEY = 'sk_test';
+    process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
+    delete process.env.STRIPE_CONNECT_WEBHOOK_SECRET;
+    process.env.VITE_SUPABASE_URL = 'http://supabase.test';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
+    mockRpc.mockResolvedValue({ data: { success: true, membresia_id: 'mem_1' }, error: null });
+    claimDevuelve('nuevo');
+    mockTenantMaybeSingle.mockResolvedValue({ data: { id: 'tenant-1' }, error: null });
+    listaPorTabla.membresias = [{ stripe_subscription_id: 'sub_vieja' }, { stripe_subscription_id: 'sub_nueva' }];
+    mockConstructEvent.mockReturnValue(PRIMERA_FACTURA);
+    mockSubRetrieve.mockResolvedValue({ current_period_end: 1700000000, customer: 'cus_1', metadata: { usuario_id: 'u1', tier_id: 't1' } });
+    mockEjecutarOps.mockResolvedValue({ procesadas: 1, aplicadas: 1, fallidas: 0, descartadas: 0, sin_stripe: false });
+  });
+  afterAll(() => { delete listaPorTabla.membresias; });
+
+  it('25/27/28 · registra UNA operación por suscripción anterior (nunca la nueva) ANTES de activar; después la aplica el ejecutor común', async () => {
+    const res = await invocar();
+    expect(res.statusCode).toBe(200);
+    const registros = mockRpc.mock.calls.filter((c) => c[0] === 'registrar_cancelacion_suscripcion_anterior');
+    expect(registros.map((c) => c[1])).toEqual([{ p_usuario_id: 'u1', p_sub_anterior: 'sub_vieja', p_sub_nueva: 'sub_nueva', p_evento: 'evt_06b' }]);
+    const iReg = mockRpc.mock.calls.findIndex((c) => c[0] === 'registrar_cancelacion_suscripcion_anterior');
+    const iAct = mockRpc.mock.calls.findIndex((c) => c[0] === 'activar_membresia');
+    expect(iReg).toBeLessThan(iAct);
+    expect(mockEjecutarOps).toHaveBeenCalledWith(expect.anything(), { usuarioId: 'u1' });
+    expect(ultimaTransicion()).toMatchObject({ estado: 'procesado', motivo: 'activado:sub' });
+  });
+
+  it('30 · si la operación no se puede registrar, NO se activa y el webhook falla (Stripe reintenta): nunca una sub anterior sin evidencia', async () => {
+    mockRpc.mockImplementation(async (name: string) =>
+      name === 'registrar_cancelacion_suscripcion_anterior' ? { data: null, error: { message: 'connection reset' } } : { data: null, error: null });
+    await invocar();
+    expect(mockRpc.mock.calls.some((c) => c[0] === 'activar_membresia')).toBe(false);
+    expect(ultimaTransicion()?.estado).not.toBe('procesado');
+  });
+
+  it('31 · si Stripe falla al cancelar, la activación se mantiene: la operación queda para el ejecutor (cron) y se reporta', async () => {
+    mockEjecutarOps.mockRejectedValue(new Error('stripe caído'));
+    const res = await invocar();
+    expect(res.statusCode).toBe(200);
+    expect(ultimaTransicion()).toMatchObject({ estado: 'procesado' });
+    expect(mockReportar).toHaveBeenCalledWith('stripe-webhook', expect.any(Error), expect.objectContaining({ paso: 'cancelar_suscripcion_anterior', event_id: 'evt_06b' }));
+  });
+
+  it('sin suscripciones anteriores no registra nada', async () => {
+    listaPorTabla.membresias = [{ stripe_subscription_id: 'sub_nueva' }];
+    await invocar();
+    expect(mockRpc.mock.calls.some((c) => c[0] === 'registrar_cancelacion_suscripcion_anterior')).toBe(false);
   });
 });

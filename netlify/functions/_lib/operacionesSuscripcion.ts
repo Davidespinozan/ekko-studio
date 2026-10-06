@@ -15,6 +15,10 @@ import { reportarErrorServidor } from './sentry';
  *   PKG-02H · también las operaciones del STAFF (pausa, reactivación, baja al fin
  *   del periodo): suspender_cobro/reanudar_cobro con causa pausa_staff /
  *   reactivacion_staff, y cancelar_fin_periodo → cancel_at_period_end: true.
+ *   PKG-06B · también lo que pide el MIEMBRO (baja o reactivación al fin del
+ *   periodo: reanudar_renovacion → cancel_at_period_end: false) y la cancelación
+ *   de la suscripción ANTERIOR que registra el webhook. `cambiar_plan` NUNCA pasa
+ *   por aquí: lo ejecuta el propio flujo del miembro.
  *
  * Aquí solo se EJECUTA y se asienta el resultado:
  *   1) `operacion_suscripcion_preparar` revalida contra el estado actual (no se
@@ -25,6 +29,9 @@ import { reportarErrorServidor } from './sentry';
  * Un fallo NO deshace nada en EKKO: la fila queda `fallida`, el admin recibe un
  * aviso y el cron diario (o el siguiente disparo) la reintenta. Sin reembolsos.
  */
+
+/** PKG-06B: lo que este ejecutor aplica en Stripe. `cambiar_plan` queda fuera a propósito. */
+export const TIPOS_EJECUTABLES = ['suspender_cobro', 'reanudar_cobro', 'cancelar_suscripcion', 'cancelar_fin_periodo', 'reanudar_renovacion'];
 
 export interface ResumenOperaciones {
   procesadas: number;
@@ -39,7 +46,7 @@ interface Preparada {
   ejecutar: boolean;
   estado?: string;
   motivo?: string;
-  tipo?: 'suspender_cobro' | 'reanudar_cobro' | 'cancelar_suscripcion' | 'cancelar_fin_periodo';
+  tipo?: 'suspender_cobro' | 'reanudar_cobro' | 'cancelar_suscripcion' | 'cancelar_fin_periodo' | 'reanudar_renovacion';
   tenant_id?: string;
   stripe_subscription_id?: string;
   idempotency_key?: string;
@@ -70,6 +77,8 @@ export async function ejecutarOperacionesSuscripcion(
     .from('stripe_operaciones_suscripcion')
     .select('id')
     .in('estado', ['pendiente', 'fallida'])
+    // PKG-06B: solo los tipos que este ejecutor sabe aplicar (el cambio de plan no).
+    .in('tipo', TIPOS_EJECUTABLES)
     // PKG-03A: agotada (5 intentos en la ronda) = necesita a un humano en Operación.
     .is('reintentos_agotados_at', null)
     .order('created_at', { ascending: true })
@@ -113,16 +122,20 @@ export async function ejecutarOperacionesSuscripcion(
       if (prep.tipo === 'cancelar_suscripcion') {
         const sub = await stripe.subscriptions.cancel(subId, opciones);
         resultado = { status: sub?.status ?? 'canceled' };
-      } else if (prep.tipo === 'cancelar_fin_periodo') {
-        const sub = await stripe.subscriptions.update(subId, { cancel_at_period_end: true }, opciones);
-        resultado = { status: sub?.status ?? null, cancel_at_period_end: sub?.cancel_at_period_end ?? true };
-      } else {
+      } else if (prep.tipo === 'cancelar_fin_periodo' || prep.tipo === 'reanudar_renovacion') {
+        const cancelar = prep.tipo === 'cancelar_fin_periodo';
+        const sub = await stripe.subscriptions.update(subId, { cancel_at_period_end: cancelar }, opciones);
+        resultado = { status: sub?.status ?? null, cancel_at_period_end: sub?.cancel_at_period_end ?? cancelar };
+      } else if (prep.tipo === 'suspender_cobro' || prep.tipo === 'reanudar_cobro') {
         const sub = await stripe.subscriptions.update(
           subId,
           { pause_collection: prep.tipo === 'suspender_cobro' ? { behavior: 'void' as const } : null },
           opciones
         );
         resultado = { status: sub?.status ?? null, pause_collection: sub?.pause_collection?.behavior ?? null };
+      } else {
+        // PKG-06B: un tipo que este ejecutor no conoce jamás se traduce en otra llamada.
+        throw Object.assign(new Error(`tipo no ejecutable: ${String(prep.tipo)}`), { type: 'ekko', code: 'tipo_no_ejecutable' });
       }
       aplicada = true;
     } catch (e) {

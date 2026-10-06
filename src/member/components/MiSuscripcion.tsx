@@ -425,10 +425,13 @@ export function MiSuscripcion({ usuarioId, tierSlug, status }: Props) {
       const res = await cancelarSuscripcion(reactivar);
       setMembresia((prev) => (prev ? { ...prev, cancel_at_period_end: res.cancel_at_period_end } : prev));
       setConfirmarCancelar(false);
+      // PKG-06B: si Stripe aún no lo confirmó, no se afirma de más (EKKO-120).
       toast.success(
-        reactivar
-          ? '¡Listo! Tu plan se renovará normalmente.'
-          : 'Tu plan se cancelará al final del periodo. Puedes reactivarlo cuando quieras.'
+        res.stripe_pendiente
+          ? 'Recibimos tu solicitud. La estamos confirmando con el procesador de pagos; no tienes que repetirla.'
+          : reactivar
+            ? '¡Listo! Tu plan se renovará normalmente.'
+            : 'Tu plan se cancelará al final del periodo. Puedes reactivarlo cuando quieras.'
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No pudimos actualizar tu suscripción. Intenta de nuevo.');

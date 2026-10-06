@@ -986,3 +986,37 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   ocurre cuando alguien abre Operación o el Centro de pendientes; no hay alarma
   externa que avise sola. **Complementa a EKKO-137 (03A) y EKKO-140 (03B); no
   configura Sentry.**
+
+## PKG-06B — operaciones de cobro del miembro y del webhook (2026-10-06)
+
+- **EKKO-145 — PKG-06B · Toda mutación de suscripción que pide el miembro o hace el
+  webhook deja operación durable, idempotente y visible.** Se reutiliza
+  `stripe_operaciones_suscripcion` (R2-B/02H), sin tabla nueva: tipos
+  `cambiar_plan` y `reanudar_renovacion`, causas `cambio_plan_miembro`,
+  `baja_miembro`, `reactivacion_miembro` y `suscripcion_anterior`, y una columna
+  `contexto` (operation_id, tier destino, suscripción nueva, evento; sin PII ni
+  payloads). (1) **FR-15 cambio de plan:** la intención se registra después de los
+  guardias y ANTES de mutar la suscripción (`cambio_plan_registrar`, identidad =
+  operation_id del miembro, la misma que va en la llave de Stripe) y se cierra con
+  honestidad (`cambio_plan_resultado`): `aplicada` solo si Stripe aplicó Y la
+  membresía ya tiene el tier destino; `descartada` si Stripe definitivamente no
+  mutó (cobro rechazado, rechazo sin efecto); `fallida` si el resultado es
+  desconocido, el cobro no se confirmó o EKKO no convergió — visible en Operación
+  aunque el miembro no reintente, con aviso al admin. El ejecutor genérico jamás
+  lo ejecuta ni lo asienta, y el panel no lo "reintenta": lo reintenta el miembro
+  con la misma operación (converge) o el admin lo revisa en Stripe y lo descarta
+  con nota. (2) **FR-16 baja/reactivación del miembro:** `miembro_programar_renovacion`
+  (sesión del miembro, actor del servidor) deja en UNA transacción el
+  `cancel_at_period_end` local y la operación; Stripe va después por el ejecutor
+  común. El derecho no se toca (la baja surte efecto al fin del periodo). Revocado
+  no gestiona; sancionado puede dar de baja pero no reactivar; una baja que
+  programó el estudio (02H) no la revierte el miembro. (3) **FR-17 suscripción
+  anterior:** el webhook registra UNA operación por suscripción anterior
+  (`cancelar_anterior:<sub>`, solo subs que respaldan una membresía de ese
+  miembro) ANTES de activar la nueva; si no puede registrarla, falla y Stripe
+  reintenta. El ejecutor la aplica cuando la membresía anterior ya no está viva; un
+  fallo es `fallida`, severidad ALTA desde el primer fallo ("posible doble cobro")
+  y la reintenta el cron. Ambigüedad del proveedor = `fallida` con la misma
+  identidad, nunca una operación nueva. 03B sigue detect-only: la operación dice qué
+  intentó EKKO, la discrepancia qué no coincide hoy; pueden convivir. **Extiende a
+  EKKO-131, EKKO-137 y EKKO-141; no reabre R1, R2-B, 02H ni EKKO-138.**

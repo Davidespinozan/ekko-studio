@@ -33,7 +33,8 @@ import { ejecutarOperacionesSuscripcion, describirErrorProveedor } from '../../n
 
 function admin() {
   const chain: Record<string, unknown> = {};
-  for (const m of ['select', 'in', 'order', 'limit']) chain[m] = () => chain;
+  for (const m of ['select', 'order', 'limit']) chain[m] = () => chain;
+  chain.in = (col: string, val: unknown) => { h.filtros.push([`in:${col}`, val]); return chain; };
   chain.eq = (col: string, val: unknown) => { h.filtros.push([col, val]); return chain; };
   chain.is = (col: string, val: unknown) => { h.filtros.push([`is:${col}`, val]); return chain; };
   chain.then = (cb: (v: unknown) => unknown) => Promise.resolve({ data: h.ops, error: null }).then(cb);
@@ -161,5 +162,33 @@ describe('ejecutarOperacionesSuscripcion', () => {
   it('el error asentado lleva tipo y código, recortado', () => {
     expect(describirErrorProveedor(Object.assign(new Error('x'.repeat(500)), { type: 'api_error', code: 'rate_limit' })).length).toBeLessThanOrEqual(190);
     expect(describirErrorProveedor(Object.assign(new Error('caída'), { type: 'api_error', code: 'rate_limit' }))).toBe('api_error:rate_limit:caída');
+  });
+});
+
+describe('PKG-06B · tipos del miembro y del webhook', () => {
+  it('solo pide a la base los tipos que sabe ejecutar: `cambiar_plan` nunca entra al ejecutor', async () => {
+    await ejecutarOperacionesSuscripcion(admin());
+    const tipos = h.filtros.find(([c]) => c === 'in:tipo')?.[1] as string[];
+    expect(tipos).toEqual(['suspender_cobro', 'reanudar_cobro', 'cancelar_suscripcion', 'cancelar_fin_periodo', 'reanudar_renovacion']);
+    expect(tipos).not.toContain('cambiar_plan');
+  });
+
+  it('reanudar_renovacion (el miembro revierte su baja) → cancel_at_period_end:false con la llave de la operación', async () => {
+    h.ops = [{ id: 'op-r' }];
+    h.preparadas['op-r'] = prep('reanudar_renovacion', { idempotency_key: 'ekko:renovacion_miembro:abc:1' });
+    h.update.mockResolvedValue({ id: 'sub_1', status: 'active', cancel_at_period_end: false });
+    await ejecutarOperacionesSuscripcion(admin());
+    expect(h.update).toHaveBeenCalledWith('sub_1', { cancel_at_period_end: false }, { stripeAccount: 'acct_1', idempotencyKey: 'ekko:renovacion_miembro:abc:1' });
+    expect(resultados()[0]).toMatchObject({ p_id: 'op-r', p_ok: true, p_resultado: { cancel_at_period_end: false } });
+  });
+
+  it('un tipo desconocido que llegara a preparar NO se traduce en ninguna llamada a Stripe: queda fallida', async () => {
+    h.ops = [{ id: 'op-x' }];
+    h.preparadas['op-x'] = prep('cambiar_plan');
+    await ejecutarOperacionesSuscripcion(admin());
+    expect(h.update).not.toHaveBeenCalled();
+    expect(h.cancel).not.toHaveBeenCalled();
+    expect(resultados()[0]).toMatchObject({ p_id: 'op-x', p_ok: false });
+    expect(String((resultados()[0] as { p_error: string }).p_error)).toMatch(/tipo_no_ejecutable/);
   });
 });

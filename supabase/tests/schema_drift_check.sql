@@ -329,6 +329,19 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
             AND column_name IN ('push_revisado_at','push_revisado_por')) = 2 THEN '✅ PASS' ELSE '❌ FALTA — 06G no aplicada' END);
 
 
+-- PKG-06B (20261016100000): operaciones de cobro del miembro y del webhook.
+INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
+('11 · Grants/RLS', '20261016100000_06b', 'stripe_operaciones_suscripcion: tipos cambiar_plan/reanudar_renovacion, causas del miembro y del webhook, columna contexto',
+ CASE WHEN (SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='stripe_operaciones_suscripcion_tipo_check') LIKE '%cambiar_plan%'
+         AND (SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='stripe_operaciones_suscripcion_causa_check') LIKE '%suscripcion_anterior%'
+         AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='stripe_operaciones_suscripcion' AND column_name='contexto')
+        THEN '✅ PASS' ELSE '❌ FALTA — 06B no aplicada' END),
+('11 · Grants/RLS', '20261016100000_06b', 'RPC cambio_plan_registrar / cambio_plan_resultado / miembro_programar_renovacion / registrar_cancelacion_suscripcion_anterior',
+ CASE WHEN (SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace
+            AND proname IN ('cambio_plan_registrar','cambio_plan_resultado','miembro_programar_renovacion','registrar_cancelacion_suscripcion_anterior')) = 4
+        THEN '✅ PASS' ELSE '❌ FALTA — 06B no aplicada' END);
+
+
 -- ////////////////////////////////////////////////////////////////////////////
 -- BLOQUE 12 — Índices / objetos varios
 -- ////////////////////////////////////////////////////////////////////////////

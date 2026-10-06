@@ -51,6 +51,9 @@ const LABEL_TIPO: Record<string, string> = {
   discrepancia_plan_distinto: 'El plan en Stripe no es el de la membresía',
   reconciliacion_parcial: 'La última reconciliación con Stripe quedó incompleta',
   reconciliacion_fallida: 'La última reconciliación con Stripe falló',
+  // PKG-06B · operaciones del miembro y del webhook
+  cambiar_plan: 'Cambio de plan del miembro sin confirmar',
+  reanudar_renovacion: 'Quitar la baja programada (lo pidió el miembro)',
   // PKG-06G · señales durables sin Sentry
   reconciliacion_atrasada: 'La reconciliación diaria con Stripe no ha corrido',
   proceso_atrasado: 'Un proceso automático no ha corrido a tiempo',
@@ -69,9 +72,19 @@ const LABEL_ACCION: Record<string, string> = {
   discrepancia_revisada: 'Ya revisada; sigue abierta porque Stripe y EKKO aún no coinciden.',
   reconciliacion_incompleta: 'No se leyó todo Stripe: lo no visto no se dio por bueno ni por malo. Se reintentará.',
   reconciliacion_atrasada: 'Revisa en Netlify que la función programada cron-reconciliar-stripe siga activa y sin errores. Desaparece sola cuando vuelva a correr.',
+  revisar_cambio_plan: 'Compara el plan en el panel de Stripe con la ficha. Si el miembro reintenta con la misma operación, converge solo; si no, descártalo con nota cuando lo hayas resuelto. EKKO no lo cambia por su cuenta.',
   revisar_proceso: 'Revisa en Netlify (Functions → la función programada) que esté activa y sus registros. EKKO no lo corre ni lo repara solo; desaparece cuando vuelva a correr bien.',
   revisar_fallos_push: 'Lo que se avisó SÍ ocurrió y el aviso sigue en la campana de la app: solo no llegó como notificación al teléfono. Si se repite, revisa la configuración de push. Márcalo como revisado.'
 };
+
+/** PKG-06B: la suscripción ANTERIOR sin cancelar tras activar otra se nombra por lo
+ * que puede significar (doble cobro), no como una cancelación más. */
+function etiquetaTipo(p: PendienteOperativo): string {
+  if (p.fuente === 'stripe_operaciones_suscripcion' && p.detalle?.startsWith('suscripcion_anterior')) {
+    return 'Suscripción anterior sin cancelar: posible doble cobro';
+  }
+  return LABEL_TIPO[p.tipo] ?? p.tipo;
+}
 
 type Accion = 'evento' | 'reintentar' | 'descartar' | 'entrega' | 'revisar' | 'push';
 
@@ -155,7 +168,7 @@ export default function Operacion() {
                     <AlertTriangle size={16} aria-hidden="true"
                       style={{ color: p.severidad === 'alta' ? 'var(--ek-danger)' : 'var(--ek-warning)', flexShrink: 0, marginTop: '2px' }} />
                     <div style={{ flex: 1 }}>
-                      <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>{LABEL_TIPO[p.tipo] ?? p.tipo}</p>
+                      <p style={{ margin: 0, fontWeight: 600, fontSize: '14px' }}>{etiquetaTipo(p)}</p>
                       <p className="ek-body-muted" style={{ margin: '2px 0 0', fontSize: '12.5px' }}>
                         {p.desde ? formatFechaHoraEnZona(p.desde, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Detectado ahora'}
                         {p.detalle ? <> · <span style={{ fontFamily: 'var(--ek-font-mono)', fontSize: '12px' }}>{p.detalle}</span></> : null}

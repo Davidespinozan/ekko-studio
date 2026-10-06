@@ -128,6 +128,18 @@ describe('Operación (PKG-03A)', () => {
     await waitFor(() => expect(h.rpc).toHaveBeenCalledWith('revisar_fallos_push', { p_nota: 'Revisé las llaves VAPID en Netlify' }));
   });
 
+  it('PKG-06B: la suscripción anterior sin cancelar se nombra como posible doble cobro (alta); un cambio de plan se revisa, NO se reintenta', async () => {
+    const anterior = { ...opAgotada, tipo: 'cancelar_suscripcion', fuente_id: 'op-a', severidad: 'alta', accion: 'vigilar_operacion', detalle: 'suscripcion_anterior · api_error:timeout' };
+    const plan = { ...opAgotada, tipo: 'cambiar_plan', fuente_id: 'op-p', severidad: 'media', accion: 'revisar_cambio_plan', detalle: 'cambio_plan_miembro · resultado_desconocido' };
+    h.filas = [anterior, plan];
+    montar();
+    expect(await screen.findByText('Suscripción anterior sin cancelar: posible doble cobro')).toBeInTheDocument();
+    expect(screen.getByText('Cambio de plan del miembro sin confirmar')).toBeInTheDocument();
+    expect(screen.getByText(/EKKO no lo cambia por su cuenta/)).toBeInTheDocument();
+    expect(screen.queryByText('Reintentar')).toBeNull();
+    expect(screen.getAllByText('Descartar')).toHaveLength(2);
+  });
+
   it('vacío legítimo → "Nada pendiente"; fallo al cargar → error, nunca "Nada pendiente"', async () => {
     h.filas = [];
     const { unmount } = montar();

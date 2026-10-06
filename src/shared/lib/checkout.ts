@@ -293,7 +293,18 @@ export function actualizarTarjeta(paymentMethodId: string): Promise<{ success: b
   return backendPost<{ success: boolean }>('stripe-actualizar-tarjeta', { payment_method: paymentMethodId });
 }
 
-/** Cancela al fin del periodo (o reactiva) la suscripción del miembro. */
-export function cancelarSuscripcion(reactivar = false): Promise<{ success: boolean; cancel_at_period_end: boolean }> {
-  return backendPost<{ success: boolean; cancel_at_period_end: boolean }>('stripe-cancelar-suscripcion', { reactivar });
+export interface RenovacionResult {
+  success: boolean;
+  cancel_at_period_end: boolean;
+  /** PKG-06B: EKKO ya lo registró pero Stripe aún no lo confirmó (se reintenta solo). */
+  stripe_pendiente?: boolean;
+}
+
+/**
+ * Cancela al fin del periodo (o reactiva) la suscripción del miembro. PKG-06B: la
+ * acción lleva su identidad (`operation_id`): el mismo UUID en un reintento
+ * converge en la misma operación del servidor.
+ */
+export function cancelarSuscripcion(reactivar = false, operationId: string = nuevaOperacionMostrador()): Promise<RenovacionResult> {
+  return backendPost<RenovacionResult>('stripe-cancelar-suscripcion', { reactivar, operation_id: operationId });
 }

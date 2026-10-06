@@ -12,6 +12,7 @@ import { requireEnv } from '../_lib/env';
 import { getStripe, llavePrecio } from '../_lib/stripe';
 import { resolverCuentaConectada } from '../_lib/connectBilling';
 import { crearPresupuesto, leerOperationId, clasificarErrorSaliente, registrarOperacion } from '../_lib/operacionPago';
+import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
  * POST /cambiar-plan-suscripcion
@@ -44,6 +45,13 @@ import { crearPresupuesto, leerOperationId, clasificarErrorSaliente, registrarOp
  *
  * Los resultados de negocio van con HTTP 200 y `success:false` + `code` para que
  * la UI los distinga (backend.ts solo conserva el mensaje en los 4xx).
+ *
+ * PKG-06B (FR-15): la intención queda DURABLE en `stripe_operaciones_suscripcion`
+ * (tipo `cambiar_plan`, identidad = operation_id) después de los guardias y antes
+ * de mutar Stripe, y se cierra con honestidad: `aplicada` solo si Stripe aplicó Y
+ * EKKO convergió; `descartada` si Stripe definitivamente no mutó; `fallida` si el
+ * resultado es desconocido, el cobro no se confirmó o EKKO no convergió — visible
+ * en Operación aunque el miembro no vuelva a intentarlo.
  */
 
 interface Body {
@@ -174,11 +182,30 @@ export const handler: Handler = async (event) => {
     const direccion: 'upgrade' | 'downgrade' | 'lateral' =
       precioActual === null ? 'upgrade' : tier.precio_centavos > precioActual ? 'upgrade' : tier.precio_centavos < precioActual ? 'downgrade' : 'lateral';
 
+    // ── PKG-06B · Intención durable ANTES de mutar la suscripción ─────────
+    const { error: errReg } = await admin.rpc('cambio_plan_registrar', {
+      p_operation_id: operationId,
+      p_usuario_id: socio.id,
+      p_membresia_id: mem.id,
+      p_tier_destino: tier.id,
+      p_direccion: direccion
+    });
+    if (errReg) {
+      if (errReg.message.includes('EKKO_OPERACION_CONFLICTO')) return rechazo('operacion_conflicto', 'Esta operación ya corresponde a otro cambio de plan. Vuelve a abrir el cambio.');
+      await reportarErrorServidor(FUNCION, new Error(errReg.message), { paso: 'cambio_plan_registrar' });
+      return rechazo('reintentable', 'No pudimos iniciar el cambio. Intenta de nuevo.');
+    }
+    const cerrar = (estado: 'aplicada' | 'descartada' | 'fallida', codigo: string, resultado: Record<string, unknown> = {}) =>
+      cerrarCambioPlan(admin, operationId, estado, codigo, resultado);
+
     let subFinal: Stripe.Subscription = sub;
     let cobro: { invoice_id: string | null; amount_paid_centavos: number | null; moneda: string | null } | null = null;
 
     if (!yaEnDestino) {
-      if (!presupuesto.puedeMutar()) return rechazo('reintentable', 'No pudimos completar el cambio a tiempo. Intenta de nuevo.');
+      if (!presupuesto.puedeMutar()) {
+        await cerrar('descartada', 'sin_efecto');
+        return rechazo('reintentable', 'No pudimos completar el cambio a tiempo. Intenta de nuevo.');
+      }
       // Precio recurrente destino en la cuenta conectada (idempotente por tier+precio).
       let priceId: string;
       try {
@@ -188,10 +215,15 @@ export const handler: Handler = async (event) => {
         );
         priceId = price.id;
       } catch (e) {
+        // El precio no es la suscripción: nada del plan del miembro cambió.
+        await cerrar('descartada', 'sin_efecto');
         return rechazo(transporte(clasificarErrorSaliente(e, 'mutacion')), 'No pudimos preparar el precio del plan. Intenta de nuevo.');
       }
 
-      if (!presupuesto.puedeMutar()) return rechazo('reintentable', 'No pudimos completar el cambio a tiempo. Intenta de nuevo.');
+      if (!presupuesto.puedeMutar()) {
+        await cerrar('descartada', 'sin_efecto');
+        return rechazo('reintentable', 'No pudimos completar el cambio a tiempo. Intenta de nuevo.');
+      }
       const key = `ekko:v1:swap_mensual:${accountId}:${socio.id}:${operationId}`;
       const params: Stripe.SubscriptionUpdateParams = {
         items: [{ id: item.id, price: priceId }],
@@ -209,11 +241,24 @@ export const handler: Handler = async (event) => {
         // NO PAYMENT → NO UPGRADE: Stripe rechazó el update porque no pudo cobrar. Nada cambió.
         if (esFalloDeCobro(err)) {
           registrarOperacion({ funcion: FUNCION, kind: 'sub_mensual', usuario_id: socio.id, estado: 'cobro_fallido' });
+          await cerrar('descartada', 'cobro_fallido');
           return rechazo('cobro_fallido', 'No pudimos cobrar la diferencia con tu tarjeta. Tu plan no cambió. Actualiza tu tarjeta e inicia el cambio de nuevo.');
         }
-        if (clase === 'conflicto') return rechazo('operacion_conflicto', 'Esta operación ya se usó con otros datos. Vuelve a abrir el cambio.');
-        if (clase === 'resultado_desconocido') return rechazo('resultado_desconocido', 'No pudimos confirmar el cambio. Reintenta: no se aplicará dos veces.');
-        if (clase === 'pago_no_iniciable') return rechazo('pago_no_iniciable', 'No pudimos cambiar tu plan. Acércate a recepción.');
+        if (clase === 'conflicto') {
+          await cerrar('fallida', 'operacion_conflicto');
+          return rechazo('operacion_conflicto', 'Esta operación ya se usó con otros datos. Vuelve a abrir el cambio.');
+        }
+        if (clase === 'resultado_desconocido') {
+          // Ambiguo: NO se descarta ni se cambia de identidad; el reintento con la
+          // MISMA operación converge (misma llave en Stripe).
+          await cerrar('fallida', 'resultado_desconocido');
+          return rechazo('resultado_desconocido', 'No pudimos confirmar el cambio. Reintenta: no se aplicará dos veces.');
+        }
+        if (clase === 'pago_no_iniciable') {
+          await cerrar('descartada', 'pago_no_iniciable');
+          return rechazo('pago_no_iniciable', 'No pudimos cambiar tu plan. Acércate a recepción.');
+        }
+        await cerrar('descartada', 'sin_efecto');
         return rechazo('reintentable', 'No pudimos cambiar tu plan. Intenta de nuevo.');
       }
     }
@@ -225,6 +270,7 @@ export const handler: Handler = async (event) => {
       if (!pagada) {
         // Con error_if_incomplete esto no debería ocurrir; si ocurre, no se afirma nada.
         registrarOperacion({ funcion: FUNCION, kind: 'sub_mensual', usuario_id: socio.id, estado: 'requiere_revision' });
+        await cerrar('fallida', 'requiere_revision');
         return rechazo('requiere_revision', 'No pudimos confirmar el cobro del cambio. No lo repitas: el estudio lo revisará.');
       }
       cobro = { invoice_id: inv.id ?? null, amount_paid_centavos: inv.amount_paid ?? null, moneda: inv.currency ?? null };
@@ -254,14 +300,24 @@ export const handler: Handler = async (event) => {
     });
     if (errCambio) {
       const m = errCambio.message;
-      if (m.includes('EKKO_OPERACION_CONFLICTO')) return rechazo('operacion_conflicto', 'Esta operación ya corresponde a otro cambio de plan. Vuelve a abrir el cambio.');
-      if (m.includes('EKKO_CUENTA_RESTRINGIDA')) return forbidden('Tu cuenta está suspendida por el estudio.');
-      // Stripe ya cambió; EKKO no. El reintento con la MISMA operación converge (recuperación).
+      // Stripe ya cambió; EKKO no: la operación queda `fallida` y visible.
+      if (m.includes('EKKO_OPERACION_CONFLICTO')) {
+        await cerrar('fallida', 'operacion_conflicto');
+        return rechazo('operacion_conflicto', 'Esta operación ya corresponde a otro cambio de plan. Vuelve a abrir el cambio.');
+      }
+      if (m.includes('EKKO_CUENTA_RESTRINGIDA')) {
+        await cerrar('fallida', 'cuenta_restringida');
+        return forbidden('Tu cuenta está suspendida por el estudio.');
+      }
+      // El reintento con la MISMA operación converge (recuperación).
       console.error('[cambiar-plan-suscripcion] transición', m);
       registrarOperacion({ funcion: FUNCION, kind: 'sub_mensual', usuario_id: socio.id, estado: 'db_pendiente' });
+      await cerrar('fallida', 'db_pendiente');
       return rechazo('resultado_desconocido', 'Stripe aceptó el cambio pero no pudimos aplicarlo aún. Reintenta: no se cobrará dos veces.');
     }
     const c = (cambio ?? {}) as { idempotente?: boolean; tier_anterior?: string };
+    // Stripe aplicó y EKKO convergió (la RPC lo verifica contra la membresía).
+    await cerrar('aplicada', 'convergido', { direccion, recuperado: yaEnDestino, idempotente: c.idempotente === true });
     registrarOperacion({ funcion: FUNCION, kind: 'sub_mensual', usuario_id: socio.id, estado: c.idempotente ? 'aplicado:idempotente' : 'aplicado' });
 
     return ok({
@@ -278,6 +334,28 @@ export const handler: Handler = async (event) => {
     return serverError('No pudimos cambiar tu plan. Intenta de nuevo.');
   }
 };
+
+/** Cierra la operación durable. Nunca rompe la respuesta: si falla, lo que quedó
+ * (pendiente) se ve en Operación al pasar una hora. */
+async function cerrarCambioPlan(
+  admin: { rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }> },
+  operationId: string,
+  estado: 'aplicada' | 'descartada' | 'fallida',
+  codigo: string,
+  resultado: Record<string, unknown>
+): Promise<void> {
+  try {
+    const { error } = await admin.rpc('cambio_plan_resultado', {
+      p_operation_id: operationId,
+      p_estado: estado,
+      p_codigo: codigo,
+      p_resultado: resultado
+    });
+    if (error) await reportarErrorServidor(FUNCION, new Error(error.message), { paso: 'cambio_plan_resultado', estado });
+  } catch (e) {
+    await reportarErrorServidor(FUNCION, e, { paso: 'cambio_plan_resultado', estado });
+  }
+}
 
 function mensajeEstado(status: string): string {
   if (status === 'past_due' || status === 'unpaid') return 'Tu suscripción tiene un pago pendiente. Ponla al corriente antes de cambiar de plan.';

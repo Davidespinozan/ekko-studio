@@ -62,6 +62,7 @@ rediscute sin evidencia nueva.
 - EKKO-105 (D-01A-1) — estado durable de los eventos del webhook.
 - EKKO-106 — crear un Checkout no da derecho; lo da el evento financiero.
 - EKKO-107 — idempotencia de lo que EKKO le pide a Stripe.
+- EKKO-145 (PKG-06B) — cambio de plan, baja/reactivación del miembro y cancelación de la suscripción anterior por el webhook como operaciones durables en `stripe_operaciones_suscripcion`; ambigüedad = `fallida` visible, misma identidad.
 - EKKO-114 (D-01G-3) — desautorización de Connect: apaga el cobro del estudio, no derechos.
 - EKKO-102 — facturas (basil) y atribución sin doble conteo. EKKO-050 — recibido ≠ procesado.
 - EKKO-019, EKKO-043 — cuenta de Stripe compartida: se filtra por cuenta y por `metadata.app`; una sola lista de eventos.

@@ -26,6 +26,7 @@ import {
 import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo, emailPaqueteComprado, identidadEstudio, motivoPersistible, type EmailRenderizado } from '../_lib/email';
 import { reportarErrorServidor } from '../_lib/sentry';
 import { avisarStaff } from '../_lib/avisosStaff';
+import { ejecutarOperacionesSuscripcion } from '../_lib/operacionesSuscripcion';
 
 /**
  * POST /stripe-webhook — materializa los cambios de la suscripción del miembro.
@@ -95,18 +96,38 @@ async function subsAnterioresDelSocio(
   return [...new Set(ids)];
 }
 
-/** Cancela en Stripe cada suscripción anterior (best-effort; no rompe el webhook). */
-async function cancelarSubsAnteriores(
-  stripe: ReturnType<typeof getStripe>,
+/**
+ * PKG-06B (FR-17) · Cada suscripción anterior queda como OPERACIÓN durable ANTES
+ * de activar la nueva (`registrar_cancelacion_suscripcion_anterior`, una fila por
+ * suscripción anterior: los reintentos del webhook convergen en la misma). Si no
+ * se puede registrar, el webhook falla y Stripe reintenta: nunca queda una
+ * suscripción anterior viva sin evidencia. El ejecutor la aplica cuando la
+ * membresía anterior ya no está viva; un fallo queda `fallida`, visible en
+ * Operación con severidad alta (posible doble cobro) y la reintenta el cron.
+ */
+async function registrarSubsAnteriores(
+  admin: any,
+  usuarioId: string,
   subIds: string[],
-  acctOpt: { stripeAccount: string } | undefined
+  subNueva: string | null | undefined,
+  eventoId: string
 ): Promise<void> {
   for (const subId of subIds) {
-    try {
-      await stripe.subscriptions.cancel(subId, acctOpt);
-    } catch (e) {
-      console.error('[stripe-webhook] no se pudo cancelar sub anterior', subId, e instanceof Error ? e.message : e);
-    }
+    rpcOk('registrar_cancelacion_suscripcion_anterior', await admin.rpc('registrar_cancelacion_suscripcion_anterior', {
+      p_usuario_id: usuarioId,
+      p_sub_anterior: subId,
+      p_sub_nueva: subNueva ?? null,
+      p_evento: eventoId
+    }));
+  }
+}
+
+/** Aplica en Stripe lo que quede pendiente del socio (incluida la sub anterior). No rompe el webhook. */
+async function aplicarCancelacionesAnteriores(admin: any, usuarioId: string, eventoId: string): Promise<void> {
+  try {
+    await ejecutarOperacionesSuscripcion(admin, { usuarioId });
+  } catch (e) {
+    await reportarErrorServidor('stripe-webhook', e, { paso: 'cancelar_suscripcion_anterior', event_id: eventoId });
   }
 }
 
@@ -222,6 +243,7 @@ async function ejecutarAccion(
       periodoFin = periodoFinFromSubscription(sub);
     }
     const subsPrevias = await subsAnterioresDelSocio(admin, accion.usuario_id, accion.subscription_id);
+    await registrarSubsAnteriores(admin, accion.usuario_id, subsPrevias, accion.subscription_id, stripeEvent.id);
     const act = rpcOk<{ idempotente?: boolean; membresia_id?: string | null; creditos?: number | null; periodo_fin?: string | null } | null>(
       'activar_membresia',
       await admin.rpc('activar_membresia', {
@@ -243,8 +265,9 @@ async function ejecutarAccion(
       if (!accion.subscription_id) {
         ef.paqueteActivado = { creditos: act?.creditos ?? null, periodo_fin: act?.periodo_fin ?? null };
       }
-      await cancelarSubsAnteriores(stripe, subsPrevias, acctOpt);
     }
+    // PKG-06B: también en un reintento idempotente (la operación es la misma).
+    if (subsPrevias.length > 0 || act?.idempotente) await aplicarCancelacionesAnteriores(admin, accion.usuario_id, stripeEvent.id);
     return ef;
   }
 
@@ -261,6 +284,7 @@ async function ejecutarAccion(
       throw new DivergenciaWebhook('suscripcion_sin_metadata', `sub ${accion.subscription_id} sin usuario_id/tier_id/customer`);
     }
     const subsPrevias = await subsAnterioresDelSocio(admin, usuarioId, accion.subscription_id);
+    await registrarSubsAnteriores(admin, usuarioId, subsPrevias, accion.subscription_id, stripeEvent.id);
     const actSub = rpcOk<{ membresia_id?: string | null } | null>(
       'activar_membresia (sub)',
       await admin.rpc('activar_membresia', {
@@ -276,7 +300,8 @@ async function ejecutarAccion(
     ef.resultado = 'activado:sub';
     // #2: cancelar la(s) suscripción(es) anterior(es) en Stripe para que el
     // miembro NO quede pagando dos mensualidades tras un cambio de plan.
-    await cancelarSubsAnteriores(stripe, subsPrevias, acctOpt);
+    // PKG-06B: por la operación durable registrada arriba (y en cada reintento).
+    await aplicarCancelacionesAnteriores(admin, usuarioId, stripeEvent.id);
     return ef;
   }
 

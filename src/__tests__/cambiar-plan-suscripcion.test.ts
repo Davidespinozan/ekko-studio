@@ -65,6 +65,12 @@ const invocar = async (body: Record<string, unknown>) => {
 };
 const BODY = { tier: 'premium', operation_id: OP };
 const rpcCalls = (nombre: string) => h.rpc.mock.calls.filter((c) => c[0] === nombre);
+/** PKG-06B: la operación durable (registro y cierre) responde OK salvo que la prueba diga otra cosa. */
+const rpcOperacion = (nombre: string) =>
+  nombre === 'cambio_plan_registrar' ? { data: { id: 'op-row', estado: 'pendiente', existente: false }, error: null }
+  : nombre === 'cambio_plan_resultado' ? { data: { success: true }, error: null }
+  : null;
+const cierres = () => rpcCalls('cambio_plan_resultado').map((c) => [(c[1] as Record<string, unknown>).p_estado, (c[1] as Record<string, unknown>).p_codigo]);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -76,6 +82,8 @@ beforeEach(() => {
   h.dp = { stripe_customer_id: 'cus_m1' };
   h.resolver.mockResolvedValue({ accountId: 'acct_1', chargesEnabled: true });
   h.rpc.mockImplementation(async (nombre: string, args: Record<string, unknown>) => {
+    const op = rpcOperacion(nombre);
+    if (op) return op;
     if (nombre === 'reservas_incompatibles_con_tier') return { data: [], error: null };
     if (nombre === 'cambiar_tier_membresia') return { data: { success: true, idempotente: false, membresia_id: args.p_membresia_id, tier_anterior: 'esencial', tier: 'premium' }, error: null };
     return { data: null, error: { message: 'rpc inesperado ' + nombre } };
@@ -218,7 +226,7 @@ describe('identidad, idempotencia y recuperación', () => {
   it('doble clic / retry: misma operación → misma key → un solo update en Stripe y transición idempotente', async () => {
     await invocar(BODY);
     h.rpc.mockImplementation(async (nombre: string) =>
-      nombre === 'reservas_incompatibles_con_tier' ? { data: [], error: null } : { data: { success: true, idempotente: true, membresia_id: 'mem1', tier_anterior: 'esencial', tier: 'premium' }, error: null }
+      rpcOperacion(nombre) ?? (nombre === 'reservas_incompatibles_con_tier' ? { data: [], error: null } : { data: { success: true, idempotente: true, membresia_id: 'mem1', tier_anterior: 'esencial', tier: 'premium' }, error: null })
     );
     const r = await invocar(BODY);
     expect(r.body).toMatchObject({ success: true, idempotente: true, recuperado: true });
@@ -265,7 +273,7 @@ describe('identidad, idempotencia y recuperación', () => {
 
   it('Stripe aceptó pero la transición de EKKO falla → resultado_desconocido (el reintento converge); nunca mensaje crudo', async () => {
     h.rpc.mockImplementation(async (nombre: string) =>
-      nombre === 'reservas_incompatibles_con_tier' ? { data: [], error: null } : { data: null, error: { message: 'deadlock detected at cambiar_tier_membresia' } }
+      rpcOperacion(nombre) ?? (nombre === 'reservas_incompatibles_con_tier' ? { data: [], error: null } : { data: null, error: { message: 'deadlock detected at cambiar_tier_membresia' } })
     );
     const r = await invocar(BODY);
     expect(r.body).toMatchObject({ success: false, code: 'resultado_desconocido' });
@@ -277,5 +285,68 @@ describe('identidad, idempotencia y recuperación', () => {
     h.stripe.subscriptions.update.mockRejectedValueOnce(Object.assign(new Error('timeout'), { type: 'StripeConnectionError' }));
     expect((await invocar(BODY)).body.code).toBe('resultado_desconocido');
     expect(rpcCalls('cambiar_tier_membresia')).toHaveLength(0);
+  });
+});
+
+describe('PKG-06B · la intención del cambio de plan queda durable y se cierra con honestidad', () => {
+  it('1 · se registra (operation_id, membresía, tier destino, dirección) DESPUÉS de los guardias y ANTES de mutar Stripe', async () => {
+    await invocar(BODY);
+    const [[, args]] = rpcCalls('cambio_plan_registrar') as Array<[string, Record<string, unknown>]>;
+    expect(args).toMatchObject({ p_operation_id: OP, p_usuario_id: 'm1', p_direccion: 'upgrade' });
+    const orden = h.rpc.mock.invocationCallOrder[h.rpc.mock.calls.findIndex((c) => c[0] === 'cambio_plan_registrar')];
+    expect(orden).toBeLessThan(h.stripe.subscriptions.update.mock.invocationCallOrder[0]);
+  });
+
+  it('3 · éxito: `aplicada` solo después de la transición de EKKO', async () => {
+    await invocar(BODY);
+    expect(cierres()).toEqual([['aplicada', 'convergido']]);
+    const iTrans = h.rpc.mock.calls.findIndex((c) => c[0] === 'cambiar_tier_membresia');
+    const iCierre = h.rpc.mock.calls.findIndex((c) => c[0] === 'cambio_plan_resultado');
+    expect(iTrans).toBeLessThan(iCierre);
+  });
+
+  it('5 · cobro rechazado (Stripe no mutó) → `descartada` cobro_fallido', async () => {
+    h.stripe.subscriptions.update.mockRejectedValueOnce(Object.assign(new Error('Your card was declined'), { type: 'StripeCardError', code: 'card_declined' }));
+    await invocar(BODY);
+    expect(cierres()).toEqual([['descartada', 'cobro_fallido']]);
+  });
+
+  it('6 · timeout al mutar (no se sabe) → `fallida` resultado_desconocido, sin cambiar de identidad', async () => {
+    h.stripe.subscriptions.update.mockRejectedValueOnce(Object.assign(new Error('timeout'), { type: 'StripeConnectionError' }));
+    await invocar(BODY);
+    expect(cierres()).toEqual([['fallida', 'resultado_desconocido']]);
+  });
+
+  it('4 · Stripe aceptó y EKKO no convergió → `fallida` db_pendiente (visible aunque el miembro no reintente)', async () => {
+    h.rpc.mockImplementation(async (nombre: string) =>
+      rpcOperacion(nombre) ?? (nombre === 'reservas_incompatibles_con_tier' ? { data: [], error: null } : { data: null, error: { message: 'deadlock' } })
+    );
+    await invocar(BODY);
+    expect(cierres()).toEqual([['fallida', 'db_pendiente']]);
+  });
+
+  it('factura de upgrade sin pagar → `fallida` requiere_revision', async () => {
+    h.stripe.subscriptions.update.mockImplementationOnce(async () => ({ ...h.stripe.estado.subs[0], items: { data: [{ id: 'si_sub_1', price: { id: 'price_120000', unit_amount: 120000, currency: 'mxn' } }] }, latest_invoice: { id: 'in_open', status: 'open', amount_paid: 0 } }));
+    await invocar(BODY);
+    expect(cierres()).toEqual([['fallida', 'requiere_revision']]);
+  });
+
+  it('si la intención no se puede registrar, Stripe NO se toca', async () => {
+    h.rpc.mockImplementation(async (nombre: string) =>
+      nombre === 'cambio_plan_registrar' ? { data: null, error: { message: 'connection reset' } }
+      : nombre === 'reservas_incompatibles_con_tier' ? { data: [], error: null } : { data: null, error: { message: 'no debía llamarse' } }
+    );
+    const r = await invocar(BODY);
+    expect(r.body).toMatchObject({ success: false, code: 'reintentable' });
+    expect(h.stripe.subscriptions.update).not.toHaveBeenCalled();
+  });
+
+  it('2/7 · la misma operación en otro destino → conflicto desde el registro, sin mutar', async () => {
+    h.rpc.mockImplementation(async (nombre: string) =>
+      nombre === 'cambio_plan_registrar' ? { data: null, error: { message: 'EKKO_OPERACION_CONFLICTO: otra' } }
+      : nombre === 'reservas_incompatibles_con_tier' ? { data: [], error: null } : { data: null, error: { message: 'no' } }
+    );
+    expect((await invocar(BODY)).body.code).toBe('operacion_conflicto');
+    expect(h.stripe.subscriptions.update).not.toHaveBeenCalled();
   });
 });

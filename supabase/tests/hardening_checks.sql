@@ -305,5 +305,26 @@ SELECT 'P4', 'contrato 06G: resumen_fallos_push agrega (sin contenido) con guard
          AND (SELECT prosrc FROM pg_proc WHERE proname='revisar_fallos_push' AND pronamespace='public'::regnamespace) LIKE '%EKKO_NOTA_REQUERIDA%'
        THEN '✅ PASS' ELSE '❌ FAIL — guardia o contrato de 06G perdido' END;
 
+-- PKG-06B (20261016100000): las operaciones de cobro del miembro y del webhook.
+-- Lo que asienta resultados es del servidor; el miembro solo deja SU intención; el
+-- ejecutor genérico jamás entrega un cambio de plan.
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'RPC de 06B: registro/cierre de cambio de plan y sub anterior solo service_role; miembro_programar_renovacion sin anon',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace
+         AND p.proname IN ('cambio_plan_registrar','cambio_plan_resultado','registrar_cancelacion_suscripcion_anterior')
+         AND (has_function_privilege('authenticated', p.oid, 'EXECUTE') OR has_function_privilege('anon', p.oid, 'EXECUTE')))
+       AND NOT has_function_privilege('anon', 'public.miembro_programar_renovacion(boolean, uuid)', 'EXECUTE')
+       AND (SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace
+            AND proname IN ('cambio_plan_registrar','cambio_plan_resultado','registrar_cancelacion_suscripcion_anterior','miembro_programar_renovacion')) = 4
+       THEN '✅ PASS' ELSE '❌ FAIL — una RPC de 06B falta o es invocable por quien no debe' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P4', 'contrato 06B: preparar no entrega cambiar_plan; la sub anterior espera a la membresía vieja; reactivar respeta revocación, sanción y baja del estudio',
+  CASE WHEN (SELECT prosrc FROM pg_proc WHERE proname='operacion_suscripcion_preparar' AND pronamespace='public'::regnamespace) LIKE '%lo_ejecuta_el_miembro%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='operacion_suscripcion_preparar' AND pronamespace='public'::regnamespace) LIKE '%membresia_anterior_vigente%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='miembro_programar_renovacion' AND pronamespace='public'::regnamespace) LIKE '%EKKO_CUENTA_REVOCADA%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='miembro_programar_renovacion' AND pronamespace='public'::regnamespace) LIKE '%EKKO_BAJA_DEL_ESTUDIO%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='staff_reintentar_operacion_cobro' AND pronamespace='public'::regnamespace) LIKE '%EKKO_OPERACION_NO_REINTENTABLE%'
+       THEN '✅ PASS' ELSE '❌ FAIL — se perdió una guardia de 06B' END;
+
 -- ── Resultado ────────────────────────────────────────────────────────────────
 SELECT area, caso, resultado FROM _hardening_resultado ORDER BY id;
