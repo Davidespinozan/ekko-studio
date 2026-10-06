@@ -27,7 +27,7 @@ vi.mock('@shared/lib/fetchWithTimeout', () => ({
   fetchWithTimeout: (...args: unknown[]) => h.fetchWithTimeout(...args)
 }));
 
-import { backendPost } from '../backend';
+import { backendPost, MENSAJE_ERROR_SERVIDOR } from '../backend';
 
 /** Respuesta falsa: backend.ts solo usa `.ok`, `.status` y `.json()`. */
 function fakeRes(status: number, body: string | object | null): Response {
@@ -121,9 +121,30 @@ describe('backendPost · ERROR-UI-FIX E-06', () => {
     await expect(backendPost('x', {})).rejects.not.toThrow(/backendPost/);
   });
 
-  it('cae a "HTTP <status>" si el body viene vacío o no es JSON', async () => {
+  it('cae a "HTTP <status>" si un 4xx viene sin body; un 5xx sin body da el mensaje genérico (PKG-06D)', async () => {
+    h.fetchWithTimeout.mockResolvedValue(fakeRes(404, ''));
+    await expect(backendPost('x', {})).rejects.toThrow('HTTP 404');
     h.fetchWithTimeout.mockResolvedValue(fakeRes(502, ''));
-    await expect(backendPost('x', {})).rejects.toThrow('HTTP 502');
+    await expect(backendPost('x', {})).rejects.toThrow(MENSAJE_ERROR_SERVIDOR);
+  });
+
+  // PKG-06D (FR-26): el cliente no pinta cualquier body. Un 4xx trae texto de
+  // dominio/validación escrito a mano; un 5xx solo se muestra si el servidor lo
+  // marcó `seguro` (parcial honesto, "no se pudo subir la foto").
+  it('26 · un 5xx con mensaje técnico (sin marca seguro) se enmascara', async () => {
+    h.fetchWithTimeout.mockResolvedValue(fakeRes(500, { error: 'duplicate key value violates unique constraint "usuarios_pkey"' }));
+    await expect(backendPost('x', {})).rejects.toThrow(MENSAJE_ERROR_SERVIDOR);
+    await expect(backendPost('x', {})).rejects.not.toThrow(/duplicate|usuarios_pkey/);
+  });
+
+  it('25 · un 5xx marcado seguro (parcial honesto de 06A) sí se muestra tal cual', async () => {
+    h.fetchWithTimeout.mockResolvedValue(fakeRes(500, { error: 'El correo de acceso ya cambió, pero el perfil no se actualizó.', seguro: true, parcial: { email: 'auth_actualizado_perfil_pendiente' } }));
+    await expect(backendPost('x', {})).rejects.toThrow('El correo de acceso ya cambió, pero el perfil no se actualizó.');
+  });
+
+  it('20/21 · un 4xx de dominio o validación se muestra (texto del servidor)', async () => {
+    h.fetchWithTimeout.mockResolvedValue(fakeRes(400, { error: 'Motivo obligatorio para esta acción', codigo: 'MOTIVO_REQUERIDO' }));
+    await expect(backendPost('x', {})).rejects.toThrow('Motivo obligatorio para esta acción');
   });
 
   it('respuesta OK → devuelve el JSON parseado', async () => {

@@ -4,6 +4,7 @@ import { ArrowRight, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
+import { COLUMNAS_RESERVA_CLIENTE } from '@shared/lib/columnas';
 import type { Database } from '@shared/types/database';
 import { ProximaSesionHero } from '@member/components/ProximaSesionHero';
 import { ResumenHome } from '@member/components/ResumenHome';
@@ -42,7 +43,7 @@ export function useProximasReservas(usuarioId: string | undefined) {
     setError(false);
     const { data, error: queryError } = await supabase
       .from('reservas')
-      .select('*, recurso:recursos(id, nombre, slug, foto_url, max_invitados_extra)')
+      .select(`${COLUMNAS_RESERVA_CLIENTE}, recurso:recursos(id, nombre, slug, foto_url, max_invitados_extra)`)
       .eq('usuario_id', usuarioId)
       .eq('status', 'confirmada')
       // Por slot_fin + gracia de check-in: la sesión en curso sigue siendo "la próxima".

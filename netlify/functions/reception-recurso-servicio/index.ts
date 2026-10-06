@@ -6,7 +6,8 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
+import { ok, badRequest, unauthorized, forbidden, notFound } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
 import { enviarPushAUsuario, clasificarPush, registrarResultadoPush } from '../_lib/push';
@@ -86,7 +87,7 @@ export const handler: Handler = async (event) => {
       .select('id, tenant_id, nombre, fuera_de_servicio')
       .eq('id', body.recurso_id)
       .maybeSingle();
-    if (recErr) return serverError(recErr.message);
+    if (recErr) return errorInterno('reception-recurso-servicio', recErr);
     if (!recurso) return notFound('Estudio no encontrado');
     if (recurso.tenant_id !== caller.tenant_id) {
       return forbidden('El estudio pertenece a otro tenant');
@@ -98,7 +99,7 @@ export const handler: Handler = async (event) => {
         .from('recursos')
         .update({ fuera_de_servicio: false, fuera_de_servicio_motivo: null })
         .eq('id', recurso.id);
-      if (upErr) return serverError(upErr.message);
+      if (upErr) return errorInterno('reception-recurso-servicio', upErr);
 
       await writeAuditLog(supabaseAdmin, {
         tenant_id: recurso.tenant_id,
@@ -117,7 +118,7 @@ export const handler: Handler = async (event) => {
       .from('recursos')
       .update({ fuera_de_servicio: true, fuera_de_servicio_motivo: motivo || null })
       .eq('id', recurso.id);
-    if (upErr) return serverError(upErr.message);
+    if (upErr) return errorInterno('reception-recurso-servicio', upErr);
 
     const nowIso = new Date().toISOString();
     const { data: afectadas, error: selErr } = await supabaseAdmin
@@ -126,7 +127,7 @@ export const handler: Handler = async (event) => {
       .eq('recurso_id', recurso.id)
       .eq('status', 'confirmada')
       .gt('slot_inicio', nowIso);
-    if (selErr) return serverError(selErr.message);
+    if (selErr) return errorInterno('reception-recurso-servicio', selErr);
 
     const lista = afectadas ?? [];
     if (lista.length > 0) {
@@ -145,7 +146,7 @@ export const handler: Handler = async (event) => {
           cancelacion_notificada_at: nowIso
         })
         .in('id', ids);
-      if (cancelErr) return serverError(cancelErr.message);
+      if (cancelErr) return errorInterno('reception-recurso-servicio', cancelErr);
 
       const notifs = lista.map((r) => ({
         tenant_id: recurso.tenant_id,
@@ -191,6 +192,6 @@ export const handler: Handler = async (event) => {
     return ok({ success: true, reservas_canceladas: lista.length });
   } catch (e) {
     console.error('[reception-recurso-servicio]', e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return errorInterno('reception-recurso-servicio', e);
   }
 };

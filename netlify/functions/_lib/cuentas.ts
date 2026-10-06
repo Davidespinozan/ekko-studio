@@ -56,7 +56,7 @@ export async function respuestaErrorRpc(
   return {
     statusCode: 500,
     headers: baseHeaders,
-    body: JSON.stringify({ error: 'No se pudo completar la operación. Intenta de nuevo.' })
+    body: JSON.stringify({ error: 'No se pudo completar la operación. Intenta de nuevo.', codigo: 'interno', seguro: true })
   };
 }
 
@@ -188,7 +188,7 @@ export async function altaDeCuenta(a: AltaArgs): Promise<AltaOk | HandlerRespons
         return { statusCode: 400, headers: baseHeaders, body: JSON.stringify({ error: 'Ya existe una cuenta con ese email' }) };
       }
       await reportarErrorServidor(a.funcion, new Error(creado.error?.message ?? 'sin usuario'), { paso: 'auth.createUser' });
-      return { statusCode: 500, headers: baseHeaders, body: JSON.stringify({ error: 'No se pudo crear la cuenta de acceso. Intenta de nuevo.' }) };
+      return { statusCode: 500, headers: baseHeaders, body: JSON.stringify({ error: 'No se pudo crear la cuenta de acceso. Intenta de nuevo.', seguro: true }) };
     }
     authId = creado.data.user.id;
   }
@@ -216,13 +216,14 @@ export async function altaDeCuenta(a: AltaArgs): Promise<AltaOk | HandlerRespons
           headers: baseHeaders,
           body: JSON.stringify({
             error: `La cuenta de acceso se creó pero no se pudo completar el alta (${codigo ? texto : 'error del servidor'}) y tampoco revertirla. Vuelve a intentarlo con el mismo correo: se completará.`,
+            seguro: true,
             parcial: { acceso_creado: true, perfil_finalizado: false }
           })
         };
       }
       if (codigo) return { statusCode: STATUS_POR_CODIGO[codigo] ?? 400, headers: baseHeaders, body: JSON.stringify({ error: `${texto} Se revirtió la cuenta de acceso.`, codigo }) };
       await reportarErrorServidor(a.funcion, new Error(finErr.message), { paso: 'finalizar', modo });
-      return { statusCode: 500, headers: baseHeaders, body: JSON.stringify({ error: 'No se pudo completar el alta; se revirtió la cuenta de acceso. Intenta de nuevo.' }) };
+      return { statusCode: 500, headers: baseHeaders, body: JSON.stringify({ error: 'No se pudo completar el alta; se revirtió la cuenta de acceso. Intenta de nuevo.', seguro: true }) };
     }
     // Perfil preexistente vinculado (o alta recuperada): NUNCA se borra nada.
     await reportarErrorServidor(a.funcion, new Error(finErr.message), { paso: 'finalizar', modo, auth_id: authId });
@@ -231,6 +232,7 @@ export async function altaDeCuenta(a: AltaArgs): Promise<AltaOk | HandlerRespons
       headers: baseHeaders,
       body: JSON.stringify({
         error: `El acceso quedó creado y vinculado al perfil, pero no se pudo completar el alta${codigo ? `: ${texto}` : ''}. Vuelve a intentarlo con el mismo correo: se completará sin duplicar nada.`,
+        seguro: true,
         parcial: { acceso_creado: true, perfil_finalizado: false }
       })
     };

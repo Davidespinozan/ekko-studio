@@ -6,7 +6,8 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, serverError } from '../_lib/http';
+import { ok, badRequest, unauthorized } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada } from '../_lib/connectBilling';
@@ -86,6 +87,6 @@ export const handler: Handler = async (event) => {
     return ok({ success: true, cancel_at_period_end: sub.cancel_at_period_end });
   } catch (err) {
     console.error('[stripe-cancelar-suscripcion]', err);
-    return serverError(err instanceof Error ? err.message : 'Error inesperado');
+    return errorInterno('stripe-cancelar-suscripcion', err);
   }
 };

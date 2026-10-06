@@ -157,6 +157,8 @@ export default function Signup() {
         ) {
           throw new Error('Ya existe una cuenta con este email. Inicia sesión.');
         }
+        // PKG-06D: un 5xx no se muestra crudo; los 4xx traen texto escrito a mano.
+        if (response.status >= 500 && result?.seguro !== true) throw new Error('No se pudo crear la cuenta. Intenta de nuevo.');
         throw new Error(result.error || 'No se pudo crear la cuenta.');
       }
 

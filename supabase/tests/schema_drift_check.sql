@@ -303,6 +303,19 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
         THEN '✅ PASS' ELSE '❌ FALTA — 06A no aplicada' END);
 
 
+-- PKG-06D (20261014100000 / 20261014110000): RPC de lectura interna y frontera de columnas.
+INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
+('11 · Grants/RLS', '20261014100000_06d_a', 'RPC staff_datos_internos_cuenta / staff_observaciones_reserva / buscar_cuentas_staff',
+ CASE WHEN (SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace
+            AND proname IN ('staff_datos_internos_cuenta','staff_observaciones_reserva','buscar_cuentas_staff')) = 3
+        THEN '✅ PASS' ELSE '❌ FALTA — 06D-A no aplicada' END),
+('11 · Grants/RLS', '20261014110000_06d_b', 'usuarios/reservas: SELECT del cliente por columnas (sin notas_admin, sancion_motivo, observaciones, qr_token_hash)',
+ CASE WHEN NOT has_column_privilege('authenticated', 'public.usuarios', 'notas_admin', 'SELECT')
+         AND NOT has_column_privilege('authenticated', 'public.reservas', 'observaciones', 'SELECT')
+         AND has_column_privilege('authenticated', 'public.usuarios', 'email', 'SELECT')
+        THEN '✅ PASS' ELSE '❌ FALTA — 06D-B no aplicada' END);
+
+
 -- ////////////////////////////////////////////////////////////////////////////
 -- BLOQUE 12 — Índices / objetos varios
 -- ////////////////////////////////////////////////////////////////////////////

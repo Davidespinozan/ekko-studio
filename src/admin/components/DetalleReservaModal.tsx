@@ -108,17 +108,27 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
     supabase
       .from('reservas')
       .select(
-        'id, slot_inicio, slot_fin, status, folio, created_at, cancelada_at, cancelada_motivo, cancelada_por, invitados_count, invitados_extra_pagados, observaciones, recurso:recursos(nombre), usuario:usuarios!reservas_usuario_id_fkey(nombre, email, membresia_tier)'
+        'id, slot_inicio, slot_fin, status, folio, created_at, cancelada_at, cancelada_motivo, cancelada_por, invitados_count, invitados_extra_pagados, recurso:recursos(nombre), usuario:usuarios!reservas_usuario_id_fkey(nombre, email, membresia_tier)'
       )
       .eq('id', reservaId)
       .single()
-      .then(({ data: row, error }) => {
+      .then(async ({ data: row, error }) => {
         if (!mounted) return;
         if (error || !row) {
-          toast.error(`No se pudo cargar la reserva: ${error?.message ?? 'no encontrada'}`);
+          toast.error('No se pudo cargar la reserva.');
           onClose();
           return;
         }
+        // PKG-06D: las observaciones del staff ya no viajan por REST (columna
+        // revocada al cliente); se leen por la RPC con guardia de recepción/admin.
+        const { data: obsData, error: obsErr } = await supabase.rpc('staff_observaciones_reserva', { p_reserva_id: reservaId });
+        if (!mounted) return;
+        if (obsErr) {
+          toast.error('No se pudieron cargar las observaciones de la reserva.');
+          onClose();
+          return;
+        }
+        const observaciones = (obsData as string | null) ?? null;
         const r = row as unknown as {
           id: string;
           slot_inicio: string;
@@ -131,7 +141,6 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
           cancelada_por: string | null;
           invitados_count?: number | null;
           invitados_extra_pagados?: number | null;
-          observaciones?: string | null;
           recurso?: { nombre?: string } | null;
           usuario?: { nombre?: string | null; email?: string; membresia_tier?: string | null } | null;
         };
@@ -147,13 +156,13 @@ export default function DetalleReservaModal({ reservaId, onClose, onCancelar }: 
           cancelada_por: r.cancelada_por,
           invitados_count: r.invitados_count ?? 0,
           invitados_extra_pagados: r.invitados_extra_pagados ?? 0,
-          observaciones: r.observaciones ?? null,
+          observaciones,
           recurso_nombre: r.recurso?.nombre ?? '—',
           usuario_nombre: capitalizar(r.usuario?.nombre) || r.usuario?.email || '—',
           usuario_email: r.usuario?.email ?? '—',
           tier: r.usuario?.membresia_tier ?? null
         });
-        setObs(r.observaciones ?? '');
+        setObs(observaciones ?? '');
         setLoading(false);
       });
 

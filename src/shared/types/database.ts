@@ -1036,6 +1036,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      // PKG-06D (20261014100000): lectura interna del staff y búsqueda con parámetros ligados.
+      staff_datos_internos_cuenta: {
+        Args: { p_usuario_id: string }
+        Returns: Json
+      }
+      staff_observaciones_reserva: {
+        Args: { p_reserva_id: string }
+        Returns: string | null
+      }
+      buscar_cuentas_staff: {
+        Args: { p_texto?: string | null; p_rol?: string | null; p_status?: string | null }
+        Returns: {
+          id: string; auth_id: string | null; tenant_id: string; email: string; nombre: string | null; telefono: string | null
+          avatar_url: string | null; rol: string; status: string; membresia_tier: string | null; membresia_activa_id: string | null
+          trial_ends_at: string | null; commitment_ends_at: string | null; no_shows_count: number; bloqueado_hasta: string | null
+          created_at: string; updated_at: string; invitado: boolean; identidad_completa: boolean; contrato_firmado: boolean
+          contrato_firmado_at: string | null; sancionado_at: string | null
+        }[]
+      }
       resolver_revision_financiera: {
         Args: { p_revision_id: string; p_resolucion: string; p_nota: string }
         Returns: Json

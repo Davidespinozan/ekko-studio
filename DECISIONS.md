@@ -917,3 +917,39 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   `writeAuditLog` queda para evidencia no crítica; ninguna mutación de cuenta depende
   de él. El rol legado `staff` deja de aceptarse en las funciones. **Refina EKKO-095 y
   EKKO-083; complementa EKKO-136 y EKKO-137.**
+
+## PKG-06D — frontera de columnas y de cliente (2026-10-06)
+
+- **EKKO-143 — PKG-06D · Seguridad de filas ≠ privacidad de columnas ≠ lo que
+  pinta el cliente.** Todos los usuarios de la app comparten el rol de base
+  `authenticated`: la RLS decide qué FILAS ve cada quien y no podía ocultar
+  columnas; el miembro recibía `notas_admin`, `sancion_motivo`, los marcadores de
+  06A y las `observaciones` del staff de sus reservas aunque la interfaz no las
+  mostrara. (1) El privilegio SELECT de `authenticated`/`anon` sobre `usuarios` y
+  `reservas` pasa a una lista explícita de columnas (migración B,
+  `20261014110000`); `qr_token_hash` también queda del lado del servidor. Lo
+  interno lo lee el staff por RPC SECURITY DEFINER con guardia de rol y tenant
+  (`staff_datos_internos_cuenta`, `staff_observaciones_reserva`; migración A,
+  `20261014100000`). Ninguna lectura del cliente usa `select('*')` sobre esas
+  tablas (`columnas.ts`). Activación en dos pasos: A → deploy → B, para que el
+  cliente publicado nunca expanda columnas revocadas. (2) La búsqueda del panel es
+  `buscar_cuentas_staff(texto, rol, status)`: el texto es un parámetro ligado con
+  `%`/`_`/`\` escapados; nunca se construye gramática `.or()` de PostgREST con
+  texto del usuario. (3) Un error INTERNO (Postgres, PostgREST, Auth, Storage,
+  Stripe, excepción) nunca viaja crudo al navegador: `errorInterno` deja la
+  evidencia en el servidor y responde un texto fijo marcado `seguro`; el cliente
+  (`backend.ts`) muestra el `error` de un 4xx (dominio/validación escrito a mano)
+  y el de un 5xx solo si trae esa marca; los códigos EKKO_* y los parciales
+  honestos de 06A se conservan. Las funciones programadas y el webhook (sin
+  navegador) no cambian. (4) Content-Security-Policy en Netlify: `script-src`
+  estricto ('self' + Stripe.js), `connect-src` Supabase + API de Stripe,
+  `frame-ancestors 'none'`; `'unsafe-inline'` SOLO en `style-src` (librerías que
+  fijan atributos style; React va por CSSOM), documentado en `netlify.toml` y
+  fijado por `csp.test.ts`. Sentry no está en la política porque no está
+  configurado (D-FIN-2). (5) Producción no publica source maps (`sourcemap:false`;
+  con Sentry configurado: `hidden` + borrado tras subir) y `/*.map` responde 404.
+  (6) E-16: `isLoading` dura hasta que la hidratación termina; un fallo deja
+  `errorSesion` (Reintentar / Cerrar sesión) y una sesión válida sin perfil se dice
+  (`sin_perfil`). La autorización sigue siendo del servidor. **Complementa a
+  EKKO-020, EKKO-124, EKKO-136 y la serie E-01..E-06; no reabre 02C, F-1, R1,
+  R2-B, 02H, 03A, 03B ni 06A.**

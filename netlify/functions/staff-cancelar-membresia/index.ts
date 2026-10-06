@@ -6,6 +6,7 @@ if (!globalThis.WebSocket) {
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada } from '../_lib/connectBilling';
@@ -119,7 +120,7 @@ export const handler: Handler = async (event) => {
     // reintento. Antes, la baja al fin del periodo iba Stripe primero con un
     // rollback best-effort que, si fallaba, nadie registraba.
     const { data, error } = await llamarRpc();
-    if (error) return badRequest(humano(error.message));
+    if (error) return error.message.includes('EKKO_') ? badRequest(humano(error.message)) : errorInterno('staff-cancelar-membresia', error);
 
     let stripeCancelado: boolean | null = null;
     if (stripe && subId && accountId) {

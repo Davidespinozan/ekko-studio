@@ -8,12 +8,19 @@ import { renderHook, waitFor, act } from '@testing-library/react';
  */
 
 const h = vi.hoisted(() => ({
-  porTabla: {} as Record<string, { data: unknown; error: unknown }>
+  porTabla: {} as Record<string, { data: unknown; error: unknown }>,
+  rpcLlamadas: [] as Array<{ fn: string; args: Record<string, unknown> }>
 }));
 
 vi.mock('@shared/hooks/useTenant', () => ({ useTenant: () => ({ id: 't-1' }) }));
 vi.mock('@shared/lib/supabase', () => ({
   supabase: {
+    // PKG-06D: la lista de cuentas es la RPC `buscar_cuentas_staff` (texto como
+    // parámetro, nunca gramática `.or()`); se simula con la misma tabla 'usuarios'.
+    rpc: (fn: string, args: Record<string, unknown>) => {
+      h.rpcLlamadas.push({ fn, args });
+      return Promise.resolve(h.porTabla.usuarios ?? { data: [], error: null });
+    },
     from: (tabla: string) => {
       const c: Record<string, unknown> = {};
       for (const m of ['select', 'eq', 'in', 'or', 'order', 'limit']) c[m] = () => c;
@@ -39,6 +46,19 @@ describe('useMiembros (F07)', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.miembros).toHaveLength(1);
     expect(result.current.error).toBe(false);
+  });
+
+  it("PKG-06D (FR-27): la búsqueda viaja como parámetro de buscar_cuentas_staff, jamás interpolada en `.or()`", async () => {
+    h.rpcLlamadas.length = 0;
+    h.porTabla.usuarios = { data: [], error: null };
+    const carga = "x),email.ilike.%@%,nombre.ilike.%";
+    const { result } = renderHook(() => useMiembros({ rol: 'staff', status: 'activo', search: ` ${carga} ` }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(h.rpcLlamadas).toEqual([{ fn: 'buscar_cuentas_staff', args: { p_texto: carga, p_rol: 'staff', p_status: 'activo' } }]);
+    h.rpcLlamadas.length = 0;
+    renderHook(() => useMiembros({}));
+    await waitFor(() => expect(h.rpcLlamadas).toHaveLength(1));
+    expect(h.rpcLlamadas[0].args).toEqual({ p_texto: null, p_rol: null, p_status: null });
   });
 
   it('error → error=true y la lista no se reemplaza por [] "real"', async () => {

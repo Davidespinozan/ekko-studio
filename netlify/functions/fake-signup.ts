@@ -113,9 +113,12 @@ export const handler: Handler = async (event) => {
 
     if (authError || !authData.user) {
       console.error('[fake-signup] auth error:', authError);
+      // PKG-06D (FR-26): el mensaje del proveedor de Auth no viaja al navegador.
+      const m = (authError?.message ?? '').toLowerCase();
+      const duplicado = m.includes('already') || m.includes('exists') || m.includes('registered') || m.includes('duplicate');
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: authError?.message || 'Error al crear usuario' })
+        body: JSON.stringify({ error: duplicado ? 'Ya existe una cuenta con este email. Inicia sesión.' : 'No se pudo crear la cuenta. Revisa el correo e intenta de nuevo.' })
       };
     }
 
@@ -163,11 +166,10 @@ export const handler: Handler = async (event) => {
     };
   } catch (err) {
     console.error('[fake-signup] unexpected error:', err);
+    // PKG-06D (FR-26): nunca el error crudo al navegador.
     return {
       statusCode: 500,
-      body: JSON.stringify({
-        error: err instanceof Error ? err.message : 'Error inesperado'
-      })
+      body: JSON.stringify({ error: 'No se pudo crear la cuenta. Intenta de nuevo.', seguro: true })
     };
   }
 };

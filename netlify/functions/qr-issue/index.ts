@@ -8,7 +8,8 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
+import { ok, badRequest, unauthorized, forbidden } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 
 /**
@@ -143,7 +144,7 @@ export const handler: Handler = async (event) => {
     });
   } catch (e) {
     console.error('[qr-issue]', e);
-    return serverError(e instanceof Error ? e.message : 'Unknown error');
+    return errorInterno('qr-issue', e);
   }
 };
 

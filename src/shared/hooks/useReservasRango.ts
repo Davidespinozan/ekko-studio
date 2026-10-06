@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
+import { COLUMNAS_RESERVA_CLIENTE } from '@shared/lib/columnas';
 import { useTenant } from '@shared/hooks/useTenant';
 import type { Database } from '@shared/types/database';
 
@@ -36,7 +37,7 @@ export function useReservasRango(fechaInicio: Date, fechaFin: Date) {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('reservas')
-      .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)')
+      .select(`${COLUMNAS_RESERVA_CLIENTE}, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)`)
       .eq('tenant_id', tenant.id)
       .gte('slot_inicio', new Date(inicioMs).toISOString())
       .lt('slot_inicio', new Date(finMs).toISOString())

@@ -8,7 +8,8 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
+import { ok, badRequest, unauthorized, forbidden, notFound } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
 import { enviarPushAUsuario, clasificarPush, registrarResultadoPush } from '../_lib/push';
@@ -90,7 +91,7 @@ export const handler: Handler = async (event) => {
       .select('id, tenant_id, usuario_id, status, check_in_at, slot_inicio, slot_fin, folio')
       .eq('id', body.reserva_id)
       .maybeSingle();
-    if (reservaErr) return serverError(reservaErr.message);
+    if (reservaErr) return errorInterno('reception-marcar-no-show', reservaErr);
     if (!reserva) return notFound('Reserva no encontrada');
     if (reserva.tenant_id !== caller.tenant_id) {
       return forbidden('La reserva pertenece a otro estudio');
@@ -108,7 +109,7 @@ export const handler: Handler = async (event) => {
       .select('id, no_shows_count, bloqueado_hasta')
       .eq('id', reserva.usuario_id)
       .maybeSingle();
-    if (miembroErr) return serverError(miembroErr.message);
+    if (miembroErr) return errorInterno('reception-marcar-no-show', miembroErr);
     if (!miembro) return notFound('Miembro de la reserva no encontrado');
 
     // 3b. Reglas del tenant (Admin → Reglas → Penalizaciones). Mismo cálculo
@@ -118,7 +119,7 @@ export const handler: Handler = async (event) => {
       .select('config')
       .eq('id', reserva.tenant_id)
       .maybeSingle();
-    if (tenantErr) return serverError(tenantErr.message);
+    if (tenantErr) return errorInterno('reception-marcar-no-show', tenantErr);
 
     // ¿Ya se le puede dar por ausente? Antes había que esperar a que TERMINARA la
     // sesión (slot_fin): durante esa hora el estudio quedaba bloqueado —ni se
@@ -156,7 +157,7 @@ export const handler: Handler = async (event) => {
       .eq('id', reserva.id)
       .eq('status', 'confirmada')
       .select('id');
-    if (upReservaErr) return serverError(upReservaErr.message);
+    if (upReservaErr) return errorInterno('reception-marcar-no-show', upReservaErr);
     if (!marcada || marcada.length === 0) {
       return badRequest('La reserva ya cambió de estado; recarga la pantalla.');
     }
@@ -165,7 +166,7 @@ export const handler: Handler = async (event) => {
       .from('usuarios')
       .update({ no_shows_count: countNuevo, bloqueado_hasta: bloqueoNuevo })
       .eq('id', miembro.id);
-    if (upMiembroErr) return serverError(upMiembroErr.message);
+    if (upMiembroErr) return errorInterno('reception-marcar-no-show', upMiembroErr);
 
     // 4b. Avisar al miembro (in-app + push, best-effort): que se entere de la
     //     falta y del bloqueo ahora, no cuando intente reservar.
@@ -215,6 +216,6 @@ export const handler: Handler = async (event) => {
     });
   } catch (e) {
     console.error('[reception-marcar-no-show]', e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return errorInterno('reception-marcar-no-show', e);
   }
 };

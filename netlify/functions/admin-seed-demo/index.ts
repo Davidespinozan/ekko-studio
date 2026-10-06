@@ -8,6 +8,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { randomInt } from 'node:crypto';
 import { ok, unauthorized, forbidden, serverError, badRequest } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { esAdminActivo } from '../_lib/staff';
 
@@ -179,6 +180,6 @@ export const handler: Handler = async (event) => {
     });
   } catch (e) {
     console.error('[admin-seed-demo]', e instanceof Error ? e.message : e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return errorInterno('admin-seed-demo', e);
   }
 };

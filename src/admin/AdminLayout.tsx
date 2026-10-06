@@ -4,6 +4,7 @@ import { lazy, Suspense } from 'react';
 import { X, Menu } from 'lucide-react';
 import { useAdminGuard } from './hooks/useAdminGuard';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
+import { ErrorSesion } from '@shared/components/ErrorSesion';
 import { BrandLogo } from '@shared/components/BrandLogo';
 import { Sidebar } from './components/Sidebar';
 import { CambiarPasswordGate } from '@shared/components/CambiarPasswordGate';
@@ -25,9 +26,11 @@ const AjustesReglas = lazy(() => import('./pages/AjustesReglas'));
 const AjustesMarca = lazy(() => import('./pages/AjustesMarca'));
 
 export default function AdminLayout() {
-  const { isLoading } = useAdminGuard();
+  const { isLoading, errorSesion, reintentarSesion, signOut } = useAdminGuard();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
+  // PKG-06D (E-16): la cuenta no se pudo cargar → estado honesto, nunca "cargando".
+  if (errorSesion) return <ErrorSesion tipo={errorSesion} onReintentar={() => void reintentarSesion()} onCerrarSesion={() => void signOut()} />;
   if (isLoading) return <LoadingScreen />;
 
   return (

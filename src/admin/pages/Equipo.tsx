@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Ban, Trash2, UserPlus, KeyRound } from 'lucide-react';
 import { ResetPasswordModal } from '@reception/components/ResetPasswordModal';
 import { supabase } from '@shared/lib/supabase';
+import { COLUMNAS_USUARIO_CLIENTE, type UsuarioCliente } from '@shared/lib/columnas';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useToast } from '@shared/hooks/useToast';
@@ -16,9 +17,8 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import CrearAccesoModal, { type CredencialesCreadas } from '../components/CrearAccesoModal';
 import CredencialesCreadasModal from '../components/CredencialesCreadasModal';
 import CambiarRolModal from '../components/CambiarRolModal';
-import type { Database } from '@shared/types/database';
 
-type Usuario = Database['public']['Tables']['usuarios']['Row'];
+type Usuario = UsuarioCliente;
 type RolStaff = 'admin' | 'recepcionista';
 
 function capitalizar(s: string | null | undefined): string {
@@ -59,7 +59,7 @@ export default function Equipo() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('usuarios')
-      .select('*')
+      .select(COLUMNAS_USUARIO_CLIENTE)
       .eq('tenant_id', tenant.id)
       .in('rol', ['admin', 'recepcionista'])
       .neq('status', 'revocado')
@@ -74,7 +74,7 @@ export default function Equipo() {
       return;
     }
     setErrorCarga(false);
-    setStaff(data ?? []);
+    setStaff((data ?? []) as unknown as Usuario[]);
     setIsLoading(false);
   }, [tenant.id]);
 

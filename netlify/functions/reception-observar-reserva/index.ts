@@ -6,7 +6,8 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
+import { ok, badRequest, unauthorized, forbidden, notFound } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
 import { esStaffActivo } from '../_lib/staff';
@@ -68,7 +69,7 @@ export const handler: Handler = async (event) => {
       .select('id, tenant_id, usuario_id, observaciones')
       .eq('id', body.reserva_id)
       .maybeSingle();
-    if (resErr) return serverError(resErr.message);
+    if (resErr) return errorInterno('reception-observar-reserva', resErr);
     if (!reserva) return notFound('Reserva no encontrada');
     if (reserva.tenant_id !== caller.tenant_id) {
       return forbidden('La reserva pertenece a otro estudio');
@@ -79,7 +80,7 @@ export const handler: Handler = async (event) => {
       .from('reservas')
       .update({ observaciones: nuevoValor })
       .eq('id', reserva.id);
-    if (upErr) return serverError(upErr.message);
+    if (upErr) return errorInterno('reception-observar-reserva', upErr);
 
     await writeAuditLog(supabaseAdmin, {
       tenant_id: reserva.tenant_id,
@@ -95,6 +96,6 @@ export const handler: Handler = async (event) => {
     return ok({ success: true, observaciones: nuevoValor });
   } catch (e) {
     console.error('[reception-observar-reserva]', e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return errorInterno('reception-observar-reserva', e);
   }
 };

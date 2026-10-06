@@ -6,6 +6,7 @@ if (!globalThis.WebSocket) {
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { ejecutarOperacionesSuscripcion } from '../_lib/operacionesSuscripcion';
 import { esStaffActivo } from '../_lib/staff';
@@ -80,6 +81,7 @@ export const handler: Handler = async (event) => {
       p_motivo: motivo
     });
     if (error) {
+      if (!error.message.includes('EKKO_')) return errorInterno('stripe-pausar-membresia', error);
       const humano = error.message.includes(': ') ? error.message.split(': ').slice(1).join(': ') : error.message;
       return badRequest(humano);
     }

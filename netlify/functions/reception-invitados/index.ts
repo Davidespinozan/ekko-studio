@@ -8,6 +8,7 @@ import type { Handler } from '@netlify/functions';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
 import { esStaffActivo } from '../_lib/staff';
@@ -145,7 +146,7 @@ export const handler: Handler = async (event) => {
         const { error: upErr } = await admin.storage
           .from('identidad')
           .upload(path, buffer, { contentType: body.foto.contentType, upsert: true });
-        if (upErr) return serverError(`No se pudo subir la foto: ${upErr.message}`);
+        if (upErr) return errorInterno('reception-invitados', upErr, 'No se pudo subir la foto. Intenta de nuevo.');
         fotoPath = path;
       }
 
@@ -198,7 +199,7 @@ export const handler: Handler = async (event) => {
         await admin.storage.from('identidad').remove([inv.foto_path]);
       }
       const { error: delErr } = await admin.from('reserva_invitados').delete().eq('id', body.invitado_id);
-      if (delErr) return serverError(delErr.message);
+      if (delErr) return errorInterno('reception-invitados', delErr);
 
       await writeAuditLog(admin, {
         tenant_id: caller.tenant_id,
@@ -216,6 +217,6 @@ export const handler: Handler = async (event) => {
     return badRequest('Acción inválida');
   } catch (e) {
     console.error('[reception-invitados]', e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return errorInterno('reception-invitados', e);
   }
 };

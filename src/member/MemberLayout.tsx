@@ -4,6 +4,7 @@ import { useAuth } from '@shared/hooks/useAuth';
 import { validarStatusCuenta } from '@shared/lib/validarStatusCuenta';
 import { MENSAJE_EN_PAUSA, suspendidoPorPausa } from '@shared/lib/pausaMembresia';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
+import { ErrorSesion } from '@shared/components/ErrorSesion';
 import { DemoBanner } from '@shared/components/DemoBanner';
 import { BrandLogo } from '@shared/components/BrandLogo';
 import { NotificacionesBell } from './components/NotificacionesBell';
@@ -37,7 +38,7 @@ function tituloDeSeccion(path: string): string | null {
 }
 
 export default function MemberLayout() {
-  const { authUser, usuario, isLoading, signOut } = useAuth();
+  const { authUser, usuario, isLoading, errorSesion, reintentarSesion, signOut } = useAuth();
   const location = useLocation();
   const yaCerrado = useRef(false);
 
@@ -77,6 +78,8 @@ export default function MemberLayout() {
   if (mensajeSalida) return <Navigate to="/login" state={{ mensaje: mensajeSalida }} replace />;
   if (isLoading) return <LoadingScreen />;
   if (!authUser) return <Navigate to="/login" state={{ from: location }} replace />;
+  // PKG-06D (E-16): la cuenta no se pudo cargar → estado honesto, nunca "cargando".
+  if (errorSesion) return <ErrorSesion tipo={errorSesion} onReintentar={() => void reintentarSesion()} onCerrarSesion={() => void signOut()} />;
   if (pendientePago) {
     return (
       <Suspense fallback={<LoadingScreen />}>

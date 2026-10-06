@@ -4,6 +4,7 @@ import { AgregarAlCalendario } from '@member/components/AgregarAlCalendario';
 import { Loader2, RefreshCw, ArrowLeft, UserPlus } from 'lucide-react';
 import QRCodeStyling from 'qr-code-styling';
 import { supabase } from '@shared/lib/supabase';
+import { COLUMNAS_RESERVA_CLIENTE } from '@shared/lib/columnas';
 import { backendPost } from '@shared/lib/backend';
 import { useTenant } from '@shared/hooks/useTenant';
 import { formatHora } from '@member/logic/reservaLogic';
@@ -155,7 +156,7 @@ export default function MiQR() {
       try {
         const { data: r } = await supabase
           .from('reservas')
-          .select('*, recurso:recursos(id, slug, nombre, max_invitados_extra)')
+          .select(`${COLUMNAS_RESERVA_CLIENTE}, recurso:recursos(id, slug, nombre, max_invitados_extra)`)
           .eq('id', reservaId!)
           .maybeSingle();
 

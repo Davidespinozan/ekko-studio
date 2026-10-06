@@ -25,13 +25,13 @@ import { HistorialCambios } from '@reception/components/perfil/HistorialCambios'
 import { useAuditLogDeUsuario } from '@reception/hooks/useAuditLogDeUsuario';
 import { actualizarMiembro } from '@reception/lib/accionesMiembro';
 import ConfirmDialog from '../components/ConfirmDialog';
-import type { Database } from '@shared/types/database';
+import type { UsuarioCliente } from '@shared/lib/columnas';
 
 export default function MiembroDetalle() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const toast = useToast();
-  const { miembro, reservas, isLoading, refetch } = useMiembroDetalle(id);
+  const { miembro, reservas, notasAdmin, isLoading, refetch } = useMiembroDetalle(id);
   const { membresia, isLoading: membresiaLoading, error: membresiaError, refetch: refetchMembresia } = useMembresiaActualAdmin(id);
   const { entries: auditEntries, isLoading: auditLoading, error: auditError } = useAuditLogDeUsuario(id);
   const [motivo, setMotivo] = useState('');
@@ -248,7 +248,7 @@ export default function MiembroDetalle() {
         </p>
         <NotasControl
           usuarioId={miembro.id}
-          notasIniciales={(miembro as { notas_admin?: string | null }).notas_admin ?? null}
+          notasIniciales={notasAdmin}
           onSaved={refetch}
         />
       </section>
@@ -577,7 +577,7 @@ function AvatarUploadControl({ usuarioId, avatarUrl, onChanged }: {
 }
 
 function EditarDatosForm({ miembro, onSaved }: {
-  miembro: Database['public']['Tables']['usuarios']['Row'];
+  miembro: UsuarioCliente;
   onSaved: () => Promise<void>;
 }) {
   const [nombre, setNombre] = useState(miembro.nombre ?? '');

@@ -71,6 +71,7 @@ rediscute sin evidencia nueva.
 ## Seguridad y autorización
 - EKKO-124 — ser admin de la fila no autoriza a mutar invariantes por REST.
 - EKKO-136 (PKG-02C) — gate `cambiar_password` del servidor; avisos solo leído/no leído; autor de notas del servidor; anon sin escritura ni EXECUTE.
+- EKKO-143 (PKG-06D) — frontera de columnas para el cliente (grants por columna + RPC de staff); el texto de búsqueda es parámetro; un error interno nunca viaja crudo (`errorInterno` + marca `seguro`); CSP estricta en scripts; sin source maps en producción; la hidratación de sesión nunca se queda en "cargando".
 - EKKO-142 (PKG-06A, D-FIN-1 = A) — operaciones compuestas de cuenta por RPC con actor explícito; el correo no prueba identidad (vincular solo cascarón o perfil autorizado); sin borrado físico con historial durable; compensación por propiedad y respuesta parcial honesta.
 - EKKO-083 — nunca dejar el estudio sin admin activo. EKKO-039, EKKO-040 — staff inactivo sin poderes; alcance de recepción.
 - EKKO-020 — privilegios de funciones y columnas. EKKO-042 — cuentas demo sin contraseña fija.

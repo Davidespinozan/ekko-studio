@@ -6,7 +6,8 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, serverError } from '../_lib/http';
+import { ok, badRequest, unauthorized } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada, getOrCreateSocioCustomer } from '../_lib/connectBilling';
@@ -76,6 +77,6 @@ export const handler: Handler = async (event) => {
     return ok({ clientSecret: si.client_secret, account: accountId });
   } catch (err) {
     console.error('[stripe-setup-intent]', err);
-    return serverError(err instanceof Error ? err.message : 'Error inesperado');
+    return errorInterno('stripe-setup-intent', err);
   }
 };

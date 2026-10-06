@@ -220,6 +220,7 @@ export const handler: Handler = async (event) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             error: 'El correo de acceso ya cambió, pero el perfil no se actualizó. Vuelve a guardar para sincronizarlo.',
+            seguro: true,
             parcial
           })
         };

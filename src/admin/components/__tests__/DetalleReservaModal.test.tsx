@@ -7,15 +7,18 @@ import { render, screen, waitFor } from '@testing-library/react';
  * confirmada y futura. Con onCancelar (admin) sí lo muestra.
  */
 
-const { single, toastMock } = vi.hoisted(() => ({
+const { single, rpc, toastMock } = vi.hoisted(() => ({
   single: vi.fn(),
+  // PKG-06D: las observaciones del staff se leen por `staff_observaciones_reserva`.
+  rpc: vi.fn(),
   // Identidad ESTABLE: el modal depende de `toast` en un useEffect; un objeto
   // nuevo por render dispararía un re-fetch en loop (se quedaría en skeleton).
   toastMock: { error: () => {}, success: () => {}, info: () => {} }
 }));
 vi.mock('@shared/lib/supabase', () => ({
   supabase: {
-    from: () => ({ select: () => ({ eq: () => ({ single }) }) })
+    from: () => ({ select: () => ({ eq: () => ({ single }) }) }),
+    rpc: (...a: unknown[]) => rpc(...a)
   }
 }));
 vi.mock('@shared/hooks/useToast', () => ({ useToast: () => toastMock }));
@@ -39,6 +42,14 @@ const ROW = {
 describe('DetalleReservaModal · read-only para recepción', () => {
   beforeEach(() => {
     single.mockResolvedValue({ data: ROW, error: null });
+    rpc.mockResolvedValue({ data: 'Trajo equipo propio', error: null });
+  });
+
+  it('PKG-06D: las observaciones llegan por la RPC de staff (no por REST) y se muestran', async () => {
+    render(<DetalleReservaModal reservaId="r1" onClose={vi.fn()} />);
+    await screen.findByText(/Folio EKK-000999/i);
+    expect(rpc).toHaveBeenCalledWith('staff_observaciones_reserva', { p_reserva_id: 'r1' });
+    expect(await screen.findByDisplayValue('Trajo equipo propio')).toBeInTheDocument();
   });
 
   it('SIN onCancelar (recepción): no muestra "Cancelar reserva"', async () => {

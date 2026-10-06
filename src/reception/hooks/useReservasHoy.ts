@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
+import { COLUMNAS_RESERVA_CLIENTE } from '@shared/lib/columnas';
 import { useTenant } from '@shared/hooks/useTenant';
 import { useVisibilityAwarePolling } from '@shared/hooks/useVisibilityAwarePolling';
 import type { Database } from '@shared/types/database';
@@ -51,7 +52,7 @@ export function useReservasHoy(fechaISO?: string, pollingEnabled = true) {
 
     const { data, error } = await supabase
       .from('reservas')
-      .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier, telefono, avatar_url, identidad_completa, contrato_firmado)')
+      .select(`${COLUMNAS_RESERVA_CLIENTE}, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier, telefono, avatar_url, identidad_completa, contrato_firmado)`)
       .eq('tenant_id', tenant.id)
       .gte('slot_inicio', inicio.toISOString())
       .lt('slot_inicio', fin.toISOString())

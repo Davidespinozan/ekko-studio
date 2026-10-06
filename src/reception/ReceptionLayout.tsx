@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useRef } from 'react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { validarStatusStaff } from '@shared/lib/validarStatusCuenta';
 import { LoadingScreen } from '@shared/components/LoadingScreen';
+import { ErrorSesion } from '@shared/components/ErrorSesion';
 import { DemoBanner } from '@shared/components/DemoBanner';
 import { BrandLogo } from '@shared/components/BrandLogo';
 import { ReceptionBottomNav } from './components/ReceptionBottomNav';
@@ -35,7 +36,7 @@ function capitalizar(s: string | null | undefined): string {
 }
 
 export default function ReceptionLayout() {
-  const { authUser, usuario, isLoading, signOut } = useAuth();
+  const { authUser, usuario, isLoading, errorSesion, reintentarSesion, signOut } = useAuth();
   const location = useLocation();
   const yaCerrado = useRef(false);
 
@@ -56,6 +57,8 @@ export default function ReceptionLayout() {
 
   if (isLoading) return <LoadingScreen />;
   if (!authUser) return <Navigate to="/login" state={{ from: location }} replace />;
+  // PKG-06D (E-16): la cuenta no se pudo cargar → estado honesto, nunca "cargando".
+  if (errorSesion) return <ErrorSesion tipo={errorSesion} onReintentar={() => void reintentarSesion()} onCerrarSesion={() => void signOut()} />;
   if (!usuario) return <LoadingScreen />;
 
   if (!esStaff) {

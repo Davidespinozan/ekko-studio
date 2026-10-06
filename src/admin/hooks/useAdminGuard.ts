@@ -13,7 +13,7 @@ import { validarStatusStaff } from '@shared/lib/validarStatusCuenta';
  * Login valida al entrar pero no a la sesión que ya estaba abierta.
  */
 export function useAdminGuard() {
-  const { authUser, usuario, isLoading, signOut } = useAuth();
+  const { authUser, usuario, isLoading, errorSesion, reintentarSesion, signOut } = useAuth();
   const navigate = useNavigate();
   const yaCerrado = useRef(false);
 
@@ -26,6 +26,9 @@ export function useAdminGuard() {
       navigate('/login', { replace: true });
       return;
     }
+
+    // PKG-06D (E-16): la hidratación falló → el layout muestra el error, no redirige.
+    if (errorSesion) return;
 
     // 3. Hay sesión pero usuario aún no hidratado → esperar
     //    (la query a `usuarios` corre dentro de setTimeout(0) por el
@@ -49,10 +52,10 @@ export function useAdminGuard() {
       navigate('/login', { replace: true, state: { mensaje: validacion.mensaje } });
       void signOut();
     }
-  }, [authUser, usuario, isLoading, navigate, signOut]);
+  }, [authUser, usuario, isLoading, errorSesion, navigate, signOut]);
 
   // El layout muestra LoadingScreen hasta que tengamos certeza de admin ACTIVO
   const isReady =
     !isLoading && !!usuario && usuario.rol === 'admin' && validarStatusStaff(usuario).permitido;
-  return { usuario, isLoading: !isReady };
+  return { usuario, isLoading: !isReady && !errorSesion, errorSesion, reintentarSesion, signOut };
 }

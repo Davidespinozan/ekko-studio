@@ -6,7 +6,8 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
+import { ok, badRequest, unauthorized, forbidden, notFound } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
 import { esStaffActivo, puedeOperarSobre } from '../_lib/staff';
@@ -106,7 +107,7 @@ export const handler: Handler = async (event) => {
       .select('id, tenant_id, rol, avatar_url, identidad_completa, contrato_firmado')
       .eq('id', usuarioId)
       .maybeSingle();
-    if (tErr) return serverError(tErr.message);
+    if (tErr) return errorInterno('reception-datos-identidad', tErr);
     if (!target) return notFound('Miembro no encontrado');
     if (target.tenant_id !== caller.tenant_id) return forbidden('El miembro pertenece a otro estudio');
     // Recepción solo ve/edita la ficha (INE, domicilio) de MIEMBROS, no del equipo.
@@ -152,7 +153,7 @@ export const handler: Handler = async (event) => {
       .select('fecha_nacimiento, domicilio, ine_folio, ine_foto_path')
       .eq('usuario_id', usuarioId)
       .maybeSingle();
-    if (prevErr) return serverError(prevErr.message);
+    if (prevErr) return errorInterno('reception-datos-identidad', prevErr);
 
     const fecha = fusionarCampo(body.fecha_nacimiento, prev?.fecha_nacimiento ?? null);
     const domicilio = fusionarCampo(body.domicilio, prev?.domicilio ?? null);
@@ -170,7 +171,7 @@ export const handler: Handler = async (event) => {
       const { error: upErr } = await admin.storage
         .from('identidad')
         .upload(path, buffer, { contentType: body.ine_foto.contentType, upsert: true });
-      if (upErr) return serverError(`No se pudo subir la INE: ${upErr.message}`);
+      if (upErr) return errorInterno('reception-datos-identidad', upErr, 'No se pudo subir la INE. Intenta de nuevo.');
       ineFotoPath = path;
       subioIne = true;
     }
@@ -198,7 +199,7 @@ export const handler: Handler = async (event) => {
           },
           { onConflict: 'usuario_id' }
         );
-      if (dpErr) return serverError(dpErr.message);
+      if (dpErr) return errorInterno('reception-datos-identidad', dpErr);
     }
 
     // Recalcular el gate con los valores FUSIONADOS: foto + nacimiento + domicilio + INE.
@@ -223,7 +224,7 @@ export const handler: Handler = async (event) => {
     }
     if (Object.keys(patch).length > 0) {
       const { error: uErr } = await admin.from('usuarios').update(patch).eq('id', usuarioId);
-      if (uErr) return serverError(uErr.message);
+      if (uErr) return errorInterno('reception-datos-identidad', uErr);
     }
 
     // Audit SIN valores sensibles (H4): solo qué se tocó.
@@ -255,6 +256,6 @@ export const handler: Handler = async (event) => {
     });
   } catch (e) {
     console.error('[reception-datos-identidad]', e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return errorInterno('reception-datos-identidad', e);
   }
 };

@@ -14,6 +14,7 @@ import {
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import { supabase } from '@shared/lib/supabase';
+import { COLUMNAS_RESERVA_CLIENTE } from '@shared/lib/columnas';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ErrorCarga } from '@shared/components/ErrorCarga';
 import { ESTADOS_RESERVA_HISTORICOS } from '@shared/constants/reservaStatus';
@@ -62,14 +63,14 @@ function useMisReservas(usuarioId: string | undefined) {
       const [proxRes, histRes] = await Promise.all([
         supabase
           .from('reservas')
-          .select('*, recurso:recursos(nombre, max_invitados_extra)')
+          .select(`${COLUMNAS_RESERVA_CLIENTE}, recurso:recursos(nombre, max_invitados_extra)`)
           .eq('usuario_id', usuarioId!)
           .eq('status', 'confirmada')
           .gte('slot_fin', vigentesDesde)
           .order('slot_inicio', { ascending: true }),
         supabase
           .from('reservas')
-          .select('*, recurso:recursos(nombre, max_invitados_extra)')
+          .select(`${COLUMNAS_RESERVA_CLIENTE}, recurso:recursos(nombre, max_invitados_extra)`)
           .eq('usuario_id', usuarioId!)
           .in('status', ESTADOS_RESERVA_HISTORICOS as unknown as string[])
           .order('slot_inicio', { ascending: false })

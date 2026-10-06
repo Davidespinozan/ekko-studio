@@ -7,6 +7,7 @@ if (!globalThis.WebSocket) {
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
 import { esStaffActivo, puedeOperarSobre } from '../_lib/staff';
@@ -110,7 +111,7 @@ export const handler: Handler = async (event) => {
       .select('id, tenant_id, rol, status, membresia_tier')
       .eq('id', body.usuario_id)
       .maybeSingle();
-    if (targetErr) return serverError(targetErr.message);
+    if (targetErr) return errorInterno('reception-activar-membresia', targetErr);
     if (!target) return notFound('Miembro no encontrado');
     if (target.tenant_id !== caller.tenant_id) {
       return forbidden('El miembro pertenece a otro estudio');
@@ -127,7 +128,7 @@ export const handler: Handler = async (event) => {
       .eq('slug', body.tier)
       .eq('activo', true)
       .maybeSingle();
-    if (tierErr) return serverError(tierErr.message);
+    if (tierErr) return errorInterno('reception-activar-membresia', tierErr);
     if (!tier) return badRequest(`Plan "${body.tier}" no encontrado o inactivo`);
 
     // Venta + activación en UNA transacción (registrar_venta_mostrador → activar_membresia).

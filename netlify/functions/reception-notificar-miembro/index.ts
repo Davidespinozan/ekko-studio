@@ -6,7 +6,8 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
+import { ok, badRequest, unauthorized, forbidden, notFound } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
 import { enviarPushAUsuario, clasificarPush, registrarResultadoPush } from '../_lib/push';
@@ -76,7 +77,7 @@ export const handler: Handler = async (event) => {
       .select('id, tenant_id')
       .eq('id', body.miembro_id)
       .maybeSingle();
-    if (targetErr) return serverError(targetErr.message);
+    if (targetErr) return errorInterno('reception-notificar-miembro', targetErr);
     if (!target) return notFound('Miembro no encontrado');
     if (target.tenant_id !== caller.tenant_id) {
       return forbidden('El miembro pertenece a otro estudio');
@@ -91,7 +92,7 @@ export const handler: Handler = async (event) => {
       // PKG-03A: el push sale aquí mismo; el lease evita que cron-push lo repita.
       push_intento_at: new Date().toISOString()
     }).select('id').maybeSingle();
-    if (insErr) return serverError(insErr.message);
+    if (insErr) return errorInterno('reception-notificar-miembro', insErr);
 
     // Entrega push (además del aviso in-app) y resultado asentado DESPUÉS de
     // intentar. No-op si no hay VAPID configurado (queda `sin_config`).
@@ -118,6 +119,6 @@ export const handler: Handler = async (event) => {
     return ok({ success: true, push });
   } catch (e) {
     console.error('[reception-notificar-miembro]', e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return errorInterno('reception-notificar-miembro', e);
   }
 };

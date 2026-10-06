@@ -256,5 +256,33 @@ SELECT 'P4', 'contrato 06A: cuenta_eliminar consulta el historial durable y la h
          AND (SELECT prosrc FROM pg_proc WHERE proname='handle_new_auth_user' AND pronamespace='public'::regnamespace) LIKE '%acceso_autorizado_at IS NULL%'
        THEN '✅ PASS' ELSE '❌ FAIL — se perdió la guardia de D-FIN-1 o la vinculación elegible' END;
 
+-- PKG-06D (20261014110000): RLS decide filas; estos grants deciden columnas. El
+-- cliente (authenticated/anon) no lee las columnas internas de usuarios ni las
+-- del servidor en reservas; el staff las lee por RPC con guardia (06D-A).
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'usuarios: authenticated/anon sin SELECT en notas_admin, sancion_motivo, acceso_autorizado_*',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM unnest(ARRAY['notas_admin','sancion_motivo','acceso_autorizado_at','acceso_autorizado_por']) c
+         WHERE has_column_privilege('authenticated', 'public.usuarios', c, 'SELECT')
+            OR has_column_privilege('anon', 'public.usuarios', c, 'SELECT'))
+         AND has_column_privilege('authenticated', 'public.usuarios', 'nombre', 'SELECT')
+         AND has_column_privilege('authenticated', 'public.usuarios', 'notas_admin', 'UPDATE')
+       THEN '✅ PASS' ELSE '❌ FAIL — columnas internas de usuarios legibles por el cliente (06D-B no aplicada)' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'reservas: authenticated/anon sin SELECT en observaciones ni qr_token_hash',
+  CASE WHEN NOT has_column_privilege('authenticated', 'public.reservas', 'observaciones', 'SELECT')
+         AND NOT has_column_privilege('anon', 'public.reservas', 'observaciones', 'SELECT')
+         AND NOT has_column_privilege('authenticated', 'public.reservas', 'qr_token_hash', 'SELECT')
+         AND has_column_privilege('authenticated', 'public.reservas', 'slot_inicio', 'SELECT')
+       THEN '✅ PASS' ELSE '❌ FAIL — columnas del servidor en reservas legibles por el cliente (06D-B no aplicada)' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P4', 'contrato 06D: las RPC de lectura interna y la búsqueda exigen is_recepcionista() y el tenant del caller',
+  CASE WHEN (SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace
+              AND proname IN ('staff_datos_internos_cuenta','staff_observaciones_reserva','buscar_cuentas_staff')
+              AND prosrc LIKE '%is_recepcionista()%' AND prosrc LIKE '%get_my_tenant_id()%' AND prosecdef) = 3
+         AND NOT EXISTS (SELECT 1 FROM pg_proc WHERE pronamespace='public'::regnamespace
+              AND proname IN ('staff_datos_internos_cuenta','staff_observaciones_reserva','buscar_cuentas_staff')
+              AND has_function_privilege('anon', oid, 'EXECUTE'))
+       THEN '✅ PASS' ELSE '❌ FAIL — RPC de 06D sin guardia o ejecutable por anon' END;
+
 -- ── Resultado ────────────────────────────────────────────────────────────────
 SELECT area, caso, resultado FROM _hardening_resultado ORDER BY id;

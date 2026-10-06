@@ -3,6 +3,9 @@ import { fetchWithTimeout } from './fetchWithTimeout';
 
 const FUNCTIONS_BASE = '/.netlify/functions';
 
+/** Lo único que ve el usuario ante un 5xx sin texto marcado como seguro. */
+export const MENSAJE_ERROR_SERVIDOR = 'No se pudo completar la operación. Intenta de nuevo.';
+
 /** Margen (s) antes de que venza el access_token para refrescarlo proactivamente. */
 const MARGEN_REFRESH_SEG = 120;
 
@@ -45,10 +48,15 @@ async function refrescarHeader(): Promise<Record<string, string>> {
  * 401 que sobrevivió al reintento = la sesión de verdad expiró → mensaje claro.
  */
 async function errorDeRespuesta(res: Response, path: string): Promise<Error> {
-  let mensaje = `HTTP ${res.status}`;
+  let mensaje = res.status >= 500 ? MENSAJE_ERROR_SERVIDOR : `HTTP ${res.status}`;
   try {
-    const body = (await res.json()) as { error?: unknown };
-    if (typeof body?.error === 'string' && body.error.trim()) {
+    const body = (await res.json()) as { error?: unknown; seguro?: unknown };
+    // PKG-06D (FR-26): un 4xx trae texto de dominio/validación escrito a mano y
+    // se muestra. Un 5xx solo se muestra si el servidor marcó el texto como
+    // `seguro` (escrito a mano: parcial honesto, "no se pudo subir la foto");
+    // cualquier otro 5xx se enmascara, aunque el servidor haya filtrado un
+    // mensaje técnico. Defensa en profundidad: la frontera real es el servidor.
+    if (typeof body?.error === 'string' && body.error.trim() && (res.status < 500 || body.seguro === true)) {
       mensaje = body.error;
     }
   } catch {

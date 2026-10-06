@@ -32,6 +32,13 @@ protege la base. Procede de la fundación del kernel multi-tenant (historia en
   penalización, sanción, correo, contrato) no se cambian por REST, ni siquiera
   siendo admin: trigger `proteger_columnas_privilegiadas_usuarios`. Permitido por
   REST: nombre, teléfono, avatar, notas del admin, revocar a staff.
+- RLS ≠ privacidad de columnas (PKG-06D, EKKO-143): el cliente (`authenticated`,
+  `anon`) tiene SELECT por COLUMNAS en `usuarios` (sin `notas_admin`,
+  `sancion_motivo`, `acceso_autorizado_*`) y en `reservas` (sin `observaciones`,
+  `qr_token_hash`); por eso ninguna lectura del cliente usa `select('*')` sobre
+  ellas (`src/shared/lib/columnas.ts`). Lo interno lo lee el staff por RPC con
+  guardia (`staff_datos_internos_cuenta`, `staff_observaciones_reserva`) y la
+  búsqueda del panel es `buscar_cuentas_staff` con el texto como parámetro.
 - Datos sensibles aparte: `usuarios_datos_privados` (solo dueño y admin lectura).
 - Nunca se deja un estudio sin admin activo (`count_admins_activos`).
 - Operaciones compuestas de cuenta (PKG-06A, EKKO-142): alta, cambio de rol, baja,

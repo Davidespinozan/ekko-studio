@@ -6,7 +6,8 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, serverError } from '../_lib/http';
+import { ok, badRequest, unauthorized } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 
@@ -197,6 +198,6 @@ export const handler: Handler = async (event) => {
     return ok({ paymentMethod, pagos });
   } catch (err) {
     console.error('[stripe-billing-info]', err);
-    return serverError(err instanceof Error ? err.message : 'Error inesperado');
+    return errorInterno('stripe-billing-info', err);
   }
 };

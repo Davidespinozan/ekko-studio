@@ -8,7 +8,8 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { ok, badRequest, unauthorized, serverError } from '../_lib/http';
+import { ok, badRequest, unauthorized } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 
 /**
@@ -93,7 +94,7 @@ export const handler: Handler = async (event) => {
     });
   } catch (e) {
     console.error('[qr-verify]', e);
-    return serverError(e instanceof Error ? e.message : 'Unknown error');
+    return errorInterno('qr-verify', e);
   }
 };
 
@@ -152,5 +153,7 @@ function translateError(code: string, fallback: string): string {
     EKKO_QR_INVALIDO: 'QR inválido',
     EKKO_QR_EXPIRADO: 'QR expirado'
   };
-  return map[code] ?? fallback.replace(code + ':', '').trim() ?? fallback;
+  // PKG-06D: un error no mapeado nunca viaja crudo (podía ser SQL o Postgres).
+  void fallback;
+  return map[code] ?? 'No se pudo validar el QR. Intenta de nuevo o avisa a recepción.';
 }

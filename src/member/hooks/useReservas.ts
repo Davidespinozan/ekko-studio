@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@shared/lib/supabase';
+import { COLUMNAS_RESERVA_CLIENTE } from '@shared/lib/columnas';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useTenant } from '@shared/hooks/useTenant';
 import type { Database } from '@shared/types/database';
@@ -33,7 +34,7 @@ export function useReservasDelUsuario() {
 
     const { data, error: queryError } = await supabase
       .from('reservas')
-      .select('*, recurso:recursos(id, slug, nombre)')
+      .select(`${COLUMNAS_RESERVA_CLIENTE}, recurso:recursos(id, slug, nombre)`)
       .eq('usuario_id', usuario.id)
       .order('slot_inicio', { ascending: false });
 

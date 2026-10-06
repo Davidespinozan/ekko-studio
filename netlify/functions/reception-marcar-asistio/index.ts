@@ -5,7 +5,8 @@ if (!globalThis.WebSocket) {
 
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
-import { badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
+import { badRequest, unauthorized, forbidden } from '../_lib/http';
+import { errorInterno } from '../_lib/errores';
 import { requireEnv } from '../_lib/env';
 import { esStaffActivo } from '../_lib/staff';
 import { corregirAsistencia } from '../_lib/corregirAsistencia';
@@ -80,6 +81,6 @@ export const handler: Handler = async (event) => {
     });
   } catch (e) {
     console.error('[reception-marcar-asistio]', e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return errorInterno('reception-marcar-asistio', e);
   }
 };

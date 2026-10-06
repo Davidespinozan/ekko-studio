@@ -174,7 +174,36 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- Nada.
+- **PKG-06D "Frontera de columnas y de cliente" — IMPLEMENTADO LOCALMENTE, en un
+  commit local SIN PUSH** (EKKO-143). Dos migraciones, NO aplicadas en producción:
+  A `20261014100000_06d_a_lectura_interna_por_rpc.sql` (md5
+  `ad0798d34a5ee6de13cabdbc0a9058a9`; aditiva: `staff_datos_internos_cuenta`,
+  `staff_observaciones_reserva`, `buscar_cuentas_staff`) y B
+  `20261014110000_06d_b_frontera_columnas.sql` (md5
+  `81bf09281b2a3c8ab932d7c5d523d99f`; SELECT de `authenticated`/`anon` por columnas
+  en `usuarios` —sin `notas_admin`, `sancion_motivo`, `acceso_autorizado_*`— y en
+  `reservas` —sin `observaciones`, `qr_token_hash`—). ORDEN DE ACTIVACIÓN
+  OBLIGATORIO: A → push/deploy → B (un cliente viejo con `select('*')` recibiría
+  "permission denied" si B va antes del deploy). Cliente: ninguna lectura de
+  `usuarios`/`reservas` usa `*` (`src/shared/lib/columnas.ts`); la lista del panel
+  es la RPC `buscar_cuentas_staff` (texto como parámetro: FR-27); notas y
+  observaciones del staff por RPC; `AuthProvider` con `errorSesion` +
+  `ErrorSesion` (E-16, FR-36) en los tres layouts. Servidor: `_lib/errores.ts`
+  (`errorInterno`, marca `seguro`) aplicado a 44 sitios de 20 funciones de
+  navegador (FR-26); `backend.ts` solo muestra el `error` de un 5xx marcado
+  `seguro`; Signup igual. `netlify.toml`: Content-Security-Policy (FR-25; script
+  estricto, `'unsafe-inline'` solo en style-src, documentado) y `/*.map` → 404;
+  `vite.config.ts`: `sourcemap` false en producción (FR-37). Pruebas:
+  `db/06d-frontera-columnas.db.test.ts` (16; 12 muerden sin migraciones, 5 con solo
+  A), `csp.test.ts` (8), `vite-config.test.ts` (3), `errores-internos.test.ts` (4),
+  `AuthProvider.test.tsx` (6), `backend.test.ts` (+4), contratos de
+  `useAdminData.errores` y `DetalleReservaModal` al nuevo contrato RPC. Hardening
+  54/54 (antes 51); drift 68/68 (antes 66). Gate completo verde: 213 archivos / 2041
+  pruebas, build OK sin ningún `.map` en `dist`, `git diff --check` OK (62 s, máquina en
+  reposo; una corrida previa falló en tsc por una prueba que importaba
+  `vite.config.ts` a través de la referencia de proyecto; se reescribió como prueba
+  estática). Activación: pendiente de
+  autorización del dueño (`ekko-activar`, en dos fases).
 
 ## PKG-06A — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06A "Operaciones compuestas de cuenta con frontera del servidor"** (EKKO-142,

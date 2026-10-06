@@ -32,6 +32,14 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# PKG-06D (FR-37): ningún source map se sirve en producción (el build ya no los
+# genera; esto cubre cualquier .map que llegara a dist por otra vía).
+[[redirects]]
+  from = "/*.map"
+  to = "/index.html"
+  status = 404
+  force = true
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -39,6 +47,24 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(self), microphone=(), geolocation=()"
+    # PKG-06D (FR-25) · Content-Security-Policy. Inventario real de orígenes
+    # (src/__tests__/csp.test.ts lo verifica):
+    #  - script-src: solo el bundle propio y Stripe.js (PaymentElement). Sin
+    #    'unsafe-inline' ni 'unsafe-eval'; el único <script> inline de index.html
+    #    es ld+json (dato, no código).
+    #  - style-src: CSS propio + Google Fonts. 'unsafe-inline' SOLO aquí: librerías
+    #    de terceros (qr-code-styling genera SVG con atributos style; el wrapper de
+    #    Stripe Elements) fijan estilos como atributo, que CSP bloquea sin esta
+    #    excepción; los estilos de React van por CSSOM y no la necesitan. El
+    #    riesgo de inyección de estilos es menor y script-src sigue estricto.
+    #  - connect-src: Supabase (REST/Auth/Storage, y wss por si se usa realtime),
+    #    la API de Stripe y las funciones propias (same-origin).
+    #  - img-src: propio, Supabase Storage (avatares, logos, material), data:/blob:
+    #    (previsualizaciones de cámara y QR) y Stripe.
+    #  - frame-src: iframes de Stripe Elements y 3DS. frame-ancestors 'none' =
+    #    X-Frame-Options DENY. Sentry no está configurado: si se activa, añadir su
+    #    host de ingest a connect-src (D-FIN-2).
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://js.stripe.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://cfihcrjbvgjiohedsjos.supabase.co https://*.stripe.com; connect-src 'self' https://cfihcrjbvgjiohedsjos.supabase.co wss://cfihcrjbvgjiohedsjos.supabase.co https://api.stripe.com; frame-src https://js.stripe.com https://hooks.stripe.com; worker-src 'self'; manifest-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
 
 # ── Crons ────────────────────────────────────────────────────────────────────
 # OJO: la sintaxis de Netlify para funciones programadas es [functions."nombre"]

@@ -1,6 +1,7 @@
 import type { HandlerResponse } from '@netlify/functions';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ok, badRequest, forbidden, notFound, serverError } from './http';
+import { ok, badRequest, forbidden, notFound } from './http';
+import { errorInterno } from './errores';
 
 /**
  * R2-A (PKG-01I) · Corrección de asistencia = UNA transición de servidor.
@@ -35,7 +36,7 @@ export function respuestaErrorAsistencia(mensaje: string): HandlerResponse {
   if (m.includes('EKKO_MOTIVO_REQUERIDO')) return badRequest('Motivo obligatorio para esta acción');
   // Guarda de identidad (trigger exigir_identidad_al_ingresar) y demás EKKO_*.
   if (m.includes('EKKO_')) return badRequest(texto);
-  return serverError(m || 'Error desconocido');
+  return errorInterno('corregir-asistencia', new Error(m || 'error_desconocido'));
 }
 
 export async function corregirAsistencia(

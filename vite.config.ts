@@ -6,10 +6,11 @@ import path from 'path';
 
 export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production';
-  const hasSentryConfig =
+  const hasSentryConfig = Boolean(
     process.env.SENTRY_AUTH_TOKEN &&
     process.env.SENTRY_ORG &&
-    process.env.SENTRY_PROJECT;
+    process.env.SENTRY_PROJECT
+  );
 
   return {
     plugins: [
@@ -54,7 +55,10 @@ export default defineConfig(({ mode }) => {
       isProduction && hasSentryConfig && sentryVitePlugin({
         org: process.env.SENTRY_ORG!,
         project: process.env.SENTRY_PROJECT!,
-        authToken: process.env.SENTRY_AUTH_TOKEN!
+        authToken: process.env.SENTRY_AUTH_TOKEN!,
+        // PKG-06D (FR-37): si algún día se configura Sentry, los mapas se suben
+        // y se BORRAN de dist antes de publicar; nunca quedan descargables.
+        sourcemaps: { filesToDeleteAfterUpload: ['./dist/**/*.map'] }
       })
     ].filter(Boolean),
     resolve: {
@@ -69,7 +73,11 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       outDir: 'dist',
-      sourcemap: isProduction,
+      // PKG-06D (FR-37): en producción no se publican source maps (eran
+      // descargables en /assets/*.js.map). Con Sentry configurado se generan
+      // 'hidden' (sin comentario sourceMappingURL) y el plugin los borra tras
+      // subirlos. En desarrollo siguen activos.
+      sourcemap: isProduction ? (hasSentryConfig ? 'hidden' : false) : true,
       rollupOptions: {
         output: {
           manualChunks: {

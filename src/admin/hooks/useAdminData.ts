@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { traducirErrorTier } from '../lib/traducirErrorTier';
 import { supabase } from '@shared/lib/supabase';
+import { COLUMNAS_RESERVA_CLIENTE, COLUMNAS_USUARIO_CLIENTE, type UsuarioCliente } from '@shared/lib/columnas';
 import { useTenant } from '@shared/hooks/useTenant';
 import { backendPost } from '@shared/lib/backend';
 import { inicioDeHoyEnZona, inicioDeMesEnZona, fechaISOEnZona } from '@shared/lib/timezone';
 import type { Database } from '@shared/types/database';
 
-type Usuario = Database['public']['Tables']['usuarios']['Row'];
+// PKG-06D: el cliente solo lee las columnas permitidas de `usuarios`.
+type Usuario = UsuarioCliente;
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 type Tier = Database['public']['Tables']['tiers']['Row'];
 type Reserva = Database['public']['Tables']['reservas']['Row'];
@@ -26,7 +28,6 @@ export interface ReservaConJoin extends Reserva {
  * Lista de miembros del tenant (sin paginación por simplicidad inicial).
  */
 export function useMiembros(filtros?: { search?: string; status?: string; rol?: string | 'staff' }) {
-  const tenant = useTenant();
   const [miembros, setMiembros] = useState<Usuario[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   // PKG-02A (C02): un fallo de la consulta no es "todavía no hay miembros".
@@ -35,36 +36,24 @@ export function useMiembros(filtros?: { search?: string; status?: string; rol?: 
   const refetch = useCallback(async () => {
     setIsLoading(true);
     setError(false);
-    let query = supabase
-      .from('usuarios')
-      .select('*')
-      .eq('tenant_id', tenant.id)
-      .order('created_at', { ascending: false });
-
-    if (filtros?.status) query = query.eq('status', filtros.status);
-
-    // Filtro especial "staff" = todos los no-miembros (recepcionista, staff, admin)
-    if (filtros?.rol === 'staff') {
-      query = query.in('rol', ['recepcionista', 'staff', 'admin']);
-    } else if (filtros?.rol) {
-      query = query.eq('rol', filtros.rol);
-    }
-
-    if (filtros?.search) {
-      const term = `%${filtros.search}%`;
-      query = query.or(`nombre.ilike.${term},email.ilike.${term}`);
-    }
-
-    const { data, error: qErr } = await query;
+    // PKG-06D (FR-27): el texto de búsqueda viaja como PARÁMETRO de la RPC
+    // `buscar_cuentas_staff` (ILIKE con escape en el servidor), nunca interpolado
+    // en la gramática `.or()` de PostgREST. La RPC filtra por el tenant del
+    // caller y devuelve solo columnas permitidas; "staff" agrupa recepción/admin.
+    const { data, error: qErr } = await supabase.rpc('buscar_cuentas_staff', {
+      p_texto: filtros?.search?.trim() || null,
+      p_rol: filtros?.rol || null,
+      p_status: filtros?.status || null
+    });
     if (qErr) {
       console.error('[useMiembros]', qErr);
       setError(true); // la lista anterior se conserva
       setIsLoading(false);
       return;
     }
-    setMiembros(data ?? []);
+    setMiembros((data ?? []) as Usuario[]);
     setIsLoading(false);
-  }, [tenant.id, filtros?.search, filtros?.status, filtros?.rol]);
+  }, [filtros?.search, filtros?.status, filtros?.rol]);
 
   useEffect(() => { refetch(); }, [refetch]);
   return { miembros, isLoading, error, refetch };
@@ -76,29 +65,33 @@ export function useMiembros(filtros?: { search?: string; status?: string; rol?: 
 export function useMiembroDetalle(miembroId: string | undefined) {
   const [miembro, setMiembro] = useState<Usuario | null>(null);
   const [reservas, setReservas] = useState<ReservaConJoin[]>([]);
+  // PKG-06D: `notas_admin` ya no viaja por REST; se lee por la RPC de staff.
+  const [notasAdmin, setNotasAdmin] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const refetch = useCallback(async () => {
     if (!miembroId) return;
     setIsLoading(true);
 
-    const [m, r] = await Promise.all([
-      supabase.from('usuarios').select('*').eq('id', miembroId).maybeSingle(),
+    const [m, r, n] = await Promise.all([
+      supabase.from('usuarios').select(COLUMNAS_USUARIO_CLIENTE).eq('id', miembroId).maybeSingle(),
       supabase
         .from('reservas')
-        .select('*, recurso:recursos(id, slug, nombre)')
+        .select(`${COLUMNAS_RESERVA_CLIENTE}, recurso:recursos(id, slug, nombre)`)
         .eq('usuario_id', miembroId)
         .order('slot_inicio', { ascending: false })
-        .limit(50)
+        .limit(50),
+      supabase.rpc('staff_datos_internos_cuenta', { p_usuario_id: miembroId }).then(({ data }) => (data as { notas_admin?: string | null } | null)?.notas_admin ?? null)
     ]);
 
-    setMiembro(m.data);
+    setMiembro((m.data ?? null) as unknown as Usuario | null);
     setReservas((r.data ?? []) as unknown as ReservaConJoin[]);
+    setNotasAdmin(n);
     setIsLoading(false);
   }, [miembroId]);
 
   useEffect(() => { refetch(); }, [refetch]);
-  return { miembro, reservas, isLoading, refetch };
+  return { miembro, reservas, notasAdmin, isLoading, refetch };
 }
 
 export interface MembresiaResumen {
@@ -414,7 +407,7 @@ export function useAdminMetrics() {
           .lt('slot_inicio', inicioHoy.toISOString()),
         supabase
           .from('reservas')
-          .select('*, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)')
+          .select(`${COLUMNAS_RESERVA_CLIENTE}, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)`)
           .eq('tenant_id', tenant.id)
           .eq('status', 'confirmada')
           .gte('slot_inicio', now.toISOString())
@@ -501,7 +494,7 @@ export function useDashboardData() {
       supabase
         .from('reservas')
         .select(
-          '*, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)'
+          `${COLUMNAS_RESERVA_CLIENTE}, recurso:recursos(id, slug, nombre), usuario:usuarios!reservas_usuario_id_fkey(id, nombre, email, membresia_tier)`
         )
         .eq('tenant_id', tenant.id)
         .neq('status', 'cancelada')
