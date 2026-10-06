@@ -4,13 +4,13 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-06 · PKG-06C cerrado en producción (alta pública con
-correo verificado; FR-24, el último P2). Antes: PKG-06B (operaciones de cobro del miembro y del webhook). Todo lo de
+Última actualización: 2026-10-06 · PKG-06E cerrado en producción (ciclo de vida del
+material; FR-42..46). Antes: PKG-06C (alta pública con correo verificado; FR-24). Todo lo de
 abajo se verificó en vivo contra git, Netlify y Supabase.
 
-## Producción (verificado 2026-10-06 18:47 UTC)
-- Código de negocio publicado: `7927fb5f94a9cc090b1828581cead258d08aeb3e`
-  ("fix(auth): verify email before public signup identity", PKG-06C); el commit docs-only
+## Producción (verificado 2026-10-06 19:16 UTC)
+- Código de negocio publicado: `6b2e086a2e9f079a612940459ac9f78a5a6e7ea8`
+  ("fix(material): make storage lifecycle recoverable", PKG-06E); el commit docs-only
   de este archivo va encima (ver `git log`). Cadena:
   `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
   en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
@@ -19,11 +19,13 @@ abajo se verificó en vivo contra git, Netlify y Supabase.
   → `07a85d8` (STATUS) → `308a4a7` (STATUS) → `f713586` (PKG-03B fase D) → `a682065` (STATUS)
   → `50c3a4c` (PKG-02H) → `82604ef` (STATUS) → `b12fe4f` (PKG-06A) → `c02532b` (STATUS)
   → `fdecdbb` (PKG-06D) → `06d27b8` (STATUS) → `3649842` (PKG-06G) → `cf1cfc0` (STATUS)
-  → `33b44d2` (PKG-06B) → `6d456a4` (STATUS) → `7927fb5` (PKG-06C).
-- Netlify production: deploy `6ac540f8e7755100085bc98d`, READY, `commit_ref` =
-  `7927fb5`, publicado 2026-10-06 18:44:11 UTC; 47 funciones (+`alta-publica`;
-  `fake-signup` inerte con 410), las 9 programadas sin cambio (`netlify.toml` intacto).
-  Antes `6ac53720ff4a4f00081dd047` = 6d456a4, `6ac535d7ff4a4f00081d51eb` =
+  → `33b44d2` (PKG-06B) → `6d456a4` (STATUS) → `7927fb5` (PKG-06C) → `13d2d11` (STATUS)
+  → `6b2e086` (PKG-06E).
+- Netlify production: deploy `6ac5480b642ade0008efd97d`, READY, `commit_ref` =
+  `6b2e086`, publicado 2026-10-06 19:14:26 UTC; 47 funciones, las 9 programadas sin
+  cambio (`netlify.toml` intacto). Antes `6ac5424b7e7cd40008d8ff0a` = 13d2d11,
+  `6ac540f8e7755100085bc98d` = 7927fb5 (18:44:11 UTC, PKG-06C; +`alta-publica`,
+  `fake-signup` inerte con 410), `6ac53720ff4a4f00081dd047` = 6d456a4, `6ac535d7ff4a4f00081d51eb` =
   `33b44d2`, publicado 2026-10-06 17:56:34 UTC; antes `6ac52f4a4ccb810008ff86b9` =
   cf1cfc0, `6ac52e61c8b49900079d0b0c` = 3649842 (17:24:35 UTC, PKG-06G); 46 funciones, 9 programadas con los
   mismos horarios, `cron-reconciliar-stripe` a `0 9 * * *`; cabeceras con
@@ -42,8 +44,10 @@ abajo se verificó en vivo contra git, Netlify y Supabase.
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **115/115 migraciones**; última
-  `20261017100000_06c_alta_publica_verificada.sql` (PKG-06C, md5
+- Supabase: **116/116 migraciones**; última
+  `20261018100000_06e_ciclo_material.sql` (PKG-06E, md5
+  `24aa22fac47895fb3c50c9e23e77545c`, aplicada 2026-10-06 19:11 UTC, ANTES del
+  deploy); la 115 es `20261017100000_06c_alta_publica_verificada.sql` (PKG-06C, md5
   `0949ae3beed41862afdaf47bedf65b5d`, aplicada 2026-10-06 18:41 UTC, ANTES del
   deploy); la 114 es `20261016100000_06b_operaciones_cobro_miembro.sql` (PKG-06B, md5
   `91e48dea5680ba8fe400265494f639dd`, aplicada 2026-10-06 ~17:50 UTC, ANTES del
@@ -88,7 +92,9 @@ la sección "PKG-06G" de abajo) ·
 **PKG-06B "Operaciones de cobro del miembro y del webhook" — CLOSED IN PRODUCTION**
 (EKKO-145; FR-15/16/17; detalle en la sección "PKG-06B" de abajo) ·
 **PKG-06C "Alta pública con correo verificado" — CLOSED IN PRODUCTION** (EKKO-146;
-FR-24; D-FIN-6 = A; detalle en la sección "PKG-06C" de abajo).
+FR-24; D-FIN-6 = A; detalle en la sección "PKG-06C" de abajo) ·
+**PKG-06E "Ciclo de vida del material" — CLOSED IN PRODUCTION** (EKKO-147; FR-42..46;
+detalle en la sección "PKG-06E" de abajo).
 Alcance final tras deduplicar contra R1, R2-A/B, EKKO-138, 03A y 03B: pausar, reactivar y
 dar de baja al fin del periodo escriben su operación en `stripe_operaciones_suscripcion`
 en la misma transacción que la transición local (causas `pausa_staff`,
@@ -201,29 +207,50 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- **PKG-06E "Ciclo de vida del material" — IMPLEMENTADO LOCALMENTE, en un commit
-  local SIN PUSH** (EKKO-147, FR-42..46). Migración `20261018100000_06e_ciclo_material.sql`
-  (NO aplicada en producción): RPC nueva `material_limpieza_pendiente` (solo
-  service_role: lo retirado cuyo objeto sigue en `storage.objects`); recreadas desde
-  su última definición `staff_eliminar_material` (idempotente) y
-  `staff_listar_material_pendiente` (sesión `completada` que nunca recibió material);
-  `v_pendientes_operativos` igual que 06B/06C salvo tres ramas de material (solo admin:
-  material sin archivo, limpieza atascada > 2 días, objetos huérfanos > 1 h,
-  agregados y sin rutas). Sin tabla ni columnas nuevas. Netlify: `cron-material-vencido`
-  borra por tandas todo lo pendiente y registra `fallo`/`parcial` honesto (06G). App:
-  subida sin texto crudo del proveedor y con limpieza compensatoria verificada; retirar
-  dice si el archivo quedó pendiente de borrar; Operación con el dominio "Material de
-  sesiones". Funciones: 139 → 140 en la base local (cambian `staff_eliminar_material` y
-  `staff_listar_material_pendiente`; nueva `material_limpieza_pendiente`; la base local
-  sin 06E = producción salvo `rls_auto_enable()`). Pruebas:
-  `db/06e-ciclo-material.db.test.ts` (17; 14 muerden sin la migración),
-  `cron-material-vencido` (8, nuevo), `material` (+11), `Operacion` (+1),
-  `cron-procesos` (contrato ajustado: las rutas salen de la limpieza pendiente).
-  Hardening 62/62 (antes 60); drift 75/75 (antes 74). Gate completo verde a la
-  primera: 223 archivos / 2201 pruebas, build OK, `git diff --check` OK (67 s, máquina
-  en reposo). Al activar, Operación mostrará los 2 objetos huérfanos de producción
-  (agregados) — esperado; no se borran (D-FIN-8). Activación: migración (aditiva) →
-  deploy; pendiente de autorización del dueño (`ekko-activar`).
+Nada.
+
+## PKG-06E — cerrado en producción (detalle; la línea corta está en "Cerrado")
+- **PKG-06E "Ciclo de vida del material"** (EKKO-147, FR-42..46) — commit `6b2e086`
+  ("fix(material): make storage lifecycle recoverable"), migración
+  `20261018100000_06e_ciclo_material.sql` (md5 `24aa22fac47895fb3c50c9e23e77545c`;
+  Supabase 115 → 116, 19:11 UTC), deploy Netlify `6ac5480b642ade0008efd97d` READY =
+  6b2e086 (19:14 UTC). Orden: migración (aditiva; el código viejo seguía igual) → push
+  → deploy.
+- Qué quedó: FR-42, FR-43, FR-44, FR-45 y FR-46 CLOSED IN PRODUCTION. El estado de
+  negocio es la fila (`eliminado_at` = acceso terminado; `disponible_hasta` = vigencia)
+  y manda primero; el de limpieza se DERIVA fila ↔ `storage.objects` (bucket
+  `material`, carpeta del estudio; SQL sobre metadatos: sin listar por API, sin
+  paginación, sin escaneo parcial), sin tabla ni columnas nuevas. `material_limpieza_pendiente`
+  (nueva, solo service_role, search_path fijo, rutas de la base): lo retirado/vencido
+  cuyo objeto sigue; `cron-material-vencido` conserva el barrido de 7 días y además
+  borra por tandas de 100 todo lo pendiente; un fallo queda pendiente para la siguiente
+  corrida y 06G registra `fallo` (todo falló) o `parcial` (algo falló) con clase
+  `almacenamiento` (sin segundo latido ni fila de proceso nueva; horario intacto).
+  `staff_eliminar_material` idempotente (misma ruta, sin otra auditoría); el navegador
+  revisa el resultado del borrado y avisa "se borrará en la limpieza automática"; la
+  subida no muestra el texto del proveedor y la limpieza compensatoria revisa su
+  resultado. `staff_listar_material_pendiente`: sesión `completada`, que requiere
+  material y NUNCA recibió ninguno (lo vencido, barrido o retirado no vuelve; una
+  pasada sin check-in no cuenta). Operación (solo admin, su estudio, sin rutas, sin
+  botones de reintentar/borrar): `material_sin_archivo` (por material),
+  `material_limpieza_atascada` (> 2 días, agregada) y `material_objeto_huerfano`
+  (> 1 h, agregado). Acceso del miembro sin cambios (D-FIN-5 no requerido).
+- Verificación: 141 funciones en producción (140 + `material_limpieza_pendiente`);
+  cambiaron solo `staff_eliminar_material(uuid)` (d7f4462d… → 12140984…) y
+  `staff_listar_material_pendiente()` (c122d66e… → e73134c8…), las 3 idénticas al
+  build local probado; ninguna otra cambió. Vista security_invoker, sin anon; grants
+  como antes. Hardening 62/62 y drift 75/75 en producción. Operación antes → después:
+  admin 2 → 3 (+1 `material_objeto_huerfano`: "2 archivos sin material registrado ·
+  592 KB" = los 2 huérfanos conocidos del 2026-10-04, intactos); recepción y miembro 0.
+  Material pendiente 0 → 0. Filas de material (2 vivas con su objeto), objetos (4),
+  huérfanos (2), proceso del cron, auditoría (25) y los 14 hashes de negocio idénticos
+  antes, tras migrar y al final. Bundle: textos nuevos presentes, "No se pudo subir el
+  archivo: " ausente, RPC de limpieza solo en el servidor; sondas: RPC de limpieza con
+  la llave anónima 401, `material_sesion` anónima vacía, cron por URL 403 (no corrió).
+  Gate local: 223 archivos / 2201 pruebas.
+- Cero objetos de Storage borrados, filas de material modificadas, huérfanos
+  borrados, retiros/vencimientos/limpiezas manuales o mutaciones de negocio causadas
+  por la activación. D-FIN-8 sin cambio.
 
 ## PKG-06C — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06C "Alta pública con correo verificado"** (EKKO-146, FR-24, D-FIN-6 = A) —
@@ -529,6 +556,9 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   dos pruebas). No se aplica, no se borra, no se commitea. Ver nota de `57b9af0`.
 
 ## Diferido / pendiente no bloqueante
+- PKG-06E, evidencia natural (no se fabrica): primer retiro real con su borrado (o su
+  limpieza pendiente y la convergencia en la siguiente corrida del cron), primera
+  corrida registrada de `cron-material-vencido` y primer vencimiento barrido.
 - PKG-06C, evidencia natural (no se fabrica): la primera alta pública real — enlace de
   `generateLink` para una cuenta sin confirmar → correo aceptado por Resend →
   `verifyOtp` → `email_confirmed_at` → `on_auth_user_confirmed` → perfil
@@ -591,7 +621,9 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   saturarse ante un ataque distribuido; si aparece un perfil entre la solicitud y el
   clic, la confirmación se rechaza y la persona va a recepción.
 - Storage: 2 objetos huérfanos en el bucket `material` (del 2026-10-04, sin fila en
-  `material_sesion`; 4 objetos en total). Sin tocar. Pendiente de decisión del dueño.
+  `material_sesion`; 4 objetos en total). Sin tocar. Desde PKG-06E se ven en Operación
+  como UN renglón `material_objeto_huerfano`; EKKO no los borra. Pendiente de decisión
+  del dueño (D-FIN-8).
 - Finanzas: no se guardan comisiones de Stripe; ventas de mostrador sin evidencia de
   anulación; `stripe_price_id` sin uso; default de 2 invitados en
   `reservas_incompatibles_con_tier`.
@@ -606,9 +638,8 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 ## Siguiente paso
 Resolver desde el panel los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
 `activo_sin_derecho`). El backlog canónico final (reconciliación post-R1/R2/01/02/03)
-deja 2 paquetes (06B y 06C cerrados; ya no quedan P0, P1 ni P2): 06E (ciclo de vida
-del material; implementado en local, ver "Solo en local") y 06F (agregación en el
-servidor); el siguiente paso recomendado es la activación controlada de PKG-06E.
+deja 1 paquete (06B, 06C y 06E cerrados; ya no quedan P0, P1 ni P2; quedan 5 P3):
+06F (agregación en el servidor); es el siguiente recomendado.
 Aparte, el hallazgo nuevo del correo de recuperación sin SMTP propio (ver
 "Residuales") requiere revisión del dueño antes de salir en vivo. Decisiones del dueño pendientes: D-FIN-2 (DSN de
 Sentry en producción: hoy no hay), D-FIN-3 (deploy previews con secretos LIVE),
