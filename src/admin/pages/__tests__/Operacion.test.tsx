@@ -140,6 +140,25 @@ describe('Operación (PKG-03A)', () => {
     expect(screen.getAllByText('Descartar')).toHaveLength(2);
   });
 
+  it('PKG-06E: material sin archivo, limpieza atascada y huérfanos se muestran con su guía; ninguno ofrece "reintentar" ni "borrar"', async () => {
+    const sinArchivo = { ...base, dominio: 'material', tipo: 'material_sin_archivo', fuente: 'material_sesion', fuente_id: 'mat-1', usuario_id: 'u-9',
+      severidad: 'media', accion: 'revisar_material_sin_archivo', ruta: '/admin/miembros/u-9', detalle: 'Episodio 3' };
+    const atascada = { ...base, dominio: 'material', tipo: 'material_limpieza_atascada', fuente: 'material_sesion', fuente_id: 'limpieza:t1',
+      severidad: 'baja', accion: 'revisar_limpieza_material', detalle: '2 archivos retirados siguen en el almacenamiento' };
+    const huerfanos = { ...base, dominio: 'material', tipo: 'material_objeto_huerfano', fuente: 'storage.objects', fuente_id: 'huerfanos:t1',
+      severidad: 'baja', accion: 'revisar_objeto_huerfano', detalle: '2 archivos sin material registrado · 40 MB' };
+    h.filas = [sinArchivo, atascada, huerfanos];
+    montar();
+    expect(await screen.findByTestId('dominio-material')).toBeInTheDocument();
+    expect(screen.getByText('MATERIAL DE SESIONES · 3')).toBeInTheDocument();
+    expect(screen.getByText('Material que el miembro ve pero cuyo archivo no está')).toBeInTheDocument();
+    expect(screen.getByText('Archivos retirados que no se han podido borrar')).toBeInTheDocument();
+    expect(screen.getByText('Archivos sin material registrado')).toBeInTheDocument();
+    expect(screen.getByText(/EKKO no los borra solo/)).toBeInTheDocument();
+    expect(screen.queryByText('Reintentar')).toBeNull();
+    expect(screen.queryByText(/^Borrar|Eliminar/)).toBeNull();
+  });
+
   it('vacío legítimo → "Nada pendiente"; fallo al cargar → error, nunca "Nada pendiente"', async () => {
     h.filas = [];
     const { unmount } = montar();

@@ -353,6 +353,14 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
         THEN '✅ PASS' ELSE '❌ FALTA — 06C no aplicada' END);
 
 
+-- PKG-06E (20261018100000): ciclo de vida del material.
+INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
+('11 · Grants/RLS', '20261018100000_06e', 'RPC material_limpieza_pendiente + ramas de material en v_pendientes_operativos',
+ CASE WHEN to_regprocedure('public.material_limpieza_pendiente(integer)') IS NOT NULL
+         AND pg_get_viewdef('public.v_pendientes_operativos'::regclass) LIKE '%material_limpieza_atascada%'
+        THEN '✅ PASS' ELSE '❌ FALTA — 06E no aplicada' END);
+
+
 -- ////////////////////////////////////////////////////////////////////////////
 -- BLOQUE 12 — Índices / objetos varios
 -- ////////////////////////////////////////////////////////////////////////////

@@ -108,7 +108,10 @@ export function MaterialReservaModal({ reserva, miembroNombre, onClose }: Props)
     if (!window.confirm(`¿Retirar "${m.titulo}"? El miembro dejará de verlo y el archivo se borra.`)) return;
     setOcupado(m.id);
     try {
-      await eliminarMaterial(m.id);
+      const r = await eliminarMaterial(m.id);
+      // PKG-06E: "retirado" = el miembro ya no lo ve. Si el archivo no se pudo
+      // borrar todavía, se dice: lo reintenta la limpieza automática.
+      toast.success(r.limpiezaPendiente ? 'Material retirado. El archivo se borrará en la limpieza automática.' : 'Material retirado.');
       await cargar();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'No se pudo retirar.');

@@ -112,7 +112,8 @@ export async function subirArchivo(p: {
   const { error: upErr } = await supabase.storage
     .from(BUCKET_MATERIAL)
     .upload(ruta, p.archivo, { contentType: p.archivo.type || 'application/octet-stream', upsert: false });
-  if (upErr) throw new Error(`No se pudo subir el archivo: ${upErr.message}`);
+  // PKG-06E: el texto del proveedor de Storage no llega a la pantalla.
+  if (upErr) throw new Error(mensajeSubidaFallida(upErr));
 
   try {
     const { error } = await rpc('staff_registrar_material', {
@@ -128,10 +129,16 @@ export async function subirArchivo(p: {
     if (error) throw new Error(mensajeHumano(error.message));
   } catch (e) {
     // La fila no quedó (por un error de la RPC o por una falla de red/conexión
-    // a medio camino): no dejar el objeto huérfano ocupando espacio. Con
-    // .catch() porque si esta limpieza también falla, no debe tapar el error
-    // original que sí le vamos a mostrar al staff.
-    await supabase.storage.from(BUCKET_MATERIAL).remove([ruta]).catch(() => {});
+    // a medio camino): no dejar el objeto huérfano ocupando espacio. Si esta
+    // limpieza también falla (devuelve {error} o lanza), el error original es el
+    // que se muestra igual — la subida NO se da por buena — y el objeto queda sin
+    // fila: Operación lo muestra como "archivo sin material registrado" (PKG-06E)
+    // para que un humano decida; nunca se borra solo.
+    const limpieza = await supabase.storage
+      .from(BUCKET_MATERIAL)
+      .remove([ruta])
+      .catch((err: unknown) => ({ error: err }));
+    if (limpieza?.error) console.warn('[material] no se pudo limpiar la subida sin registro; quedará visible en Operación');
     throw e instanceof Error ? e : new Error('No se pudo registrar el archivo.');
   }
 }
@@ -147,13 +154,40 @@ export async function registrarEnlace(p: { reservaId: string; titulo: string; ur
   if (error) throw new Error(mensajeHumano(error.message));
 }
 
-export async function eliminarMaterial(materialId: string): Promise<void> {
+/** Texto fijo para una subida fallida: dice qué pasó, no el error del proveedor. */
+export function mensajeSubidaFallida(err: { message?: string; statusCode?: string | number } | null | undefined): string {
+  const status = String(err?.statusCode ?? '');
+  const m = (err?.message ?? '').toLowerCase();
+  if (status === '413' || m.includes('exceeded') || m.includes('too large') || m.includes('maximum allowed size')) {
+    return `El archivo es demasiado grande para la subida directa. Súbelo a Drive o Dropbox y usa "Pegar enlace".`;
+  }
+  return 'No se pudo subir el archivo. Revisa tu conexión e intenta de nuevo.';
+}
+
+export interface ResultadoRetiro {
+  /** true = el acceso terminó pero el archivo aún no se borró: lo reintenta la limpieza diaria. */
+  limpiezaPendiente: boolean;
+}
+
+/**
+ * Retirar = el miembro deja de verlo y de poder descargarlo (lo decide la base, en
+ * la RPC, ANTES de tocar Storage). Después se intenta borrar el objeto con la ruta
+ * que devolvió la base. PKG-06E (FR-43): si ese borrado falla, no se oculta — se
+ * informa `limpiezaPendiente` y el cron diario lo reintenta (la fila retirada con
+ * su objeto todavía presente ES la obligación pendiente). Retirar dos veces
+ * converge: la RPC devuelve la misma ruta sin error.
+ */
+export async function eliminarMaterial(materialId: string): Promise<ResultadoRetiro> {
   const { data, error } = await rpc('staff_eliminar_material', { p_material_id: materialId });
   if (error) throw new Error(mensajeHumano(error.message));
   const ruta = (data as { storage_path?: string | null } | null)?.storage_path;
-  // Best-effort: si falla, el cron de limpieza no lo verá (ya está retirado), pero
-  // el miembro tampoco puede descargarlo: la policy exige una fila vigente.
-  if (ruta) await supabase.storage.from(BUCKET_MATERIAL).remove([ruta]);
+  if (!ruta) return { limpiezaPendiente: false };
+  try {
+    const { error: rmErr } = await supabase.storage.from(BUCKET_MATERIAL).remove([ruta]);
+    return { limpiezaPendiente: Boolean(rmErr) };
+  } catch {
+    return { limpiezaPendiente: true };
+  }
 }
 
 export async function avisarMaterial(reservaId: string): Promise<{ yaAvisado: boolean }> {

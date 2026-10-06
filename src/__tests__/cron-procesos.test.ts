@@ -95,7 +95,10 @@ describe('PKG-06G · registro de corridas', () => {
     h.respuestas.material_vencido_por_borrar = { data: [] };
     await correr(material);
     expect(h.procesos.at(-1)).toEqual({ p_proceso: 'cron-material-vencido', p_estado: 'exito', p_clase_error: null });
+    // PKG-06E: las rutas a borrar salen de `material_limpieza_pendiente` (lo retirado
+    // cuyo objeto sigue en Storage), no solo de lo recién vencido.
     h.respuestas.material_vencido_por_borrar = { data: [{ storage_path: 't/a.mp4' }] };
+    h.respuestas.material_limpieza_pendiente = { data: [{ storage_path: 't/a.mp4' }] };
     h.remove.mockResolvedValue({ error: { message: 'bucket not found' } });
     await correr(material);
     expect(h.procesos.at(-1)).toEqual({ p_proceso: 'cron-material-vencido', p_estado: 'fallo', p_clase_error: 'almacenamiento' });

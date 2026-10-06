@@ -201,7 +201,29 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-Nada.
+- **PKG-06E "Ciclo de vida del material" — IMPLEMENTADO LOCALMENTE, en un commit
+  local SIN PUSH** (EKKO-147, FR-42..46). Migración `20261018100000_06e_ciclo_material.sql`
+  (NO aplicada en producción): RPC nueva `material_limpieza_pendiente` (solo
+  service_role: lo retirado cuyo objeto sigue en `storage.objects`); recreadas desde
+  su última definición `staff_eliminar_material` (idempotente) y
+  `staff_listar_material_pendiente` (sesión `completada` que nunca recibió material);
+  `v_pendientes_operativos` igual que 06B/06C salvo tres ramas de material (solo admin:
+  material sin archivo, limpieza atascada > 2 días, objetos huérfanos > 1 h,
+  agregados y sin rutas). Sin tabla ni columnas nuevas. Netlify: `cron-material-vencido`
+  borra por tandas todo lo pendiente y registra `fallo`/`parcial` honesto (06G). App:
+  subida sin texto crudo del proveedor y con limpieza compensatoria verificada; retirar
+  dice si el archivo quedó pendiente de borrar; Operación con el dominio "Material de
+  sesiones". Funciones: 139 → 140 en la base local (cambian `staff_eliminar_material` y
+  `staff_listar_material_pendiente`; nueva `material_limpieza_pendiente`; la base local
+  sin 06E = producción salvo `rls_auto_enable()`). Pruebas:
+  `db/06e-ciclo-material.db.test.ts` (17; 14 muerden sin la migración),
+  `cron-material-vencido` (8, nuevo), `material` (+11), `Operacion` (+1),
+  `cron-procesos` (contrato ajustado: las rutas salen de la limpieza pendiente).
+  Hardening 62/62 (antes 60); drift 75/75 (antes 74). Gate completo verde a la
+  primera: 223 archivos / 2201 pruebas, build OK, `git diff --check` OK (67 s, máquina
+  en reposo). Al activar, Operación mostrará los 2 objetos huérfanos de producción
+  (agregados) — esperado; no se borran (D-FIN-8). Activación: migración (aditiva) →
+  deploy; pendiente de autorización del dueño (`ekko-activar`).
 
 ## PKG-06C — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06C "Alta pública con correo verificado"** (EKKO-146, FR-24, D-FIN-6 = A) —
@@ -585,7 +607,8 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 Resolver desde el panel los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
 `activo_sin_derecho`). El backlog canónico final (reconciliación post-R1/R2/01/02/03)
 deja 2 paquetes (06B y 06C cerrados; ya no quedan P0, P1 ni P2): 06E (ciclo de vida
-del material) y 06F (agregación en el servidor); el siguiente recomendado es PKG-06E.
+del material; implementado en local, ver "Solo en local") y 06F (agregación en el
+servidor); el siguiente paso recomendado es la activación controlada de PKG-06E.
 Aparte, el hallazgo nuevo del correo de recuperación sin SMTP propio (ver
 "Residuales") requiere revisión del dueño antes de salir en vivo. Decisiones del dueño pendientes: D-FIN-2 (DSN de
 Sentry en producción: hoy no hay), D-FIN-3 (deploy previews con secretos LIVE),

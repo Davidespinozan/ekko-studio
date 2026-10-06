@@ -9,6 +9,8 @@ import {
   subirArchivo,
   marcarMaterialRequerido,
   listarMaterialPendiente,
+  eliminarMaterial,
+  mensajeSubidaFallida,
   type MaterialConSesion
 } from '../material';
 
@@ -156,5 +158,93 @@ describe('listarMaterialPendiente', () => {
   it('error → mensaje humano', async () => {
     h.rpc.mockResolvedValue({ data: null, error: { message: 'EKKO_NO_AUTH: Usuario no autenticado' } });
     await expect(listarMaterialPendiente()).rejects.toThrow('Usuario no autenticado');
+  });
+});
+
+describe('PKG-06E · subida: el error del proveedor no llega a la pantalla (FR-42)', () => {
+  const archivo = new File(['contenido'], 'video.mp4', { type: 'video/mp4' });
+  const p = { tenantId: 't1', usuarioId: 'u1', reservaId: 'r1', archivo, titulo: 'Título', diasDisponible: 30 };
+  beforeEach(() => {
+    h.upload.mockReset();
+    h.remove.mockReset().mockResolvedValue({ error: null });
+    h.rpc.mockReset();
+  });
+
+  it('5 · fallo de Storage al subir → texto fijo, sin el mensaje crudo; no se registra nada', async () => {
+    h.upload.mockResolvedValue({ error: { message: 'new row violates row-level security policy for table "objects"', statusCode: '403' } });
+    await expect(subirArchivo(p)).rejects.toThrow('No se pudo subir el archivo. Revisa tu conexión e intenta de nuevo.');
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+
+  it('demasiado grande (413 / "exceeded") → manda a "Pegar enlace"', () => {
+    expect(mensajeSubidaFallida({ message: 'The object exceeded the maximum allowed size', statusCode: '413' })).toMatch(/Pegar enlace/);
+    expect(mensajeSubidaFallida({ message: 'Payload too large' })).toMatch(/Pegar enlace/);
+    expect(mensajeSubidaFallida(null)).toBe('No se pudo subir el archivo. Revisa tu conexión e intenta de nuevo.');
+  });
+
+  it('3/4 · el registro falla Y la limpieza devuelve {error}: la subida NO se da por buena (error original)', async () => {
+    h.upload.mockResolvedValue({ error: null });
+    h.rpc.mockResolvedValue({ data: null, error: { message: 'EKKO_RESERVA_NO_VALIDA: No se entrega material de una sesión cancelada' } });
+    h.remove.mockResolvedValue({ data: null, error: { message: 'storage caído' } });
+    await expect(subirArchivo(p)).rejects.toThrow('No se entrega material de una sesión cancelada');
+    expect(h.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it('2 · el registro falla y la limpieza sí borra: mismo error original', async () => {
+    h.upload.mockResolvedValue({ error: null });
+    h.rpc.mockResolvedValue({ data: null, error: { message: 'EKKO_RUTA_INVALIDA: El archivo no está en la carpeta de esta reserva' } });
+    await expect(subirArchivo(p)).rejects.toThrow('El archivo no está en la carpeta de esta reserva');
+  });
+});
+
+describe('PKG-06E · retirar material (FR-43)', () => {
+  beforeEach(() => {
+    h.remove.mockReset();
+    h.rpc.mockReset();
+  });
+
+  it('6/8 · retira (la base primero) y borra el objeto con la ruta que devolvió la base → sin limpieza pendiente', async () => {
+    h.rpc.mockResolvedValue({ data: { success: true, ya_retirado: false, storage_path: 't1/u1/r1/a-video.mp4' }, error: null });
+    h.remove.mockResolvedValue({ data: [{ name: 't1/u1/r1/a-video.mp4' }], error: null });
+    expect(await eliminarMaterial('m1')).toEqual({ limpiezaPendiente: false });
+    expect(h.rpc).toHaveBeenCalledWith('staff_eliminar_material', { p_material_id: 'm1' });
+    expect(h.remove).toHaveBeenCalledWith(['t1/u1/r1/a-video.mp4']);
+  });
+
+  it('9 · Storage devuelve {error} → retirado igual, pero se dice que la limpieza queda pendiente', async () => {
+    h.rpc.mockResolvedValue({ data: { success: true, storage_path: 't1/u1/r1/a.mp4' }, error: null });
+    h.remove.mockResolvedValue({ data: null, error: { message: 'gateway timeout' } });
+    expect(await eliminarMaterial('m1')).toEqual({ limpiezaPendiente: true });
+  });
+
+  it('resultado desconocido (lanza) → limpieza pendiente, sin propagar el error crudo', async () => {
+    h.rpc.mockResolvedValue({ data: { success: true, storage_path: 't1/u1/r1/a.mp4' }, error: null });
+    h.remove.mockRejectedValue(new Error('NetworkError'));
+    expect(await eliminarMaterial('m1')).toEqual({ limpiezaPendiente: true });
+  });
+
+  it('10/11 · retirar dos veces converge (ya_retirado) y "ya no estaba" (data vacía, sin error) es éxito', async () => {
+    h.rpc.mockResolvedValue({ data: { success: true, ya_retirado: true, storage_path: 't1/u1/r1/a.mp4' }, error: null });
+    h.remove.mockResolvedValue({ data: [], error: null });
+    expect(await eliminarMaterial('m1')).toEqual({ limpiezaPendiente: false });
+  });
+
+  it('enlace (sin ruta) → no toca Storage', async () => {
+    h.rpc.mockResolvedValue({ data: { success: true, storage_path: null }, error: null });
+    expect(await eliminarMaterial('m1')).toEqual({ limpiezaPendiente: false });
+    expect(h.remove).not.toHaveBeenCalled();
+  });
+
+  it('12 · la ruta borrada es SOLO la de la base: la función no acepta una ruta del llamador', async () => {
+    h.rpc.mockResolvedValue({ data: { success: true, storage_path: 't1/u1/r1/b.mp4' }, error: null });
+    h.remove.mockResolvedValue({ data: [], error: null });
+    await (eliminarMaterial as unknown as (id: string, ruta: string) => Promise<unknown>)('m1', 'otro-tenant/x/y/z.mp4');
+    expect(h.remove).toHaveBeenCalledWith(['t1/u1/r1/b.mp4']);
+  });
+
+  it('error de la RPC (p. ej. otro estudio) → mensaje humano y Storage intacto', async () => {
+    h.rpc.mockResolvedValue({ data: null, error: { message: 'EKKO_MATERIAL_NO_EXISTE: Material no encontrado' } });
+    await expect(eliminarMaterial('m1')).rejects.toThrow('Material no encontrado');
+    expect(h.remove).not.toHaveBeenCalled();
   });
 });

@@ -1052,3 +1052,32 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   Un alta pendiente abandonada es una cuenta de Auth sin perfil: no da acceso y la
   limpia el alta del staff (EKKO-142). Sin CAPTCHA (escalamiento futuro si hay
   abuso real). **Refina EKKO-095 y EKKO-142; cierra FR-24.**
+
+## PKG-06E — ciclo de vida del material (2026-10-06)
+
+- **EKKO-147 — PKG-06E · La base y Storage pueden divergir un rato, pero nunca en
+  silencio.** No hay transacción entre la base y Storage y no se finge. El estado de
+  NEGOCIO sigue siendo la fila (`eliminado_at` = acceso terminado por retiro o
+  barrido; `disponible_hasta` = vigencia) y manda primero: retirar o vencer quita el
+  acceso antes de tocar Storage. El estado de LIMPIEZA se deriva, sin tabla ni
+  columnas nuevas, comparando la fila con los metadatos de Storage (`storage.objects`,
+  en la misma base: sin listar por API ni escaneos parciales): retirada con objeto
+  presente = limpieza pendiente; retirada sin objeto = completa (incluye "ya no
+  estaba"); viva sin objeto = material sin archivo; objeto sin fila = huérfano.
+  (1) FR-42: la subida no se da por buena si el registro falla; la limpieza
+  compensatoria revisa su resultado y, si falla, el objeto queda como huérfano visible;
+  el texto del proveedor no llega a la pantalla. (2) FR-43: `staff_eliminar_material`
+  es idempotente (retirar dos veces devuelve la misma ruta, sin otra auditoría) y el
+  navegador informa si el archivo no se pudo borrar ("se borrará en la limpieza
+  automática"). (3) FR-44: el cron diario borra TODO lo retirado cuyo objeto sigue
+  (`material_limpieza_pendiente`, solo service_role, rutas de la base), por tandas;
+  un fallo queda pendiente para la siguiente corrida y 06G registra `fallo`/`parcial`
+  con clase `almacenamiento` (sin segundo sistema de latidos). (4) FR-45: Operación
+  (solo admin, su estudio) muestra material sin archivo (por material), limpieza
+  atascada > 2 días y objetos huérfanos > 1 h (agregados por estudio, sin rutas).
+  Los huérfanos NUNCA se borran solos: D-FIN-8 (los 2 de producción) sigue siendo
+  decisión del dueño. (5) FR-46: material pendiente = sesión con check-in
+  (`completada`), que requiere material y nunca recibió ninguno; lo vencido, barrido o
+  retirado ya se entregó. D-FIN-5 (acceso de un miembro sancionado/revocado a su
+  material) no se decide aquí: el acceso sigue igual. **Extiende EKKO-075; respeta
+  EKKO-144 (06G).**

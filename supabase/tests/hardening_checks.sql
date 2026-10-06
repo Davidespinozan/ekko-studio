@@ -354,5 +354,29 @@ SELECT 'P4', 'contrato 06C: sin correo verificado no hay identidad EKKO; la conf
          AND (SELECT prosrc FROM pg_proc WHERE proname='alta_publica_solicitar' AND pronamespace='public'::regnamespace) LIKE '%EKKO_PLAN_NO_DISPONIBLE%'
        THEN '✅ PASS' ELSE '❌ FAIL — se perdió una guardia de 06C' END;
 
+-- PKG-06E (20261018100000): ciclo de vida del material. La limpieza la decide la
+-- base (solo lo retirado cuyo objeto sigue) y solo la lee el servidor; retirar es
+-- idempotente; pendiente = sesión con check-in que nunca recibió material; ningún
+-- objeto sin fila se propone para borrar.
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'RPC de 06E: material_limpieza_pendiente solo service_role',
+  CASE WHEN to_regprocedure('public.material_limpieza_pendiente(integer)') IS NULL THEN '❌ FAIL — 06E no aplicada'
+       WHEN NOT has_function_privilege('anon', 'public.material_limpieza_pendiente(integer)', 'EXECUTE')
+         AND NOT has_function_privilege('authenticated', 'public.material_limpieza_pendiente(integer)', 'EXECUTE')
+         AND has_function_privilege('service_role', 'public.material_limpieza_pendiente(integer)', 'EXECUTE')
+       THEN '✅ PASS' ELSE '❌ FAIL — la limpieza de material es invocable desde el cliente' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P4', 'contrato 06E: limpieza solo de lo retirado con fila; retirar idempotente; pendiente sin falsos positivos; huérfanos visibles y nunca borrados',
+  CASE WHEN to_regprocedure('public.material_limpieza_pendiente(integer)') IS NULL THEN '❌ FAIL — 06E no aplicada'
+       WHEN (SELECT prosrc FROM pg_proc WHERE proname='material_limpieza_pendiente' AND pronamespace='public'::regnamespace) LIKE '%m.eliminado_at IS NOT NULL%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='material_limpieza_pendiente' AND pronamespace='public'::regnamespace) !~* 'delete\s+from'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='staff_eliminar_material' AND pronamespace='public'::regnamespace) LIKE '%ya_retirado%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='staff_listar_material_pendiente' AND pronamespace='public'::regnamespace) LIKE '%r.status = ''completada''%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='staff_listar_material_pendiente' AND pronamespace='public'::regnamespace) NOT LIKE '%m.eliminado_at IS NULL%'
+         AND pg_get_viewdef('public.v_pendientes_operativos'::regclass) LIKE '%material_objeto_huerfano%'
+         AND pg_get_viewdef('public.v_pendientes_operativos'::regclass) LIKE '%material_sin_archivo%'
+         AND NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.prosrc ~* 'delete\s+from\s+storage\.objects')
+       THEN '✅ PASS' ELSE '❌ FAIL — se perdió una guardia de 06E' END;
+
 -- ── Resultado ────────────────────────────────────────────────────────────────
 SELECT area, caso, resultado FROM _hardening_resultado ORDER BY id;

@@ -103,6 +103,7 @@ rediscute sin evidencia nueva.
 ## Producto y panel
 - EKKO-017, EKKO-018, EKKO-024, EKKO-055, EKKO-056 — acceso, ficha admin, reservas por recepción, asignar plan, ajuste de créditos.
 - EKKO-071, EKKO-072, EKKO-075, EKKO-082, EKKO-087 — disponibilidad por sondeo, calendario, material, pago por hora, atajos de mostrador.
+- EKKO-147 (PKG-06E) — ciclo de vida del material: el negocio (fila) manda primero; la limpieza de Storage se deriva fila ↔ `storage.objects`, la reintenta el cron y la ve Operación; huérfanos visibles, nunca borrados solos; pendiente = sesión con check-in que nunca recibió material.
 - EKKO-067, EKKO-079, EKKO-080 — banner de instalar, centro de pendientes, reset de contraseña del equipo.
 - EKKO-054, EKKO-077 — la ficha decide por el estado de la MEMBRESÍA; la ficha admin reusa la tarjeta y modales de recepción.
 - Series antiguas: D5, R3, R6 (recepción).

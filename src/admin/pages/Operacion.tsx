@@ -21,9 +21,11 @@ const TITULO_DOMINIO: Record<string, string> = {
   entrega: 'Avisos que no se entregaron',
   membresia: 'Membresías inconsistentes',
   // PKG-06G
-  procesos: 'Procesos automáticos'
+  procesos: 'Procesos automáticos',
+  // PKG-06E
+  material: 'Material de sesiones'
 };
-const ORDEN_DOMINIO = ['procesos', 'cobro', 'stripe', 'finanzas', 'membresia', 'entrega'];
+const ORDEN_DOMINIO = ['procesos', 'cobro', 'stripe', 'finanzas', 'membresia', 'entrega', 'material'];
 
 const LABEL_TIPO: Record<string, string> = {
   ...LABEL_TIPO_REVISION,
@@ -58,7 +60,11 @@ const LABEL_TIPO: Record<string, string> = {
   reconciliacion_atrasada: 'La reconciliación diaria con Stripe no ha corrido',
   proceso_atrasado: 'Un proceso automático no ha corrido a tiempo',
   proceso_fallando: 'Un proceso automático está fallando',
-  push_no_entregado: 'Avisos push que no llegaron al teléfono'
+  push_no_entregado: 'Avisos push que no llegaron al teléfono',
+  // PKG-06E · la fila de material y su archivo en el almacenamiento no coinciden
+  material_sin_archivo: 'Material que el miembro ve pero cuyo archivo no está',
+  material_limpieza_atascada: 'Archivos retirados que no se han podido borrar',
+  material_objeto_huerfano: 'Archivos sin material registrado'
 };
 
 const LABEL_ACCION: Record<string, string> = {
@@ -74,7 +80,10 @@ const LABEL_ACCION: Record<string, string> = {
   reconciliacion_atrasada: 'Revisa en Netlify que la función programada cron-reconciliar-stripe siga activa y sin errores. Desaparece sola cuando vuelva a correr.',
   revisar_cambio_plan: 'Compara el plan en el panel de Stripe con la ficha. Si el miembro reintenta con la misma operación, converge solo; si no, descártalo con nota cuando lo hayas resuelto. EKKO no lo cambia por su cuenta.',
   revisar_proceso: 'Revisa en Netlify (Functions → la función programada) que esté activa y sus registros. EKKO no lo corre ni lo repara solo; desaparece cuando vuelva a correr bien.',
-  revisar_fallos_push: 'Lo que se avisó SÍ ocurrió y el aviso sigue en la campana de la app: solo no llegó como notificación al teléfono. Si se repite, revisa la configuración de push. Márcalo como revisado.'
+  revisar_fallos_push: 'Lo que se avisó SÍ ocurrió y el aviso sigue en la campana de la app: solo no llegó como notificación al teléfono. Si se repite, revisa la configuración de push. Márcalo como revisado.',
+  revisar_material_sin_archivo: 'El miembro no podrá descargarlo. Desde su ficha, vuelve a subir el archivo o retíralo. Desaparece solo cuando coincidan.',
+  revisar_limpieza_material: 'El miembro ya no tiene acceso; solo ocupan espacio. La limpieza diaria los reintenta sola; si no baja, revisa la función cron-material-vencido en Netlify.',
+  revisar_objeto_huerfano: 'Archivos en el almacenamiento que ningún material nombra (p. ej. una subida que no terminó). EKKO no los borra solo: decide qué hacer con ellos.'
 };
 
 /** PKG-06B: la suscripción ANTERIOR sin cancelar tras activar otra se nombra por lo
