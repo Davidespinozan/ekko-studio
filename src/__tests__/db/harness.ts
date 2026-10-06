@@ -37,6 +37,9 @@ CREATE TABLE auth.users (
   encrypted_password text,
   raw_user_meta_data jsonb DEFAULT '{}'::jsonb,
   raw_app_meta_data jsonb DEFAULT '{}'::jsonb,
+  -- Como en producción. Las altas del staff (createUser con email_confirm=true)
+  -- nacen confirmadas: ese es el default. Una alta pública nace con NULL (PKG-06C).
+  email_confirmed_at timestamptz DEFAULT now(),
   created_at timestamptz DEFAULT now()
 );
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$

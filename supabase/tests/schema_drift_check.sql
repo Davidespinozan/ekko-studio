@@ -342,6 +342,17 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
         THEN '✅ PASS' ELSE '❌ FALTA — 06B no aplicada' END);
 
 
+-- PKG-06C (20261017100000): alta pública con correo verificado.
+INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
+('11 · Grants/RLS', '20261017100000_06c', 'alta_publica_intentos (huellas HMAC, RLS sin políticas) + RPC alta_publica_solicitar',
+ CASE WHEN to_regclass('public.alta_publica_intentos') IS NOT NULL
+         AND to_regprocedure('public.alta_publica_solicitar(text, text, text, text)') IS NOT NULL
+        THEN '✅ PASS' ELSE '❌ FALTA — 06C no aplicada' END),
+('11 · Grants/RLS', '20261017100000_06c', 'trigger on_auth_user_confirmed en auth.users (la confirmación del correo da la identidad EKKO)',
+ CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'on_auth_user_confirmed' AND tgrelid = 'auth.users'::regclass)
+        THEN '✅ PASS' ELSE '❌ FALTA — 06C no aplicada' END);
+
+
 -- ////////////////////////////////////////////////////////////////////////////
 -- BLOQUE 12 — Índices / objetos varios
 -- ////////////////////////////////////////////////////////////////////////////

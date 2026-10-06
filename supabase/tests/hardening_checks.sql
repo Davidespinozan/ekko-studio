@@ -326,5 +326,33 @@ SELECT 'P4', 'contrato 06B: preparar no entrega cambiar_plan; la sub anterior es
          AND (SELECT prosrc FROM pg_proc WHERE proname='staff_reintentar_operacion_cobro' AND pronamespace='public'::regnamespace) LIKE '%EKKO_OPERACION_NO_REINTENTABLE%'
        THEN '✅ PASS' ELSE '❌ FAIL — se perdió una guardia de 06B' END;
 
+-- PKG-06C (20261017100000): alta pública con correo verificado. El límite y la
+-- clasificación son del servidor; ningún cliente lee ni escribe los intentos; sin
+-- correo confirmado no hay identidad EKKO y el alta pública no vincula staff.
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'RPC de 06C: alta_publica_solicitar solo service_role; alta_publica_intentos sin acceso de clientes',
+  CASE WHEN to_regclass('public.alta_publica_intentos') IS NULL
+            OR to_regprocedure('public.alta_publica_solicitar(text, text, text, text)') IS NULL
+       THEN '❌ FAIL — 06C no aplicada'
+       WHEN NOT has_function_privilege('anon', 'public.alta_publica_solicitar(text, text, text, text)', 'EXECUTE')
+         AND NOT has_function_privilege('authenticated', 'public.alta_publica_solicitar(text, text, text, text)', 'EXECUTE')
+         AND has_function_privilege('service_role', 'public.alta_publica_solicitar(text, text, text, text)', 'EXECUTE')
+         AND NOT has_table_privilege('anon', 'public.alta_publica_intentos', 'SELECT')
+         AND NOT has_table_privilege('authenticated', 'public.alta_publica_intentos', 'SELECT')
+         AND NOT has_table_privilege('authenticated', 'public.alta_publica_intentos', 'INSERT')
+         AND NOT has_table_privilege('authenticated', 'public.alta_publica_intentos', 'DELETE')
+         AND (SELECT relrowsecurity FROM pg_class WHERE oid = to_regclass('public.alta_publica_intentos'))
+       THEN '✅ PASS' ELSE '❌ FAIL — el alta pública o sus intentos son accesibles desde el cliente' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P4', 'contrato 06C: sin correo verificado no hay identidad EKKO; la confirmación re-ejecuta el alta; el alta pública no vincula staff; límite de tasa presente',
+  CASE WHEN to_regprocedure('public.alta_publica_solicitar(text, text, text, text)') IS NULL THEN '❌ FAIL — 06C no aplicada'
+       WHEN (SELECT prosrc FROM pg_proc WHERE proname='handle_new_auth_user' AND pronamespace='public'::regnamespace) LIKE '%NEW.email_confirmed_at IS NULL%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='handle_new_auth_user' AND pronamespace='public'::regnamespace) LIKE '%EKKO_ALTA_PUBLICA_PERFIL_STAFF%'
+         AND EXISTS (SELECT 1 FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid
+                     WHERE t.tgname = 'on_auth_user_confirmed' AND t.tgrelid = 'auth.users'::regclass AND p.proname = 'handle_new_auth_user')
+         AND (SELECT prosrc FROM pg_proc WHERE proname='alta_publica_solicitar' AND pronamespace='public'::regnamespace) LIKE '%limitado%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='alta_publica_solicitar' AND pronamespace='public'::regnamespace) LIKE '%EKKO_PLAN_NO_DISPONIBLE%'
+       THEN '✅ PASS' ELSE '❌ FAIL — se perdió una guardia de 06C' END;
+
 -- ── Resultado ────────────────────────────────────────────────────────────────
 SELECT area, caso, resultado FROM _hardening_resultado ORDER BY id;

@@ -74,6 +74,7 @@ rediscute sin evidencia nueva.
 - EKKO-136 (PKG-02C) — gate `cambiar_password` del servidor; avisos solo leído/no leído; autor de notas del servidor; anon sin escritura ni EXECUTE.
 - EKKO-143 (PKG-06D) — frontera de columnas para el cliente (grants por columna + RPC de staff); el texto de búsqueda es parámetro; un error interno nunca viaja crudo (`errorInterno` + marca `seguro`); CSP estricta en scripts; sin source maps en producción; la hidratación de sesión nunca se queda en "cargando".
 - EKKO-142 (PKG-06A, D-FIN-1 = A) — operaciones compuestas de cuenta por RPC con actor explícito; el correo no prueba identidad (vincular solo cascarón o perfil autorizado); sin borrado físico con historial durable; compensación por propiedad y respuesta parcial honesta.
+- EKKO-146 (PKG-06C, D-FIN-6 = A) — alta pública con correo verificado por el proveedor: sin confirmación no hay identidad EKKO; la contraseña se elige después de probar el buzón; límite de tasa durable con huellas HMAC; respuesta sin enumeración; nunca rol, plan pagado ni perfil de staff.
 - EKKO-083 — nunca dejar el estudio sin admin activo. EKKO-039, EKKO-040 — staff inactivo sin poderes; alcance de recepción.
 - EKKO-020 — privilegios de funciones y columnas. EKKO-042 — cuentas demo sin contraseña fija.
 - EKKO-092, EKKO-093, EKKO-094, EKKO-095, EKKO-096, EKKO-097 — ficha de identidad por PATCH, contrato como evento, avatar como identidad, alta en Auth, correo único, sin `membresia_tier` por recepción.

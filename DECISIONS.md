@@ -1020,3 +1020,35 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   identidad, nunca una operación nueva. 03B sigue detect-only: la operación dice qué
   intentó EKKO, la discrepancia qué no coincide hoy; pueden convivir. **Extiende a
   EKKO-131, EKKO-137 y EKKO-141; no reabre R1, R2-B, 02H ni EKKO-138.**
+
+## PKG-06C — alta pública con correo verificado (2026-10-06)
+
+- **EKKO-146 — PKG-06C · El registro público pide la cuenta; la identidad EKKO
+  nace cuando el proveedor de Auth comprueba el correo (D-FIN-6 = A).** El alta
+  pública sigue abierta (el dueño la conserva; no se sustituye por alta solo en
+  recepción). Escribir un correo no prueba nada: `handle_new_auth_user` no crea ni
+  vincula identidad mientras `email_confirmed_at` sea NULL y la misma función corre
+  al confirmarse el correo (`on_auth_user_confirmed`). Las altas del staff nacen
+  confirmadas y no cambian. `alta-publica` (sustituye a `fake-signup`, que queda
+  inerte con 410) crea la cuenta de Auth SIN confirmar y SIN contraseña; el
+  proveedor genera el token (`generateLink`, sin enviar) y EKKO manda el enlace por
+  su remitente verificado de Resend, porque el proyecto no tiene SMTP propio en
+  Auth (el remitente por defecto solo entrega a direcciones del equipo y 2 por
+  hora); el token no se guarda en tablas. El dueño del buzón abre el enlace
+  (`/confirmar-correo`, `verifyOtp`) y ELIGE su contraseña después de probar el
+  buzón: nadie puede sembrar una contraseña en la cuenta de otro. El perfil nuevo
+  nace `miembro` / `pendiente_pago` con el plan solo si sigue en venta, con
+  auditoría `alta_publica_verificada`; nada de rol, estudio, créditos, membresía,
+  sanción ni Stripe sale de la metadata o del body. Vincular un perfil existente
+  sigue EKKO-142 (cascarón o acceso autorizado; sin reescribir rol, status ni plan;
+  la confirmación entera se revierte si no es seguro) y el alta pública nunca
+  vincula un perfil de staff. Límite durable (`alta_publica_intentos`, solo huellas
+  HMAC con llave del servidor, 24 h): por correo 1 por minuto y 5 al día
+  (excedido = silencio, no error), por origen de red (`x-nf-client-connection-ip`,
+  IPv6 por /64; `x-forwarded-for` se ignora) 5 en 10 min y 20 al día, y 60 por hora
+  para el estudio; solo cuentan las solicitudes aceptadas. Respuesta pública única
+  ("si el correo puede usarse…") exista o no la cuenta; 429 genérico por origen o
+  estudio; 503 honesto si el proveedor no aceptó el correo; nunca errores crudos.
+  Un alta pendiente abandonada es una cuenta de Auth sin perfil: no da acceso y la
+  limpia el alta del staff (EKKO-142). Sin CAPTCHA (escalamiento futuro si hay
+  abuso real). **Refina EKKO-095 y EKKO-142; cierra FR-24.**

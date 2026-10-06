@@ -25,7 +25,9 @@ export const REMITENTE_EKKO = 'EKKO Studio <notificaciones@mail.ekkostudio.app>'
 const APP_URL = optionalEnv('EKKO_APP_URL', 'https://ekkostudio.app');
 const TIMEOUT_DEFAULT_MS = 5000;
 
-export type PlantillaEmail = 'pago_fallido' | 'bienvenida' | 'recibo' | 'paquete_comprado' | 'aviso';
+// `verificacion_correo` (PKG-06C): el enlace de confirmación del alta pública. Lo
+// manda la function de alta directamente; no pasa por la cola de notificaciones.
+export type PlantillaEmail = 'pago_fallido' | 'bienvenida' | 'recibo' | 'paquete_comprado' | 'aviso' | 'verificacion_correo';
 
 export type MotivoFalloEmail = 'timeout' | 'red' | 'http_4xx' | 'http_5xx' | 'destinatario_invalido';
 

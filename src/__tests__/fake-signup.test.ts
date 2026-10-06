@@ -1,120 +1,35 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 /**
- * Tests de seguridad de la Netlify Function `fake-signup` (SEC-FIX C1).
- *
- * El agujero original: endpoint público SIN autenticación que, con
- * `service_role`, creaba cuentas `status='activo'` + un `payment_event`
- * 'fake_succeeded' → cualquiera con `curl` se daba de alta una cuenta
- * activa ilimitada, gratis (bypass de monetización).
- *
- * El fix: la cuenta nace `pendiente_pago` (inerte — el RPC de reserva
- * exige `status='activo'`) y NO se finge ningún pago.
+ * `fake-signup` quedó RETIRADO en PKG-06C (FR-24): creaba la cuenta con el correo
+ * auto-confirmado, sin límite, delatando cuentas existentes y reescribiendo el
+ * perfil vinculado. Ahora es un stub inerte: no crea cliente de Supabase, no toca
+ * Auth ni la base y responde 410 con un texto escrito a mano (la copia vieja de la
+ * app en caché lo muestra tal cual). El registro vive en `alta-publica`.
  */
 
-const mockCreateUser = vi.fn();
-const mockDeleteUser = vi.fn();
-const tablasTocadas: string[] = [];
-const updatePayloads: Record<string, unknown>[] = [];
-
-interface QueryBuilder {
-  select: () => QueryBuilder;
-  eq: () => QueryBuilder;
-  update: (payload: Record<string, unknown>) => QueryBuilder;
-  insert: () => Promise<{ error: null }>;
-  single: () => Promise<{ data: Record<string, unknown> | null; error: null }>;
-}
-
-function builder(tabla: string): QueryBuilder {
-  const b: QueryBuilder = {
-    select: () => b,
-    eq: () => b,
-    update: (payload) => {
-      updatePayloads.push(payload);
-      return b;
-    },
-    insert: () => Promise.resolve({ error: null }),
-    single: () => {
-      if (tabla === 'tenants') return Promise.resolve({ data: { id: 'tenant-ekko' }, error: null });
-      if (tabla === 'tiers') return Promise.resolve({ data: { slug: 'pro' }, error: null });
-      if (tabla === 'usuarios') return Promise.resolve({ data: { id: 'u-nuevo' }, error: null });
-      return Promise.resolve({ data: null, error: null });
-    }
-  };
-  return b;
-}
-
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: vi.fn(() => ({
-    auth: { admin: { createUser: mockCreateUser, deleteUser: mockDeleteUser } },
-    from: vi.fn((tabla: string) => {
-      tablasTocadas.push(tabla);
-      return builder(tabla);
-    })
-  }))
-}));
+const mockCreateClient = vi.fn();
+vi.mock('@supabase/supabase-js', () => ({ createClient: (...a: unknown[]) => mockCreateClient(...a) }));
 
 import { handler } from '../../netlify/functions/fake-signup';
 
 type AnyEvent = Parameters<typeof handler>[0];
 
-const BODY_OK = { nombre: 'Cliente Nuevo', email: 'nuevo@x.com', password: 'password123', tier: 'pro' };
-
-function evento(body: unknown): AnyEvent {
-  return { httpMethod: 'POST', headers: {}, body: JSON.stringify(body) } as unknown as AnyEvent;
-}
-
-async function invocar(event: AnyEvent) {
-  const res = await handler(event, {} as never, () => {});
-  return res as { statusCode: number; body: string };
-}
-
-describe('fake-signup · SEC-FIX C1', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    tablasTocadas.length = 0;
-    updatePayloads.length = 0;
+describe('fake-signup · retirado (PKG-06C)', () => {
+  it('cualquier llamada (aun con datos válidos o privilegiados) → 410 seguro, sin Supabase', async () => {
     process.env.VITE_SUPABASE_URL = 'http://supabase.test';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
-    mockCreateUser.mockResolvedValue({ data: { user: { id: 'auth-nuevo' } }, error: null });
-  });
-
-  it('crea la cuenta como pendiente_pago — NUNCA activo', async () => {
-    const res = await invocar(evento(BODY_OK));
-    expect(res.statusCode).toBe(200);
-
-    const updateUsuarios = updatePayloads[0];
-    expect(updateUsuarios.status).toBe('pendiente_pago');
-    expect(updateUsuarios.status).not.toBe('activo');
-  });
-
-  it('NO inserta en payment_events — no finge un pago', async () => {
-    await invocar(evento(BODY_OK));
-    expect(tablasTocadas).not.toContain('payment_events');
-  });
-
-  it('rechaza método que no sea POST', async () => {
-    const res = await invocar({ httpMethod: 'GET', headers: {}, body: null } as unknown as AnyEvent);
-    expect(res.statusCode).toBe(405);
-  });
-
-  it('acepta un paquete de créditos (sin allowlist hardcodeada basica/pro)', async () => {
-    // La validez del plan la decide la BD (existe + activo + del tenant), no una
-    // lista fija en código → un slug de paquete como "creador" debe pasar.
-    const res = await invocar(evento({ ...BODY_OK, tier: 'creador' }));
-    expect(res.statusCode).toBe(200);
-  });
-
-  it('rechaza tier que no sea string', async () => {
-    const res = await invocar(evento({ ...BODY_OK, tier: { hack: true } }));
-    expect(res.statusCode).toBe(400);
-  });
-
-  it('normaliza el correo en el servidor (trim + minúsculas) y recorta el nombre', async () => {
-    await invocar(evento({ nombre: '  Ana Núñez ', email: '  Ana.Nunez@EKKO.mx ', password: 'secreta123', tier: 'pro' }));
-    expect(mockCreateUser).toHaveBeenCalledTimes(1);
-    const arg = mockCreateUser.mock.calls[0][0] as { email: string; user_metadata: { nombre: string } };
-    expect(arg.email).toBe('ana.nunez@ekko.mx');
-    expect(arg.user_metadata.nombre).toBe('Ana Núñez');
+    for (const body of [
+      { nombre: 'Cliente', email: 'nuevo@x.com', password: 'password123', tier: 'pro' },
+      { nombre: 'X', email: 'a@b.mx', password: 'p', tier: 'pro', rol: 'admin', status: 'activo' }
+    ]) {
+      const res = (await handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify(body) } as unknown as AnyEvent, {} as never, () => {})) as {
+        statusCode: number;
+        body: string;
+      };
+      expect(res.statusCode).toBe(410);
+      expect(JSON.parse(res.body)).toEqual({ error: 'El registro se actualizó. Recarga la página para continuar.', seguro: true });
+    }
+    expect(mockCreateClient).not.toHaveBeenCalled();
   });
 });

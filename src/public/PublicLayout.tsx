@@ -12,6 +12,7 @@ const Terminos = lazy(() => import('./pages/Terminos'));
 const Privacidad = lazy(() => import('./pages/Privacidad'));
 const RecuperarContrasena = lazy(() => import('./pages/RecuperarContrasena'));
 const NuevaContrasena = lazy(() => import('./pages/NuevaContrasena'));
+const ConfirmarCorreo = lazy(() => import('./pages/ConfirmarCorreo'));
 
 export default function PublicLayout() {
   const { authUser, signOut } = useAuth();
@@ -78,6 +79,7 @@ export default function PublicLayout() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/recuperar" element={<RecuperarContrasena />} />
           <Route path="/nueva-contrasena" element={<NuevaContrasena />} />
+          <Route path="/confirmar-correo" element={<ConfirmarCorreo />} />
           <Route path="/terminos" element={<Terminos />} />
           <Route path="/privacidad" element={<Privacidad />} />
         </Routes>

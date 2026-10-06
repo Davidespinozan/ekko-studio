@@ -194,7 +194,27 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-Nada.
+- **PKG-06C "Alta pública con correo verificado" — IMPLEMENTADO LOCALMENTE, en un
+  commit local SIN PUSH** (EKKO-146, FR-24, D-FIN-6 = A). Migración
+  `20261017100000_06c_alta_publica_verificada.sql` (NO aplicada en producción):
+  `handle_new_auth_user` recreada desde su última definición (06A) con la guarda
+  "sin correo confirmado no hay identidad EKKO" y enganchada además al trigger nuevo
+  `on_auth_user_confirmed`; tabla `alta_publica_intentos` (huellas HMAC, RLS sin
+  políticas, sin grants a clientes) y RPC `alta_publica_solicitar` (solo
+  service_role). Netlify: `alta-publica` nueva (cuenta de Auth sin confirmar ni
+  contraseña, enlace del proveedor enviado por Resend, respuesta neutra, límite de
+  tasa); `fake-signup` inerte (410). App: `/signup` ya no pide contraseña ni inicia
+  sesión; `/confirmar-correo` verifica el enlace y pide la contraseña. Funciones:
+  138 → 139 en la base local (cambia solo `handle_new_auth_user`; nueva
+  `alta_publica_solicitar`; la base local sin 06C = producción salvo
+  `rls_auto_enable()`). Pruebas: `db/06c-alta-publica.db.test.ts` (21; 19 muerden sin
+  la migración), `alta-publica` (19), `fake-signup` (reescrita, 1), `Signup` (6),
+  `ConfirmarCorreo` (7). Hardening 60/60 (antes 58); drift 74/74 (antes 72). Gate
+  completo verde a la primera: 221 archivos / 2164 pruebas, build OK, `git diff
+  --check` OK (58 s, máquina en reposo). Sin cambio de configuración de Auth en
+  producción (registro directo ya apagado; remitente de Auth sin SMTP propio, por eso
+  el enlace sale por Resend, ya configurado). Activación: migración (aditiva) →
+  deploy; pendiente de autorización del dueño (`ekko-activar`).
 
 ## PKG-06B — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06B "Operaciones de cobro del miembro y del webhook"** (EKKO-145) — commit
@@ -517,9 +537,10 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 ## Siguiente paso
 Resolver desde el panel los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
 `activo_sin_derecho`). El backlog canónico final (reconciliación post-R1/R2/01/02/03)
-deja 3 paquetes (06B cerrado): 06C (alta pública con verificación, FR-24, el último P2),
-06E (ciclo de vida del material), 06F (agregación en el servidor); el siguiente
-recomendado es PKG-06C. Decisiones del dueño pendientes: D-FIN-2 (DSN de
+deja 3 paquetes (06B cerrado): 06C (alta pública con verificación, FR-24, el último P2;
+implementado en local, ver "Solo en local"), 06E (ciclo de vida del material), 06F
+(agregación en el servidor); el siguiente paso recomendado es la activación
+controlada de PKG-06C. Decisiones del dueño pendientes: D-FIN-2 (DSN de
 Sentry en producción: hoy no hay), D-FIN-3 (deploy previews con secretos LIVE),
 D-FIN-4 (cuentas demo al salir), D-FIN-8 (2 objetos huérfanos de Storage), respaldo y
 simulacro de restauración, cuál versión del enlace de Login queda (publicada vs stash).

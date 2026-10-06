@@ -1,6 +1,6 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { useSearchParams, Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, Check, Eye, EyeOff, AlertCircle, User } from 'lucide-react';
+import { ArrowLeft, Check, AlertCircle, User, Mail } from 'lucide-react';
 import { supabase } from '@shared/lib/supabase';
 import { parseBeneficios } from '@shared/lib/beneficios';
 import { sufijoPrecio, detallePlan } from '@shared/lib/planPresentacion';
@@ -28,6 +28,17 @@ interface TierRow {
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** PKG-06C: lo mismo que dice el servidor; respaldo si la respuesta no trae texto. */
+const MENSAJE_NEUTRO =
+  'Si el correo puede usarse para una cuenta nueva, te enviamos un enlace para confirmarlo. Revisa tu bandeja de entrada y la carpeta de spam. Si ya tienes cuenta, inicia sesión.';
+const ESPERA_REENVIO_MS = 60_000;
+
+interface Enviado {
+  nombre: string;
+  email: string;
+  mensaje: string;
+}
 
 function useTierPorSlug(slug: string) {
   const [tier, setTier] = useState<TierRow | null>(null);
@@ -65,12 +76,19 @@ export default function Signup() {
   const [nombre, setNombre] = useState('');
   const [email, setEmail] = useState('');
   const [emailConfirm, setEmailConfirm] = useState('');
-  const [password, setPassword] = useState('');
-  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [acepto, setAcepto] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // PKG-06C: tras pedir el alta se espera al correo; reenviar se habilita al minuto.
+  const [enviado, setEnviado] = useState<Enviado | null>(null);
+  const [puedeReenviar, setPuedeReenviar] = useState(false);
+
+  useEffect(() => {
+    if (!enviado) return;
+    setPuedeReenviar(false);
+    const t = setTimeout(() => setPuedeReenviar(true), ESPERA_REENVIO_MS);
+    return () => clearTimeout(t);
+  }, [enviado]);
 
   const plan: PlanInfo | null = tierRow
     ? {
@@ -99,8 +117,39 @@ export default function Signup() {
     }
   };
 
+  /**
+   * PKG-06C (FR-24): el alta pública solo PIDE la cuenta. El servidor responde
+   * igual exista o no (sin enumeración) y manda un enlace al correo; la cuenta
+   * nace cuando el dueño del buzón lo abre, y ahí elige su contraseña. Aquí no
+   * se crea sesión ni se inicia sesión.
+   */
+  async function solicitarAlta(nombreNorm: string, emailNorm: string): Promise<void> {
+    setIsProcessing(true);
+    setError(null);
+    try {
+      const response = await fetch('/.netlify/functions/alta-publica', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: nombreNorm, email: emailNorm, tier: plan!.tier, acepto: true })
+      });
+      const result = (await response.json().catch(() => ({}))) as { error?: unknown; seguro?: unknown; mensaje?: unknown };
+      if (!response.ok) {
+        // PKG-06D: un 5xx sin `seguro` no se muestra crudo; los 4xx y los marcados `seguro` traen texto escrito a mano.
+        const legible = typeof result.error === 'string' && (response.status < 500 || result.seguro === true);
+        throw new Error(legible ? (result.error as string) : 'No pudimos procesar tu registro. Intenta de nuevo.');
+      }
+      setEnviado({ nombre: nombreNorm, email: emailNorm, mensaje: typeof result.mensaje === 'string' ? result.mensaje : MENSAJE_NEUTRO });
+    } catch (err) {
+      console.error('[Signup]', err);
+      setError(err instanceof Error ? err.message : 'Error inesperado. Intenta de nuevo.');
+    } finally {
+      setIsProcessing(false);
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (isProcessing) return;
     setError(null);
 
     const emailNorm = email.trim().toLowerCase();
@@ -118,67 +167,11 @@ export default function Signup() {
       setError('Los emails no coinciden. Verifica que estén iguales.');
       return;
     }
-    if (password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres.');
-      return;
-    }
-    if (password !== passwordConfirm) {
-      setError('Las contraseñas no coinciden.');
-      return;
-    }
     if (!acepto) {
       setError('Debes aceptar los términos y el aviso de privacidad para continuar.');
       return;
     }
-
-    setIsProcessing(true);
-
-    try {
-      const response = await fetch('/.netlify/functions/fake-signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          nombre: nombreNorm,
-          email: emailNorm,
-          password,
-          tier: plan!.tier
-        })
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        const errMsg = String(result.error ?? '').toLowerCase();
-        if (
-          errMsg.includes('already') ||
-          errMsg.includes('registered') ||
-          errMsg.includes('exists') ||
-          errMsg.includes('duplicate')
-        ) {
-          throw new Error('Ya existe una cuenta con este email. Inicia sesión.');
-        }
-        // PKG-06D: un 5xx no se muestra crudo; los 4xx traen texto escrito a mano.
-        if (response.status >= 500 && result?.seguro !== true) throw new Error('No se pudo crear la cuenta. Intenta de nuevo.');
-        throw new Error(result.error || 'No se pudo crear la cuenta.');
-      }
-
-      // Auto-login para dejar sesión activa (necesaria para el pago).
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        email: emailNorm,
-        password
-      });
-      if (loginError) {
-        throw new Error('Cuenta creada pero no pudimos iniciar sesión. Inicia sesión manualmente.');
-      }
-
-      // Cuenta creada + sesión activa. El login dispara el redirect a /app
-      // (useRoleRedirect), donde el miembro pendiente_pago paga su membresía.
-      // No hace falta hacer nada más aquí; se desmonta al redirigir.
-    } catch (err) {
-      console.error('[Signup]', err);
-      setError(err instanceof Error ? err.message : 'Error inesperado. Intenta de nuevo.');
-      setIsProcessing(false);
-    }
+    await solicitarAlta(nombreNorm, emailNorm);
   }
 
   if (tierLoading) {
@@ -192,6 +185,35 @@ export default function Signup() {
   if (!plan) {
     // Sin plan válido en la URL → mandalo a elegir uno en el landing.
     return <Navigate to="/#membresias" replace />;
+  }
+
+  if (enviado) {
+    return (
+      <div style={{ maxWidth: '480px', margin: '0 auto', padding: '40px 24px', minHeight: '100dvh' }}>
+        <div className="ek-card ek-stack-md" style={{ padding: '24px' }}>
+          <p className="ek-eyebrow ek-eyebrow--mustard ek-eyebrow--bar" style={{ margin: 0 }}>
+            <Mail size={13} aria-hidden="true" /> REVISA TU CORREO
+          </p>
+          <h2 className="ek-h3" style={{ margin: 0 }}>Confirma tu correo para continuar</h2>
+          <p className="ek-body-muted" style={{ margin: 0, lineHeight: 1.55 }} role="status">{enviado.mensaje}</p>
+          <p className="ek-body-muted" style={{ margin: 0, fontSize: '13px', lineHeight: 1.55 }}>
+            Correo indicado: <strong>{enviado.email}</strong>. El enlace vence en 1 hora y solo funciona una vez; al abrirlo eliges tu contraseña.
+          </p>
+          {error && <p className="ek-error-text" role="alert" style={{ margin: 0 }}>{error}</p>}
+          <button
+            type="button"
+            className="ek-cta ek-cta--full"
+            disabled={!puedeReenviar || isProcessing}
+            onClick={() => void solicitarAlta(enviado.nombre, enviado.email)}
+          >
+            {isProcessing ? <Spinner size={18} label="Enviando…" /> : puedeReenviar ? 'Enviar el enlace de nuevo' : 'Podrás pedir otro enlace en un minuto'}
+          </button>
+          <p style={{ fontSize: '12px', color: 'var(--ek-ink-muted)', textAlign: 'center', margin: 0 }}>
+            ¿Ya tienes cuenta? <Link to="/login" style={{ color: 'var(--ek-mustard)' }}>Iniciar sesión</Link>
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -296,48 +318,6 @@ export default function Signup() {
           <p className="ek-helper-text">Escríbelo de nuevo para confirmar (aquí llegan tus accesos y comprobantes).</p>
         </div>
 
-        <div className="ek-form-field">
-          <label className="ek-label" htmlFor="signup-password">Contraseña</label>
-          <div style={{ position: 'relative' }}>
-            <input
-              id="signup-password"
-              type={showPassword ? 'text' : 'password'}
-              className="ek-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              disabled={isProcessing}
-              autoComplete="new-password"
-              style={{ paddingRight: '48px' }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((v) => !v)}
-              className="ek-icon-btn ek-icon-btn--ghost ek-icon-btn--sm"
-              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-              style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)' }}
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          </div>
-          <p className="ek-helper-text">Mínimo 8 caracteres.</p>
-        </div>
-
-        <div className="ek-form-field">
-          <label className="ek-label" htmlFor="signup-password-confirm">Confirmar contraseña</label>
-          <input
-            id="signup-password-confirm"
-            type={showPassword ? 'text' : 'password'}
-            className="ek-input"
-            value={passwordConfirm}
-            onChange={(e) => setPasswordConfirm(e.target.value)}
-            required
-            disabled={isProcessing}
-            autoComplete="new-password"
-          />
-        </div>
-
         <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginTop: '8px', fontSize: '13px', lineHeight: 1.5, cursor: 'pointer' }}>
           <input
             type="checkbox"
@@ -382,7 +362,7 @@ export default function Signup() {
           style={{ marginTop: '12px', padding: '16px', fontSize: '15px' }}
           disabled={isProcessing}
         >
-          {isProcessing ? <Spinner size={18} label="Creando tu cuenta…" /> : 'Crear mi cuenta'}
+          {isProcessing ? <Spinner size={18} label="Enviando…" /> : 'Crear mi cuenta'}
         </button>
 
         <p style={{
@@ -392,6 +372,7 @@ export default function Signup() {
           marginTop: '4px',
           lineHeight: 1.5
         }}>
+          Te mandamos un enlace para confirmar tu correo; al abrirlo eliges tu contraseña y pagas tu plan.{' '}
           {plan.esPaquete
             ? 'Es un pago único, sin mensualidad. '
             : 'Es una membresía mensual: se cobra automáticamente cada mes. '}
