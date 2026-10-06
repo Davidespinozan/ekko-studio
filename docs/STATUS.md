@@ -4,26 +4,29 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-06 · PKG-03A cerrado en producción (pendientes
-operativos y entrega). Antes: F-1 (vistas de valor aisladas). Todo lo de abajo se
+Última actualización: 2026-10-06 · EKKO-138 / D-03A-1 cerrado en producción (pausa
+comercial durable). Antes: PKG-03A (pendientes operativos) y F-1. Todo lo de abajo se
 verificó en vivo contra git, Netlify y Supabase.
 
-## Producción (verificado 2026-10-06 00:20 UTC)
-- Código de negocio publicado: `890498add89e2b728efd85e1f3e8a294ac86741a`
-  ("feat(operations): add durable operational pending workflow", PKG-03A); el
-  commit docs-only de este archivo va encima (ver `git log`). Cadena:
+## Producción (verificado 2026-10-06 01:35 UTC)
+- Código de negocio publicado: `0890adb461749a7348c62982f294cff1b41fae84`
+  ("fix(billing): preserve independent staff pause intent", EKKO-138); el commit
+  docs-only de este archivo va encima (ver `git log`). Cadena:
   `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
   en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
-  pendiente) → `c33b750` (STATUS) → `6fe3f64` (F-1) → `762dbe4` (STATUS) → `890498a` (PKG-03A).
-- Netlify production: deploy `6ac43c905e3475000842d63f`, READY, `commit_ref` =
-  `890498a`, publicado 2026-10-06 00:12:49 UTC. Antes: `6ac432a4…` = 762dbe4,
+  pendiente) → `c33b750` (STATUS) → `6fe3f64` (F-1) → `762dbe4` (STATUS) → `890498a` (PKG-03A)
+  → `1d42079` (STATUS) → `0890adb` (EKKO-138).
+- Netlify production: deploy `6ac44ea7bb615e00082cbf73`, READY, `commit_ref` =
+  `0890adb`, publicado 2026-10-06 01:30:10 UTC. Antes: `6ac43df1…` = 1d42079,
+  `6ac43c90…` = 890498a (00:12 UTC), `6ac432a4…` = 762dbe4,
   `6ac43209…` = 6fe3f64 (23:27 UTC), `6ac42df5…` = c33b750 (23:10),
   `6ac42883…` = cf7c3a0 (22:47 UTC). Cada commit anterior tuvo su deploy
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **106/106 migraciones**; última
-  `20261009100000_03a_pendientes_operativos.sql` (PKG-03A). La 105 es
+- Supabase: **107/107 migraciones**; última
+  `20261010100000_ekko138_pausa_comercial.sql` (EKKO-138). La 106 es
+  `20261009100000_03a_pendientes_operativos.sql` (PKG-03A), la 105
   `20261008100000_f1_vistas_valor_security_invoker.sql` (F-1), la 104
   `20261007100000_material_pendiente_y_requerido.sql` y la 103
   `20261006100000_02c_frontera_rest_avisos_y_grants.sql` (PKG-02C), aplicadas.
@@ -84,7 +87,22 @@ esperado: el evento de Stripe en `revision` desde 2026-10-02 y una divergencia
 `activo_sin_derecho`; recepción y miembro ven 0. Hardening 47/47; drift 64/64; datos
 de negocio intactos (hash de `notificaciones` y `stripe_webhook_events` sobre las
 columnas previas = idéntico al de antes). Gate local 201 archivos / 1878 pruebas.
-D-03A-1 / EKKO-138: BLOQUEADA, NO implementada (ver "Diferido").
+**EKKO-138 / D-03A-1 "Pausa comercial durable" — CLOSED IN PRODUCTION** (EKKO-138,
+EKKO-139). Evidencia (2026-10-06 01:25–01:35 UTC): commit `0890adb`; migración
+`20261010100000` aplicada (106 → 107, md5 `46a1bdabf4e4f2e5e376570f56c6fbab`) ANTES del
+código, sin backfill (0 membresías con intención: había 0 pausadas, 0 sancionadas, 0
+auditorías de pausa); deploy `6ac44ea7bb615e00082cbf73` READY con ese SHA. Funciones
+116 → 116: cambiaron solo `staff_pausar_membresia`, `_reconciliar_cobro_sancion` y
+`operacion_suscripcion_preparar`; 0 nuevas, 0 quitadas; idénticas al build probado.
+Autorización: sin escritura de cliente sobre `membresias` (anon PATCH 401), ACL de
+las 3 funciones sin cambio, anon 401 en la RPC; 02C, F-1 y 03A siguen vigentes.
+Invariantes presentes en las definiciones vivas: la pausa del staff pone la
+intención y la reactivación la quita (y re-asegura la sanción); el sync del webhook
+no escribe `pausa_comercial_at`; levantar la sanción con intención deja la
+reanudación descartada `pausa_comercial_vigente`; la revocación sigue primero.
+Hardening 47/47; drift 64/64; datos intactos (hash de `membresias` sobre columnas
+previas = idéntico). Gate local 202 archivos / 1896 pruebas (15/15 de EKKO-138;
+suites cerradas afectadas 117/117).
 Qué decidió cada uno: `docs/DECISIONS_INDEX.md` → `DECISIONS.md`.
 Evidencia: migraciones `supabase/migrations/`, pruebas `src/__tests__/db/`.
 
@@ -113,13 +131,7 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- **EKKO-138 / D-03A-1 "Pausa comercial durable"** (EKKO-138, EKKO-139) —
-  COMMITTED en local (un commit, ver `git log`), gate verde, SIN PUSH / SIN DEPLOY
-  / MIGRACIÓN NO APLICADA. Migración `20261010100000_ekko138_pausa_comercial.sql`
-  (columna `membresias.pausa_comercial_at`, sin backfill). Cambian de cuerpo a
-  propósito `staff_pausar_membresia` (R1), `_reconciliar_cobro_sancion` y
-  `operacion_suscripcion_preparar` (R2-B); `stripe-pausar-membresia` no reanuda
-  Stripe durante una sanción. Pruebas: `src/__tests__/db/ekko138-pausa-comercial.db.test.ts`.
+- Nada.
 - (Corrección histórica: la versión anterior de este archivo, dentro del commit
   `890498a`, decía "SIN COMMIT"; se escribió antes de commitear. PKG-03A ya está
   publicado y cerrado, ver "Cerrado en producción".)
@@ -139,13 +151,18 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 - PKG-03A, evidencia natural (no se fabrica): primer correo que falle y se
   reintente; primer push con fallo; primera operación de cobro que agote reintentos;
   primer correo directo del webhook asentado en `correos_directos`.
-- **D-03A-1 / EKKO-138:** implementada en LOCAL (ver "Solo en local"); en
-  producción sigue sin estar. Hasta activarla: levantar una sanción reanuda el
-  cobro aunque el staff haya pausado, y reactivar durante una sanción reanuda Stripe.
-- Al levantar una sanción el acceso vuelve a `activo` aunque haya pausa comercial
-  vigente (comportamiento previo del levantamiento; la membresía sigue en pausa y
-  la divergencia `activo_sin_derecho` aparece en Operación). No se cambió: acceso ≠
-  intención de cobro.
+- EKKO-138, evidencia natural (no se fabrica): primera pausa real del staff, primera
+  reactivación, primera sanción con pausa comercial vigente y primer levantamiento
+  de sanción con la pausa vigente (PENDING FIRST LEGITIMATE EVENT).
+- Residuales de EKKO-138 (separados, no se resuelven de paso):
+  1. Al levantar una sanción el acceso vuelve a `activo` aunque haya pausa comercial
+     vigente (comportamiento previo del levantamiento; la membresía sigue en pausa
+     y la divergencia `activo_sin_derecho` aparece en Operación). Acceso ≠ cobro.
+  2. Si alguien reanuda el cobro directo en Stripe durante una pausa comercial, la
+     intención local se conserva y el proveedor queda activo: divergencia que
+     detectaría PKG-03B.
+  3. La pausa/reactivación del staff sigue llamando a Stripe directo, sin fila de
+     operación ni llave de idempotencia (02H).
 - `PENDING FIRST LEGITIMATE PASSWORD CHANGE` (PKG-02C): el primer cambio real de
   contraseña de un usuario con aviso `cambiar_password` abierto debe cerrarlo; hoy no
   hay ningún aviso de ese tipo. No se fabrica.
@@ -169,7 +186,9 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 - 2 usuarios con caché de plan divergente (evidencia de que el caché no decide).
 
 ## Siguiente paso
-Revisión del dueño y activación controlada de EKKO-138 (commit local). En Operación hay trabajo real
+Decisión del dueño sobre el siguiente bloque. En Operación hay trabajo real esperando
+una decisión: el evento de Stripe en `revision` desde 2026-10-02 y una divergencia
+`activo_sin_derecho`. PKG-03B y 02H no están autorizados. En Operación hay trabajo real
 esperando una decisión del dueño: el evento de Stripe en `revision` desde 2026-10-02
 y una divergencia `activo_sin_derecho`. PKG-03B no está autorizado.
 Pendientes previos — decisiones del dueño: cierre formal de los tres trabajos de material/Login, cuál
