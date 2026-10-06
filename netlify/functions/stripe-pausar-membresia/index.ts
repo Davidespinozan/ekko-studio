@@ -24,6 +24,10 @@ import { esStaffActivo } from '../_lib/staff';
  *     estados, aviso al miembro, audit_log). Si la RPC rechaza, se revierte Stripe.
  * Paquetes / membresías de mostrador (sin suscripción) solo pasan por la RPC.
  * (SALA pausar-membresia.)
+ *
+ * EKKO-138: reactivar durante una SANCIÓN no reanuda el cobro en Stripe: la RPC
+ * quita la intención de pausa comercial y re-asegura la suspensión de la sanción;
+ * el cobro vuelve al levantarla. Si no se puede leer la sanción, no se toca Stripe.
  */
 
 interface Body {
@@ -81,7 +85,15 @@ export const handler: Handler = async (event) => {
       return forbidden('No puedes modificar la membresía de otro estudio');
     }
 
-    let subId: string | null = mem?.stripe_subscription_id ?? null;
+    // EKKO-138: ¿sigue sancionado? Entonces reactivar NO reanuda el cobro.
+    let sancionado = false;
+    if (!body.pausar) {
+      const r = await admin.from('usuarios').select('sancionado_at').eq('id', body.usuario_id).maybeSingle();
+      if (r?.error) return serverError('No pudimos confirmar el estado del miembro');
+      sancionado = Boolean((r?.data as { sancionado_at?: string | null } | null)?.sancionado_at);
+    }
+
+    let subId: string | null = sancionado ? null : mem?.stripe_subscription_id ?? null;
     let accountId: string | null = null;
     if (subId && process.env.STRIPE_SECRET_KEY) {
       accountId = (await resolverCuentaConectada(admin, staff.tenant_id)).accountId;
@@ -121,7 +133,7 @@ export const handler: Handler = async (event) => {
     // `push_enviado_at` y cron-push lo reparte en el siguiente minuto (EKKO-033).
     // Mandarlo también inline hacía que al miembro le llegara dos veces.
 
-    return ok({ success: true, result: data, stripe_pausado: Boolean(subId) });
+    return ok({ success: true, result: data, stripe_pausado: Boolean(subId), cobro_suspendido_por_sancion: sancionado });
   } catch (err) {
     console.error('[stripe-pausar-membresia]', err instanceof Error ? err.message : err);
     return serverError('No pudimos actualizar la membresía');

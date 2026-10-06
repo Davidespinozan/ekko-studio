@@ -844,8 +844,17 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
 - **EKKO-138 — `D-03A-1 = A`: una pausa del staff es independiente de la sanción.**
   Levantar una sanción NO reanuda el cobro si sigue vigente una pausa comercial
   puesta por el staff; el cobro solo vuelve con la transición explícita de
-  reactivar. **Decidida, NO implementada:** hoy `membresias.status = 'pausada'`
-  también llega como eco de la suspensión por sanción (Stripe `pause_collection`
-  → webhook → sync), así que el modelo no distingue la causa. Requiere una
-  extensión mínima del modelo (origen durable de la pausa del staff) autorizada
-  aparte. **Extiende a EKKO-066 y EKKO-129.**
+  reactivar. `membresias.status = 'pausada'` también llega como eco de la
+  suspensión por sanción (Stripe `pause_collection` → webhook → sync), así que la
+  intención vive aparte: `membresias.pausa_comercial_at`, que solo escribe
+  `staff_pausar_membresia` (el webhook no la crea ni la borra). Al levantar la
+  sanción con la intención vigente queda una `reanudar_cobro` DESCARTADA con motivo
+  `pausa_comercial_vigente` (evidencia y cierre del ciclo). Sin backfill: la
+  autoridad empieza hacia adelante. **Extiende a EKKO-066 y EKKO-129.**
+- **EKKO-139 — EKKO-138 · Reactivar durante una sanción no reanuda el cobro.**
+  Reactivar quita la intención de pausa comercial y la membresía vuelve a su
+  estado, pero el acceso sigue bloqueado (la sanción manda) y el cobro sigue
+  suspendido por la sanción (se re-asegura su suspensión; Stripe no se toca); el
+  cobro vuelve al levantar la sanción. Pausar estando ya en pausa por el
+  proveedor solo declara la intención. Pausar y reactivar son idempotentes. La
+  revocación no cambia (contrato R1). **Extiende a EKKO-138 y EKKO-129.**

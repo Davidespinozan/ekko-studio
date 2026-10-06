@@ -113,7 +113,14 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- Nada. (Corrección: la versión anterior de este archivo, dentro del commit
+- **EKKO-138 / D-03A-1 "Pausa comercial durable"** (EKKO-138, EKKO-139) —
+  COMMITTED en local (un commit, ver `git log`), gate verde, SIN PUSH / SIN DEPLOY
+  / MIGRACIÓN NO APLICADA. Migración `20261010100000_ekko138_pausa_comercial.sql`
+  (columna `membresias.pausa_comercial_at`, sin backfill). Cambian de cuerpo a
+  propósito `staff_pausar_membresia` (R1), `_reconciliar_cobro_sancion` y
+  `operacion_suscripcion_preparar` (R2-B); `stripe-pausar-membresia` no reanuda
+  Stripe durante una sanción. Pruebas: `src/__tests__/db/ekko138-pausa-comercial.db.test.ts`.
+- (Corrección histórica: la versión anterior de este archivo, dentro del commit
   `890498a`, decía "SIN COMMIT"; se escribió antes de commitear. PKG-03A ya está
   publicado y cerrado, ver "Cerrado en producción".)
 
@@ -132,11 +139,13 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 - PKG-03A, evidencia natural (no se fabrica): primer correo que falle y se
   reintente; primer push con fallo; primera operación de cobro que agote reintentos;
   primer correo directo del webhook asentado en `correos_directos`.
-- **D-03A-1 / EKKO-138 — BLOQUEADA / NO IMPLEMENTADA:** hace falta una
-  representación durable que distinga una pausa comercial/del staff de una pausa
-  derivada de la sanción (hoy `membresias.status = 'pausada'` también llega como eco
-  de la suspensión por sanción vía Stripe). Relacionado: reactivar a mano durante
-  una sanción reanuda el cobro.
+- **D-03A-1 / EKKO-138:** implementada en LOCAL (ver "Solo en local"); en
+  producción sigue sin estar. Hasta activarla: levantar una sanción reanuda el
+  cobro aunque el staff haya pausado, y reactivar durante una sanción reanuda Stripe.
+- Al levantar una sanción el acceso vuelve a `activo` aunque haya pausa comercial
+  vigente (comportamiento previo del levantamiento; la membresía sigue en pausa y
+  la divergencia `activo_sin_derecho` aparece en Operación). No se cambió: acceso ≠
+  intención de cobro.
 - `PENDING FIRST LEGITIMATE PASSWORD CHANGE` (PKG-02C): el primer cambio real de
   contraseña de un usuario con aviso `cambiar_password` abierto debe cerrarlo; hoy no
   hay ningún aviso de ese tipo. No se fabrica.
@@ -160,7 +169,7 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 - 2 usuarios con caché de plan divergente (evidencia de que el caché no decide).
 
 ## Siguiente paso
-Decidir la extensión de modelo para D-03A-1 (EKKO-138). En Operación hay trabajo real
+Revisión del dueño y activación controlada de EKKO-138 (commit local). En Operación hay trabajo real
 esperando una decisión del dueño: el evento de Stripe en `revision` desde 2026-10-02
 y una divergencia `activo_sin_derecho`. PKG-03B no está autorizado.
 Pendientes previos — decisiones del dueño: cierre formal de los tres trabajos de material/Login, cuál

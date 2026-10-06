@@ -54,7 +54,8 @@ rediscute sin evidencia nueva.
 
 ## Stripe y cobro
 - EKKO-129, EKKO-130 (D-01P-1) — sanción suspende el cobro; revocación cancela de inmediato.
-- EKKO-138 (D-03A-1 = A) — pausa del staff ≠ sanción: levantar la sanción no reanuda una pausa comercial. Decidida; pendiente de extensión de modelo.
+- EKKO-138 (D-03A-1 = A) — pausa del staff ≠ sanción: `pausa_comercial_at` (intención del staff); levantar la sanción no reanuda una pausa comercial.
+- EKKO-139 — reactivar durante una sanción no reanuda el cobro; pausar/reactivar idempotentes.
 - EKKO-131 — operaciones de cobro con evidencia durable y reintento.
 - EKKO-105 (D-01A-1) — estado durable de los eventos del webhook.
 - EKKO-106 — crear un Checkout no da derecho; lo da el evento financiero.

@@ -83,6 +83,39 @@ describe('stripe-pausar-membresia', () => {
     expect(mockSubUpdate).toHaveBeenCalledWith('sub_1', { pause_collection: null }, { stripeAccount: 'acct_1' });
   });
 
+  it('EKKO-138: reactivar a un miembro SANCIONADO no reanuda el cobro en Stripe (solo la RPC, que re-asegura la suspensión)', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: STAFF, error: null })
+      .mockResolvedValueOnce({ data: { id: 'm1', tenant_id: 't1', stripe_subscription_id: 'sub_1', status: 'pausada' }, error: null })
+      .mockResolvedValueOnce({ data: { sancionado_at: '2026-10-01T00:00:00Z' }, error: null });
+    const res = await invocar({ usuario_id: 'u1', pausar: false, motivo: 'Regresó del viaje' });
+    expect(res.statusCode).toBe(200);
+    expect(mockSubUpdate).not.toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledWith('staff_pausar_membresia', { p_usuario_id: 'u1', p_pausar: false, p_motivo: 'Regresó del viaje' });
+    expect(JSON.parse(res.body)).toMatchObject({ stripe_pausado: false, cobro_suspendido_por_sancion: true });
+  });
+
+  it('EKKO-138: si no se puede leer la sanción al reactivar, no se toca Stripe ni la RPC (falla cerrado)', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: STAFF, error: null })
+      .mockResolvedValueOnce({ data: { id: 'm1', tenant_id: 't1', stripe_subscription_id: 'sub_1', status: 'pausada' }, error: null })
+      .mockResolvedValueOnce({ data: null, error: { message: 'timeout' } });
+    const res = await invocar({ usuario_id: 'u1', pausar: false, motivo: 'Regresó' });
+    expect(res.statusCode).toBe(500);
+    expect(mockSubUpdate).not.toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('EKKO-138: si Stripe falla al pausar, no se registra intención local (la RPC no corre) y se informa el error', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: STAFF, error: null })
+      .mockResolvedValueOnce({ data: { id: 'm1', tenant_id: 't1', stripe_subscription_id: 'sub_1', status: 'activa' }, error: null });
+    mockSubUpdate.mockRejectedValueOnce(new Error('Stripe caído'));
+    const res = await invocar({ usuario_id: 'u1', pausar: true, motivo: 'Viaje' });
+    expect(res.statusCode).toBe(500);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
   it('si la RPC rechaza, revierte Stripe y devuelve el mensaje humano', async () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: STAFF, error: null })
