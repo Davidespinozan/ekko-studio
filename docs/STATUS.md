@@ -4,23 +4,24 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-06 · PKG-02H cerrado en producción (operaciones de cobro
-del staff durables). Antes: PKG-03B (reconciliador diario, primera corrida pendiente). Todo lo de abajo se
-verificó en vivo contra git, Netlify y Supabase.
+Última actualización: 2026-10-06 · PKG-06A cerrado en producción (operaciones compuestas
+de cuenta con frontera del servidor). Antes: PKG-02H (operaciones de cobro del staff
+durables). Todo lo de abajo se verificó en vivo contra git, Netlify y Supabase.
 
-## Producción (verificado 2026-10-06 02:00 UTC)
-- Código de negocio publicado: `50c3a4c2b1790b64c43aac90c65c876c1e071783`
-  ("fix(billing): make staff pause operations durable", PKG-02H); el commit docs-only
+## Producción (verificado 2026-10-06 04:15 UTC y re-verificado 15:51 UTC)
+- Código de negocio publicado: `b12fe4f3237a7f3fb20c7bf568a6bce3e60b16ec`
+  ("fix(accounts): make account composites durable", PKG-06A); el commit docs-only
   de este archivo va encima (ver `git log`). Cadena:
   `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
   en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
   pendiente) → `c33b750` (STATUS) → `6fe3f64` (F-1) → `762dbe4` (STATUS) → `890498a` (PKG-03A)
   → `1d42079` (STATUS) → `0890adb` (EKKO-138) → `0b23ca7` (STATUS) → `0ffe13d` (PKG-03B)
   → `07a85d8` (STATUS) → `308a4a7` (STATUS) → `f713586` (PKG-03B fase D) → `a682065` (STATUS)
-  → `50c3a4c` (PKG-02H).
-- Netlify production: deploy `6ac46533fd7f11000905e896`, READY, `commit_ref` =
-  `50c3a4c`, publicado 2026-10-06 03:06:13 UTC; 9 funciones programadas (sin cambio),
-  `cron-reconciliar-stripe` a `0 9 * * *`. Antes: `6ac45c84…` = a682065, `6ac45ba0…` =
+  → `50c3a4c` (PKG-02H) → `82604ef` (STATUS) → `b12fe4f` (PKG-06A).
+- Netlify production: deploy `6ac473f643f09e0008dc0393`, READY, `commit_ref` =
+  `b12fe4f`, publicado 2026-10-06 04:09:16 UTC; 46 funciones, 9 programadas (sin
+  cambio), `cron-reconciliar-stripe` a `0 9 * * *`. Antes: `6ac466413a08ae000859a132` =
+  82604ef, `6ac46533…` = 50c3a4c (03:06 UTC, PKG-02H), `6ac45c84…` = a682065, `6ac45ba0…` =
   f713586 (02:25 UTC, fase D de 03B). Antes de eso:
   `6ac45875…` = 308a4a7, `6ac45790…` = 07a85d8 (reconstrucción para cargar la
   variable del reconciliador, 02:08 UTC), `6ac455aa…` = 07a85d8,
@@ -32,7 +33,9 @@ verificó en vivo contra git, Netlify y Supabase.
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **109/109 migraciones**; última
+- Supabase: **110/110 migraciones**; última
+  `20261013100000_06a_cuentas_compuestas.sql` (PKG-06A, md5
+  `4cbd57a7b5ce694918fc048e314c4b1d`, aplicada 2026-10-06 ~04:03 UTC). La 109 es
   `20261012100000_02h_operaciones_staff_durables.sql` (PKG-02H). La 108 es
   `20261011100000_03b_reconciliacion_stripe.sql` (PKG-03B), la 107
   `20261010100000_ekko138_pausa_comercial.sql` (EKKO-138), la 106
@@ -54,8 +57,11 @@ verificó en vivo contra git, Netlify y Supabase.
 R1 · PKG-00A, 00C, 00E, 00F, 00G · PKG-01A–01H · R2-A (01I–01M) · R2-B (01N–01Q) ·
 PKG-02A, 02B · Arquitectura de contexto fases 1–4 (PUBLICADA / VALIDADA / CERRADA) ·
 **PKG-03B "Reconciliador Stripe (detect-only)" — CLOSED IN PRODUCTION** (EKKO-140; detalle
-y evidencia en la sección "PKG-03B" de abajo; primera corrida programada pendiente) ·
-**PKG-02H "Operaciones de cobro del staff durables" — CLOSED IN PRODUCTION** (EKKO-141).
+y evidencia en la sección "PKG-03B" de abajo; primera corrida programada OBSERVADA el
+2026-10-06 09:00:52 UTC: completa, 15 suscripciones leídas, 0 discrepancias) ·
+**PKG-02H "Operaciones de cobro del staff durables" — CLOSED IN PRODUCTION** (EKKO-141) ·
+**PKG-06A "Operaciones compuestas de cuenta" — CLOSED IN PRODUCTION** (EKKO-142,
+D-FIN-1 = A; detalle en la sección "PKG-06A" de abajo).
 Alcance final tras deduplicar contra R1, R2-A/B, EKKO-138, 03A y 03B: pausar, reactivar y
 dar de baja al fin del periodo escriben su operación en `stripe_operaciones_suscripcion`
 en la misma transacción que la transición local (causas `pausa_staff`,
@@ -168,30 +174,60 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- **PKG-06A "Operaciones compuestas de cuenta" — IMPLEMENTADO LOCALMENTE, en un
-  commit local SIN PUSH** (EKKO-142, D-FIN-1 = A). Migración
-  `20261013100000_06a_cuentas_compuestas.sql` (md5 `4cbd57a7b5ce694918fc048e314c4b1d`,
-  NO aplicada en producción): columnas `usuarios.acceso_autorizado_at/por`; RPC de
-  servicio `cuenta_alta_preparar`, `cuenta_alta_finalizar`, `cuenta_cambiar_rol`,
+- Nada.
+
+## PKG-06A — cerrado en producción (detalle; la línea corta está en "Cerrado")
+- **PKG-06A "Operaciones compuestas de cuenta con frontera del servidor"** (EKKO-142,
+  D-FIN-1 = A) — commit `b12fe4f` ("fix(accounts): make account composites durable"),
+  migración `20261013100000_06a_cuentas_compuestas.sql` (md5
+  `4cbd57a7b5ce694918fc048e314c4b1d`; Supabase 109 → 110), deploy Netlify
+  `6ac473f643f09e0008dc0393` READY = b12fe4f (04:09 UTC). Activado 2026-10-06 en orden
+  migración (aditiva) → push → deploy; ventana vieja-código/nueva-base de ~6 min, segura
+  (la única conducta nueva para el código viejo: un alta contra un perfil sin acceso con
+  historial ya no vincula por el correo).
+- Qué quedó: FR-01, FR-02, FR-03, FR-04, FR-05, FR-06 y FR-08 CLOSED IN PRODUCTION. La
+  parte LOCAL de alta (admin y recepción), cambio de rol, baja, reset de contraseña y
+  edición por staff es una RPC de servicio en UNA transacción con actor explícito
+  validado (`cuenta_alta_preparar`/`cuenta_alta_finalizar`, `cuenta_cambiar_rol`,
   `cuenta_eliminar`, `cuenta_password_reseteada`, `staff_actualizar_cuenta`,
-  `auth_usuario_sin_perfil`, `cuenta_historial_durable` (+ `_cuenta_actor`,
-  `_cuenta_huella_staff`, `_cuenta_avisar_cambiar_password`), solo service_role;
-  `handle_new_auth_user` recreada (hash `a2a99ce2…` → `b2a4f040…`): vincula por
-  correo solo cascarones o perfiles autorizados. Funciones de Netlify
-  `admin-create-user`, `reception-create-member`, `admin-update-role`,
-  `admin-delete-user`, `reception-reset-password`, `reception-update-member`
-  reescritas sobre `_lib/cuentas.ts` (RPC → Auth → RPC; compensación por propiedad;
-  respuesta parcial honesta); `_lib/acceso.ts` retirado (lo hace la RPC). Pruebas:
-  `db/06a-cuentas-compuestas.db.test.ts` (36; 35 muerden sin la migración), 6 suites
-  de funciones reescritas al contrato RPC (58). Hardening 51/51 (antes 49); drift 66/66 (antes 64).
-  Gate completo verde: 208 archivos / 1999 pruebas, build OK, `git diff --check` OK (58 s, máquina en reposo). Las demás funciones de producción quedan con hash
-  idéntico (comparado contra `h_prod_02h_despues`). Activación: pendiente de
-  autorización del dueño (`ekko-activar`); orden: migración (aditiva) → deploy.
+  `auth_usuario_sin_perfil`, `cuenta_historial_durable`, `_cuenta_actor`,
+  `_cuenta_huella_staff`, `_cuenta_avisar_cambiar_password`): 11 funciones nuevas,
+  SECURITY DEFINER, `search_path=public`, dueño postgres, sin EXECUTE para
+  PUBLIC/anon/authenticated, solo service_role (el actor no se forja); el actor
+  validado se publica en la transacción para que `_audit_actor()` (R1, hash intacto)
+  registre a la persona real. `handle_new_auth_user` es la ÚNICA función previa que
+  cambió (`a2a99ce2…` → `b2a4f040…`): vincula por correo solo cascarones sin historial o
+  perfiles autorizados por un staff (`usuarios.acceso_autorizado_at/por`, 2 columnas
+  NULL nuevas). D-FIN-1 = A: sin borrado físico con historial durable (membresías,
+  ledger, pagos, reservas, ventas, material, reversales, operaciones/discrepancias de
+  Stripe, correos directos, notas, cliente de Stripe) ni huella como staff; el
+  permitido deja `cuenta_eliminada` antes del DELETE, sin PII. Funciones de Netlify
+  reescritas sobre `_lib/cuentas.ts` (preparar → Auth → finalizar; compensación por
+  propiedad; respuesta parcial honesta; reset verdadero aunque falle la evidencia).
+- Verificación: 129 funciones de aplicación (118 + 11); las 11 nuevas y la cambiada
+  hash-idénticas al build local probado; las otras 117 idénticas a antes (único extra
+  de producción, previo: `rls_auto_enable()`, helper gestionado). Matriz de privilegios
+  verificada en vivo. Hardening 51/51; drift 66/66. Datos de negocio: hash de todas las
+  tablas (usuarios con columnas previas, auth.users, membresías, movimientos, pagos,
+  reservas, audit_log, operaciones, discrepancias, corridas, avisos, eventos) idéntico
+  antes de migrar, después de migrar y después del deploy: CERO mutaciones de Auth, de
+  negocio o de Stripe causadas por la activación; 0 filas de auditoría 06A, 0
+  marcadores. Único evento natural posterior (15:51 UTC): la primera corrida programada
+  del reconciliador (09:00 UTC, 03B), que solo leyó Stripe y no cambió nada más. Sondas: sitio 200; las 6 funciones responden 401 sin token y con token
+  inválido antes de cualquier lógica; bundle publicado con las etiquetas y mensajes
+  nuevos y sin las cadenas retiradas. Gate local 208 archivos / 1999 pruebas;
+  regresión de suites cerradas 175/175; `db/06a-cuentas-compuestas` 36/36 (35 muerden
+  sin la migración).
+- Residuales aceptados: el CHECK de `usuarios.rol` conserva el valor legado `staff`
+  (las funciones ya no lo aceptan; 0 filas); la autorización explícita de vinculación
+  (`perfil_id`) existe en el servidor sin UI; el trigger de R1 sigue escribiendo su
+  `cuenta_estado_cambio` junto a la fila explícita de la RPC (ambas con actor).
 
 ## PKG-03B — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-03B "Reconciliador Stripe (detect-only)"** (EKKO-140, D-03B-1 = A) —
-  **FASES A, B y D CERRADAS EN PRODUCCIÓN → PKG-03B = CLOSED IN PRODUCTION, con la
-  PRIMERA CORRIDA PROGRAMADA NATURAL PENDIENTE (no bloqueante). RECONCILIADOR =
+  **FASES A, B y D CERRADAS EN PRODUCCIÓN → PKG-03B = CLOSED IN PRODUCTION; la PRIMERA
+  CORRIDA PROGRAMADA NATURAL ya ocurrió (2026-10-06 09:00:52 UTC: completa, 15
+  suscripciones, 0 discrepancias; leída el mismo día a las 15:51 UTC). RECONCILIADOR =
   DIARIO (09:00 UTC) + MANUAL (endpoint protegido por token).**
   **Fase D (2026-10-06 02:20–02:30 UTC):** commit `f713586`, sin migración (Supabase
   sigue en 108); deploy `6ac45ba046ad180008bf2860` READY con ese SHA; 9 funciones
@@ -238,7 +274,8 @@ remediación y su cierre formal lo decide el dueño.
   sigue mostrando solo los 2 pendientes reales previos (evento de Stripe en
   `revision` desde 2026-10-02 y `activo_sin_derecho`); recepción y miembro, 0.
   Hardening 49/49; drift 64/64; 118 funciones sin cambio. Nada revisado ni resuelto.
-  **Pendiente (no bloqueante):** la primera corrida programada natural (09:00 UTC).
+  **Evidencia natural obtenida:** la primera corrida programada (09:00:52 UTC) quedó en
+  `reconciliacion_stripe_corridas` como `completa`, 15 leídas, 0 abiertas.
   Limitaciones observadas (residual menor P3, aceptado): la corrida no desglosa cuántas
   de las 15 suscripciones estaban vivas, terminadas o sin marca `app`, así que el 0 no
   se puede contrastar por estado sin volver a leer Stripe (las vivas sin marca y sin
@@ -260,6 +297,10 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   dos pruebas). No se aplica, no se borra, no se commitea. Ver nota de `57b9af0`.
 
 ## Diferido / pendiente no bloqueante
+- PKG-06A, evidencia natural (no se fabrica): primera alta real (admin o recepción),
+  primer cambio de rol, primer intento de borrado (permitido o protegido), primer
+  reset de contraseña y primera edición de cuenta por recepción; primera fila de
+  auditoría con actor real escrita por el trigger de R1 a través de una RPC 06A.
 - PKG-02H, evidencia natural (no se fabrica): primera pausa real del staff con
   suscripción, primera reactivación, primera baja al fin del periodo, primer fallo
   ambiguo del proveedor en una operación del staff.
@@ -301,21 +342,17 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 - 2 usuarios con caché de plan divergente (evidencia de que el caché no decide).
 
 ## Siguiente paso
-Observar la primera corrida programada del reconciliador (09:00 UTC) en
-`reconciliacion_stripe_corridas` / Operación, sin intervenir, y resolver desde el panel
-los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
-`activo_sin_derecho`). Fuera de 02H quedan, para decisión del dueño: intención local en
-cambio de plan, auditoría en borrar usuario / cambiar rol, huérfanos de Storage y
-`cron-material-vencido`. Ningún paquete nuevo está autorizado. En Operación hay trabajo real esperando
-una decisión: el evento de Stripe en `revision` desde 2026-10-02 y una divergencia
-`activo_sin_derecho`. PKG-03B y 02H no están autorizados. En Operación hay trabajo real
-esperando una decisión del dueño: el evento de Stripe en `revision` desde 2026-10-02
-y una divergencia `activo_sin_derecho`. PKG-03B no está autorizado.
-Pendientes previos — decisiones del dueño: cierre formal de los tres trabajos de material/Login, cuál
-versión del enlace de Login queda (publicada vs stash) y qué hacer con los 2 objetos
-huérfanos de Storage. Después, el siguiente bloque del programa (resto del E — admin —
-o Fase 2 de identidad). Ningún paquete nuevo está autorizado; un backlog o una
-auditoría antigua no es autorización.
+Resolver desde el panel los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
+`activo_sin_derecho`). El backlog canónico final (reconciliación post-R1/R2/01/02/03)
+deja 7 paquetes: 06B (operaciones de cobro del miembro y del webhook), 06C (alta pública
+con verificación), 06D (frontera de columnas y cliente), 06E (ciclo de vida del
+material), 06F (agregación en el servidor), 06G (señales operativas durables); el
+siguiente recomendado es PKG-06D. Decisiones del dueño pendientes: D-FIN-2 (DSN de
+Sentry en producción: hoy no hay), D-FIN-3 (deploy previews con secretos LIVE),
+D-FIN-4 (cuentas demo al salir), D-FIN-8 (2 objetos huérfanos de Storage), respaldo y
+simulacro de restauración, cuál versión del enlace de Login queda (publicada vs stash).
+Ningún paquete nuevo está autorizado; un backlog o una auditoría antigua no es
+autorización.
 
 ## Reglas de este archivo
 - Cambia solo tras verificar: IMPLEMENTADO LOCALMENTE (código + gate verde),
