@@ -75,19 +75,49 @@ export function conceptoDeOrigen(origen: string): string {
 }
 
 /**
- * @param filas     filas del libro económico del tenant (al menos desde el inicio del mes anterior)
- * @param inicioMes inicio del mes actual (instante, en la zona del estudio)
- * @param inicioMesAnterior inicio del mes anterior
- * @param ahora     instante actual
- * @param fallidos  cobros fallidos del diario (últimos ~31 días)
+ * PKG-06F: un GRUPO del libro económico (lo que devuelve la RPC
+ * `libro_economico_agregado`): mismas columnas que deciden cada KPI, con la suma
+ * de montos y cuántas filas representa. `periodo` usa los mismos cortes que
+ * `calcularCobrado` (inicio del mes y del mes anterior, en la zona del estudio).
  */
-export function calcularCobrado(
-  filas: LibroFila[],
-  inicioMes: Date,
-  inicioMesAnterior: Date,
-  ahora: Date = new Date(),
-  fallidos: PagoFallido[] = []
-): CobradoResult {
+export interface LibroGrupo {
+  periodo: 'mes' | 'mes_anterior' | 'otro';
+  clase: string;
+  origen_negocio: string;
+  moneda: string;
+  estado_evidencia: string;
+  monto_centavos: number;
+  efecto_neto_centavos: number;
+  n: number;
+}
+
+/** Cobros fallidos ya contados en la base (`cobros_fallidos_resumen`). */
+export interface FallidosResumen {
+  cobros: number;
+  monto_centavos: number;
+}
+
+/** Agrupa filas como lo hace la base (para el camino por filas y para las pruebas de equivalencia). */
+export function agruparLibro(filas: LibroFila[], inicioMes: Date, inicioMesAnterior: Date): LibroGrupo[] {
+  const grupos = new Map<string, LibroGrupo>();
+  for (const f of filas) {
+    const t = new Date(f.ocurrido_at).getTime();
+    const periodo: LibroGrupo['periodo'] = t >= inicioMes.getTime() ? 'mes' : t >= inicioMesAnterior.getTime() ? 'mes_anterior' : 'otro';
+    const clave = [periodo, f.clase, f.origen_negocio, f.moneda, f.estado_evidencia].join('|');
+    const g = grupos.get(clave) ?? { periodo, clase: f.clase, origen_negocio: f.origen_negocio, moneda: f.moneda, estado_evidencia: f.estado_evidencia, monto_centavos: 0, efecto_neto_centavos: 0, n: 0 };
+    g.monto_centavos += f.monto_centavos;
+    g.efecto_neto_centavos += f.efecto_neto_centavos;
+    g.n += 1;
+    grupos.set(clave, g);
+  }
+  return [...grupos.values()];
+}
+
+/**
+ * Lo cobrado a partir de los GRUPOS del libro (PKG-06F). Misma semántica que el
+ * cálculo por filas: cada suma es aditiva y cada conteo suma `n`.
+ */
+export function calcularCobradoAgregado(grupos: LibroGrupo[], fallidos: FallidosResumen = { cobros: 0, monto_centavos: 0 }): CobradoResult {
   let cobradoMes = 0;
   let cobradoMesAnterior = 0;
   let reversadoMes = 0;
@@ -99,48 +129,38 @@ export function calcularCobrado(
   const porConcepto = new Map<string, { centavos: number; cobros: number }>();
   const otras = new Set<string>();
 
-  for (const f of filas) {
-    if (f.moneda !== MONEDA_PRINCIPAL) {
-      if (f.estado_evidencia !== 'excluido') otras.add(f.moneda);
+  for (const g of grupos) {
+    const monto = Number(g.monto_centavos);
+    const neto = Number(g.efecto_neto_centavos);
+    const n = Number(g.n);
+    if (g.moneda !== MONEDA_PRINCIPAL) {
+      if (g.estado_evidencia !== 'excluido') otras.add(g.moneda);
       continue;
     }
-    const t = new Date(f.ocurrido_at).getTime();
-    const enMes = t >= inicioMes.getTime();
-    const enMesAnterior = !enMes && t >= inicioMesAnterior.getTime();
-    const esReversal = f.clase === 'reembolso' || f.clase === 'disputa';
-
-    if (f.clase === 'cobro' && f.estado_evidencia === 'firme') {
+    const enMes = g.periodo === 'mes';
+    const esReversal = g.clase === 'reembolso' || g.clase === 'disputa';
+    if (g.clase === 'cobro' && g.estado_evidencia === 'firme') {
       if (enMes) {
-        cobradoMes += f.monto_centavos;
-        const c = conceptoDeOrigen(f.origen_negocio);
+        cobradoMes += monto;
+        const c = conceptoDeOrigen(g.origen_negocio);
         const prev = porConcepto.get(c) ?? { centavos: 0, cobros: 0 };
-        prev.centavos += f.monto_centavos;
-        prev.cobros += 1;
+        prev.centavos += monto;
+        prev.cobros += n;
         porConcepto.set(c, prev);
-      } else if (enMesAnterior) {
-        cobradoMesAnterior += f.monto_centavos;
+      } else if (g.periodo === 'mes_anterior') {
+        cobradoMesAnterior += monto;
       }
     }
     if (!enMes) continue;
-    netoMes += f.efecto_neto_centavos;
-    if (esReversal && f.estado_evidencia === 'firme') {
-      reversadoMes += -f.efecto_neto_centavos;
-      reversalesMes += 1;
-    } else if (f.estado_evidencia === 'en_disputa') {
-      enDisputaMes += f.monto_centavos;
-    } else if (f.estado_evidencia === 'sin_resolver') {
-      sinResolverCentavos += f.monto_centavos;
-      sinResolverN += 1;
-    }
-  }
-
-  const hace30d = ahora.getTime() - 30 * 24 * 60 * 60 * 1000;
-  let fallidos30d = 0;
-  let montoFallido = 0;
-  for (const e of fallidos) {
-    if (new Date(e.created_at).getTime() >= hace30d) {
-      fallidos30d += 1;
-      montoFallido += e.monto_centavos ?? 0;
+    netoMes += neto;
+    if (esReversal && g.estado_evidencia === 'firme') {
+      reversadoMes += -neto;
+      reversalesMes += n;
+    } else if (g.estado_evidencia === 'en_disputa') {
+      enDisputaMes += monto;
+    } else if (g.estado_evidencia === 'sin_resolver') {
+      sinResolverCentavos += monto;
+      sinResolverN += n;
     }
   }
 
@@ -157,11 +177,37 @@ export function calcularCobrado(
     enDisputaMesCentavos: enDisputaMes,
     sinResolverMesCentavos: sinResolverCentavos,
     sinResolverMes: sinResolverN,
-    cobrosFallidos30d: fallidos30d,
-    montoFallido30dCentavos: montoFallido,
+    cobrosFallidos30d: Number(fallidos.cobros),
+    montoFallido30dCentavos: Number(fallidos.monto_centavos),
     porConcepto: Array.from(porConcepto.entries())
       .map(([concepto, v]) => ({ concepto, ...v }))
       .sort((a, b) => b.centavos - a.centavos),
     otrasMonedas: Array.from(otras).sort()
   };
+}
+
+/**
+ * @param filas     filas del libro económico del tenant (al menos desde el inicio del mes anterior)
+ * @param inicioMes inicio del mes actual (instante, en la zona del estudio)
+ * @param inicioMesAnterior inicio del mes anterior
+ * @param ahora     instante actual
+ * @param fallidos  cobros fallidos del diario (últimos ~31 días)
+ */
+export function calcularCobrado(
+  filas: LibroFila[],
+  inicioMes: Date,
+  inicioMesAnterior: Date,
+  ahora: Date = new Date(),
+  fallidos: PagoFallido[] = []
+): CobradoResult {
+  const hace30d = ahora.getTime() - 30 * 24 * 60 * 60 * 1000;
+  let cobros = 0;
+  let monto = 0;
+  for (const e of fallidos) {
+    if (new Date(e.created_at).getTime() >= hace30d) {
+      cobros += 1;
+      monto += e.monto_centavos ?? 0;
+    }
+  }
+  return calcularCobradoAgregado(agruparLibro(filas, inicioMes, inicioMesAnterior), { cobros, monto_centavos: monto });
 }

@@ -14,6 +14,7 @@ rediscute sin evidencia nueva.
 - EKKO-112 (D7; sustituye a EKKO-028) — un reembolso no muta derechos: evidencia + revisión humana.
 - EKKO-113 (D8) — disputas: evidencia y revisión; sin mutación automática.
 - EKKO-126 (sustituye a EKKO-034) — libro económico: bruto, reversado, neto, sin resolver.
+- EKKO-148 (PKG-06F) — totales y conteos de reportes calculados en la base (cap de 1000 filas de PostgREST); listas acotadas leídas completas o con error; sin cambiar el significado de ningún KPI (D-FIN-10 aparte).
 - EKKO-115 (D-01G-4) — proveniencia del valor solo hacia adelante; histórico `desconocido`.
 - EKKO-108 (D9, D-01D-3, D-01D-5) — venta de mostrador con evidencia e idempotencia.
 - EKKO-109 (D-01E-4) — tarjeta en mostrador; el servidor fija el monto.

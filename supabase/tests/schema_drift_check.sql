@@ -361,6 +361,17 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
         THEN '✅ PASS' ELSE '❌ FALTA — 06E no aplicada' END);
 
 
+-- PKG-06F (20261019100000): agregados de reportes en la base (FR-62/63). FR-65: el
+-- índice por estudio de membresia_movimientos ya existe desde 20260921110000.
+INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
+('11 · Grants/RLS', '20261019100000_06f', 'RPC reporte_creditos / libro_economico_agregado / cobros_fallidos_resumen / membresias_vivas_por_tier / reservas_por_dia_estudio',
+ CASE WHEN (SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace
+            AND proname IN ('reporte_creditos','libro_economico_agregado','cobros_fallidos_resumen','membresias_vivas_por_tier','reservas_por_dia_estudio')) = 5
+        THEN '✅ PASS' ELSE '❌ FALTA — 06F no aplicada' END),
+('12 · Índices', '20260921110000_indices_faltantes', 'mov_tenant_fecha_idx (membresia_movimientos por estudio y fecha)',
+ CASE WHEN EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='mov_tenant_fecha_idx') THEN '✅ PASS' ELSE '❌ FALTA' END);
+
+
 -- ////////////////////////////////////////////////////////////////////////////
 -- BLOQUE 12 — Índices / objetos varios
 -- ////////////////////////////////////////////////////////////////////////////

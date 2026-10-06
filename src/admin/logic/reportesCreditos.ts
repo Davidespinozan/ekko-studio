@@ -65,3 +65,26 @@ export function calcularCreditos(
 
   return { pasivoSesiones, valorPasivoCentavos, miembrosConSaldo, vendidos, usados, tasaUsoPct };
 }
+
+/** PKG-06F: totales que devuelve la RPC `reporte_creditos()` (ledger completo, en la base). */
+export interface CreditosTotales {
+  vendidos: number;
+  usados: number;
+  pasivo_sesiones: number;
+  valor_pasivo_centavos: number;
+  miembros_con_saldo: number;
+}
+
+/** Mismo resultado que `calcularCreditos`, a partir de los totales agregados en la base. */
+export function creditosDesdeTotales(t: CreditosTotales): CreditosResult {
+  const vendidos = Number(t.vendidos);
+  const usados = Number(t.usados);
+  return {
+    pasivoSesiones: Number(t.pasivo_sesiones),
+    valorPasivoCentavos: Number(t.valor_pasivo_centavos),
+    miembrosConSaldo: Number(t.miembros_con_saldo),
+    vendidos,
+    usados,
+    tasaUsoPct: vendidos > 0 ? (usados / vendidos) * 100 : null
+  };
+}

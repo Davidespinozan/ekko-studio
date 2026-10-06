@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
-import { useTenant } from '@shared/hooks/useTenant';
 import { inicioDeMesEnZona } from '@shared/lib/timezone';
-import { calcularCobrado, type CobradoResult, type LibroFila, type PagoFallido } from '../logic/reportesCobrado';
+import { calcularCobradoAgregado, type CobradoResult, type FallidosResumen, type LibroGrupo } from '../logic/reportesCobrado';
 
 /**
  * Lo COBRADO de verdad del mes actual vs. anterior (bruto, reversado y neto,
@@ -10,7 +9,6 @@ import { calcularCobrado, type CobradoResult, type LibroFila, type PagoFallido }
  * contratado). Lee desde el inicio del mes anterior y delega al cálculo puro.
  */
 export function useReportesCobrado() {
-  const tenant = useTenant();
   const [data, setData] = useState<CobradoResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -23,34 +21,31 @@ export function useReportesCobrado() {
     const inicioMesAnterior = inicioDeMesEnZona(-1, ahora);
     const desde = new Date(Math.min(inicioMesAnterior.getTime(), ahora.getTime() - 31 * 24 * 60 * 60 * 1000));
     try {
-      // R2-B (PKG-01N): el dinero sale del LIBRO ECONÓMICO (cobros firmes de Stripe
-      // y de mostrador, reversales exactos, lo no atribuible aparte). Cast: la RPC
-      // aún no está en los tipos generados.
-      const { data: filas, error: err } = await (supabase.rpc as unknown as (
-        fn: string,
-        args: Record<string, unknown>
-      ) => Promise<{ data: LibroFila[] | null; error: { message: string } | null }>)('libro_economico', {
+      // R2-B (PKG-01N): el dinero sale del LIBRO ECONÓMICO. PKG-06F (FR-62/63): la
+      // base lo devuelve AGRUPADO por periodo, clase, origen, moneda y estado (unos
+      // pocos renglones sin importar cuántos cobros haya); la lógica del KPI no cambia.
+      const { data: grupos, error: err } = await (supabase.rpc as unknown as <T>(fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: T | null; error: { message: string } | null }>)<LibroGrupo[]>('libro_economico_agregado', {
         p_desde: desde.toISOString(),
+        p_inicio_mes_anterior: inicioMesAnterior.toISOString(),
+        p_inicio_mes: inicioMes.toISOString(),
         p_hasta: new Date(ahora.getTime() + 60_000).toISOString()
       });
       if (err) throw err;
-      // Cobros fallidos: no son ingreso; siguen saliendo del diario de Stripe.
-      const { data: fallidos, error: errF } = await supabase
-        .from('payment_events')
-        .select('created_at, monto_centavos')
-        .eq('tenant_id', tenant.id)
-        .eq('status', 'failed')
-        .gte('created_at', desde.toISOString())
-        .limit(2000);
+      // Cobros fallidos de los últimos 30 días, contados en la base (antes: filas
+      // crudas con un tope que el servidor recortaba a 1000).
+      const { data: fallidos, error: errF } = await (supabase.rpc as unknown as <T>(fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: T | null; error: { message: string } | null }>)<FallidosResumen[]>('cobros_fallidos_resumen', {
+        p_desde: new Date(ahora.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      });
       if (errF) throw errF;
-      setData(calcularCobrado(filas ?? [], inicioMes, inicioMesAnterior, ahora, (fallidos ?? []) as PagoFallido[]));
+      if (!fallidos?.[0]) throw new Error('cobros_fallidos_resumen sin fila');
+      setData(calcularCobradoAgregado(grupos ?? [], fallidos[0]));
     } catch (e) {
       console.error('[useReportesCobrado]', e);
       setError(true);
     } finally {
       setIsLoading(false);
     }
-  }, [tenant.id]);
+  }, []);
 
   useEffect(() => {
     void refetch();

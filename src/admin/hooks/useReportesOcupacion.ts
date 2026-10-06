@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
+import { leerTodo } from '@shared/lib/leerTodo';
 import {
   calcularOcupacion,
   type OcupacionResult,
@@ -25,35 +26,33 @@ export function useReportesOcupacion() {
   const refetch = useCallback(async () => {
     setIsLoading(true);
     setError(false);
-    const desde = new Date(Date.now() - DIAS * 24 * 60 * 60 * 1000).toISOString();
+    const desde90 = new Date(Date.now() - DIAS * 24 * 60 * 60 * 1000).toISOString();
 
-    const [recursosRes, reservasRes] = await Promise.all([
-      supabase
-        .from('recursos')
-        .select('id, nombre, cupos, horarios')
-        .eq('tenant_id', tenant.id)
-        .eq('activo', true),
-      supabase
-        .from('reservas')
-        .select('recurso_id, status, duracion_min, slot_inicio')
-        .eq('tenant_id', tenant.id)
-        .gte('slot_inicio', desde)
-    ]);
-
-    if (recursosRes.error || reservasRes.error) {
-      console.error('[useReportesOcupacion]', recursosRes.error || reservasRes.error);
+    try {
+      const [recursosRes, reservas] = await Promise.all([
+        supabase
+          .from('recursos')
+          .select('id, nombre, cupos, horarios')
+          .eq('tenant_id', tenant.id)
+          .eq('activo', true),
+        // PKG-06F (FR-62): la ventana de 90 días se lee COMPLETA (por páginas y
+        // con conteo exacto); si no se puede, es error — nunca una ocupación parcial.
+        leerTodo<ReservaLite>((desde, hasta) =>
+          supabase
+            .from('reservas')
+            .select('recurso_id, status, duracion_min, slot_inicio', { count: 'exact' })
+            .eq('tenant_id', tenant.id)
+            .gte('slot_inicio', desde90)
+            .order('id')
+            .range(desde, hasta) as unknown as PromiseLike<{ data: ReservaLite[] | null; error: { message: string } | null; count: number | null }>
+        )
+      ]);
+      if (recursosRes.error) throw recursosRes.error;
+      setData(calcularOcupacion((recursosRes.data ?? []) as unknown as RecursoLite[], reservas, DIAS));
+    } catch (e) {
+      console.error('[useReportesOcupacion]', e);
       setError(true);
-      setIsLoading(false);
-      return;
     }
-
-    setData(
-      calcularOcupacion(
-        (recursosRes.data ?? []) as unknown as RecursoLite[],
-        (reservasRes.data ?? []) as unknown as ReservaLite[],
-        DIAS
-      )
-    );
     setIsLoading(false);
   }, [tenant.id]);
 

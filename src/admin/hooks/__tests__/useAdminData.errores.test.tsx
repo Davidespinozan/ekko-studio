@@ -13,22 +13,34 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@shared/hooks/useTenant', () => ({ useTenant: () => ({ id: 't-1' }) }));
+/**
+ * Constructor encadenable. PKG-06F: `.range(a, b)` responde como PostgREST — a lo
+ * más 1000 filas por respuesta (`max_rows`) y el conteo exacto del total — para
+ * probar que las listas se leen COMPLETAS por páginas.
+ */
+const MAX_ROWS = 1000;
+function constructor(res: () => { data: unknown; error: unknown }) {
+  const c: Record<string, unknown> = {};
+  for (const m of ['select', 'eq', 'in', 'or', 'order', 'limit', 'neq', 'gte', 'lt']) c[m] = () => c;
+  c.range = (a: number, b: number) => {
+    const r = res();
+    if (r.error || !Array.isArray(r.data)) return Promise.resolve({ data: null, error: r.error, count: null });
+    return Promise.resolve({ data: r.data.slice(a, Math.min(b + 1, a + MAX_ROWS)), error: null, count: r.data.length });
+  };
+  c.maybeSingle = () => Promise.resolve(res());
+  c.then = (cb: (v: unknown) => unknown) => Promise.resolve(res()).then(cb);
+  return c;
+}
+
 vi.mock('@shared/lib/supabase', () => ({
   supabase: {
     // PKG-06D: la lista de cuentas es la RPC `buscar_cuentas_staff` (texto como
     // parámetro, nunca gramática `.or()`); se simula con la misma tabla 'usuarios'.
     rpc: (fn: string, args: Record<string, unknown>) => {
       h.rpcLlamadas.push({ fn, args });
-      return Promise.resolve(h.porTabla.usuarios ?? { data: [], error: null });
+      return constructor(() => h.porTabla.usuarios ?? { data: [], error: null });
     },
-    from: (tabla: string) => {
-      const c: Record<string, unknown> = {};
-      for (const m of ['select', 'eq', 'in', 'or', 'order', 'limit']) c[m] = () => c;
-      const res = () => h.porTabla[tabla] ?? { data: [], error: null };
-      c.maybeSingle = () => Promise.resolve(res());
-      c.then = (cb: (v: unknown) => unknown) => Promise.resolve(res()).then(cb);
-      return c;
-    }
+    from: (tabla: string) => constructor(() => h.porTabla[tabla] ?? { data: [], error: null })
   }
 }));
 
@@ -59,6 +71,17 @@ describe('useMiembros (F07)', () => {
     renderHook(() => useMiembros({}));
     await waitFor(() => expect(h.rpcLlamadas).toHaveLength(1));
     expect(h.rpcLlamadas[0].args).toEqual({ p_texto: null, p_rol: null, p_status: null });
+  });
+
+  it('PKG-06F (FR-62): 2,500 cuentas → la lista llega COMPLETA (3 páginas), no cortada en 1000', async () => {
+    h.rpcLlamadas.length = 0;
+    h.porTabla.usuarios = { data: Array.from({ length: 2500 }, (_, i) => ({ id: `u${i}` })), error: null };
+    const { result } = renderHook(() => useMiembros({ rol: 'miembro' }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.miembros).toHaveLength(2500);
+    expect(new Set(result.current.miembros.map((m) => m.id)).size).toBe(2500);
+    expect(h.rpcLlamadas).toHaveLength(3);
+    expect(result.current.error).toBe(false);
   });
 
   it('error → error=true y la lista no se reemplaza por [] "real"', async () => {
@@ -95,6 +118,14 @@ describe('useMembresiasVigentesPorUsuario (F04)', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.porUsuario.get('u1')?.status).toBe('activa');
     expect(result.current.error).toBe(false);
+  });
+
+  it('PKG-06F (FR-62): 1,500 membresías vivas → el mapa tiene a los 1,500 miembros (ninguno "sin membresía" por el tope)', async () => {
+    h.porTabla.membresias = { data: Array.from({ length: 1500 }, (_, i) => ({ usuario_id: `u${i}`, status: 'activa', created_at: '2026-02-01' })), error: null };
+    const { result } = renderHook(() => useMembresiasVigentesPorUsuario());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.porUsuario.size).toBe(1500);
+    expect(result.current.porUsuario.get('u1499')?.status).toBe('activa');
   });
 
   it('error → error=true; el mapa queda vacío pero la UI NO debe leerlo como "todos sin membresía"', async () => {

@@ -207,7 +207,27 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-Nada.
+- **PKG-06F "Agregados en el servidor" — IMPLEMENTADO LOCALMENTE, en un commit local
+  SIN PUSH** (EKKO-148; FR-62, FR-63; FR-65 ya estaba resuelto). Migración
+  `20261019100000_06f_agregados_servidor.sql` (NO aplicada en producción): 5 RPC
+  nuevas, todas SECURITY INVOKER con estudio de `get_my_tenant_id()` —
+  `reporte_creditos`, `libro_economico_agregado`, `cobros_fallidos_resumen`,
+  `membresias_vivas_por_tier` (las de admin exigen admin) y `reservas_por_dia_estudio`.
+  Ninguna función existente cambia; sin índice nuevo (FR-65: `mov_tenant_fecha_idx`
+  existe desde 20260921110000 y está en producción). App: créditos, cobrado, dinero del
+  dashboard, MRR y la gráfica de 30 días consumen agregados; ocupación, engagement,
+  padrón de miembros y membresías vivas por miembro se leen COMPLETOS por páginas con
+  conteo exacto (`leerTodo`; incompleto = error). Ningún KPI cambia de significado
+  (D-FIN-10 no se toca). Funciones: 140 → 145 en la base local (la base local sin 06F
+  = producción salvo `rls_auto_enable()`). Pruebas: `db/06f-agregados-servidor.db.test.ts`
+  (11, con 1,100–1,500 filas reales por fuente; 10 muerden sin la migración; la de
+  FR-65 pasa con o sin ella), `leerTodo` (8), `useReportesAgregados` (8),
+  `useAdminData.errores` (+2, listas de 2,500 y 1,500), `useDashboardData` (+2).
+  Hardening 64/64 (antes 62); drift 77/77 (antes 75). Gate completo: 1.ª corrida con 1
+  fallo en el intermitente conocido `ekko138-pausa-comercial` 5b (residual registrado,
+  ajeno a 06F, no se tocó); 2.ª corrida verde: 226 archivos / 2232 pruebas, build OK,
+  `git diff --check` OK (61 s, máquina en reposo). Activación: migración (aditiva) →
+  deploy; pendiente de autorización del dueño (`ekko-activar`).
 
 ## PKG-06E — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06E "Ciclo de vida del material"** (EKKO-147, FR-42..46) — commit `6b2e086`
@@ -638,8 +658,13 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 ## Siguiente paso
 Resolver desde el panel los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
 `activo_sin_derecho`). El backlog canónico final (reconciliación post-R1/R2/01/02/03)
-deja 1 paquete (06B, 06C y 06E cerrados; ya no quedan P0, P1 ni P2; quedan 5 P3):
-06F (agregación en el servidor); es el siguiente recomendado.
+deja 1 paquete (06B, 06C y 06E cerrados; ya no quedan P0, P1 ni P2): 06F (agregación
+en el servidor; implementado en local, ver "Solo en local"); el siguiente paso es su
+activación controlada. Corrección de conteo: la tabla canónica tiene 16 P3; 13 están
+cerrados en producción (06A, 06B, 06D, 06E, 06G) y quedan 3 (FR-62, FR-63, FR-65, este
+último ya resuelto en producción). El "5" de los reportes anteriores arrastraba un
+error de aritmética de +2 (se contaron 17 P3 al inicio y se restaron 4 en vez de 5 al
+cerrar 06A/06D); no hay otros 2 hallazgos abiertos.
 Aparte, el hallazgo nuevo del correo de recuperación sin SMTP propio (ver
 "Residuales") requiere revisión del dueño antes de salir en vivo. Decisiones del dueño pendientes: D-FIN-2 (DSN de
 Sentry en producción: hoy no hay), D-FIN-3 (deploy previews con secretos LIVE),

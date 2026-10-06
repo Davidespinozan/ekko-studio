@@ -3,6 +3,7 @@ import { traducirErrorTier } from '../lib/traducirErrorTier';
 import { supabase } from '@shared/lib/supabase';
 import { COLUMNAS_RESERVA_CLIENTE, COLUMNAS_USUARIO_CLIENTE, type UsuarioCliente } from '@shared/lib/columnas';
 import { useTenant } from '@shared/hooks/useTenant';
+import { leerTodo } from '@shared/lib/leerTodo';
 import { backendPost } from '@shared/lib/backend';
 import { inicioDeHoyEnZona, inicioDeMesEnZona, fechaISOEnZona } from '@shared/lib/timezone';
 import type { Database } from '@shared/types/database';
@@ -40,18 +41,28 @@ export function useMiembros(filtros?: { search?: string; status?: string; rol?: 
     // `buscar_cuentas_staff` (ILIKE con escape en el servidor), nunca interpolado
     // en la gramática `.or()` de PostgREST. La RPC filtra por el tenant del
     // caller y devuelve solo columnas permitidas; "staff" agrupa recepción/admin.
-    const { data, error: qErr } = await supabase.rpc('buscar_cuentas_staff', {
-      p_texto: filtros?.search?.trim() || null,
-      p_rol: filtros?.rol || null,
-      p_status: filtros?.status || null
-    });
-    if (qErr) {
+    // PKG-06F (FR-62): la lista se trae COMPLETA (páginas del mismo orden que la RPC,
+    // `created_at` desc + `id`, con conteo exacto); antes se cortaba en 1000 sin aviso.
+    let data: Usuario[];
+    try {
+      data = await leerTodo<Usuario>((desde, hasta) =>
+        supabase
+          .rpc('buscar_cuentas_staff', {
+            p_texto: filtros?.search?.trim() || null,
+            p_rol: filtros?.rol || null,
+            p_status: filtros?.status || null
+          }, { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .order('id')
+          .range(desde, hasta) as unknown as PromiseLike<{ data: Usuario[] | null; error: { message: string } | null; count: number | null }>
+      );
+    } catch (qErr) {
       console.error('[useMiembros]', qErr);
       setError(true); // la lista anterior se conserva
       setIsLoading(false);
       return;
     }
-    setMiembros((data ?? []) as Usuario[]);
+    setMiembros(data);
     setIsLoading(false);
   }, [filtros?.search, filtros?.status, filtros?.rol]);
 
@@ -119,19 +130,20 @@ export function useMembresiasVigentesPorUsuario() {
     setIsLoading(true);
     setError(false);
     try {
-      const { data, error: qErr } = await supabase
-        .from('membresias')
-        .select('usuario_id, status, periodo_actual_fin, creditos_restantes, created_at, tier:tiers(slug, nombre, tipo)')
-        .eq('tenant_id', tenant.id)
-        .in('status', ['trialing', 'activa', 'past_due', 'pausada'])
-        .order('created_at', { ascending: false });
-      if (qErr) {
-        console.error('[useMembresiasVigentesPorUsuario]', qErr);
-        setError(true); // el mapa anterior se conserva
-        return;
-      }
+      // PKG-06F (FR-62): COMPLETA (por páginas con conteo exacto). Con más de 1000
+      // membresías vivas, el resto de los miembros salía "SIN MEMBRESÍA" sin aviso.
+      const data = await leerTodo<MembresiaResumen>((desde, hasta) =>
+        supabase
+          .from('membresias')
+          .select('usuario_id, status, periodo_actual_fin, creditos_restantes, created_at, tier:tiers(slug, nombre, tipo)', { count: 'exact' })
+          .eq('tenant_id', tenant.id)
+          .in('status', ['trialing', 'activa', 'past_due', 'pausada'])
+          .order('created_at', { ascending: false })
+          .order('id')
+          .range(desde, hasta) as unknown as PromiseLike<{ data: MembresiaResumen[] | null; error: { message: string } | null; count: number | null }>
+      );
       const map = new Map<string, MembresiaResumen>();
-      for (const m of (data ?? []) as unknown as MembresiaResumen[]) {
+      for (const m of data) {
         if (!map.has(m.usuario_id)) map.set(m.usuario_id, m); // la más reciente gana
       }
       setPorUsuario(map);
@@ -551,14 +563,12 @@ export function useDashboardData() {
         .neq('status', 'cancelada_admin')
         .gte('slot_inicio', inicioMesAnterior.toISOString())
         .lt('slot_inicio', finMesAnterior.toISOString()),
-      supabase
-        .from('reservas')
-        .select('slot_inicio')
-        .eq('tenant_id', tenant.id)
-        .neq('status', 'cancelada')
-        .neq('status', 'cancelada_admin')
-        .gte('slot_inicio', hace30dias.toISOString())
-        .lt('slot_inicio', finHoy.toISOString())
+      // PKG-06F (FR-62/63): la serie de 30 días se CUENTA en la base, por día del
+      // estudio (antes: una fila por reserva, recortada a 1000 por el servidor).
+      (supabase.rpc as unknown as <T>(fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: T | null; error: { message: string } | null }>)<{ dia: string; n: number }[]>('reservas_por_dia_estudio', {
+        p_desde: hace30dias.toISOString(),
+        p_hasta: finHoy.toISOString()
+      })
     ]);
 
     // ERROR-UI-FIX E-03: si CUALQUIERA de las 9 queries falló, no pintar un
@@ -583,10 +593,10 @@ export function useDashboardData() {
       const d = new Date(hace30dias.getTime() + i * 24 * 60 * 60 * 1000);
       conteoPorDia[fechaISOEnZona(d)] = 0;
     }
-    (reservas30d.data ?? []).forEach((r) => {
-      const k = fechaISOEnZona(String(r.slot_inicio));
-      if (k in conteoPorDia) conteoPorDia[k]++;
-    });
+    for (const r of reservas30d.data ?? []) {
+      const k = String(r.dia).slice(0, 10);
+      if (k in conteoPorDia) conteoPorDia[k] += Number(r.n);
+    }
     const reservasUltimos30Dias = Object.entries(conteoPorDia).map(([fecha, count]) => ({
       fecha,
       count
@@ -638,16 +648,14 @@ export function useDineroMetrics() {
     const inicioMesAnterior = inicioDeMesEnZona(-1, now);
 
     // R2-B (PKG-01N): mismo origen que Reportes → el libro económico (cobros
-    // FIRMES de Stripe y mostrador, por fecha del proveedor). Antes: payment_events
-    // crudo, sin mostrador y con filas históricas no atribuibles.
-    const { data, error: qErr } = await (supabase.rpc as unknown as (
-      fn: string,
-      args: Record<string, unknown>
-    ) => Promise<{
-      data: { clase: string; estado_evidencia: string; moneda: string; monto_centavos: number; ocurrido_at: string }[] | null;
-      error: { message: string } | null;
-    }>)('libro_economico', {
+    // FIRMES de Stripe y mostrador, por fecha del proveedor). PKG-06F (FR-62/63):
+    // la base lo devuelve AGRUPADO; antes se sumaban filas crudas (tope de 1000).
+    const { data, error: qErr } = await (supabase.rpc as unknown as <T>(fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: T | null; error: { message: string } | null }>)<
+      { periodo: string; clase: string; estado_evidencia: string; moneda: string; monto_centavos: number; n: number }[]
+    >('libro_economico_agregado', {
       p_desde: inicioMesAnterior.toISOString(),
+      p_inicio_mes_anterior: inicioMesAnterior.toISOString(),
+      p_inicio_mes: inicioMes.toISOString(),
       p_hasta: new Date(now.getTime() + 60_000).toISOString()
     });
 
@@ -661,14 +669,13 @@ export function useDineroMetrics() {
     let facturadoMesActual = 0;
     let facturadoMesAnterior = 0;
     let cobrosMesActual = 0;
-    for (const row of data ?? []) {
-      if (row.clase !== 'cobro' || row.estado_evidencia !== 'firme' || row.moneda !== 'mxn') continue;
-      const fecha = new Date(row.ocurrido_at);
-      if (fecha >= inicioMes) {
-        facturadoMesActual += row.monto_centavos;
-        cobrosMesActual += 1;
-      } else {
-        facturadoMesAnterior += row.monto_centavos;
+    for (const g of data ?? []) {
+      if (g.clase !== 'cobro' || g.estado_evidencia !== 'firme' || g.moneda !== 'mxn') continue;
+      if (g.periodo === 'mes') {
+        facturadoMesActual += Number(g.monto_centavos);
+        cobrosMesActual += Number(g.n);
+      } else if (g.periodo === 'mes_anterior') {
+        facturadoMesAnterior += Number(g.monto_centavos);
       }
     }
 

@@ -378,5 +378,28 @@ SELECT 'P4', 'contrato 06E: limpieza solo de lo retirado con fila; retirar idemp
          AND NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace AND p.prosrc ~* 'delete\s+from\s+storage\.objects')
        THEN '✅ PASS' ELSE '❌ FAIL — se perdió una guardia de 06E' END;
 
+-- PKG-06F (20261019100000): agregados de reportes en la base. Ninguno es DEFINER
+-- (la RLS de las filas de origen sigue mandando), ninguno lo ejecuta anon, ninguno
+-- recibe el estudio como parámetro, y los de admin exigen admin.
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'agregados de 06F: invoker, sin anon, search_path fijo, sin parámetro de estudio',
+  CASE WHEN (SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace
+             AND proname IN ('reporte_creditos','libro_economico_agregado','cobros_fallidos_resumen','membresias_vivas_por_tier','reservas_por_dia_estudio')) <> 5
+       THEN '❌ FAIL — 06F no aplicada'
+       WHEN NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace
+              AND p.proname IN ('reporte_creditos','libro_economico_agregado','cobros_fallidos_resumen','membresias_vivas_por_tier','reservas_por_dia_estudio')
+              AND (p.prosecdef OR has_function_privilege('anon', p.oid, 'EXECUTE')
+                   OR NOT COALESCE(p.proconfig @> ARRAY['search_path=public'], false)
+                   OR pg_get_function_identity_arguments(p.oid) ILIKE '%tenant%'))
+       THEN '✅ PASS' ELSE '❌ FAIL — un agregado de 06F amplía el acceso o acepta el estudio del cliente' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P4', 'contrato 06F: los agregados de admin exigen admin y el estudio del caller; el libro agregado pasa por libro_economico',
+  CASE WHEN to_regprocedure('public.reporte_creditos()') IS NULL THEN '❌ FAIL — 06F no aplicada'
+       WHEN (SELECT bool_and(prosrc LIKE '%is_admin()%' AND prosrc LIKE '%get_my_tenant_id()%') FROM pg_proc
+             WHERE pronamespace='public'::regnamespace AND proname IN ('reporte_creditos','cobros_fallidos_resumen','membresias_vivas_por_tier'))
+         AND (SELECT prosrc FROM pg_proc WHERE proname='libro_economico_agregado' AND pronamespace='public'::regnamespace) LIKE '%libro_economico(p_desde, p_hasta)%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='reservas_por_dia_estudio' AND pronamespace='public'::regnamespace) LIKE '%get_my_tenant_id()%'
+       THEN '✅ PASS' ELSE '❌ FAIL — se perdió una guardia de 06F' END;
+
 -- ── Resultado ────────────────────────────────────────────────────────────────
 SELECT area, caso, resultado FROM _hardening_resultado ORDER BY id;

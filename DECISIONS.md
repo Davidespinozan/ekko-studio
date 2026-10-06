@@ -1081,3 +1081,25 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   retirado ya se entregó. D-FIN-5 (acceso de un miembro sancionado/revocado a su
   material) no se decide aquí: el acceso sigue igual. **Extiende EKKO-075; respeta
   EKKO-144 (06G).**
+
+## PKG-06F — agregados en el servidor (2026-10-06)
+
+- **EKKO-148 — PKG-06F · Un total no depende de cuántas filas quepan en una
+  respuesta.** PostgREST corta cada respuesta en 1000 filas (`max_rows` del
+  proyecto). Todo total o conteo de reportes que crece con el tiempo se calcula en la
+  base y viaja como una fila o unos pocos grupos: `reporte_creditos()` (pasivo de
+  créditos sobre el ledger completo), `libro_economico_agregado(...)` (el libro
+  económico agrupado por periodo, clase, origen, moneda y estado; la lógica de cada
+  KPI sigue en el cliente y el cálculo por filas delega en el agrupado, así que el
+  significado es el mismo), `cobros_fallidos_resumen(p_desde)`,
+  `membresias_vivas_por_tier()` (MRR) y `reservas_por_dia_estudio(...)` (gráfica del
+  dashboard, por día en America/Mazatlan como el cliente). Contrato común: estudio de
+  `get_my_tenant_id()` (nunca del navegador), SECURITY INVOKER (la RLS de las filas de
+  origen sigue mandando: no se amplía el acceso), los de admin exigen admin y FALLAN
+  (un error no es "cero"), enteros exactos (bigint). Las LISTAS acotadas (ventana de
+  90 días de ocupación y engagement, padrón de miembros, membresías vivas por miembro)
+  se leen completas por páginas con conteo exacto (`leerTodo`); si no se pueden
+  completar, es error, nunca una lista truncada. No cambia ningún KPI (D-FIN-10 no se
+  toca). FR-65: el índice `mov_tenant_fecha_idx (tenant_id, created_at DESC)` ya existe
+  desde 20260921110000 y está en producción; no se agrega otro. **Cierra FR-62, FR-63
+  y confirma FR-65 como ya resuelto.**

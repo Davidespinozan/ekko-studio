@@ -21,6 +21,8 @@ export interface TierLite {
 export interface MembresiaLite {
   tier_id: string;
   status: string;
+  /** PKG-06F: cuántas membresías representa la fila (grupo del servidor). Default 1. */
+  n?: number;
 }
 
 export interface IngresoPorPlan {
@@ -84,16 +86,17 @@ export function calcularEconomia(
     if (!STATUS_FACTURABLE.has(m.status)) continue;
     const tier = tierPorId.get(m.tier_id);
     if (!tier) continue;
+    const k = m.n ?? 1;
     if (!esRecurrente(tier)) {
-      paquetesActivos += 1;
+      paquetesActivos += k;
       continue;
     }
     const mensual = mensualizar(tier);
-    mrrCentavos += mensual;
-    activosConPlan += 1;
+    mrrCentavos += mensual * k;
+    activosConPlan += k;
     const prev = acumPorTier.get(tier.id) ?? { tier, mrr: 0, miembros: 0 };
-    prev.mrr += mensual;
-    prev.miembros += 1;
+    prev.mrr += mensual * k;
+    prev.miembros += k;
     acumPorTier.set(tier.id, prev);
   }
 

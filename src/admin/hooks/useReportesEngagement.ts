@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
 import { useTenant } from '@shared/hooks/useTenant';
+import { leerTodo } from '@shared/lib/leerTodo';
 import {
   calcularEngagement,
   type EngagementResult,
@@ -28,33 +29,36 @@ export function useReportesEngagement() {
     const ahoraMs = Date.now();
     const hace90d = new Date(ahoraMs - VENTANA_DIAS * 24 * 60 * 60 * 1000).toISOString();
 
-    const [activosRes, reservasRes] = await Promise.all([
-      supabase
-        .from('usuarios')
-        .select('id, nombre, email, telefono, created_at')
-        .eq('tenant_id', tenant.id)
-        .eq('rol', 'miembro')
-        .eq('status', 'activo'),
-      supabase
-        .from('reservas')
-        .select('usuario_id, slot_inicio, status, created_at')
-        .eq('tenant_id', tenant.id)
-        .gte('slot_inicio', hace90d)
-    ]);
-
-    if (activosRes.error || reservasRes.error) {
-      console.error('[useReportesEngagement]', activosRes.error || reservasRes.error);
+    try {
+      // PKG-06F (FR-62): padrón activo y ventana de 90 días, COMPLETOS (por páginas
+      // con conteo exacto). Si no se pueden leer completos, es error.
+      const [activos, reservas] = await Promise.all([
+        leerTodo<MiembroLite>((desde, hasta) =>
+          supabase
+            .from('usuarios')
+            .select('id, nombre, email, telefono, created_at', { count: 'exact' })
+            .eq('tenant_id', tenant.id)
+            .eq('rol', 'miembro')
+            .eq('status', 'activo')
+            .order('id')
+            .range(desde, hasta) as unknown as PromiseLike<{ data: MiembroLite[] | null; error: { message: string } | null; count: number | null }>
+        ),
+        leerTodo<ReservaEngLite>((desde, hasta) =>
+          supabase
+            .from('reservas')
+            .select('usuario_id, slot_inicio, status, created_at', { count: 'exact' })
+            .eq('tenant_id', tenant.id)
+            .gte('slot_inicio', hace90d)
+            .order('id')
+            .range(desde, hasta) as unknown as PromiseLike<{ data: ReservaEngLite[] | null; error: { message: string } | null; count: number | null }>
+        )
+      ]);
+      const nuevos90d = activos.filter((m) => new Date(m.created_at).getTime() >= new Date(hace90d).getTime());
+      setData(calcularEngagement(activos, reservas, nuevos90d, ahoraMs));
+    } catch (e) {
+      console.error('[useReportesEngagement]', e);
       setError(true);
-      setIsLoading(false);
-      return;
     }
-
-    const activos = (activosRes.data ?? []) as MiembroLite[];
-    const nuevos90d = activos.filter((m) => new Date(m.created_at).getTime() >= new Date(hace90d).getTime());
-
-    setData(
-      calcularEngagement(activos, (reservasRes.data ?? []) as ReservaEngLite[], nuevos90d, ahoraMs)
-    );
     setIsLoading(false);
   }, [tenant.id]);
 

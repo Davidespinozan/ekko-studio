@@ -1,27 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@shared/lib/supabase';
-import { useTenant } from '@shared/hooks/useTenant';
-import {
-  calcularCreditos,
-  type CreditosResult,
-  type MovimientoLite,
-  type SaldoLite
-} from '../logic/reportesCreditos';
+import { creditosDesdeTotales, type CreditosResult, type CreditosTotales } from '../logic/reportesCreditos';
 
 // ============================================================================
 // useReportesCreditos — pasivo de créditos: vendidos vs usados y saldo vivo.
-// Lee el ledger (membresia_movimientos, RLS admin) + los saldos de membresías
-// con su plan, y delega el cálculo a la lógica pura. Scopeado por tenant.
+// PKG-06F (FR-62/63): los totales los calcula la base (`reporte_creditos`, ledger
+// COMPLETO del estudio del admin). Antes se traía el ledger crudo y se sumaba
+// aquí: con más de 1000 movimientos el total salía corto sin avisar.
 // ============================================================================
 
-// Fila de saldo con el plan anidado (join to-one tier).
-interface SaldoRow {
-  creditos_restantes: number | null;
-  tier: { precio_centavos: number | null; clases_incluidas: number | null } | null;
-}
-
 export function useReportesCreditos() {
-  const tenant = useTenant();
   const [data, setData] = useState<CreditosResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -30,37 +18,18 @@ export function useReportesCreditos() {
     setIsLoading(true);
     setError(false);
 
-    const [movsRes, saldosRes] = await Promise.all([
-      // Ledger completo del tenant (append-only; en etapa temprana es pequeño).
-      supabase
-        .from('membresia_movimientos')
-        .select('tipo, delta')
-        .eq('tenant_id', tenant.id),
-      // Saldos vivos + precio/cupo del plan para valorar el pasivo.
-      supabase
-        .from('membresias')
-        .select('creditos_restantes, tier:tiers(precio_centavos, clases_incluidas)')
-        .eq('tenant_id', tenant.id)
-        .in('status', ['trialing', 'activa', 'past_due'])
-        .not('creditos_restantes', 'is', null)
-    ]);
-
-    if (movsRes.error || saldosRes.error) {
-      console.error('[useReportesCreditos]', movsRes.error || saldosRes.error);
+    const { data: filas, error: err } = await (supabase.rpc as unknown as <T>(fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: T | null; error: { message: string } | null }>)<CreditosTotales[]>('reporte_creditos');
+    const totales = filas?.[0];
+    if (err || !totales) {
+      // Un fallo NO es "cero créditos": la tarjeta muestra el error.
+      console.error('[useReportesCreditos]', err ?? 'sin fila');
       setError(true);
       setIsLoading(false);
       return;
     }
-
-    const saldos: SaldoLite[] = ((saldosRes.data ?? []) as unknown as SaldoRow[]).map((r) => ({
-      creditos_restantes: r.creditos_restantes,
-      precio_centavos: r.tier?.precio_centavos ?? null,
-      clases_incluidas: r.tier?.clases_incluidas ?? null
-    }));
-
-    setData(calcularCreditos((movsRes.data ?? []) as MovimientoLite[], saldos));
+    setData(creditosDesdeTotales(totales));
     setIsLoading(false);
-  }, [tenant.id]);
+  }, []);
 
   useEffect(() => {
     void refetch();

@@ -30,11 +30,9 @@ export function useReportesEconomia() {
         .from('tiers')
         .select('id, slug, nombre, precio_centavos, periodo, moneda, tipo')
         .eq('tenant_id', tenant.id),
-      supabase
-        .from('membresias')
-        .select('tier_id, status')
-        .eq('tenant_id', tenant.id)
-        .in('status', ['activa', 'trialing', 'past_due']),
+      // PKG-06F (FR-62/63): conteo por plan y estado en la base (antes: una fila por
+      // membresía, recortada a 1000 por el servidor → MRR corto sin aviso).
+      (supabase.rpc as unknown as <T>(fn: string, args?: Record<string, unknown>) => PromiseLike<{ data: T | null; error: { message: string } | null }>)<MembresiaLite[]>('membresias_vivas_por_tier'),
       supabase
         .from('membresias')
         .select('id', { count: 'exact', head: true })
