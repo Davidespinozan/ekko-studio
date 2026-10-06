@@ -4,13 +4,13 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-06 · PKG-06B cerrado en producción (operaciones de cobro
-del miembro y del webhook durables). Antes: PKG-06G (señales operativas durables). Todo lo de
+Última actualización: 2026-10-06 · PKG-06C cerrado en producción (alta pública con
+correo verificado; FR-24, el último P2). Antes: PKG-06B (operaciones de cobro del miembro y del webhook). Todo lo de
 abajo se verificó en vivo contra git, Netlify y Supabase.
 
-## Producción (verificado 2026-10-06 18:00 UTC)
-- Código de negocio publicado: `33b44d25de38d1fb32bb56df6fabf8fc0f6322b8`
-  ("fix(billing): make member and webhook stripe operations durable", PKG-06B); el commit docs-only
+## Producción (verificado 2026-10-06 18:47 UTC)
+- Código de negocio publicado: `7927fb5f94a9cc090b1828581cead258d08aeb3e`
+  ("fix(auth): verify email before public signup identity", PKG-06C); el commit docs-only
   de este archivo va encima (ver `git log`). Cadena:
   `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
   en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
@@ -19,8 +19,11 @@ abajo se verificó en vivo contra git, Netlify y Supabase.
   → `07a85d8` (STATUS) → `308a4a7` (STATUS) → `f713586` (PKG-03B fase D) → `a682065` (STATUS)
   → `50c3a4c` (PKG-02H) → `82604ef` (STATUS) → `b12fe4f` (PKG-06A) → `c02532b` (STATUS)
   → `fdecdbb` (PKG-06D) → `06d27b8` (STATUS) → `3649842` (PKG-06G) → `cf1cfc0` (STATUS)
-  → `33b44d2` (PKG-06B).
-- Netlify production: deploy `6ac535d7ff4a4f00081d51eb`, READY, `commit_ref` =
+  → `33b44d2` (PKG-06B) → `6d456a4` (STATUS) → `7927fb5` (PKG-06C).
+- Netlify production: deploy `6ac540f8e7755100085bc98d`, READY, `commit_ref` =
+  `7927fb5`, publicado 2026-10-06 18:44:11 UTC; 47 funciones (+`alta-publica`;
+  `fake-signup` inerte con 410), las 9 programadas sin cambio (`netlify.toml` intacto).
+  Antes `6ac53720ff4a4f00081dd047` = 6d456a4, `6ac535d7ff4a4f00081d51eb` =
   `33b44d2`, publicado 2026-10-06 17:56:34 UTC; antes `6ac52f4a4ccb810008ff86b9` =
   cf1cfc0, `6ac52e61c8b49900079d0b0c` = 3649842 (17:24:35 UTC, PKG-06G); 46 funciones, 9 programadas con los
   mismos horarios, `cron-reconciliar-stripe` a `0 9 * * *`; cabeceras con
@@ -39,8 +42,10 @@ abajo se verificó en vivo contra git, Netlify y Supabase.
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **114/114 migraciones**; última
-  `20261016100000_06b_operaciones_cobro_miembro.sql` (PKG-06B, md5
+- Supabase: **115/115 migraciones**; última
+  `20261017100000_06c_alta_publica_verificada.sql` (PKG-06C, md5
+  `0949ae3beed41862afdaf47bedf65b5d`, aplicada 2026-10-06 18:41 UTC, ANTES del
+  deploy); la 114 es `20261016100000_06b_operaciones_cobro_miembro.sql` (PKG-06B, md5
   `91e48dea5680ba8fe400265494f639dd`, aplicada 2026-10-06 ~17:50 UTC, ANTES del
   deploy); la 113 es `20261015100000_06g_senales_operativas.sql` (PKG-06G, md5
   `fe98902ddb41caa69ececaaea4a98d28`, aplicada 2026-10-06 ~17:21 UTC); la 112 es
@@ -81,7 +86,9 @@ detalle en la sección "PKG-06D" de abajo) ·
 **PKG-06G "Señales operativas durables" — CLOSED IN PRODUCTION** (EKKO-144; detalle en
 la sección "PKG-06G" de abajo) ·
 **PKG-06B "Operaciones de cobro del miembro y del webhook" — CLOSED IN PRODUCTION**
-(EKKO-145; FR-15/16/17; detalle en la sección "PKG-06B" de abajo).
+(EKKO-145; FR-15/16/17; detalle en la sección "PKG-06B" de abajo) ·
+**PKG-06C "Alta pública con correo verificado" — CLOSED IN PRODUCTION** (EKKO-146;
+FR-24; D-FIN-6 = A; detalle en la sección "PKG-06C" de abajo).
 Alcance final tras deduplicar contra R1, R2-A/B, EKKO-138, 03A y 03B: pausar, reactivar y
 dar de baja al fin del periodo escriben su operación en `stripe_operaciones_suscripcion`
 en la misma transacción que la transición local (causas `pausa_staff`,
@@ -194,27 +201,52 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- **PKG-06C "Alta pública con correo verificado" — IMPLEMENTADO LOCALMENTE, en un
-  commit local SIN PUSH** (EKKO-146, FR-24, D-FIN-6 = A). Migración
-  `20261017100000_06c_alta_publica_verificada.sql` (NO aplicada en producción):
-  `handle_new_auth_user` recreada desde su última definición (06A) con la guarda
-  "sin correo confirmado no hay identidad EKKO" y enganchada además al trigger nuevo
-  `on_auth_user_confirmed`; tabla `alta_publica_intentos` (huellas HMAC, RLS sin
-  políticas, sin grants a clientes) y RPC `alta_publica_solicitar` (solo
-  service_role). Netlify: `alta-publica` nueva (cuenta de Auth sin confirmar ni
-  contraseña, enlace del proveedor enviado por Resend, respuesta neutra, límite de
-  tasa); `fake-signup` inerte (410). App: `/signup` ya no pide contraseña ni inicia
-  sesión; `/confirmar-correo` verifica el enlace y pide la contraseña. Funciones:
-  138 → 139 en la base local (cambia solo `handle_new_auth_user`; nueva
-  `alta_publica_solicitar`; la base local sin 06C = producción salvo
-  `rls_auto_enable()`). Pruebas: `db/06c-alta-publica.db.test.ts` (21; 19 muerden sin
-  la migración), `alta-publica` (19), `fake-signup` (reescrita, 1), `Signup` (6),
-  `ConfirmarCorreo` (7). Hardening 60/60 (antes 58); drift 74/74 (antes 72). Gate
-  completo verde a la primera: 221 archivos / 2164 pruebas, build OK, `git diff
-  --check` OK (58 s, máquina en reposo). Sin cambio de configuración de Auth en
-  producción (registro directo ya apagado; remitente de Auth sin SMTP propio, por eso
-  el enlace sale por Resend, ya configurado). Activación: migración (aditiva) →
-  deploy; pendiente de autorización del dueño (`ekko-activar`).
+Nada.
+
+## PKG-06C — cerrado en producción (detalle; la línea corta está en "Cerrado")
+- **PKG-06C "Alta pública con correo verificado"** (EKKO-146, FR-24, D-FIN-6 = A) —
+  commit `7927fb5` ("fix(auth): verify email before public signup identity"),
+  migración `20261017100000_06c_alta_publica_verificada.sql` (md5
+  `0949ae3beed41862afdaf47bedf65b5d`; Supabase 114 → 115, 18:41 UTC), deploy Netlify
+  `6ac540f8e7755100085bc98d` READY = 7927fb5 (18:44 UTC). Orden: migración (aditiva;
+  el `fake-signup` viejo crea cuentas confirmadas y seguía igual) → push → deploy.
+- Qué quedó: FR-24 CLOSED IN PRODUCTION. Sin correo verificado no hay identidad EKKO:
+  `handle_new_auth_user` regresa sin crear ni vincular mientras
+  `email_confirmed_at` sea NULL, es idempotente por cuenta de Auth y corre también en
+  el trigger nuevo `on_auth_user_confirmed` (solo en la transición NULL → confirmado).
+  Reglas de 06A intactas (vincular solo cascarón o perfil autorizado, sin reescribir
+  rol/status/plan; ambiguo o con historial sin autorizar = se rechaza la confirmación
+  entera); el alta pública nunca vincula un perfil de staff; el perfil nuevo nace
+  `miembro` / `pendiente_pago` con el plan solo si sigue en venta, auditado como
+  `alta_publica_verificada` (y `origen` en `auth_vinculado`). `fake-signup` retirado
+  (410, sin Supabase). `alta-publica`: solo lee nombre, correo, plan y aceptación;
+  cuenta de Auth SIN confirmar ni contraseña; enlace generado por el proveedor
+  (`generateLink`) y enviado por el remitente de EKKO en Resend (sin tocar la cola de
+  notificaciones; el token no se guarda, no se registra ni es llave de idempotencia);
+  respuesta neutra única ("Si el correo puede usarse para una cuenta nueva…"); 429
+  genérico; 503 honesto si el proveedor no aceptó el correo. Límite durable en
+  `alta_publica_intentos` (solo huellas HMAC, RLS sin políticas, sin grants a clientes,
+  purga a 24 h) vía `alta_publica_solicitar` (solo service_role, search_path fijo,
+  estudio y plan del servidor): correo 1/min y 5/día (excedido = silencio), origen
+  `x-nf-client-connection-ip` (IPv6 por /64; `x-forwarded-for` ignorado) 5/10 min y
+  20/día, estudio 60/h. `/signup` ya no pide contraseña ni inicia sesión;
+  `/confirmar-correo` verifica una vez (`verifyOtp`), quita el token de la URL, pide la
+  contraseña DESPUÉS de probar el buzón y cierra la sesión si se abandona. Auth sin
+  cambios: `disable_signup = true` (debe seguir así), autoconfirm encendido (irrelevante
+  con el registro directo apagado), sin inicio de sesión sin verificar.
+- Verificación: 140 funciones en producción (139 + `alta_publica_solicitar`); cambió
+  solo `handle_new_auth_user()` (b2a4f040… → 6516fefc…), ambas idénticas al build
+  local probado; ninguna otra cambió (R1, 02C, F-1, R2-B, 02H, 03A, 03B, 06A, 06B, 06D,
+  06G intactas). Hardening 60/60 y drift 74/74 en producción (tras migrar y tras
+  publicar). Cuentas de Auth (7, todas confirmadas), perfiles, vínculos, roles,
+  membresías, auditoría (25), Operación por rol y los 14 hashes de datos de negocio
+  idénticos antes, tras migrar y al final; 0 intentos. Bundle publicado: `alta-publica`
+  y textos nuevos presentes, `fake-signup` y los campos de contraseña ausentes, sin
+  llaves; sondas sin datos reales: `fake-signup` 410, `alta-publica` {} 400 y GET 405,
+  `/signup` y `/confirmar-correo` 200. Gate local: 221 archivos / 2164 pruebas.
+- Cero altas reales, cuentas de Auth, correos de verificación, cambios a cuentas demo,
+  cambios de configuración de Auth, mutaciones de Stripe o de negocio causadas por la
+  activación.
 
 ## PKG-06B — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06B "Operaciones de cobro del miembro y del webhook"** (EKKO-145) — commit
@@ -475,6 +507,11 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   dos pruebas). No se aplica, no se borra, no se commitea. Ver nota de `57b9af0`.
 
 ## Diferido / pendiente no bloqueante
+- PKG-06C, evidencia natural (no se fabrica): la primera alta pública real — enlace de
+  `generateLink` para una cuenta sin confirmar → correo aceptado por Resend →
+  `verifyOtp` → `email_confirmed_at` → `on_auth_user_confirmed` → perfil
+  `pendiente_pago` + `alta_publica_verificada` → contraseña → pago. Sin probar en
+  producción a propósito; no bloquea el cierre.
 - PKG-06B, evidencia natural (no se fabrica): primer cambio de plan real con su
   operación cerrada; primera baja o reactivación real del miembro por la RPC y el
   ejecutor (y, si ocurre, un `stripe_pendiente` real); primer checkout con suscripción
@@ -521,6 +558,16 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 - Credencial de la cuenta demo: riesgo aceptado por el dueño. NO remediar.
 
 ## Residuales conocidos (para paquetes posteriores; no corregir de paso)
+- HALLAZGO NUEVO (fuera del backlog canónico; revisión del dueño antes de salir en
+  vivo): Supabase Auth no tiene SMTP propio (`smtp_host` vacío; el remitente por
+  defecto limita a 2 correos/h y no garantiza entrega a clientes), así que el correo de
+  recuperación de contraseña (`/recuperar`, `resetPasswordForEmail`) puede no llegar a
+  clientes reales. No verificado con un envío real; no se tocó en 06C.
+- PKG-06C: el tiempo de respuesta puede insinuar si un correo ya tiene cuenta (crear
+  tarda más que no hacer nada); el tope diario por correo lo puede agotar un tercero
+  (la persona espera un día o va a recepción); el techo de 60/h del estudio puede
+  saturarse ante un ataque distribuido; si aparece un perfil entre la solicitud y el
+  clic, la confirmación se rechaza y la persona va a recepción.
 - Storage: 2 objetos huérfanos en el bucket `material` (del 2026-10-04, sin fila en
   `material_sesion`; 4 objetos en total). Sin tocar. Pendiente de decisión del dueño.
 - Finanzas: no se guardan comisiones de Stripe; ventas de mostrador sin evidencia de
@@ -537,10 +584,10 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 ## Siguiente paso
 Resolver desde el panel los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
 `activo_sin_derecho`). El backlog canónico final (reconciliación post-R1/R2/01/02/03)
-deja 3 paquetes (06B cerrado): 06C (alta pública con verificación, FR-24, el último P2;
-implementado en local, ver "Solo en local"), 06E (ciclo de vida del material), 06F
-(agregación en el servidor); el siguiente paso recomendado es la activación
-controlada de PKG-06C. Decisiones del dueño pendientes: D-FIN-2 (DSN de
+deja 2 paquetes (06B y 06C cerrados; ya no quedan P0, P1 ni P2): 06E (ciclo de vida
+del material) y 06F (agregación en el servidor); el siguiente recomendado es PKG-06E.
+Aparte, el hallazgo nuevo del correo de recuperación sin SMTP propio (ver
+"Residuales") requiere revisión del dueño antes de salir en vivo. Decisiones del dueño pendientes: D-FIN-2 (DSN de
 Sentry en producción: hoy no hay), D-FIN-3 (deploy previews con secretos LIVE),
 D-FIN-4 (cuentas demo al salir), D-FIN-8 (2 objetos huérfanos de Storage), respaldo y
 simulacro de restauración, cuál versión del enlace de Login queda (publicada vs stash).
