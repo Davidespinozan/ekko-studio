@@ -131,7 +131,14 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- Nada.
+- **PKG-03B "Reconciliador Stripe (detect-only)"** (EKKO-140) — COMMITTED en local
+  (un commit, ver `git log`), gate verde, SIN PUSH / SIN DEPLOY / MIGRACIÓN NO
+  APLICADA / SIN CORRIDA EN PRODUCCIÓN / SIN HORARIO. Migración
+  `20261011100000_03b_reconciliacion_stripe.sql` (`discrepancias_stripe`,
+  `reconciliacion_stripe_corridas`, 2 RPC nuevas, 2 ramas nuevas en
+  `v_pendientes_operativos`; ninguna función existente cambia). Función manual
+  `reconciliar-stripe`, deshabilitada sin `RECONCILIAR_STRIPE_TOKEN`. Pruebas:
+  `src/__tests__/reconciliacion-stripe.test.ts`, `src/__tests__/db/03b-reconciliacion-stripe.db.test.ts`.
 - (Corrección histórica: la versión anterior de este archivo, dentro del commit
   `890498a`, decía "SIN COMMIT"; se escribió antes de commitear. PKG-03A ya está
   publicado y cerrado, ver "Cerrado en producción".)

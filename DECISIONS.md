@@ -858,3 +858,15 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   cobro vuelve al levantar la sanción. Pausar estando ya en pausa por el
   proveedor solo declara la intención. Pausar y reactivar son idempotentes. La
   revocación no cambia (contrato R1). **Extiende a EKKO-138 y EKKO-129.**
+- **EKKO-140 — PKG-03B · `D-03B-1 = A`: el reconciliador de Stripe solo DETECTA.**
+  Compara lo que EKKO espera (membresía viva/terminada, plan, sanción, revocación,
+  intención de pausa comercial) con lo que Stripe contiene (existencia, estado,
+  `pause_collection`, `cancel_at_period_end`, `metadata.tier_id`) y deja evidencia
+  en `discrepancias_stripe`: una abierta por (estudio, suscripción, tipo); la cierra
+  solo una corrida COMPLETA que ya no la ve (`convergio`); reaparecer = episodio
+  nuevo; revisarla no la cierra. Parcial o fallida nunca cierra ni afirma "falta".
+  No repara nada: Stripe solo se lee (`accounts.retrieve`, `subscriptions.list`).
+  La cancelación automática de huérfanas de 48 h existente no cambia y lo que su
+  ventana cubre no se reporta. Alcance: cuentas de `tenants.stripe_account_id`,
+  suscripciones con `metadata.app = 'ekko'` o referidas por una membresía.
+  **Extiende a EKKO-131, EKKO-137 y EKKO-138.**

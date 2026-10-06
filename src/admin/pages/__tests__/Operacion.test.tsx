@@ -90,6 +90,26 @@ describe('Operación (PKG-03A)', () => {
     await waitFor(() => expect(h.rpc).toHaveBeenCalledWith('resolver_fallo_entrega', { p_fuente: 'notificaciones', p_id: 'n-1', p_nota: 'Se le avisó por WhatsApp' }));
   });
 
+  it('PKG-03B: una discrepancia de Stripe se REVISA (sin botón de reparar); revisada sigue listada y sin acción', async () => {
+    const dis = { ...base, dominio: 'stripe', tipo: 'discrepancia_pausa_distinta', fuente: 'discrepancias_stripe', fuente_id: 'd-1',
+      severidad: 'alta', accion: 'revisar_discrepancia', detalle: 'sub_1 · EKKO: cobro en pausa (sancion) · Stripe: active · vista 2x' };
+    const revisada = { ...dis, fuente_id: 'd-2', severidad: 'baja', accion: 'discrepancia_revisada' };
+    const corrida = { ...base, dominio: 'stripe', tipo: 'reconciliacion_parcial', fuente: 'reconciliacion_stripe_corridas', fuente_id: 'c-1',
+      severidad: 'media', accion: 'reconciliacion_incompleta', detalle: 'limite_paginas' };
+    h.filas = [dis, revisada, corrida];
+    montar();
+    // Abierta y revisada: ambas siguen listadas (leída ≠ resuelta).
+    expect(await screen.findAllByText('La pausa del cobro no coincide')).toHaveLength(2);
+    expect(screen.getByText('La última reconciliación con Stripe quedó incompleta')).toBeInTheDocument();
+    expect(screen.getAllByText('Marcar como revisada')).toHaveLength(1);
+    expect(screen.queryByText(/reparar|corregir en stripe|reanudar/i)).toBeNull();
+    fireEvent.click(screen.getByText('Marcar como revisada'));
+    fireEvent.change(screen.getByLabelText('Nota (obligatoria)'), { target: { value: 'Revisado: el miembro sigue sancionado' } });
+    fireEvent.click(screen.getByText('Guardar'));
+    await waitFor(() => expect(h.rpc).toHaveBeenCalledWith('revisar_discrepancia_stripe', { p_discrepancia_id: 'd-1', p_nota: 'Revisado: el miembro sigue sancionado' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('sigue abierta');
+  });
+
   it('vacío legítimo → "Nada pendiente"; fallo al cargar → error, nunca "Nada pendiente"', async () => {
     h.filas = [];
     const { unmount } = montar();

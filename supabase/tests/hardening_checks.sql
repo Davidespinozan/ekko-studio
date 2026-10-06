@@ -218,5 +218,20 @@ SELECT 'P5', 'RPC de entrega (03A) solo para service_role',
          AND has_function_privilege('authenticated', p.oid, 'EXECUTE'))
        THEN '✅ PASS' ELSE '❌ FAIL — authenticated ejecuta una RPC de entrega' END;
 
+-- PKG-03B (20261011100000): la evidencia de entrega y de reconciliación no es de
+-- anon, y el registro de corridas solo lo hace el reconciliador (service_role).
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'anon sin SELECT en evidencia operativa (correos directos, discrepancias, corridas)',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relnamespace='public'::regnamespace
+         AND c.relname IN ('correos_directos','discrepancias_stripe','reconciliacion_stripe_corridas')
+         AND has_table_privilege('anon', c.oid, 'SELECT'))
+       THEN '✅ PASS' ELSE '❌ FAIL — anon lee evidencia operativa' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'registrar_reconciliacion_stripe solo para service_role',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace
+         AND p.proname = 'registrar_reconciliacion_stripe'
+         AND (has_function_privilege('authenticated', p.oid, 'EXECUTE') OR has_function_privilege('anon', p.oid, 'EXECUTE')))
+       THEN '✅ PASS' ELSE '❌ FAIL — el registro de reconciliación es invocable por clientes' END;
+
 -- ── Resultado ────────────────────────────────────────────────────────────────
 SELECT area, caso, resultado FROM _hardening_resultado ORDER BY id;

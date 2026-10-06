@@ -69,8 +69,11 @@ export function useOperacion() {
     ejecutar('staff_descartar_operacion_cobro', { p_operacion_id: id, p_nota: nota });
   const atenderFalloEntrega = (fuente: string, id: string, nota: string) =>
     ejecutar('resolver_fallo_entrega', { p_fuente: fuente, p_id: id, p_nota: nota });
+  // PKG-03B: revisar deja constancia; NO cierra (solo la convergencia la cierra).
+  const revisarDiscrepancia = (id: string, nota: string) =>
+    ejecutar('revisar_discrepancia_stripe', { p_discrepancia_id: id, p_nota: nota });
 
-  return { pendientes, error, refetch, resolverEvento, reintentarOperacion, descartarOperacion, atenderFalloEntrega };
+  return { pendientes, error, refetch, resolverEvento, reintentarOperacion, descartarOperacion, atenderFalloEntrega, revisarDiscrepancia };
 }
 
 export function traducirError(m: string): string {
@@ -79,7 +82,9 @@ export function traducirError(m: string): string {
   if (m.includes('EKKO_EVENTO_RESUELTO')) return 'Este evento ya estaba resuelto con otra resolución.';
   if (m.includes('EKKO_EVENTO_SIN_PENDIENTE')) return 'Este evento ya no está pendiente.';
   if (m.includes('EKKO_OPERACION_CERRADA')) return 'Esta operación ya está cerrada (aplicada o descartada).';
-  if (m.includes('EKKO_EVENTO_INVALIDO') || m.includes('EKKO_OPERACION_INVALIDA') || m.includes('EKKO_FALLO_INVALIDO')) {
+  if (m.includes('EKKO_DISCREPANCIA_CERRADA')) return 'Esta diferencia ya se corrigió (Stripe y EKKO coinciden).';
+  if (m.includes('EKKO_EVENTO_INVALIDO') || m.includes('EKKO_OPERACION_INVALIDA') || m.includes('EKKO_FALLO_INVALIDO')
+      || m.includes('EKKO_DISCREPANCIA_INVALIDA')) {
     return 'No se encontró en tu estudio. Recarga la página.';
   }
   return 'No se pudo guardar. Intenta de nuevo.';

@@ -38,7 +38,16 @@ const LABEL_TIPO: Record<string, string> = {
   membresia_vencida_sin_expirar: 'Membresía vencida sin expirar',
   varias_membresias_vivas: 'Varias membresías vivas',
   stripe_contradictorio: 'Stripe contradijo el estado',
-  stripe_customer_distinto: 'Cliente de Stripe distinto'
+  stripe_customer_distinto: 'Cliente de Stripe distinto',
+  // PKG-03B · lo que EKKO espera ≠ lo que Stripe contiene
+  discrepancia_suscripcion_ausente: 'Stripe no tiene la suscripción que EKKO espera',
+  discrepancia_suscripcion_huerfana: 'Suscripción viva en Stripe que EKKO no respalda',
+  discrepancia_estado_distinto: 'Membresía viva en EKKO, terminada en Stripe',
+  discrepancia_pausa_distinta: 'La pausa del cobro no coincide',
+  discrepancia_cancelacion_distinta: 'La cancelación al fin del periodo no coincide',
+  discrepancia_plan_distinto: 'El plan en Stripe no es el de la membresía',
+  reconciliacion_parcial: 'La última reconciliación con Stripe quedó incompleta',
+  reconciliacion_fallida: 'La última reconciliación con Stripe falló'
 };
 
 const LABEL_ACCION: Record<string, string> = {
@@ -47,13 +56,16 @@ const LABEL_ACCION: Record<string, string> = {
   resolver_evento: 'Revisa el evento en el panel de Stripe y deja la resolución.',
   atender_fallo_entrega: 'Avísale por otro medio si hace falta y márcalo como atendido.',
   resolver_revision: 'Se resuelve en Cobros.',
-  revisar_miembro: 'Revisa su ficha.'
+  revisar_miembro: 'Revisa su ficha.',
+  revisar_discrepancia: 'Revisa en el panel de Stripe y en la ficha. EKKO no corrige nada solo: se cierra cuando ambos coinciden.',
+  discrepancia_revisada: 'Ya revisada; sigue abierta porque Stripe y EKKO aún no coinciden.',
+  reconciliacion_incompleta: 'No se leyó todo Stripe: lo no visto no se dio por bueno ni por malo. Se reintentará.'
 };
 
-type Accion = 'evento' | 'reintentar' | 'descartar' | 'entrega';
+type Accion = 'evento' | 'reintentar' | 'descartar' | 'entrega' | 'revisar';
 
 export default function Operacion() {
-  const { pendientes, error, refetch, resolverEvento, reintentarOperacion, descartarOperacion, atenderFalloEntrega } = useOperacion();
+  const { pendientes, error, refetch, resolverEvento, reintentarOperacion, descartarOperacion, atenderFalloEntrega, revisarDiscrepancia } = useOperacion();
   const [abierto, setAbierto] = useState<{ key: string; accion: Accion } | null>(null);
   const [nota, setNota] = useState('');
   const [resolucion, setResolucion] = useState<ResolucionEvento>('reenviado_desde_stripe');
@@ -77,6 +89,7 @@ export default function Operacion() {
       accion === 'evento' ? await resolverEvento(p.fuente_id, resolucion, nota)
       : accion === 'reintentar' ? await reintentarOperacion(p.fuente_id, nota)
       : accion === 'descartar' ? await descartarOperacion(p.fuente_id, nota)
+      : accion === 'revisar' ? await revisarDiscrepancia(p.fuente_id, nota)
       : await atenderFalloEntrega(p.fuente, p.fuente_id, nota);
     setGuardando(false);
     if (r.error) {
@@ -86,7 +99,9 @@ export default function Operacion() {
     setAbierto(null);
     setHecho(accion === 'reintentar'
       ? 'Listo: se reintentará en la próxima sincronización de cobros.'
-      : 'Listo: quedó registrado con tu nota.');
+      : accion === 'revisar'
+        ? 'Listo: quedó tu nota. La diferencia sigue abierta hasta que Stripe y EKKO coincidan.'
+        : 'Listo: quedó registrado con tu nota.');
   }
 
   if (pendientes === null) return <div className="ek-card"><Spinner label="Cargando pendientes…" /></div>;
@@ -182,6 +197,9 @@ export default function Operacion() {
                           )}
                           <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '36px' }} onClick={() => abrir(p, 'descartar')}>Descartar</button>
                         </>
+                      )}
+                      {p.fuente === 'discrepancias_stripe' && p.accion === 'revisar_discrepancia' && (
+                        <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '36px' }} onClick={() => abrir(p, 'revisar')}>Marcar como revisada</button>
                       )}
                       {(p.fuente === 'notificaciones' || p.fuente === 'correos_directos') && (
                         <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '36px' }} onClick={() => abrir(p, 'entrega')}>Marcar como atendido</button>
