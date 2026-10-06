@@ -82,6 +82,7 @@ rediscute sin evidencia nueva.
 ## Avisos y correo
 - EKKO-111 — el correo dice la verdad: aceptado por el proveedor ≠ entregado.
 - EKKO-137 (PKG-03A) — outbox con intentos y backoff; push honesto; evidencia de correos directos; cierre humano de eventos y operaciones; vista derivada de pendientes.
+- EKKO-144 (PKG-06G) — estado durable de los crons que importan, atraso derivado al leer Operación (sin Sentry); reconciliación vigilada por sus corridas; push no entregado agregado y revisable.
 - EKKO-073, EKKO-074, EKKO-027 — correo por despachador central; confirmación por trigger; avisos.
 - EKKO-008, EKKO-033, EKKO-068 — web push; push central; push para staff. EKKO-081 — la campana es historial.
 

@@ -4,10 +4,11 @@ if (!globalThis.WebSocket) {
 }
 
 import type { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { reportarErrorServidor } from '../_lib/sentry';
+import { registrarEjecucion } from '../_lib/procesos';
 
 /**
  * Cron: recuerda a los miembros su reserva próxima (~1 hora antes).
@@ -18,8 +19,9 @@ import { reportarErrorServidor } from '../_lib/sentry';
  * por cada una se dispara el push. Service_role: opera sin sesión, cross-tenant.
  */
 export const handler: Handler = async () => {
+  let supabase: SupabaseClient | null = null;
   try {
-    const supabase = createClient(
+    supabase = createClient(
       requireEnv('VITE_SUPABASE_URL'),
       requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
       { auth: { persistSession: false } }
@@ -28,6 +30,7 @@ export const handler: Handler = async () => {
     const { data, error } = await supabase.rpc('generar_recordatorios_reservas');
     if (error) {
       await reportarErrorServidor('cron-recordatorios', new Error(error.message), { rpc: 'generar_recordatorios_reservas' });
+      await registrarEjecucion(supabase, 'cron-recordatorios', 'fallo', 'base_datos');
       return serverError(error.message);
     }
 
@@ -43,9 +46,11 @@ export const handler: Handler = async () => {
     const pushEnviados = 0;
 
     console.log('[cron-recordatorios] OK', { recordatorios: filas.length, pushEnviados });
+    await registrarEjecucion(supabase, 'cron-recordatorios', 'exito');
     return ok({ recordatorios: filas.length, pushEnviados });
   } catch (e) {
     await reportarErrorServidor('cron-recordatorios', e);
+    await registrarEjecucion(supabase, 'cron-recordatorios', 'fallo', 'interno');
     return serverError(e instanceof Error ? e.message : 'Unknown error');
   }
 };

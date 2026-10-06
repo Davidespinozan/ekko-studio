@@ -4,11 +4,12 @@ if (!globalThis.WebSocket) {
 }
 
 import type { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { enviarPushAUsuario, clasificarPush, registrarResultadoPush, type ResultadoPush } from '../_lib/push';
 import { reportarErrorServidor } from '../_lib/sentry';
+import { registrarEjecucion } from '../_lib/procesos';
 
 /**
  * Cron (cada minuto): reparte por push TODA notificación pendiente
@@ -42,14 +43,16 @@ const URL_POR_TIPO: Record<string, string> = {
 };
 
 export const handler: Handler = async () => {
+  let supabase: SupabaseClient | null = null;
   try {
-    const supabase = createClient(requireEnv('VITE_SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
+    supabase = createClient(requireEnv('VITE_SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
       auth: { persistSession: false }
     });
 
     const { data, error } = await supabase.rpc('reclamar_push_pendientes', { p_limite: 200 });
     if (error) {
       await reportarErrorServidor('cron-push', new Error(error.message), { paso: 'select' });
+      await registrarEjecucion(supabase, 'cron-push', 'fallo', 'base_datos');
       return serverError(error.message);
     }
 
@@ -74,9 +77,13 @@ export const handler: Handler = async () => {
     }
 
     if (filas.length) console.log('[cron-push] OK', { pendientes: filas.length, pushEnviados: enviados });
+    // La corrida terminó: cada aviso quedó con su resultado (los no entregados los
+    // muestra Operación agregados; no son un fallo del proceso).
+    await registrarEjecucion(supabase, 'cron-push', 'exito');
     return ok({ pendientes: filas.length, pushEnviados: enviados });
   } catch (e) {
     await reportarErrorServidor('cron-push', e);
+    await registrarEjecucion(supabase, 'cron-push', 'fallo', 'interno');
     return serverError(e instanceof Error ? e.message : 'Unknown error');
   }
 };

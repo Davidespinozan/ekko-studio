@@ -953,3 +953,36 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   (`sin_perfil`). La autorización sigue siendo del servidor. **Complementa a
   EKKO-020, EKKO-124, EKKO-136 y la serie E-01..E-06; no reabre 02C, F-1, R1,
   R2-B, 02H, 03A, 03B ni 06A.**
+
+## PKG-06G — señales operativas durables (2026-10-06)
+
+- **EKKO-144 — PKG-06G · Un proceso automático que importa deja evidencia durable
+  y visible sin Sentry; un push que no llegó no queda escondido.** Sentry no está
+  configurado en producción (D-FIN-2): un cron que fallaba o dejaba de correr solo
+  dejaba rastro en los logs de Netlify. (1) `procesos_programados`: una fila de
+  ESTADO ACTUAL por proceso (no un log de latidos), catálogo fijo con umbral de
+  atraso, fallos seguidos para avisar y severidad: `cron-expirar-membresias`
+  (diario, 26 h, alta, 1 fallo) y `cron-no-shows` (horario, 3 h, alta, 2) son
+  continuidad crítica; `cron-email` (20 min, 5), `cron-push` (15 min, 10),
+  `cron-recordatorios` (1 h, 3) y `cron-material-vencido` (26 h, 1) son
+  importantes. `cron-membresias-por-vencer` y `cron-felicitaciones` son cortesía
+  y no se instrumentan. `cron-reconciliar-stripe` no lleva latido: su evidencia
+  es la corrida de 03B (`reconciliacion_stripe_corridas`). (2) Cada cron asienta
+  su corrida AL TERMINAR por `registrar_ejecucion_proceso` (solo service_role):
+  `exito`, `parcial` (terminó pero un paso secundario falló), `fallo` u `omitido`
+  (sin configuración; no cuenta como éxito), con una clase de error fija y sin
+  texto crudo. Si no puede asentar, el cron no se rompe. (3) El atraso se DERIVA al
+  leer `v_pendientes_operativos`: un cron muerto, nunca invocado o retirado del
+  deploy se ve sin tener que reportar su propia muerte; si nunca corrió, el aviso
+  espera max(umbral, 2 h) desde que se vigila. La reconciliación atrasada (>26 h
+  desde la última corrida) se deriva de las corridas de 03B. Nada se corre ni se
+  repara solo; un proceso sano no es trabajo y el ítem desaparece cuando vuelve a
+  correr bien. (4) Push es entrega OPCIONAL (el aviso sigue en la campana y no hay
+  reintento): los `fallo`/`sin_config` salen AGREGADOS por estudio (cuántos, desde
+  cuándo, de qué tipo), por `resumen_fallos_push` (SECURITY DEFINER, sin
+  destinatario, contenido, endpoint ni llaves; la política de avisos de 03A no se
+  amplía), y el admin los marca revisados con nota (`revisar_fallos_push`, con
+  evidencia en `audit_log`); lo nuevo vuelve a salir. Límite honesto: la detección
+  ocurre cuando alguien abre Operación o el Centro de pendientes; no hay alarma
+  externa que avise sola. **Complementa a EKKO-137 (03A) y EKKO-140 (03B); no
+  configura Sentry.**

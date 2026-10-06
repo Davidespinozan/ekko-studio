@@ -110,6 +110,24 @@ describe('Operación (PKG-03A)', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('sigue abierta');
   });
 
+  it('PKG-06G: proceso atrasado (sin botón de "correr"), push no entregado (se revisa con nota); el push dice que el hecho SÍ ocurrió', async () => {
+    const proc = { ...base, dominio: 'procesos', tipo: 'proceso_atrasado', fuente: 'procesos_programados', fuente_id: 'cron-no-shows',
+      severidad: 'alta', accion: 'revisar_proceso', detalle: 'cron-no-shows · 0 * * * * · último estado: exito' };
+    const push = { ...base, dominio: 'entrega', tipo: 'push_no_entregado', fuente: 'notificaciones_push', fuente_id: 'push:t1',
+      severidad: 'baja', accion: 'revisar_fallos_push', detalle: '3 sin entregar · recordatorio_reserva' };
+    h.filas = [proc, push];
+    montar();
+    expect(await screen.findByTestId('dominio-procesos')).toBeInTheDocument();
+    expect(screen.getByText('Un proceso automático no ha corrido a tiempo')).toBeInTheDocument();
+    expect(screen.getByText(/EKKO no lo corre ni lo repara solo/)).toBeInTheDocument();
+    expect(screen.queryByText(/correr ahora|ejecutar/i)).toBeNull();
+    expect(screen.getByText(/Lo que se avisó SÍ ocurrió/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Marcar como revisado'));
+    fireEvent.change(screen.getByLabelText('Nota (obligatoria)'), { target: { value: 'Revisé las llaves VAPID en Netlify' } });
+    fireEvent.click(screen.getByText('Guardar'));
+    await waitFor(() => expect(h.rpc).toHaveBeenCalledWith('revisar_fallos_push', { p_nota: 'Revisé las llaves VAPID en Netlify' }));
+  });
+
   it('vacío legítimo → "Nada pendiente"; fallo al cargar → error, nunca "Nada pendiente"', async () => {
     h.filas = [];
     const { unmount } = montar();

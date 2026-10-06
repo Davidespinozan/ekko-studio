@@ -183,7 +183,24 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- Nada.
+- **PKG-06G "Señales operativas durables" — IMPLEMENTADO LOCALMENTE, en un commit
+  local SIN PUSH** (EKKO-144). Migración `20261015100000_06g_senales_operativas.sql`
+  (md5 `fe98902ddb41caa69ececaaea4a98d28`, NO aplicada en producción): tabla `procesos_programados` (estado
+  actual de 6 crons, catálogo con umbral/fallos/severidad), RPC
+  `registrar_ejecucion_proceso` (solo service_role), `revisar_fallos_push` (admin,
+  nota), `resumen_fallos_push` (agregado sin contenido), columnas
+  `notificaciones.push_revisado_at/por`, y `v_pendientes_operativos` recreada con
+  sus ramas previas idénticas + 3 derivadas (proceso atrasado/fallando,
+  reconciliación atrasada, push no entregado). Seis crons asientan su corrida
+  (`_lib/procesos.ts`); Operación muestra el dominio "Procesos automáticos" y el
+  botón para revisar push. Pruebas: `db/06g-senales-operativas.db.test.ts` (18; 15
+  muerden sin la migración), `cron-procesos.test.ts` (8), `cron-email` (+1),
+  `cron-push` (+1), `Operacion.test` (+1). Hardening 56/56 (antes 54); drift 70/70 (antes
+  68). Ninguna función previa cambia (3 nuevas). Gate completo verde: 215 archivos /
+  2070 pruebas, build OK, `git diff --check` OK (65 s); una corrida previa falló en
+  `ekko138-pausa-comercial` 5b, intermitente que también falla SIN la migración 06G
+  (1 de 3) — residual preexistente, no se tocó. Activación: migración (aditiva) → deploy; pendiente de
+  autorización del dueño (`ekko-activar`).
 
 ## PKG-06D — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06D "Frontera de columnas y de cliente"** (EKKO-143) — commit `fdecdbb`
@@ -399,6 +416,9 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   anulación; `stripe_price_id` sin uso; default de 2 invitados en
   `reservas_incompatibles_con_tier`.
 - Si staff reanuda a mano una membresía pausada por sanción, el cobro vuelve.
+- Intermitente en `db/ekko138-pausa-comercial.db.test.ts` caso 5b (orden de
+  operaciones con marcas de tiempo empatadas; falla ~1 de 3 corridas aisladas con y sin
+  06G), sin tocar.
 - Carrera intermitente en `usePlanesActivos.test.tsx` (PKG-02A; 1 fallo en 17 gates),
   sin tocar. `sentry-lib.test.ts` (5 s) puede expirar bajo carga; aislado pasa.
 - 2 usuarios con caché de plan divergente (evidencia de que el caché no decide).

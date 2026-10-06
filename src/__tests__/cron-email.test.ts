@@ -27,6 +27,8 @@ let pendientes: Record<string, unknown>[] = [];
 let reclamo: { p_tipos?: string[]; p_limite?: number; p_ventana?: string } = {};
 type Asiento = { p_id: string; p_resultado: string; p_proveedor_id: string | null; p_error: string | null; p_reintentable: boolean };
 const marcas: Asiento[] = [];
+// PKG-06G: lo que el cron asienta de SU corrida (estado del proceso), aparte de los correos.
+const procesos: Array<{ p_proceso: string; p_estado: string; p_clase_error: string | null }> = [];
 const mockFrom = vi.fn();
 const mockRpc = vi.fn();
 
@@ -37,6 +39,10 @@ vi.mock('@supabase/supabase-js', () => ({
       if (fn === 'reclamar_correos_pendientes') {
         reclamo = args as typeof reclamo;
         return Promise.resolve({ data: pendientes, error: null });
+      }
+      if (fn === 'registrar_ejecucion_proceso') {
+        procesos.push(args as (typeof procesos)[number]);
+        return Promise.resolve({ data: { estado: args.p_estado }, error: null });
       }
       // notificacion_email_resultado: la base decide; aquí, su contrato mínimo.
       const a = args as unknown as Asiento;
@@ -73,6 +79,7 @@ beforeEach(() => {
   configurado = true;
   pendientes = [];
   marcas.length = 0;
+  procesos.length = 0;
   reclamo = {};
   process.env.VITE_SUPABASE_URL = 'http://supabase.test';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
@@ -113,14 +120,22 @@ describe('cron-email', () => {
     expect(mockFrom).not.toHaveBeenCalledWith('notificaciones');
   });
 
-  it('SIN Resend configurado: no consulta ni marca nada (para no perder lo reciente en silencio)', async () => {
+  it('SIN Resend configurado: no consulta ni marca correos (para no perder lo reciente en silencio); asienta la corrida como `omitido` (PKG-06G)', async () => {
     configurado = false;
     pendientes = [confirmada];
     const r = await correr();
     expect(r).toEqual({ skipped: 'email_no_configurado' });
     expect(mockFrom).not.toHaveBeenCalled();
-    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockRpc.mock.calls.map((c) => c[0])).toEqual(['registrar_ejecucion_proceso']);
     expect(marcas).toEqual([]);
+    expect(procesos).toEqual([{ p_proceso: 'cron-email', p_estado: 'omitido', p_clase_error: 'configuracion' }]);
+  });
+
+  it('PKG-06G: la corrida asienta `exito` al TERMINAR, aunque un correo haya fallado (eso lo muestra 03A); falla al reclamar → `fallo`', async () => {
+    pendientes = [confirmada];
+    await correr();
+    expect(procesos).toEqual([{ p_proceso: 'cron-email', p_estado: 'exito', p_clase_error: null }]);
+    expect(mockRpc.mock.calls.at(-1)?.[0]).toBe('registrar_ejecucion_proceso');
   });
 
   it('usuario sin correo: no se intenta; queda `sin_correo` SIN email_enviado_at', async () => {

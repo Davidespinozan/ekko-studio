@@ -76,4 +76,13 @@ describe('cron-push', () => {
     expect(asientos()).toEqual([]);
     expect(r).toEqual({ pendientes: 0, pushEnviados: 0 });
   });
+
+  it('PKG-06G: la corrida asienta `exito` al terminar aunque un aviso haya fallado (los no entregados los muestra Operación agregados)', async () => {
+    h.pendientes = [fila('a')];
+    h.enviar.mockResolvedValueOnce({ enviados: 0, borrados: 0, fallidos: 1 });
+    await correr();
+    const corridas = h.rpc.mock.calls.filter((c) => c[0] === 'registrar_ejecucion_proceso').map((c) => c[1]);
+    expect(corridas).toEqual([{ p_proceso: 'cron-push', p_estado: 'exito', p_clase_error: null }]);
+    expect(h.rpc.mock.calls.at(-1)?.[0]).toBe('registrar_ejecucion_proceso');
+  });
 });

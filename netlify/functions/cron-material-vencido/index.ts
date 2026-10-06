@@ -4,10 +4,11 @@ if (!globalThis.WebSocket) {
 }
 
 import type { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { reportarErrorServidor } from '../_lib/sentry';
+import { registrarEjecucion } from '../_lib/procesos';
 
 /**
  * Cron (diario): borra de Storage los ARCHIVOS de material cuya vigencia terminó
@@ -19,34 +20,42 @@ import { reportarErrorServidor } from '../_lib/sentry';
  * Los enlaces externos no ocupan nada aquí: no se tocan.
  */
 export const handler: Handler = async () => {
+  let supabase: SupabaseClient | null = null;
   try {
-    const supabase = createClient(requireEnv('VITE_SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
+    supabase = createClient(requireEnv('VITE_SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
       auth: { persistSession: false }
     });
 
     const { data, error } = await supabase.rpc('material_vencido_por_borrar', { p_limite: 200 });
     if (error) {
       await reportarErrorServidor('cron-material-vencido', new Error(error.message), { paso: 'rpc' });
+      await registrarEjecucion(supabase, 'cron-material-vencido', 'fallo', 'base_datos');
       return serverError(error.message);
     }
 
     const rutas = ((data ?? []) as Array<{ storage_path: string | null }>)
       .map((f) => f.storage_path)
       .filter((r): r is string => !!r);
-    if (rutas.length === 0) return ok({ borrados: 0 });
+    if (rutas.length === 0) {
+      await registrarEjecucion(supabase, 'cron-material-vencido', 'exito');
+      return ok({ borrados: 0 });
+    }
 
     const { error: rmErr } = await supabase.storage.from('material').remove(rutas);
     if (rmErr) {
       // Las filas ya quedaron marcadas: el miembro no las ve. Queda espacio sin
       // liberar → se reporta con las rutas para borrarlas a mano.
       await reportarErrorServidor('cron-material-vencido', new Error(rmErr.message), { paso: 'storage.remove', rutas });
+      await registrarEjecucion(supabase, 'cron-material-vencido', 'fallo', 'almacenamiento');
       return serverError(rmErr.message);
     }
 
     console.log('[cron-material-vencido] OK', { borrados: rutas.length });
+    await registrarEjecucion(supabase, 'cron-material-vencido', 'exito');
     return ok({ borrados: rutas.length });
   } catch (e) {
     await reportarErrorServidor('cron-material-vencido', e);
+    await registrarEjecucion(supabase, 'cron-material-vencido', 'fallo', 'interno');
     return serverError(e instanceof Error ? e.message : 'Unknown error');
   }
 };

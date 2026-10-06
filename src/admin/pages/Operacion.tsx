@@ -18,10 +18,12 @@ const TITULO_DOMINIO: Record<string, string> = {
   finanzas: 'Revisiones financieras',
   stripe: 'Eventos de Stripe sin resolver',
   cobro: 'Cambios de cobro en Stripe',
-  entrega: 'Correos que no salieron',
-  membresia: 'Membresías inconsistentes'
+  entrega: 'Avisos que no se entregaron',
+  membresia: 'Membresías inconsistentes',
+  // PKG-06G
+  procesos: 'Procesos automáticos'
 };
-const ORDEN_DOMINIO = ['cobro', 'stripe', 'finanzas', 'membresia', 'entrega'];
+const ORDEN_DOMINIO = ['procesos', 'cobro', 'stripe', 'finanzas', 'membresia', 'entrega'];
 
 const LABEL_TIPO: Record<string, string> = {
   ...LABEL_TIPO_REVISION,
@@ -48,7 +50,12 @@ const LABEL_TIPO: Record<string, string> = {
   discrepancia_cancelacion_distinta: 'La cancelación al fin del periodo no coincide',
   discrepancia_plan_distinto: 'El plan en Stripe no es el de la membresía',
   reconciliacion_parcial: 'La última reconciliación con Stripe quedó incompleta',
-  reconciliacion_fallida: 'La última reconciliación con Stripe falló'
+  reconciliacion_fallida: 'La última reconciliación con Stripe falló',
+  // PKG-06G · señales durables sin Sentry
+  reconciliacion_atrasada: 'La reconciliación diaria con Stripe no ha corrido',
+  proceso_atrasado: 'Un proceso automático no ha corrido a tiempo',
+  proceso_fallando: 'Un proceso automático está fallando',
+  push_no_entregado: 'Avisos push que no llegaron al teléfono'
 };
 
 const LABEL_ACCION: Record<string, string> = {
@@ -60,13 +67,16 @@ const LABEL_ACCION: Record<string, string> = {
   revisar_miembro: 'Revisa su ficha.',
   revisar_discrepancia: 'Revisa en el panel de Stripe y en la ficha. EKKO no corrige nada solo: se cierra cuando ambos coinciden.',
   discrepancia_revisada: 'Ya revisada; sigue abierta porque Stripe y EKKO aún no coinciden.',
-  reconciliacion_incompleta: 'No se leyó todo Stripe: lo no visto no se dio por bueno ni por malo. Se reintentará.'
+  reconciliacion_incompleta: 'No se leyó todo Stripe: lo no visto no se dio por bueno ni por malo. Se reintentará.',
+  reconciliacion_atrasada: 'Revisa en Netlify que la función programada cron-reconciliar-stripe siga activa y sin errores. Desaparece sola cuando vuelva a correr.',
+  revisar_proceso: 'Revisa en Netlify (Functions → la función programada) que esté activa y sus registros. EKKO no lo corre ni lo repara solo; desaparece cuando vuelva a correr bien.',
+  revisar_fallos_push: 'Lo que se avisó SÍ ocurrió y el aviso sigue en la campana de la app: solo no llegó como notificación al teléfono. Si se repite, revisa la configuración de push. Márcalo como revisado.'
 };
 
-type Accion = 'evento' | 'reintentar' | 'descartar' | 'entrega' | 'revisar';
+type Accion = 'evento' | 'reintentar' | 'descartar' | 'entrega' | 'revisar' | 'push';
 
 export default function Operacion() {
-  const { pendientes, error, refetch, resolverEvento, reintentarOperacion, descartarOperacion, atenderFalloEntrega, revisarDiscrepancia } = useOperacion();
+  const { pendientes, error, refetch, resolverEvento, reintentarOperacion, descartarOperacion, atenderFalloEntrega, revisarDiscrepancia, revisarFallosPush } = useOperacion();
   const [abierto, setAbierto] = useState<{ key: string; accion: Accion } | null>(null);
   const [nota, setNota] = useState('');
   const [resolucion, setResolucion] = useState<ResolucionEvento>('reenviado_desde_stripe');
@@ -91,6 +101,7 @@ export default function Operacion() {
       : accion === 'reintentar' ? await reintentarOperacion(p.fuente_id, nota)
       : accion === 'descartar' ? await descartarOperacion(p.fuente_id, nota)
       : accion === 'revisar' ? await revisarDiscrepancia(p.fuente_id, nota)
+      : accion === 'push' ? await revisarFallosPush(nota)
       : await atenderFalloEntrega(p.fuente, p.fuente_id, nota);
     setGuardando(false);
     if (r.error) {
@@ -201,6 +212,9 @@ export default function Operacion() {
                       )}
                       {p.fuente === 'discrepancias_stripe' && p.accion === 'revisar_discrepancia' && (
                         <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '36px' }} onClick={() => abrir(p, 'revisar')}>Marcar como revisada</button>
+                      )}
+                      {p.fuente === 'notificaciones_push' && (
+                        <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '36px' }} onClick={() => abrir(p, 'push')}>Marcar como revisado</button>
                       )}
                       {(p.fuente === 'notificaciones' || p.fuente === 'correos_directos') && (
                         <button type="button" className="ek-cta ek-cta--secondary" style={{ minHeight: '36px' }} onClick={() => abrir(p, 'entrega')}>Marcar como atendido</button>

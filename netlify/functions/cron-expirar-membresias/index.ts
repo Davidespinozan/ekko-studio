@@ -10,6 +10,7 @@ import { requireEnv } from '../_lib/env';
 import { getStripe } from '../_lib/stripe';
 import { resolverCuentaConectada } from '../_lib/connectBilling';
 import { reportarErrorServidor, conMonitorCron } from '../_lib/sentry';
+import { registrarEjecucion } from '../_lib/procesos';
 import { ejecutarOperacionesSuscripcion, type ResumenOperaciones } from '../_lib/operacionesSuscripcion';
 
 /**
@@ -68,11 +69,12 @@ async function chequeosDeFrescura(supabase: SupabaseClient): Promise<void> {
 }
 
 const run: Handler = async () => {
+  let supabase: SupabaseClient | null = null;
   try {
     const supabaseUrl = requireEnv('VITE_SUPABASE_URL');
     const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
-    const supabase = createClient(supabaseUrl, serviceKey, {
+    supabase = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false }
     });
 
@@ -80,10 +82,15 @@ const run: Handler = async () => {
 
     if (error) {
       await reportarErrorServidor('cron-expirar-membresias', new Error(error.message), { rpc: 'expirar_membresias_vencidas' });
+      await registrarEjecucion(supabase, 'cron-expirar-membresias', 'fallo', 'base_datos');
       return serverError(error.message);
     }
 
-    const subsCanceladas = await reconciliarSubsHuerfanas(supabase);
+    const huerfanas = await reconciliarSubsHuerfanas(supabase);
+    const subsCanceladas = huerfanas.canceladas;
+    // PKG-06G: un paso secundario que falla deja la corrida `parcial` (las
+    // expiraciones sí se aplicaron) y Operación lo muestra.
+    let pasoFallido: 'proveedor' | 'interno' | null = huerfanas.errores > 0 ? 'proveedor' : null;
 
     // R2-B (PKG-01P): reintenta las operaciones de cobro pendientes o fallidas
     // (suspender / reanudar / cancelar) sin ventana de tiempo: mientras la fila
@@ -93,6 +100,7 @@ const run: Handler = async () => {
       operacionesCobro = await ejecutarOperacionesSuscripcion(supabase, { limite: 50 });
     } catch (e) {
       await reportarErrorServidor('cron-expirar-membresias', e, { paso: 'operaciones_suscripcion' });
+      pasoFallido = pasoFallido ?? 'interno';
     }
 
     // Salud del resto de la plataforma (nunca tira el cron principal).
@@ -103,9 +111,11 @@ const run: Handler = async () => {
     }
 
     console.log('[cron-expirar-membresias] OK', { expiradas: data, subsCanceladas, operacionesCobro });
+    await registrarEjecucion(supabase, 'cron-expirar-membresias', pasoFallido ? 'parcial' : 'exito', pasoFallido);
     return ok({ expiradas: data, subsCanceladas, operacionesCobro });
   } catch (e) {
     await reportarErrorServidor('cron-expirar-membresias', e);
+    await registrarEjecucion(supabase, 'cron-expirar-membresias', 'fallo', 'interno');
     return serverError(e instanceof Error ? e.message : 'Unknown error');
   }
 };
@@ -116,8 +126,8 @@ export const handler: Handler = conMonitorCron('cron-expirar-membresias', CRON_E
  * Cancela en Stripe las suscripciones de membresías dadas de baja (cancelada/
  * expirada) en las últimas 48 h cuya sub siga viva. No-op sin Stripe configurado.
  */
-async function reconciliarSubsHuerfanas(supabase: any): Promise<number> {
-  if (!process.env.STRIPE_SECRET_KEY) return 0;
+async function reconciliarSubsHuerfanas(supabase: any): Promise<{ canceladas: number; errores: number }> {
+  if (!process.env.STRIPE_SECRET_KEY) return { canceladas: 0, errores: 0 };
 
   const desde = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
   const { data } = await supabase
@@ -128,11 +138,12 @@ async function reconciliarSubsHuerfanas(supabase: any): Promise<number> {
     .gte('updated_at', desde);
 
   const filas = (data ?? []) as Array<{ tenant_id: string; stripe_subscription_id: string }>;
-  if (filas.length === 0) return 0;
+  if (filas.length === 0) return { canceladas: 0, errores: 0 };
 
   const stripe = getStripe();
   const cuentaPorTenant = new Map<string, string | null>();
   let canceladas = 0;
+  let errores = 0;
 
   for (const m of filas) {
     // Guarda: si esa sub sigue ligada a una membresía VIVA, no tocarla.
@@ -159,8 +170,9 @@ async function reconciliarSubsHuerfanas(supabase: any): Promise<number> {
       }
     } catch (e) {
       await reportarErrorServidor('cron-expirar-membresias', e, { paso: 'reconciliar_sub', sub: m.stripe_subscription_id });
+      errores++;
     }
   }
 
-  return canceladas;
+  return { canceladas, errores };
 }

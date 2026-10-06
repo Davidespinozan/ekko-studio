@@ -4,10 +4,11 @@ if (!globalThis.WebSocket) {
 }
 
 import type { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { reportarErrorServidor } from '../_lib/sentry';
+import { registrarEjecucion } from '../_lib/procesos';
 
 /**
  * Cron: cada hora, marca reservas no asistidas como no_show + bloquea usuario.
@@ -19,11 +20,12 @@ import { reportarErrorServidor } from '../_lib/sentry';
  * tenant sin contexto de sesión.
  */
 export const handler: Handler = async () => {
+  let supabase: SupabaseClient | null = null;
   try {
     const supabaseUrl = requireEnv('VITE_SUPABASE_URL');
     const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
-    const supabase = createClient(supabaseUrl, serviceKey, {
+    supabase = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false }
     });
 
@@ -31,13 +33,16 @@ export const handler: Handler = async () => {
 
     if (error) {
       await reportarErrorServidor('cron-no-shows', new Error(error.message), { rpc: 'marcar_no_shows' });
+      await registrarEjecucion(supabase, 'cron-no-shows', 'fallo', 'base_datos');
       return serverError(error.message);
     }
 
     console.log('[cron-no-shows] OK', data);
+    await registrarEjecucion(supabase, 'cron-no-shows', 'exito');
     return ok(data);
   } catch (e) {
     await reportarErrorServidor('cron-no-shows', e);
+    await registrarEjecucion(supabase, 'cron-no-shows', 'fallo', 'interno');
     return serverError(e instanceof Error ? e.message : 'Unknown error');
   }
 };

@@ -316,6 +316,19 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
         THEN '✅ PASS' ELSE '❌ FALTA — 06D-B no aplicada' END);
 
 
+-- PKG-06G (20261015100000): señales operativas durables.
+INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
+('11 · Grants/RLS', '20261015100000_06g', 'procesos_programados (6 procesos) + registrar_ejecucion_proceso + revisar_fallos_push + resumen_fallos_push',
+ CASE WHEN to_regclass('public.procesos_programados') IS NOT NULL
+         AND (SELECT count(*) FROM procesos_programados) = 6
+         AND (SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace
+              AND proname IN ('registrar_ejecucion_proceso','revisar_fallos_push','resumen_fallos_push')) = 3
+        THEN '✅ PASS' ELSE '❌ FALTA — 06G no aplicada' END),
+('11 · Grants/RLS', '20261015100000_06g', 'notificaciones.push_revisado_at / push_revisado_por',
+ CASE WHEN (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='notificaciones'
+            AND column_name IN ('push_revisado_at','push_revisado_por')) = 2 THEN '✅ PASS' ELSE '❌ FALTA — 06G no aplicada' END);
+
+
 -- ////////////////////////////////////////////////////////////////////////////
 -- BLOQUE 12 — Índices / objetos varios
 -- ////////////////////////////////////////////////////////////////////////////

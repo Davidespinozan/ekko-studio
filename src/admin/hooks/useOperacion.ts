@@ -10,7 +10,7 @@ import { supabase } from '@shared/lib/supabase';
  */
 
 export interface PendienteOperativo {
-  dominio: 'finanzas' | 'stripe' | 'cobro' | 'entrega' | 'membresia' | string;
+  dominio: 'finanzas' | 'stripe' | 'cobro' | 'entrega' | 'membresia' | 'procesos' | string;
   tipo: string;
   fuente: string;
   fuente_id: string;
@@ -73,7 +73,11 @@ export function useOperacion() {
   const revisarDiscrepancia = (id: string, nota: string) =>
     ejecutar('revisar_discrepancia_stripe', { p_discrepancia_id: id, p_nota: nota });
 
-  return { pendientes, error, refetch, resolverEvento, reintentarOperacion, descartarOperacion, atenderFalloEntrega, revisarDiscrepancia };
+  // PKG-06G: deja constancia de que se vieron los avisos push no entregados del
+  // estudio (todos los pendientes). No reenvía nada.
+  const revisarFallosPush = (nota: string) => ejecutar('revisar_fallos_push', { p_nota: nota });
+
+  return { pendientes, error, refetch, resolverEvento, reintentarOperacion, descartarOperacion, atenderFalloEntrega, revisarDiscrepancia, revisarFallosPush };
 }
 
 export function traducirError(m: string): string {

@@ -4,11 +4,12 @@ if (!globalThis.WebSocket) {
 }
 
 import type { Handler } from '@netlify/functions';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { enviarEmail, emailAviso, emailConfigurado, identidadEstudio, falloReintentable, motivoPersistible } from '../_lib/email';
 import { reportarErrorServidor } from '../_lib/sentry';
+import { registrarEjecucion } from '../_lib/procesos';
 
 /**
  * Cron (cada 2 min): manda por CORREO los avisos de la app que lo ameritan.
@@ -65,12 +66,19 @@ type Intento =
   | { resultado: 'fallo'; error: string; reintentable: boolean };
 
 export const handler: Handler = async () => {
+  let supabase: SupabaseClient | null = null;
   try {
     if (!emailConfigurado()) {
+      // Sin proveedor no hay corrida: se asienta `omitido` (no cuenta como éxito y
+      // Operación lo mostrará atrasado) si al menos hay base a la cual escribir.
+      if (process.env.VITE_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const db = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
+        await registrarEjecucion(db, 'cron-email', 'omitido', 'configuracion');
+      }
       return ok({ skipped: 'email_no_configurado' });
     }
 
-    const supabase = createClient(requireEnv('VITE_SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
+    supabase = createClient(requireEnv('VITE_SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
       auth: { persistSession: false }
     });
 
@@ -81,6 +89,7 @@ export const handler: Handler = async () => {
     });
     if (error) {
       await reportarErrorServidor('cron-email', new Error(error.message), { paso: 'select' });
+      await registrarEjecucion(supabase, 'cron-email', 'fallo', 'base_datos');
       return serverError(error.message);
     }
 
@@ -88,7 +97,10 @@ export const handler: Handler = async () => {
       id: string; tenant_id: string; usuario_id: string; tipo: string;
       titulo: string; mensaje: string; metadata: Record<string, unknown> | null;
     }>;
-    if (filas.length === 0) return ok({ pendientes: 0, aceptados: 0, fallidos: 0, reintentables: 0, sin_correo: 0 });
+    if (filas.length === 0) {
+      await registrarEjecucion(supabase, 'cron-email', 'exito');
+      return ok({ pendientes: 0, aceptados: 0, fallidos: 0, reintentables: 0, sin_correo: 0 });
+    }
 
     // Una consulta por tabla, no una por fila.
     const [{ data: usuarios }, { data: tenants }] = await Promise.all([
@@ -159,9 +171,12 @@ export const handler: Handler = async () => {
     }
 
     console.log('[cron-email] OK', { pendientes: filas.length, ...conteo });
+    // Los correos fallidos ya los muestra Operación (03A); la corrida terminó.
+    await registrarEjecucion(supabase, 'cron-email', 'exito');
     return ok({ pendientes: filas.length, ...conteo });
   } catch (e) {
     await reportarErrorServidor('cron-email', e);
+    await registrarEjecucion(supabase, 'cron-email', 'fallo', 'interno');
     return serverError(e instanceof Error ? e.message : 'Unknown error');
   }
 };

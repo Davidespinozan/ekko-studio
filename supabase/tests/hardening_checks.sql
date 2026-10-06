@@ -284,5 +284,26 @@ SELECT 'P4', 'contrato 06D: las RPC de lectura interna y la búsqueda exigen is_
               AND has_function_privilege('anon', oid, 'EXECUTE'))
        THEN '✅ PASS' ELSE '❌ FAIL — RPC de 06D sin guardia o ejecutable por anon' END;
 
+-- PKG-06G (20261015100000): la salud de los procesos solo la escribe el servidor,
+-- y el resumen de push fallidos no abre la política de avisos ni sirve a anon.
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'procesos_programados: sin escritura de clientes; registrar_ejecucion_proceso solo service_role',
+  CASE WHEN NOT has_table_privilege('authenticated', 'public.procesos_programados', 'INSERT')
+         AND NOT has_table_privilege('authenticated', 'public.procesos_programados', 'UPDATE')
+         AND NOT has_table_privilege('authenticated', 'public.procesos_programados', 'DELETE')
+         AND NOT has_table_privilege('anon', 'public.procesos_programados', 'SELECT')
+         AND NOT has_function_privilege('authenticated', 'public.registrar_ejecucion_proceso(text, text, text)', 'EXECUTE')
+         AND NOT has_function_privilege('anon', 'public.registrar_ejecucion_proceso(text, text, text)', 'EXECUTE')
+         AND has_function_privilege('service_role', 'public.registrar_ejecucion_proceso(text, text, text)', 'EXECUTE')
+       THEN '✅ PASS' ELSE '❌ FAIL — el estado de los procesos es escribible por clientes' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P4', 'contrato 06G: resumen_fallos_push agrega (sin contenido) con guardia admin+tenant; revisar_fallos_push exige admin y nota',
+  CASE WHEN (SELECT prosrc FROM pg_proc WHERE proname='resumen_fallos_push' AND pronamespace='public'::regnamespace) LIKE '%is_admin()%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='resumen_fallos_push' AND pronamespace='public'::regnamespace) LIKE '%get_my_tenant_id()%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='resumen_fallos_push' AND pronamespace='public'::regnamespace) NOT LIKE '%mensaje%'
+         AND NOT has_function_privilege('anon', 'public.resumen_fallos_push()', 'EXECUTE')
+         AND (SELECT prosrc FROM pg_proc WHERE proname='revisar_fallos_push' AND pronamespace='public'::regnamespace) LIKE '%EKKO_NOTA_REQUERIDA%'
+       THEN '✅ PASS' ELSE '❌ FAIL — guardia o contrato de 06G perdido' END;
+
 -- ── Resultado ────────────────────────────────────────────────────────────────
 SELECT area, caso, resultado FROM _hardening_resultado ORDER BY id;
