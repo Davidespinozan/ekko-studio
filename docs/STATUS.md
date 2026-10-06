@@ -4,13 +4,13 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-06 · PKG-06D cerrado en producción (frontera de columnas y
-de cliente, en dos fases). Antes: PKG-06A (operaciones compuestas de cuenta). Todo lo de
+Última actualización: 2026-10-06 · PKG-06G cerrado en producción (señales operativas
+durables sin Sentry). Antes: PKG-06D (frontera de columnas y de cliente). Todo lo de
 abajo se verificó en vivo contra git, Netlify y Supabase.
 
-## Producción (verificado 2026-10-06 16:45 UTC)
-- Código de negocio publicado: `fdecdbb81d8cfc0d6a5c5c7cd96814e10d57cc1a`
-  ("fix(security): harden client data boundary", PKG-06D); el commit docs-only
+## Producción (verificado 2026-10-06 17:30 UTC)
+- Código de negocio publicado: `364984222541660ddf4b39061bde4ed7267d55b5`
+  ("fix(ops): make scheduled process failures durable", PKG-06G); el commit docs-only
   de este archivo va encima (ver `git log`). Cadena:
   `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
   en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
@@ -18,11 +18,12 @@ abajo se verificó en vivo contra git, Netlify y Supabase.
   → `1d42079` (STATUS) → `0890adb` (EKKO-138) → `0b23ca7` (STATUS) → `0ffe13d` (PKG-03B)
   → `07a85d8` (STATUS) → `308a4a7` (STATUS) → `f713586` (PKG-03B fase D) → `a682065` (STATUS)
   → `50c3a4c` (PKG-02H) → `82604ef` (STATUS) → `b12fe4f` (PKG-06A) → `c02532b` (STATUS)
-  → `fdecdbb` (PKG-06D).
-- Netlify production: deploy `6ac52294893a0e0008a43504`, READY, `commit_ref` =
-  `fdecdbb`, publicado 2026-10-06 16:34:20 UTC; 46 funciones, 9 programadas (sin
-  cambio), `cron-reconciliar-stripe` a `0 9 * * *`; cabeceras con
-  Content-Security-Policy. Antes: `6ac51926…` = c02532b, `6ac473f643f09e0008dc0393` =
+  → `fdecdbb` (PKG-06D) → `06d27b8` (STATUS) → `3649842` (PKG-06G).
+- Netlify production: deploy `6ac52e61c8b49900079d0b0c`, READY, `commit_ref` =
+  `3649842`, publicado 2026-10-06 17:24:35 UTC; 46 funciones, 9 programadas con los
+  mismos horarios, `cron-reconciliar-stripe` a `0 9 * * *`; cabeceras con
+  Content-Security-Policy. Antes: `6ac524403b4a4b00082c707b` = 06d27b8,
+  `6ac52294893a0e0008a43504` = fdecdbb (16:34 UTC, PKG-06D), `6ac51926…` = c02532b, `6ac473f643f09e0008dc0393` =
   b12fe4f (04:09 UTC, PKG-06A), `6ac466413a08ae000859a132` =
   82604ef, `6ac46533…` = 50c3a4c (03:06 UTC, PKG-02H), `6ac45c84…` = a682065, `6ac45ba0…` =
   f713586 (02:25 UTC, fase D de 03B). Antes de eso:
@@ -36,7 +37,9 @@ abajo se verificó en vivo contra git, Netlify y Supabase.
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **112/112 migraciones**; última
+- Supabase: **113/113 migraciones**; última
+  `20261015100000_06g_senales_operativas.sql` (PKG-06G, md5
+  `fe98902ddb41caa69ececaaea4a98d28`, aplicada 2026-10-06 ~17:21 UTC); la 112 es
   `20261014110000_06d_b_frontera_columnas.sql` (PKG-06D B, md5
   `81bf09281b2a3c8ab932d7c5d523d99f`, aplicada 2026-10-06 ~16:40 UTC, DESPUÉS del
   deploy); la 111 es `20261014100000_06d_a_lectura_interna_por_rpc.sql` (PKG-06D A,
@@ -70,7 +73,9 @@ y evidencia en la sección "PKG-03B" de abajo; primera corrida programada OBSERV
 **PKG-06A "Operaciones compuestas de cuenta" — CLOSED IN PRODUCTION** (EKKO-142,
 D-FIN-1 = A; detalle en la sección "PKG-06A" de abajo) ·
 **PKG-06D "Frontera de columnas y de cliente" — CLOSED IN PRODUCTION** (EKKO-143;
-detalle en la sección "PKG-06D" de abajo).
+detalle en la sección "PKG-06D" de abajo) ·
+**PKG-06G "Señales operativas durables" — CLOSED IN PRODUCTION** (EKKO-144; detalle en
+la sección "PKG-06G" de abajo).
 Alcance final tras deduplicar contra R1, R2-A/B, EKKO-138, 03A y 03B: pausar, reactivar y
 dar de baja al fin del periodo escriben su operación en `stripe_operaciones_suscripcion`
 en la misma transacción que la transición local (causas `pausa_staff`,
@@ -183,24 +188,49 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- **PKG-06G "Señales operativas durables" — IMPLEMENTADO LOCALMENTE, en un commit
-  local SIN PUSH** (EKKO-144). Migración `20261015100000_06g_senales_operativas.sql`
-  (md5 `fe98902ddb41caa69ececaaea4a98d28`, NO aplicada en producción): tabla `procesos_programados` (estado
-  actual de 6 crons, catálogo con umbral/fallos/severidad), RPC
-  `registrar_ejecucion_proceso` (solo service_role), `revisar_fallos_push` (admin,
-  nota), `resumen_fallos_push` (agregado sin contenido), columnas
-  `notificaciones.push_revisado_at/por`, y `v_pendientes_operativos` recreada con
-  sus ramas previas idénticas + 3 derivadas (proceso atrasado/fallando,
-  reconciliación atrasada, push no entregado). Seis crons asientan su corrida
-  (`_lib/procesos.ts`); Operación muestra el dominio "Procesos automáticos" y el
-  botón para revisar push. Pruebas: `db/06g-senales-operativas.db.test.ts` (18; 15
-  muerden sin la migración), `cron-procesos.test.ts` (8), `cron-email` (+1),
-  `cron-push` (+1), `Operacion.test` (+1). Hardening 56/56 (antes 54); drift 70/70 (antes
-  68). Ninguna función previa cambia (3 nuevas). Gate completo verde: 215 archivos /
-  2070 pruebas, build OK, `git diff --check` OK (65 s); una corrida previa falló en
-  `ekko138-pausa-comercial` 5b, intermitente que también falla SIN la migración 06G
-  (1 de 3) — residual preexistente, no se tocó. Activación: migración (aditiva) → deploy; pendiente de
-  autorización del dueño (`ekko-activar`).
+- Nada.
+
+## PKG-06G — cerrado en producción (detalle; la línea corta está en "Cerrado")
+- **PKG-06G "Señales operativas durables"** (EKKO-144) — commit `3649842`
+  ("fix(ops): make scheduled process failures durable"), migración
+  `20261015100000_06g_senales_operativas.sql` (md5 `fe98902ddb41caa69ececaaea4a98d28`;
+  Supabase 112 → 113), deploy Netlify `6ac52e61c8b49900079d0b0c` READY = 3649842
+  (17:24 UTC). Orden: migración (aditiva; el código viejo no registra y la ventana de
+  primera corrida absorbe el despliegue) → push → deploy → verificación.
+- Qué quedó: FR-50 y FR-51 CLOSED IN PRODUCTION. Las 9 funciones programadas siguen
+  con sus horarios. `procesos_programados` (estado actual, sin Sentry) vigila 6:
+  `cron-expirar-membresias` (26 h, alta, 1 fallo) y `cron-no-shows` (3 h, alta, 2) como
+  continuidad crítica; `cron-email` (20 min, media, 5), `cron-push` (15 min, media, 10),
+  `cron-recordatorios` (1 h, media, 3) y `cron-material-vencido` (26 h, media, 1).
+  `cron-reconciliar-stripe` no tiene fila: su atraso (>26 h) se deriva de
+  `reconciliacion_stripe_corridas` (03B intacto, detect-only, sin otra ejecución).
+  `cron-membresias-por-vencer` y `cron-felicitaciones` (cortesía) quedan fuera a
+  propósito. Cada cron vigilado asienta su corrida AL TERMINAR por
+  `registrar_ejecucion_proceso` (solo service_role; exito / parcial / fallo / omitido,
+  clase de error fija, sin texto crudo). El atraso y los fallos seguidos se DERIVAN al
+  leer `v_pendientes_operativos` (security_invoker, ramas previas idénticas + 4 tipos
+  nuevos: proceso_atrasado, proceso_fallando, reconciliacion_atrasada,
+  push_no_entregado); un cron muerto se ve sin reportarse; ventana de primera corrida
+  max(umbral, 2 h). Push: `fallo`/`sin_config` agregados por estudio vía
+  `resumen_fallos_push` (sin destinatario, contenido, endpoint ni llaves; la política
+  de avisos sigue con 3 políticas) y revisables con nota (`revisar_fallos_push`, admin,
+  audit). Sin "correr ahora" ni auto-reparación. Límite aceptado: no hay alarma
+  externa; la detección ocurre al abrir Operación o el Centro de pendientes.
+- Verificación: 135 funciones (132 + 3), ninguna previa cambió (R1, 02C, F-1, R2-B,
+  02H, 03A, 03B, 06A, 06D intactas por hash), las 3 nuevas idénticas al build probado;
+  matriz de privilegios en vivo (registrar: solo service_role; revisar/resumen: sin
+  PUBLIC/anon). Hardening 56/56; drift 70/70. Operación leída como admin, recepción y
+  miembro reales en transacciones revertidas: el admin ve solo los 2 pendientes reales
+  previos; recepción y miembro, 0. Bundle publicado con las etiquetas nuevas, el botón
+  de revisar push con nota y sin control de "correr". Datos de negocio: 14 tablas
+  idénticas antes y después (avisos idénticos en sus 21 columnas previas; solo se
+  agregaron 2 columnas NULL): CERO mutaciones causadas por la activación; CERO
+  corridas manuales, fallos de push artificiales, cambios de Auth o de Stripe.
+  Evidencia natural: `cron-push` asentó su primera corrida real (`exito`, 17:25:13 UTC)
+  y `cron-email` también (`exito`, 17:26:05 UTC); los demás esperan su horario. Gate local 215 archivos / 2070 pruebas (una corrida previa falló en el
+  intermitente preexistente `ekko138` 5b, sin tocar).
+- Residuales aceptados: sin alarma proactiva externa; crons de cortesía sin vigilar;
+  los recursos de Supabase y Netlify no se vigilan desde fuera.
 
 ## PKG-06D — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06D "Frontera de columnas y de cliente"** (EKKO-143) — commit `fdecdbb`
@@ -372,6 +402,10 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   dos pruebas). No se aplica, no se borra, no se commitea. Ver nota de `57b9af0`.
 
 ## Diferido / pendiente no bloqueante
+- PKG-06G, evidencia natural (no se fabrica): primera corrida registrada de
+  `cron-no-shows`, `cron-recordatorios`, `cron-expirar-membresias` y
+  `cron-material-vencido`; primer proceso atrasado o fallando real; primer push no
+  entregado real y su revisión.
 - PKG-06D, evidencia natural (no se fabrica): primer miembro real que entra con el
   cliente nuevo (hidratación por columnas), primera búsqueda real del panel por la RPC,
   primera lectura de notas/observaciones del staff por RPC, primer 5xx real
@@ -426,9 +460,9 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 ## Siguiente paso
 Resolver desde el panel los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
 `activo_sin_derecho`). El backlog canónico final (reconciliación post-R1/R2/01/02/03)
-deja 5 paquetes: 06B (operaciones de cobro del miembro y del webhook), 06C (alta pública
-con verificación), 06E (ciclo de vida del material), 06F (agregación en el servidor),
-06G (señales operativas durables); el siguiente recomendado es PKG-06G. Decisiones del dueño pendientes: D-FIN-2 (DSN de
+deja 4 paquetes: 06B (operaciones de cobro del miembro y del webhook), 06C (alta pública
+con verificación), 06E (ciclo de vida del material), 06F (agregación en el servidor); el
+siguiente recomendado es PKG-06B. Decisiones del dueño pendientes: D-FIN-2 (DSN de
 Sentry en producción: hoy no hay), D-FIN-3 (deploy previews con secretos LIVE),
 D-FIN-4 (cuentas demo al salir), D-FIN-8 (2 objetos huérfanos de Storage), respaldo y
 simulacro de restauración, cuál versión del enlace de Login queda (publicada vs stash).
