@@ -4,13 +4,13 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-06 · PKG-06G cerrado en producción (señales operativas
-durables sin Sentry). Antes: PKG-06D (frontera de columnas y de cliente). Todo lo de
+Última actualización: 2026-10-06 · PKG-06B cerrado en producción (operaciones de cobro
+del miembro y del webhook durables). Antes: PKG-06G (señales operativas durables). Todo lo de
 abajo se verificó en vivo contra git, Netlify y Supabase.
 
-## Producción (verificado 2026-10-06 17:30 UTC)
-- Código de negocio publicado: `364984222541660ddf4b39061bde4ed7267d55b5`
-  ("fix(ops): make scheduled process failures durable", PKG-06G); el commit docs-only
+## Producción (verificado 2026-10-06 18:00 UTC)
+- Código de negocio publicado: `33b44d25de38d1fb32bb56df6fabf8fc0f6322b8`
+  ("fix(billing): make member and webhook stripe operations durable", PKG-06B); el commit docs-only
   de este archivo va encima (ver `git log`). Cadena:
   `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
   en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
@@ -18,9 +18,11 @@ abajo se verificó en vivo contra git, Netlify y Supabase.
   → `1d42079` (STATUS) → `0890adb` (EKKO-138) → `0b23ca7` (STATUS) → `0ffe13d` (PKG-03B)
   → `07a85d8` (STATUS) → `308a4a7` (STATUS) → `f713586` (PKG-03B fase D) → `a682065` (STATUS)
   → `50c3a4c` (PKG-02H) → `82604ef` (STATUS) → `b12fe4f` (PKG-06A) → `c02532b` (STATUS)
-  → `fdecdbb` (PKG-06D) → `06d27b8` (STATUS) → `3649842` (PKG-06G).
-- Netlify production: deploy `6ac52e61c8b49900079d0b0c`, READY, `commit_ref` =
-  `3649842`, publicado 2026-10-06 17:24:35 UTC; 46 funciones, 9 programadas con los
+  → `fdecdbb` (PKG-06D) → `06d27b8` (STATUS) → `3649842` (PKG-06G) → `cf1cfc0` (STATUS)
+  → `33b44d2` (PKG-06B).
+- Netlify production: deploy `6ac535d7ff4a4f00081d51eb`, READY, `commit_ref` =
+  `33b44d2`, publicado 2026-10-06 17:56:34 UTC; antes `6ac52f4a4ccb810008ff86b9` =
+  cf1cfc0, `6ac52e61c8b49900079d0b0c` = 3649842 (17:24:35 UTC, PKG-06G); 46 funciones, 9 programadas con los
   mismos horarios, `cron-reconciliar-stripe` a `0 9 * * *`; cabeceras con
   Content-Security-Policy. Antes: `6ac524403b4a4b00082c707b` = 06d27b8,
   `6ac52294893a0e0008a43504` = fdecdbb (16:34 UTC, PKG-06D), `6ac51926…` = c02532b, `6ac473f643f09e0008dc0393` =
@@ -37,8 +39,10 @@ abajo se verificó en vivo contra git, Netlify y Supabase.
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **113/113 migraciones**; última
-  `20261015100000_06g_senales_operativas.sql` (PKG-06G, md5
+- Supabase: **114/114 migraciones**; última
+  `20261016100000_06b_operaciones_cobro_miembro.sql` (PKG-06B, md5
+  `91e48dea5680ba8fe400265494f639dd`, aplicada 2026-10-06 ~17:50 UTC, ANTES del
+  deploy); la 113 es `20261015100000_06g_senales_operativas.sql` (PKG-06G, md5
   `fe98902ddb41caa69ececaaea4a98d28`, aplicada 2026-10-06 ~17:21 UTC); la 112 es
   `20261014110000_06d_b_frontera_columnas.sql` (PKG-06D B, md5
   `81bf09281b2a3c8ab932d7c5d523d99f`, aplicada 2026-10-06 ~16:40 UTC, DESPUÉS del
@@ -75,7 +79,9 @@ D-FIN-1 = A; detalle en la sección "PKG-06A" de abajo) ·
 **PKG-06D "Frontera de columnas y de cliente" — CLOSED IN PRODUCTION** (EKKO-143;
 detalle en la sección "PKG-06D" de abajo) ·
 **PKG-06G "Señales operativas durables" — CLOSED IN PRODUCTION** (EKKO-144; detalle en
-la sección "PKG-06G" de abajo).
+la sección "PKG-06G" de abajo) ·
+**PKG-06B "Operaciones de cobro del miembro y del webhook" — CLOSED IN PRODUCTION**
+(EKKO-145; FR-15/16/17; detalle en la sección "PKG-06B" de abajo).
 Alcance final tras deduplicar contra R1, R2-A/B, EKKO-138, 03A y 03B: pausar, reactivar y
 dar de baja al fin del periodo escriben su operación en `stripe_operaciones_suscripcion`
 en la misma transacción que la transición local (causas `pausa_staff`,
@@ -188,26 +194,54 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- **PKG-06B "Operaciones de cobro del miembro y del webhook" — IMPLEMENTADO
-  LOCALMENTE, en un commit local SIN PUSH** (EKKO-145). Migración
-  `20261016100000_06b_operaciones_cobro_miembro.sql` (md5
-  `91e48dea5680ba8fe400265494f639dd`, NO aplicada en producción): tipos/causas
-  nuevos y columna `contexto` en `stripe_operaciones_suscripcion`; RPC nuevas
-  `cambio_plan_registrar`, `cambio_plan_resultado`, `registrar_cancelacion_suscripcion_anterior`
-  (service_role) y `miembro_programar_renovacion` (el miembro); recreadas desde su
-  última definición `operacion_suscripcion_preparar`, `operacion_suscripcion_resultado`
-  y `staff_reintentar_operacion_cobro`; `v_pendientes_operativos` igual que 06G salvo
-  la rama de cobro (sub anterior = ALTA; cambio de plan = revisar). Netlify:
-  `cambiar-plan-suscripcion` (intención durable + cierre honesto),
-  `stripe-cancelar-suscripcion` (RPC del miembro → ejecutor común),
-  `stripe-webhook` (operación por suscripción anterior antes de activar),
-  ejecutor con filtro de tipos y `reanudar_renovacion`. Pruebas:
-  `db/06b-operaciones-cobro-miembro.db.test.ts` (24; 22 muerden sin la migración),
-  `cambiar-plan-suscripcion` (+8), `stripe-webhook` (+4), `operacionesSuscripcion`
-  (+3), `stripe-cancelar-suscripcion` (6, nuevo), `Operacion` (+1). Hardening
-  58/58 (antes 56); drift 72/72 (antes 70). Gate completo verde a la primera: 217
-  archivos / 2116 pruebas, build OK, `git diff --check` OK (56 s, máquina en reposo). Activación: migración
-  (aditiva) → deploy; pendiente de autorización del dueño (`ekko-activar`).
+Nada.
+
+## PKG-06B — cerrado en producción (detalle; la línea corta está en "Cerrado")
+- **PKG-06B "Operaciones de cobro del miembro y del webhook"** (EKKO-145) — commit
+  `33b44d2` ("fix(billing): make member and webhook stripe operations durable"),
+  migración `20261016100000_06b_operaciones_cobro_miembro.sql` (md5
+  `91e48dea5680ba8fe400265494f639dd`; Supabase 113 → 114), deploy Netlify
+  `6ac535d7ff4a4f00081d51eb` READY = 33b44d2 (17:56 UTC). Orden: migración (aditiva;
+  el código viejo no usa los tipos ni las RPC nuevas) → push → deploy → verificación.
+- Qué quedó: FR-15, FR-16 y FR-17 CLOSED IN PRODUCTION.
+  - FR-15 (cambio de plan): `cambiar-plan-suscripcion` asienta la intención
+    (`cambio_plan_registrar`, operación `cambiar_plan`) ANTES de tocar Stripe; si no
+    puede asentarla, Stripe no se toca. Todo desenlace cierra la operación
+    (`cambio_plan_resultado`): `aplicada` solo si la membresía ya tiene el tier
+    destino; `descartada` sin efecto/cobro fallido/pago no iniciable; `fallida`
+    (resultado desconocido, conflicto, cuenta restringida, base pendiente) queda
+    visible en Operación como "revisar_cambio_plan". El ejecutor y el reintento del
+    staff NO re-ejecutan un cambio de plan (lo ejecuta el miembro).
+  - FR-16 (renovación del miembro): `stripe-cancelar-suscripcion` llama a
+    `miembro_programar_renovacion` (actor del JWT; revocado, sancionado al reactivar
+    y baja programada por el estudio se rechazan) que en UNA transacción fija
+    `cancel_at_period_end` en EKKO, crea la operación y audita; luego el ejecutor
+    común la lleva a Stripe. Si Stripe falla, la intención queda y la respuesta dice
+    `stripe_pendiente` (la app lo dice al miembro).
+  - FR-17 (suscripción anterior en el webhook): antes de activar la nueva membresía
+    se registra una operación por cada suscripción anterior
+    (`registrar_cancelacion_suscripcion_anterior`; ajena → error); si no puede
+    registrarla, el evento falla y Stripe lo reintenta. Después el ejecutor la cancela;
+    mientras no se aplique, Operación la muestra con severidad ALTA ("posible doble
+    cobro") y el cron diario la reintenta.
+  - `stripe_operaciones_suscripcion.contexto` es `jsonb NOT NULL DEFAULT '{}'` (el
+    reporte de implementación lo llamó nullable por error; la migración y producción
+    dicen NOT NULL).
+- Verificación: 139 funciones (135 + 4 nuevas); cambiaron solo
+  `operacion_suscripcion_preparar`, `operacion_suscripcion_resultado` y
+  `staff_reintentar_operacion_cobro`; las 7 idénticas por hash al build local
+  probado; ninguna otra cambió (R1, 02C, F-1, R2-B, 02H, 03A, 03B, 06A, 06D, 06G
+  intactas). Privilegios: las 3 RPC de servicio solo service_role; la del miembro solo
+  authenticated; ninguna con anon/PUBLIC; `search_path=public`. Vista security_invoker;
+  Operación por rol igual antes y después (admin: evento en revisión y
+  activo_sin_derecho; recepción y miembro: 0). Hardening 58/58 y drift 72/72 en
+  producción. Los 14 hashes de datos de negocio idénticos antes, tras migrar y tras el
+  deploy; 0 operaciones; webhook procesado:48 / revision:1 sin eventos nuevos. Bundle
+  publicado con los textos nuevos y sin sourcemaps; funciones sin token 401 y webhook
+  sin firma 400; las 9 programadas con los mismos horarios. Pruebas: DB 24 (22 muerden
+  sin la migración), regresión 181/181, gate 217 archivos / 2116 pruebas.
+- Cero mutaciones de Stripe, webhooks, eventos de cobro, auth o negocio causadas por la
+  activación.
 
 ## PKG-06G — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06G "Señales operativas durables"** (EKKO-144) — commit `3649842`
@@ -421,6 +455,10 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   dos pruebas). No se aplica, no se borra, no se commitea. Ver nota de `57b9af0`.
 
 ## Diferido / pendiente no bloqueante
+- PKG-06B, evidencia natural (no se fabrica): primer cambio de plan real con su
+  operación cerrada; primera baja o reactivación real del miembro por la RPC y el
+  ejecutor (y, si ocurre, un `stripe_pendiente` real); primer checkout con suscripción
+  anterior que registre y cancele su operación.
 - PKG-06G, evidencia natural (no se fabrica): primera corrida registrada de
   `cron-no-shows`, `cron-recordatorios`, `cron-expirar-membresias` y
   `cron-material-vencido`; primer proceso atrasado o fallando real; primer push no
@@ -479,9 +517,9 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 ## Siguiente paso
 Resolver desde el panel los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
 `activo_sin_derecho`). El backlog canónico final (reconciliación post-R1/R2/01/02/03)
-deja 4 paquetes: 06B (operaciones de cobro del miembro y del webhook), 06C (alta pública
-con verificación), 06E (ciclo de vida del material), 06F (agregación en el servidor); el
-siguiente recomendado es PKG-06B. Decisiones del dueño pendientes: D-FIN-2 (DSN de
+deja 3 paquetes (06B cerrado): 06C (alta pública con verificación, FR-24, el último P2),
+06E (ciclo de vida del material), 06F (agregación en el servidor); el siguiente
+recomendado es PKG-06C. Decisiones del dueño pendientes: D-FIN-2 (DSN de
 Sentry en producción: hoy no hay), D-FIN-3 (deploy previews con secretos LIVE),
 D-FIN-4 (cuentas demo al salir), D-FIN-8 (2 objetos huérfanos de Storage), respaldo y
 simulacro de restauración, cuál versión del enlace de Login queda (publicada vs stash).
