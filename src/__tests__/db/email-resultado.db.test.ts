@@ -102,8 +102,11 @@ describe('columnas y restricciones', () => {
 
 describe('índice y aditividad', () => {
   it('conserva el índice parcial de pendientes (cubre el predicado del cron) y no agrega otro', async () => {
+    // PKG-03A agrega su propio índice de fallos (`notificaciones_email_fallo_idx`);
+    // lo que se verifica aquí es la huella de 00F.
     const idx = await b.filas<{ indexname: string; indexdef: string }>(
-      `SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'notificaciones' AND indexname LIKE '%email%' ORDER BY 1`
+      `SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'notificaciones' AND indexname LIKE '%email%'
+         AND indexname <> 'notificaciones_email_fallo_idx' ORDER BY 1`
     );
     expect(idx).toHaveLength(1);
     expect(idx[0].indexname).toBe('notificaciones_email_pendiente_idx');
@@ -111,8 +114,12 @@ describe('índice y aditividad', () => {
   });
 
   it('las tres restricciones existen y nada más cambió en la tabla (sin DROP, sin UPDATE)', async () => {
+    // PKG-03A agrega `notificaciones_email_intentos_*` (CHECK y NOT NULL) y la FK de
+    // `email_revisado_por`, y amplía los valores de
+    // `notificaciones_email_resultado_check` (+ 'reintentable'); la huella de 00F son estas tres.
     const cons = await b.filas<{ conname: string }>(
-      `SELECT conname FROM pg_constraint WHERE conrelid = 'notificaciones'::regclass AND conname LIKE 'notificaciones_email%' ORDER BY 1`
+      `SELECT conname FROM pg_constraint WHERE conrelid = 'notificaciones'::regclass AND conname LIKE 'notificaciones_email%'
+         AND contype = 'c' AND conname NOT LIKE 'notificaciones_email_intentos%' ORDER BY 1`
     );
     expect(cons.map((c) => c.conname)).toEqual([
       'notificaciones_email_aceptado_check',

@@ -19,8 +19,14 @@ vi.mock('@shared/lib/supabase', () => ({
     from: (tabla: string) => {
       h.consultas.push(tabla);
       const c: Record<string, unknown> = {};
-      for (const m of ['select', 'eq', 'in', 'order', 'limit']) c[m] = () => c;
-      c.then = (cb: (v: unknown) => unknown) => Promise.resolve({ data: h.porTabla[tabla] ?? [], error: null }).then(cb);
+      for (const m of ['select', 'in', 'order', 'limit']) c[m] = () => c;
+      // PKG-03A: el hook pide abiertas y resueltas por separado; el mock respeta `estado`.
+      let estado: unknown;
+      c.eq = (col: string, val: unknown) => { if (col === 'estado') estado = val; return c; };
+      c.then = (cb: (v: unknown) => unknown) => {
+        const filas = (h.porTabla[tabla] ?? []) as Array<{ estado?: unknown }>;
+        return Promise.resolve({ data: estado === undefined ? filas : filas.filter((f) => f.estado === estado), error: null }).then(cb);
+      };
       return c;
     },
     rpc: (...a: unknown[]) => h.rpc(...a)

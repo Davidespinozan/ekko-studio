@@ -54,6 +54,7 @@ rediscute sin evidencia nueva.
 
 ## Stripe y cobro
 - EKKO-129, EKKO-130 (D-01P-1) — sanción suspende el cobro; revocación cancela de inmediato.
+- EKKO-138 (D-03A-1 = A) — pausa del staff ≠ sanción: levantar la sanción no reanuda una pausa comercial. Decidida; pendiente de extensión de modelo.
 - EKKO-131 — operaciones de cobro con evidencia durable y reintento.
 - EKKO-105 (D-01A-1) — estado durable de los eventos del webhook.
 - EKKO-106 — crear un Checkout no da derecho; lo da el evento financiero.
@@ -75,6 +76,7 @@ rediscute sin evidencia nueva.
 
 ## Avisos y correo
 - EKKO-111 — el correo dice la verdad: aceptado por el proveedor ≠ entregado.
+- EKKO-137 (PKG-03A) — outbox con intentos y backoff; push honesto; evidencia de correos directos; cierre humano de eventos y operaciones; vista derivada de pendientes.
 - EKKO-073, EKKO-074, EKKO-027 — correo por despachador central; confirmación por trigger; avisos.
 - EKKO-008, EKKO-033, EKKO-068 — web push; push central; push para staff. EKKO-081 — la campana es historial.
 

@@ -283,8 +283,9 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
  CASE WHEN EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='payment_events' AND policyname='payment_events_admin_read') THEN '✅ PASS' ELSE '❌ FALTA' END),
 -- PKG-02C (20261006100000): el cliente solo lee y marca lo suyo; nadie crea avisos
 -- por REST (la policy "admin crea" se retiró: los avisos los crea el servidor).
-('11 · Grants/RLS', '20261006100000_02c_frontera_rest', 'notificaciones: 2 policies (lee/marca lo propio), sin INSERT por REST',
- CASE WHEN (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='notificaciones') = 2
+-- PKG-03A (20261009100000): + lectura admin de los correos FALLIDOS de su estudio.
+('11 · Grants/RLS', '20261006100000_02c + 20261009100000_03a', 'notificaciones: 3 policies (lee/marca lo propio; admin lee fallos de correo), sin INSERT por REST',
+ CASE WHEN (SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='notificaciones') = 3
          AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='notificaciones' AND cmd IN ('INSERT','ALL'))
          AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='notificaciones' AND cmd='UPDATE' AND with_check IS NOT NULL)
         THEN '✅ PASS' ELSE '❌ FALTA — 02C no aplicada' END);

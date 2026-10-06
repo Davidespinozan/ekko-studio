@@ -92,7 +92,13 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- Nada. Árbol limpio salvo este archivo al momento de escribirlo.
+- **PKG-03A "Pendientes operativos y entrega"** (EKKO-137) — IMPLEMENTADO
+  LOCALMENTE, gate verde, SIN COMMIT / SIN PUSH / SIN DEPLOY / MIGRACIÓN NO
+  APLICADA. Migración `20261009100000_03a_pendientes_operativos.sql`. Cambian de
+  cuerpo a propósito `notificaciones_frontera_cliente` (02C, ahora lista blanca) y
+  `operacion_suscripcion_resultado` (R2-B, tope de reintentos); 10 funciones nuevas.
+  D-03A-1 (EKKO-138) decidida y NO implementada: falta extensión de modelo.
+  Pruebas: `src/__tests__/db/03a-pendientes-operativos.db.test.ts`, P5.
 
 ## Escritor único
 Un solo agente o sesión escribe en este árbol a la vez; las demás son de solo lectura.
@@ -129,7 +135,8 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 - 2 usuarios con caché de plan divergente (evidencia de que el caché no decide).
 
 ## Siguiente paso
-Decisiones del dueño: cierre formal de los tres trabajos de material/Login, cuál
+Revisión del dueño de PKG-03A (local) y de la extensión de modelo para D-03A-1.
+Pendientes previos — decisiones del dueño: cierre formal de los tres trabajos de material/Login, cuál
 versión del enlace de Login queda (publicada vs stash) y qué hacer con los 2 objetos
 huérfanos de Storage. Después, el siguiente bloque del programa (resto del E — admin —
 o Fase 2 de identidad). Ningún paquete nuevo está autorizado; un backlog o una

@@ -11,7 +11,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
-import { enviarPushAUsuario } from '../_lib/push';
+import { enviarPushAUsuario, clasificarPush, registrarResultadoPush } from '../_lib/push';
 import { leerPenalizacionConfig, calcularPenalizacionNoShow, mensajeNoShow } from '../_lib/noShow';
 import { esStaffActivo } from '../_lib/staff';
 
@@ -171,22 +171,24 @@ export const handler: Handler = async (event) => {
     //     falta y del bloqueo ahora, no cuando intente reservar.
     try {
       const aviso = mensajeNoShow({ folio: reserva.folio, resultado: pen, cfg });
-      const { error: notifErr } = await supabaseAdmin.from('notificaciones').insert({
+      const { data: creada, error: notifErr } = await supabaseAdmin.from('notificaciones').insert({
         tenant_id: reserva.tenant_id,
         usuario_id: miembro.id,
         tipo: 'no_show',
         titulo: aviso.titulo,
         mensaje: aviso.mensaje,
         metadata: { reserva_id: reserva.id, folio: reserva.folio, bloqueado_hasta: bloqueoNuevo },
-        push_enviado_at: new Date().toISOString() // el push sale aquí mismo (no lo repite cron-push)
-      });
+        // PKG-03A: el push sale aquí mismo; el lease evita que cron-push lo repita.
+        push_intento_at: new Date().toISOString()
+      }).select('id').maybeSingle();
       if (notifErr) console.error('[reception-marcar-no-show] notificación', notifErr.message);
-      await enviarPushAUsuario(supabaseAdmin, miembro.id, {
+      const r = await enviarPushAUsuario(supabaseAdmin, miembro.id, {
         titulo: aviso.titulo,
         mensaje: aviso.mensaje,
         url: '/app/reservas',
         tag: 'no_show'
       });
+      if (creada?.id) await registrarResultadoPush(supabaseAdmin, [creada.id], clasificarPush(r));
     } catch (e) {
       console.error('[reception-marcar-no-show] aviso', e instanceof Error ? e.message : e);
     }

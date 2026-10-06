@@ -33,9 +33,15 @@ const mockAuditInsert = vi.fn();
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
     auth: { getUser: mockGetUser },
+    rpc: vi.fn().mockResolvedValue({ data: 1, error: null }),
     from: vi.fn((table: string) => {
       if (table === 'audit_log') return { insert: mockAuditInsert };
-      if (table === 'notificaciones') return { insert: mockNotifInsert };
+      if (table === 'notificaciones') return { insert: (fila: unknown) => {
+        // PKG-03A: el insert encadena .select() para obtener el id y asentar el resultado del push DESPUÉS de enviar.
+        const r = mockNotifInsert(fila);
+        const res = Promise.resolve(r).then((x: { error?: unknown } | undefined) => ({ data: [{ id: 'n-1', usuario_id: 'm1' }], error: x?.error ?? null }));
+        return Object.assign(res, { select: () => Object.assign(res, { maybeSingle: () => res.then((x) => ({ data: x.data[0], error: x.error })) }) });
+      } };
       if (table === 'recursos') {
         return {
           select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockMaybeSingle })) })),

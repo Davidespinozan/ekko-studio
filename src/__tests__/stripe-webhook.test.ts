@@ -631,6 +631,44 @@ describe('stripe-webhook', () => {
       expect(mockAvisarStaff).toHaveBeenCalledTimes(1);
     });
 
+    const registros = () => mockRpc.mock.calls.filter((c) => c[0] === 'registrar_correo_directo').map((c) => c[1] as Record<string, unknown>);
+
+    it('PKG-03A: el correo directo deja evidencia con la MISMA llave; sin destinatario ni cuerpo', async () => {
+      mockConstructEvent.mockReturnValue(pagoFallido);
+      filaPorTabla.membresias = { usuario_id: 'u1', tenant_id: 't1' };
+      filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana' };
+      await invocar();
+      expect(registros()).toEqual([{
+        p_key: 'ekko:email:stripe:evt_1:pago_fallido', p_tenant_id: 't1', p_usuario_id: 'u1', p_plantilla: 'pago_fallido',
+        p_stripe_event_id: 'evt_1', p_resultado: 'aceptado', p_proveedor_id: 're_test', p_error: null
+      }]);
+      expect(JSON.stringify(registros())).not.toContain('ana@e.mx');
+    });
+
+    it('PKG-03A: un fallo del proveedor queda como fallo con motivo (clase + status), no como enviado', async () => {
+      mockConstructEvent.mockReturnValue(pagoFallido);
+      filaPorTabla.membresias = { usuario_id: 'u1', tenant_id: 't1' };
+      filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana' };
+      mockEnviarEmail.mockResolvedValueOnce({ estado: 'fallo', motivo: 'http_5xx', status: 503 });
+      const res = await invocar();
+      expect(res.statusCode).toBe(200);
+      expect(registros()).toEqual([expect.objectContaining({ p_resultado: 'fallo', p_proveedor_id: null, p_error: 'http_5xx:503' })]);
+    });
+
+    it('PKG-03A: miembro sin correo → evidencia `sin_correo` (no se intenta); sin proveedor configurado no se inventa nada', async () => {
+      mockConstructEvent.mockReturnValue(pagoFallido);
+      filaPorTabla.membresias = { usuario_id: 'u1', tenant_id: 't1' };
+      filaPorTabla.usuarios = { email: null, nombre: 'Ana' };
+      await invocar();
+      expect(registros()).toEqual([expect.objectContaining({ p_resultado: 'sin_correo', p_proveedor_id: null })]);
+
+      mockRpc.mockClear();
+      filaPorTabla.usuarios = { email: 'ana@e.mx', nombre: 'Ana' };
+      mockEnviarEmail.mockResolvedValueOnce({ estado: 'no_configurado' });
+      await invocar();
+      expect(registros()).toEqual([]);
+    });
+
     it('PKG-00F: Idempotency-Key determinista = evento Stripe + plantilla, ref = id del evento (sin PII)', async () => {
       mockConstructEvent.mockReturnValue(pagoFallido);
       filaPorTabla.membresias = { usuario_id: 'u1', tenant_id: 't1' };

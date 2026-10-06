@@ -24,12 +24,17 @@ const mockGetUser = vi.fn();
 const mockMaybeSingle = vi.fn();
 const mockNotifInsert = vi.fn();
 const mockAuditInsert = vi.fn();
+const mockRpc = vi.fn();
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
     auth: { getUser: mockGetUser },
+    rpc: (...a: unknown[]) => mockRpc(...a),
     from: vi.fn((table: string) => {
-      if (table === 'notificaciones') return { insert: mockNotifInsert };
+      // PKG-03A: el insert devuelve el id para asentar el resultado del push después.
+      if (table === 'notificaciones') {
+        return { insert: (fila: unknown) => { mockNotifInsert(fila); return { select: () => ({ maybeSingle: () => Promise.resolve({ data: { id: 'n-1' }, error: null }) }) }; } };
+      }
       if (table === 'audit_log') return { insert: mockAuditInsert };
       return { select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockMaybeSingle })) })) };
     })
@@ -71,23 +76,31 @@ describe('reception-notificar-miembro (Bloque E)', () => {
     delete process.env.VAPID_PRIVATE_KEY;
     delete process.env.VAPID_SUBJECT;
     mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-caller' } }, error: null });
-    mockNotifInsert.mockResolvedValue({ error: null });
     mockAuditInsert.mockResolvedValue({ error: null });
+    mockRpc.mockResolvedValue({ data: 1, error: null });
   });
 
-  it('válido → inserta notificación (aviso_manual) + audit', async () => {
+  it('válido → inserta notificación (aviso_manual) + audit; el push se asienta después, con resultado honesto', async () => {
     seq(CALLER, TARGET);
     const res = await invocar(evento({ miembro_id: 'm1', mensaje: 'Tu pago vence mañana' }));
     expect(res.statusCode).toBe(200);
+    // Sin VAPID: no salió nada al teléfono y la respuesta no lo afirma.
+    expect(JSON.parse(res.body)).toEqual({ success: true, push: 'sin_config' });
 
     const notif = mockNotifInsert.mock.calls[0][0] as Record<string, unknown>;
     expect(notif.tipo).toBe('aviso_manual');
     expect(notif.usuario_id).toBe('m1');
     expect(notif.mensaje).toBe('Tu pago vence mañana');
+    // PKG-03A: ya no se marca "enviado" al insertar; se reclama con un lease.
+    expect(notif).not.toHaveProperty('push_enviado_at');
+    expect(typeof notif.push_intento_at).toBe('string');
+    expect(mockRpc).toHaveBeenCalledWith('registrar_resultado_push', { p_ids: ['n-1'], p_resultado: 'sin_config' });
 
+    // PKG-03A (F-9): "registrado", no "enviado".
     const audit = mockAuditInsert.mock.calls[0][0] as Record<string, unknown>;
-    expect(audit.accion).toBe('notification_sent');
+    expect(audit.accion).toBe('aviso_registrado');
     expect(audit.target_id).toBe('m1');
+    expect(audit.despues).toEqual({ mensaje: 'Tu pago vence mañana', push: 'sin_config' });
   });
 
   it('mensaje vacío → 400', async () => {

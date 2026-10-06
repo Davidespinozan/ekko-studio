@@ -7,7 +7,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { enviarPushAUsuario } from '../_lib/push';
+import { enviarPushAUsuario, clasificarPush, registrarResultadoPush, type ResultadoPush } from '../_lib/push';
 import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
@@ -17,10 +17,13 @@ import { reportarErrorServidor } from '../_lib/sentry';
  * functions. Antes el push estaba cableado disparador por disparador y la
  * mitad de los avisos no llegaba al teléfono. (SALA aa4a34d.)
  *
- * Solo mira las últimas 24 h (lo más viejo ya no es "aviso"), en lotes de 200,
- * y marca cada fila aunque el push falle o el usuario no tenga suscripción: la
- * notificación in-app sigue existiendo; lo que no debe pasar es reintentar
- * para siempre.
+ * Solo mira las últimas 24 h (lo más viejo ya no es "aviso"), en lotes de 200.
+ *
+ * PKG-03A · resultado honesto: la base reclama las filas con un lease
+ * (`reclamar_push_pendientes`: dos corridas o un envío directo no duplican) y,
+ * DESPUÉS de intentar, se asienta `push_resultado` (enviado | sin_suscripcion |
+ * fallo | sin_config). `push_enviado_at` solo existe si de verdad salió. Sin
+ * reintento de push: un fallo queda escrito, no se repite para siempre.
  *
  * Programado en netlify.toml como [functions."cron-push"] schedule "* * * * *".
  */
@@ -44,14 +47,7 @@ export const handler: Handler = async () => {
       auth: { persistSession: false }
     });
 
-    const desde = new Date(Date.now() - 24 * 3600_000).toISOString();
-    const { data, error } = await supabase
-      .from('notificaciones')
-      .select('id, usuario_id, tipo, titulo, mensaje, metadata')
-      .is('push_enviado_at', null)
-      .gte('creada_at', desde)
-      .order('creada_at', { ascending: true })
-      .limit(200);
+    const { data, error } = await supabase.rpc('reclamar_push_pendientes', { p_limite: 200 });
     if (error) {
       await reportarErrorServidor('cron-push', new Error(error.message), { paso: 'select' });
       return serverError(error.message);
@@ -60,6 +56,7 @@ export const handler: Handler = async () => {
     const filas = (data ?? []) as Array<{ id: string; usuario_id: string; tipo: string; titulo: string; mensaje: string; metadata: Record<string, unknown> | null }>;
     let enviados = 0;
     for (const n of filas) {
+      let resultado: ResultadoPush;
       try {
         const r = await enviarPushAUsuario(supabase, n.usuario_id, {
           titulo: n.titulo,
@@ -68,11 +65,12 @@ export const handler: Handler = async () => {
           tag: n.tipo
         });
         enviados += r.enviados;
+        resultado = clasificarPush(r);
       } catch (e) {
         await reportarErrorServidor('cron-push', e, { notificacion_id: n.id, tipo: n.tipo });
-      } finally {
-        await supabase.from('notificaciones').update({ push_enviado_at: new Date().toISOString() }).eq('id', n.id);
+        resultado = 'fallo';
       }
+      await registrarResultadoPush(supabase, [n.id], resultado);
     }
 
     if (filas.length) console.log('[cron-push] OK', { pendientes: filas.length, pushEnviados: enviados });

@@ -31,7 +31,8 @@ vi.mock('@supabase/supabase-js', () => ({
     rpc: mockRpc,
     from: vi.fn(() => {
       const chain: Record<string, unknown> = {};
-      for (const m of ['select', 'eq', 'in', 'order', 'limit', 'not']) chain[m] = () => chain;
+      // PKG-03A: el ejecutor filtra las operaciones agotadas con `.is()`.
+      for (const m of ['select', 'eq', 'in', 'order', 'limit', 'not', 'is']) chain[m] = () => chain;
       chain.maybeSingle = () => mockMaybeSingle();
       // R2-B: el ejecutor de operaciones de cobro lista las pendientes (await de la consulta).
       chain.then = (cb: (v: unknown) => unknown) => Promise.resolve({ data: mockOps(), error: null }).then(cb);

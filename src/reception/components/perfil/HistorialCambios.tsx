@@ -52,8 +52,9 @@ function describirCambio(e: AuditEntryUsuario): string {
       return 'Corrigió una asistencia';
     case 'ficha_identidad_actualizada':
       return 'Actualizó la ficha de identidad';
-    case 'notification_sent':
-      return 'Le envió un aviso';
+    case 'notification_sent': // histórico anterior a PKG-03A
+    case 'aviso_registrado':
+      return 'Le dejó un aviso';
     case 'invitado_agregado':
       return 'Registró un invitado';
     case 'invitado_eliminado':

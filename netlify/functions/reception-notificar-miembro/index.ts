@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
-import { enviarPushAUsuario } from '../_lib/push';
+import { enviarPushAUsuario, clasificarPush, registrarResultadoPush } from '../_lib/push';
 import { esStaffActivo } from '../_lib/staff';
 
 /**
@@ -82,35 +82,40 @@ export const handler: Handler = async (event) => {
       return forbidden('El miembro pertenece a otro estudio');
     }
 
-    const { error: insErr } = await supabaseAdmin.from('notificaciones').insert({
+    const { data: creada, error: insErr } = await supabaseAdmin.from('notificaciones').insert({
       tenant_id: target.tenant_id,
       usuario_id: target.id,
       tipo: 'aviso_manual',
       titulo: 'Aviso del estudio',
       mensaje,
-      push_enviado_at: new Date().toISOString() // el push sale aquí mismo (no lo repite cron-push)
-    });
+      // PKG-03A: el push sale aquí mismo; el lease evita que cron-push lo repita.
+      push_intento_at: new Date().toISOString()
+    }).select('id').maybeSingle();
     if (insErr) return serverError(insErr.message);
 
-    // Entrega push (además del aviso in-app). No-op si no hay VAPID configurado.
-    await enviarPushAUsuario(supabaseAdmin, target.id, {
+    // Entrega push (además del aviso in-app) y resultado asentado DESPUÉS de
+    // intentar. No-op si no hay VAPID configurado (queda `sin_config`).
+    const r = await enviarPushAUsuario(supabaseAdmin, target.id, {
       titulo: 'Aviso del estudio',
       mensaje,
       url: '/app',
       tag: 'aviso_manual'
     });
+    const push = clasificarPush(r);
+    if (creada?.id) await registrarResultadoPush(supabaseAdmin, [creada.id], push);
 
+    // PKG-03A (F-9): se registra un aviso; "enviado" afirmaba más de lo que se sabe.
     await writeAuditLog(supabaseAdmin, {
       tenant_id: target.tenant_id,
       actor_usuario_id: caller.id,
       actor_rol: caller.rol,
-      accion: 'notification_sent',
+      accion: 'aviso_registrado',
       target_tipo: 'usuario',
       target_id: target.id,
-      despues: { mensaje }
+      despues: { mensaje, push }
     });
 
-    return ok({ success: true });
+    return ok({ success: true, push });
   } catch (e) {
     console.error('[reception-notificar-miembro]', e);
     return serverError(e instanceof Error ? e.message : 'Error desconocido');

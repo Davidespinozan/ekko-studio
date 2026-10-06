@@ -7,7 +7,7 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { enviarEmail, emailAviso, emailConfigurado, identidadEstudio } from '../_lib/email';
+import { enviarEmail, emailAviso, emailConfigurado, identidadEstudio, falloReintentable, motivoPersistible } from '../_lib/email';
 import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
@@ -29,12 +29,18 @@ import { reportarErrorServidor } from '../_lib/sentry';
  * PKG-00F · evidencia veraz (C03). Cada fila termina en UN resultado:
  *    aceptado   → Resend aceptó: email_proveedor_id + email_enviado_at.
  *    sin_correo → el usuario no tiene correo: no se intentó.
- *    fallo      → no se pudo entregar la solicitud al proveedor.
+ *    fallo      → no se pudo entregar la solicitud al proveedor (terminal).
  *  `email_enviado_at` significa "Resend aceptó", NUNCA "el miembro lo recibió"
- *  (PROVIDER ACCEPTED ≠ DELIVERED). Una fila con resultado no se vuelve a
- *  tomar: aquí no hay reintentos (eso es PKG-02C, el outbox). Sin resultado y
- *  sin enviado_at = pendiente (p. ej. el cron murió a medias): se reintenta y
- *  la Idempotency-Key evita el duplicado.
+ *  (PROVIDER ACCEPTED ≠ DELIVERED).
+ *
+ * PKG-03A · ciclo de vida en la base (la notificación ES el outbox):
+ *  · `reclamar_correos_pendientes` toma la fila, cuenta el intento y le pone un
+ *    lease; lo que salió de la ventana sin intentarse queda `fallo`
+ *    (`ventana_vencida`), visible en Operación, en vez de perderse en silencio.
+ *  · `notificacion_email_resultado` asienta el intento: transitorio con intentos
+ *    restantes → `reintentable` con backoff (máx. 3); si no → terminal, con el
+ *    motivo (clase + status, sin PII). La Idempotency-Key por aviso no cambia:
+ *    Resend descarta el duplicado si un reintento repite algo ya aceptado.
  */
 export const TIPOS_POR_CORREO: Record<string, { boton: string }> = {
   reserva_confirmada: { boton: 'Ver mi reserva y QR' },
@@ -53,9 +59,10 @@ const VENTANA_MS = 6 * 3600_000;
 /** El cron no comparte presupuesto con nadie: puede esperar más que el webhook. */
 const TIMEOUT_MS = 8000;
 
-type Marca =
-  | { email_resultado: 'aceptado'; email_proveedor_id: string; email_enviado_at: string }
-  | { email_resultado: 'sin_correo' | 'fallo' };
+type Intento =
+  | { resultado: 'aceptado'; proveedorId: string }
+  | { resultado: 'sin_correo' }
+  | { resultado: 'fallo'; error: string; reintentable: boolean };
 
 export const handler: Handler = async () => {
   try {
@@ -67,15 +74,11 @@ export const handler: Handler = async () => {
       auth: { persistSession: false }
     });
 
-    const { data, error } = await supabase
-      .from('notificaciones')
-      .select('id, tenant_id, usuario_id, tipo, titulo, mensaje, metadata')
-      .is('email_enviado_at', null)
-      .is('email_resultado', null)
-      .in('tipo', Object.keys(TIPOS_POR_CORREO))
-      .gte('creada_at', new Date(Date.now() - VENTANA_MS).toISOString())
-      .order('creada_at', { ascending: true })
-      .limit(50);
+    const { data, error } = await supabase.rpc('reclamar_correos_pendientes', {
+      p_tipos: Object.keys(TIPOS_POR_CORREO),
+      p_limite: 50,
+      p_ventana: `${VENTANA_MS / 1000} seconds`
+    });
     if (error) {
       await reportarErrorServidor('cron-email', new Error(error.message), { paso: 'select' });
       return serverError(error.message);
@@ -85,7 +88,7 @@ export const handler: Handler = async () => {
       id: string; tenant_id: string; usuario_id: string; tipo: string;
       titulo: string; mensaje: string; metadata: Record<string, unknown> | null;
     }>;
-    if (filas.length === 0) return ok({ pendientes: 0, aceptados: 0, fallidos: 0, sin_correo: 0 });
+    if (filas.length === 0) return ok({ pendientes: 0, aceptados: 0, fallidos: 0, reintentables: 0, sin_correo: 0 });
 
     // Una consulta por tabla, no una por fila.
     const [{ data: usuarios }, { data: tenants }] = await Promise.all([
@@ -95,13 +98,13 @@ export const handler: Handler = async () => {
     const usuarioPorId = new Map((usuarios ?? []).map((u) => [u.id as string, u as { email: string | null; nombre: string | null }]));
     const tenantPorId = new Map((tenants ?? []).map((t) => [t.id as string, t as { nombre: string | null; branding: unknown; config: unknown }]));
 
-    const conteo = { aceptados: 0, fallidos: 0, sin_correo: 0 };
+    const conteo = { aceptados: 0, fallidos: 0, reintentables: 0, sin_correo: 0 };
     for (const n of filas) {
-      let marca: Marca | null = null;
+      let intento: Intento | null = null;
       try {
         const u = usuarioPorId.get(n.usuario_id);
         if (!u?.email) {
-          marca = { email_resultado: 'sin_correo' };
+          intento = { resultado: 'sin_correo' };
         } else {
           // Identidad del estudio (logo, nombre, contacto) desde Administración.
           const estudio = identidadEstudio(tenantPorId.get(n.tenant_id));
@@ -125,22 +128,34 @@ export const handler: Handler = async () => {
             timeoutMs: TIMEOUT_MS
           });
           if (r.estado === 'aceptado') {
-            marca = { email_resultado: 'aceptado', email_proveedor_id: r.id, email_enviado_at: new Date().toISOString() };
+            intento = { resultado: 'aceptado', proveedorId: r.id };
           } else if (r.estado === 'fallo') {
-            marca = { email_resultado: 'fallo' };
+            intento = { resultado: 'fallo', error: motivoPersistible(r), reintentable: falloReintentable(r) };
           }
-          // `no_configurado` (la key desapareció a mitad del lote): se deja pendiente.
+          // `no_configurado` (la key desapareció a mitad del lote): sin resultado; el
+          // lease vence y la fila se vuelve a tomar.
         }
       } catch (e) {
         await reportarErrorServidor('cron-email', e, { notificacion_id: n.id, tipo: n.tipo });
-        marca = { email_resultado: 'fallo' };
+        intento = { resultado: 'fallo', error: 'error_interno', reintentable: true };
       }
-      if (!marca) continue;
-      if (marca.email_resultado === 'aceptado') conteo.aceptados++;
-      else if (marca.email_resultado === 'fallo') conteo.fallidos++;
-      else conteo.sin_correo++;
-      const { error: errMarca } = await supabase.from('notificaciones').update(marca).eq('id', n.id);
-      if (errMarca) await reportarErrorServidor('cron-email', new Error(errMarca.message), { paso: 'marcar', notificacion_id: n.id });
+      if (!intento) continue;
+      const { data: asentado, error: errMarca } = await supabase.rpc('notificacion_email_resultado', {
+        p_id: n.id,
+        p_resultado: intento.resultado,
+        p_proveedor_id: intento.resultado === 'aceptado' ? intento.proveedorId : null,
+        p_error: intento.resultado === 'fallo' ? intento.error : null,
+        p_reintentable: intento.resultado === 'fallo' ? intento.reintentable : false
+      });
+      if (errMarca) {
+        await reportarErrorServidor('cron-email', new Error(errMarca.message), { paso: 'marcar', notificacion_id: n.id });
+        continue;
+      }
+      const estado = (asentado as { estado?: string } | null)?.estado;
+      if (estado === 'aceptado') conteo.aceptados++;
+      else if (estado === 'reintentable') conteo.reintentables++;
+      else if (estado === 'fallo') conteo.fallidos++;
+      else if (estado === 'sin_correo') conteo.sin_correo++;
     }
 
     console.log('[cron-email] OK', { pendientes: filas.length, ...conteo });

@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { writeAuditLog } from '../_lib/auditLog';
-import { enviarPushAUsuario } from '../_lib/push';
+import { enviarPushAUsuario, clasificarPush, registrarResultadoPush } from '../_lib/push';
 import { esStaffActivo } from '../_lib/staff';
 
 /**
@@ -154,21 +154,26 @@ export const handler: Handler = async (event) => {
         titulo: 'Tu reserva fue cancelada',
         mensaje: `El estudio "${recurso.nombre}" quedó temporalmente fuera de servicio. Tu reserva del ${fechaLarga(r.slot_inicio)} fue cancelada. Volvé a reservar cuando esté disponible.`,
         metadata: { reserva_id: r.id, motivo: 'recurso_fuera_servicio' },
-        push_enviado_at: new Date().toISOString() // el push sale aquí mismo (no lo repite cron-push)
+        // PKG-03A: el push sale aquí mismo; el lease evita que cron-push lo repita.
+        push_intento_at: new Date().toISOString()
       }));
-      const { error: notifErr } = await supabaseAdmin.from('notificaciones').insert(notifs);
+      const { data: creadas, error: notifErr } = await supabaseAdmin.from('notificaciones').insert(notifs).select('id, usuario_id');
       if (notifErr) console.error('[reception-recurso-servicio] notif', notifErr.message);
+      const idPorUsuario = new Map(((creadas ?? []) as Array<{ id: string; usuario_id: string }>).map((c) => [c.usuario_id, c.id]));
 
-      // Entrega push a cada afectado (además del aviso in-app). No-op sin VAPID.
+      // Entrega push a cada afectado (además del aviso in-app) y asienta el
+      // resultado DESPUÉS de intentar. No-op sin VAPID (queda `sin_config`).
       await Promise.all(
-        notifs.map((n) =>
-          enviarPushAUsuario(supabaseAdmin, n.usuario_id, {
+        notifs.map(async (n) => {
+          const r = await enviarPushAUsuario(supabaseAdmin, n.usuario_id, {
             titulo: n.titulo,
             mensaje: n.mensaje,
             url: '/app',
             tag: 'reserva_cancelada'
-          })
-        )
+          });
+          const id = idPorUsuario.get(n.usuario_id);
+          if (id) await registrarResultadoPush(supabaseAdmin, [id], clasificarPush(r));
+        })
       );
     }
 

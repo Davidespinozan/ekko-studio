@@ -36,8 +36,18 @@ export interface RevisionFinanciera {
   resuelta_at: string | null;
   reabierta_at: string | null;
   reversal: ReversalResumen | null;
-  /** Nombre del miembro del reversal (si se resolvió el origen). */
+  /** Miembro de la revisión: el del reversal o, si no hay, el de `detalle.usuario_id`. */
+  usuario_id: string | null;
+  /** Nombre de ese miembro. */
   miembro_nombre: string | null;
+}
+
+/** Cuántas resueltas recientes se muestran como historial (las abiertas, todas). */
+export const LIMITE_RESUELTAS = 100;
+
+function usuarioDelDetalle(detalle: unknown): string | null {
+  const u = (detalle as { usuario_id?: unknown } | null)?.usuario_id;
+  return typeof u === 'string' && u ? u : null;
 }
 
 export type ResolucionHumana = 'sin_efecto' | 'ajuste_manual_registrado' | 'otro';
@@ -73,15 +83,24 @@ export function useRevisionesFinancieras(opts: { soloAbiertas?: boolean; usuario
   const refetch = useCallback(async () => {
     setError(false);
     try {
-      let q = supabase
-        .from('revisiones_financieras')
-        .select('id, tipo, referencia, estado, resolucion, nota, detalle, actor_rol, abierta_at, resuelta_at, reabierta_at, reversal_id')
-        .eq('tenant_id', tenant.id)
-        .order('abierta_at', { ascending: false })
-        .limit(200);
-      if (soloAbiertas) q = q.eq('estado', 'abierta');
-      const { data: filas, error: err } = await q;
-      if (err) throw err;
+      // PKG-03A: las ABIERTAS se piden aparte y SIN límite: antes un `limit(200)`
+      // mezclado con las resueltas podía esconder abiertas viejas. Las resueltas
+      // son historial: basta lo reciente.
+      const columnas = 'id, tipo, referencia, estado, resolucion, nota, detalle, actor_rol, abierta_at, resuelta_at, reabierta_at, reversal_id';
+      const [abiertas, resueltas] = await Promise.all([
+        supabase.from('revisiones_financieras').select(columnas)
+          .eq('tenant_id', tenant.id).eq('estado', 'abierta')
+          .order('abierta_at', { ascending: false }),
+        soloAbiertas
+          ? Promise.resolve({ data: [] as never[], error: null })
+          : supabase.from('revisiones_financieras').select(columnas)
+              .eq('tenant_id', tenant.id).eq('estado', 'resuelta')
+              .order('abierta_at', { ascending: false })
+              .limit(LIMITE_RESUELTAS)
+      ]);
+      if (abiertas.error) throw abiertas.error;
+      if (resueltas.error) throw resueltas.error;
+      const filas = [...(abiertas.data ?? []), ...(resueltas.data ?? [])];
 
       const ids = Array.from(new Set((filas ?? []).map((f) => f.reversal_id).filter((x): x is string => Boolean(x))));
       const reversales = new Map<string, ReversalResumen>();
@@ -93,15 +112,19 @@ export function useRevisionesFinancieras(opts: { soloAbiertas?: boolean; usuario
         if (errRv) throw errRv;
         for (const r of rv ?? []) reversales.set(r.id, r as ReversalResumen);
       }
-      const usuarios = Array.from(new Set(Array.from(reversales.values()).map((r) => r.usuario_id).filter((x): x is string => Boolean(x))));
+      const usuarios = Array.from(new Set([
+        ...Array.from(reversales.values()).map((r) => r.usuario_id),
+        ...filas.map((f) => usuarioDelDetalle(f.detalle))
+      ].filter((x): x is string => Boolean(x))));
       const nombres = new Map<string, string | null>();
       if (usuarios.length) {
         const { data: us } = await supabase.from('usuarios').select('id, nombre').in('id', usuarios);
         for (const u of us ?? []) nombres.set(u.id, u.nombre);
       }
 
-      let lista: RevisionFinanciera[] = (filas ?? []).map((f) => {
+      let lista: RevisionFinanciera[] = filas.map((f) => {
         const reversal = f.reversal_id ? reversales.get(f.reversal_id) ?? null : null;
+        const usuario = reversal?.usuario_id ?? usuarioDelDetalle(f.detalle);
         return {
           id: f.id,
           tipo: f.tipo,
@@ -115,10 +138,13 @@ export function useRevisionesFinancieras(opts: { soloAbiertas?: boolean; usuario
           resuelta_at: f.resuelta_at,
           reabierta_at: f.reabierta_at,
           reversal,
-          miembro_nombre: reversal?.usuario_id ? nombres.get(reversal.usuario_id) ?? null : null
+          usuario_id: usuario,
+          miembro_nombre: usuario ? nombres.get(usuario) ?? null : null
         };
       });
-      if (usuarioId) lista = lista.filter((r) => r.reversal?.usuario_id === usuarioId);
+      // PKG-03A: también las que no vienen de un reembolso/disputa (crédito no
+      // restaurado, extras, invitados sin aplicar): su miembro está en `detalle`.
+      if (usuarioId) lista = lista.filter((r) => r.usuario_id === usuarioId);
       setRevisiones(lista);
     } catch (e) {
       console.error('[useRevisionesFinancieras]', e instanceof Error ? e.message : e);

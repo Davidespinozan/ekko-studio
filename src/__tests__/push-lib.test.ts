@@ -19,7 +19,7 @@ const admin = {
   }))
 } as unknown as Parameters<typeof enviarPushAUsuario>[0];
 
-import { enviarPushAUsuario } from '../../netlify/functions/_lib/push';
+import { enviarPushAUsuario, clasificarPush } from '../../netlify/functions/_lib/push';
 
 const SUB = (id: string) => ({ id, endpoint: `https://push/${id}`, p256dh: 'p', auth: 'a' });
 
@@ -59,5 +59,28 @@ describe('enviarPushAUsuario', () => {
     const r = await enviarPushAUsuario(admin, 'u1', { titulo: 'x', mensaje: 'y' });
     expect(r.enviados).toBe(0);
     expect(mockSend).not.toHaveBeenCalled();
+  });
+});
+
+describe('PKG-03A · resultado honesto del push', () => {
+  it('un fallo que no es suscripción caduca cuenta como fallo, no como enviado', async () => {
+    mockSelectEq.mockResolvedValue({ data: [SUB('s1')], error: null });
+    mockSend.mockRejectedValue(Object.assign(new Error('boom'), { statusCode: 500 }));
+    const r = await enviarPushAUsuario(admin, 'u1', { titulo: 'Hola', mensaje: 'Test' });
+    expect(r).toMatchObject({ enviados: 0, fallidos: 1 });
+    expect(clasificarPush(r)).toBe('fallo');
+  });
+
+  it('no poder leer las suscripciones es fallo, no "sin suscripción"', async () => {
+    mockSelectEq.mockResolvedValue({ data: null, error: { message: 'x' } });
+    const r = await enviarPushAUsuario(admin, 'u1', { titulo: 'Hola', mensaje: 'Test' });
+    expect(clasificarPush(r)).toBe('fallo');
+  });
+
+  it('clasificación: sin VAPID → sin_config; ninguna o todas caducas → sin_suscripcion; ≥1 entregada al proveedor → enviado', () => {
+    expect(clasificarPush({ enviados: 0, borrados: 0, sinConfig: true })).toBe('sin_config');
+    expect(clasificarPush({ enviados: 0, borrados: 0 })).toBe('sin_suscripcion');
+    expect(clasificarPush({ enviados: 0, borrados: 2, fallidos: 0 })).toBe('sin_suscripcion');
+    expect(clasificarPush({ enviados: 1, borrados: 0, fallidos: 1 })).toBe('enviado');
   });
 });

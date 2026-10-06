@@ -67,6 +67,8 @@ export async function ejecutarOperacionesSuscripcion(
     .from('stripe_operaciones_suscripcion')
     .select('id')
     .in('estado', ['pendiente', 'fallida'])
+    // PKG-03A: agotada (5 intentos en la ronda) = necesita a un humano en Operación.
+    .is('reintentos_agotados_at', null)
     .order('created_at', { ascending: true })
     .limit(filtro.limite ?? 25);
   if (filtro.usuarioId) consulta = consulta.eq('usuario_id', filtro.usuarioId);

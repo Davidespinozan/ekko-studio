@@ -23,7 +23,7 @@ import {
   type EstadoEventoWebhook,
   type MontoEvento
 } from '../_lib/stripe';
-import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo, emailPaqueteComprado, identidadEstudio, type EmailRenderizado } from '../_lib/email';
+import { enviarEmail, emailPagoFallido, emailBienvenida, emailRecibo, emailPaqueteComprado, identidadEstudio, motivoPersistible, type EmailRenderizado } from '../_lib/email';
 import { reportarErrorServidor } from '../_lib/sentry';
 import { avisarStaff } from '../_lib/avisosStaff';
 
@@ -594,7 +594,6 @@ async function avisos(
     });
   }
 
-  if (!email) return;
   // Identidad del estudio (logo, nombre, contacto) desde Administración.
   let tenantFila: { nombre?: unknown; branding?: unknown; config?: unknown } | null = null;
   if (tenantIdPago) {
@@ -613,18 +612,40 @@ async function avisos(
     tpl = emailPaqueteComprado({ ...base, creditos: paqueteActivado.creditos, venceEl: paqueteActivado.periodo_fin });
   }
   // PKG-00F: identidad determinista (evento Stripe + plantilla) → Resend descarta
-  // el duplicado si el evento se reprocesa. El resultado se registra en el
-  // adapter (sin PII); aquí no se persiste ni se actúa: el dinero ya quedó.
-  if (tpl) {
-    await enviarEmail({
+  // el duplicado si el evento se reprocesa. PKG-03A: el resultado queda como
+  // evidencia en `correos_directos` (misma llave; sin destinatario ni cuerpo).
+  // Nunca se actúa sobre el dinero: ya quedó.
+  if (!tpl) return;
+  const idempotencyKey = `ekko:email:stripe:${stripeEvent.id}:${tpl.plantilla}`;
+  let registro: { resultado: 'aceptado' | 'sin_correo' | 'fallo'; proveedorId: string | null; error: string | null };
+  if (!email) {
+    registro = { resultado: 'sin_correo', proveedorId: null, error: null };
+  } else {
+    const r = await enviarEmail({
       to: email,
       subject: tpl.subject,
       html: tpl.html,
       plantilla: tpl.plantilla,
-      idempotencyKey: `ekko:email:stripe:${stripeEvent.id}:${tpl.plantilla}`,
+      idempotencyKey,
       ref: stripeEvent.id
     });
+    if (r.estado === 'no_configurado') return; // sin proveedor: no hubo intento que asentar
+    registro = r.estado === 'aceptado'
+      ? { resultado: 'aceptado', proveedorId: r.id, error: null }
+      : { resultado: 'fallo', proveedorId: null, error: motivoPersistible(r) };
   }
+  if (!tenantIdPago) return; // sin estudio no hay a quién mostrárselo
+  const { error: errReg } = await admin.rpc('registrar_correo_directo', {
+    p_key: idempotencyKey,
+    p_tenant_id: tenantIdPago,
+    p_usuario_id: usuarioIdPago,
+    p_plantilla: tpl.plantilla,
+    p_stripe_event_id: stripeEvent.id,
+    p_resultado: registro.resultado,
+    p_proveedor_id: registro.proveedorId,
+    p_error: registro.error
+  });
+  if (errReg) console.error('[stripe-webhook] correo directo sin evidencia', errReg.message);
 }
 
 /**

@@ -33,7 +33,8 @@ describe('useCentroPendientes (PKG-02A)', () => {
     h.porTabla = {
       usuarios: { count: 2, error: null },
       membresias: { count: 3, error: null },
-      reservas: { count: 1, error: null }
+      reservas: { count: 1, error: null },
+      v_pendientes_operativos: { count: 4, error: null }
     };
     h.materialPendiente = { data: [{ reserva_id: 'r-1' }], error: null };
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -43,16 +44,16 @@ describe('useCentroPendientes (PKG-02A)', () => {
     const { result } = renderHook(() => useCentroPendientes());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.error).toBe(false);
-    expect(result.current.conteo).toEqual({ cobrosPendientes: 2, identidadPendiente: 2, membresiasVencidas: 3, noShows7d: 1, materialPendiente: 1 });
+    expect(result.current.conteo).toEqual({ cobrosPendientes: 2, identidadPendiente: 2, membresiasVencidas: 3, noShows7d: 1, materialPendiente: 1, operacion: 4 });
   });
 
   it('success con todo en 0 → error=false (vacío legítimo: sí es "Todo al día")', async () => {
-    h.porTabla = { usuarios: { count: 0, error: null }, membresias: { count: 0, error: null }, reservas: { count: 0, error: null } };
+    h.porTabla = { usuarios: { count: 0, error: null }, membresias: { count: 0, error: null }, reservas: { count: 0, error: null }, v_pendientes_operativos: { count: 0, error: null } };
     h.materialPendiente = { data: [], error: null };
     const { result } = renderHook(() => useCentroPendientes());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.error).toBe(false);
-    expect(result.current.conteo).toEqual({ cobrosPendientes: 0, identidadPendiente: 0, membresiasVencidas: 0, noShows7d: 0, materialPendiente: 0 });
+    expect(result.current.conteo).toEqual({ cobrosPendientes: 0, identidadPendiente: 0, membresiasVencidas: 0, noShows7d: 0, materialPendiente: 0, operacion: 0 });
   });
 
   it('un count falla → error=true y el conteo NO se completa con parciales ni con 0', async () => {
@@ -61,11 +62,18 @@ describe('useCentroPendientes (PKG-02A)', () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.error).toBe(true);
     // conserva el valor inicial (nunca cargó) en vez de {2,2,0,1,1}
-    expect(result.current.conteo).toEqual({ cobrosPendientes: 0, identidadPendiente: 0, membresiasVencidas: 0, noShows7d: 0, materialPendiente: 0 });
+    expect(result.current.conteo).toEqual({ cobrosPendientes: 0, identidadPendiente: 0, membresiasVencidas: 0, noShows7d: 0, materialPendiente: 0, operacion: 0 });
   });
 
   it('falla justo el conteo de material → error=true (no se completa con 0)', async () => {
     h.materialPendiente = { data: null, error: { message: 'permission denied' } };
+    const { result } = renderHook(() => useCentroPendientes());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.error).toBe(true);
+  });
+
+  it('PKG-03A: falla la vista de pendientes operativos → error=true (un 0 falso escondería trabajo de cobro)', async () => {
+    h.porTabla.v_pendientes_operativos = { count: null, error: { message: 'permission denied' } };
     const { result } = renderHook(() => useCentroPendientes());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.error).toBe(true);

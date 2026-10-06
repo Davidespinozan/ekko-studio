@@ -35,6 +35,7 @@ function admin() {
   const chain: Record<string, unknown> = {};
   for (const m of ['select', 'in', 'order', 'limit']) chain[m] = () => chain;
   chain.eq = (col: string, val: unknown) => { h.filtros.push([col, val]); return chain; };
+  chain.is = (col: string, val: unknown) => { h.filtros.push([`is:${col}`, val]); return chain; };
   chain.then = (cb: (v: unknown) => unknown) => Promise.resolve({ data: h.ops, error: null }).then(cb);
   return { from: () => chain, rpc: (...a: unknown[]) => h.rpc(...a) } as never;
 }
@@ -64,6 +65,8 @@ describe('ejecutarOperacionesSuscripcion', () => {
     h.preparadas['op-s'] = prep('suspender_cobro');
     const r = await ejecutarOperacionesSuscripcion(admin(), { usuarioId: 'm1' });
     expect(h.filtros).toContainEqual(['usuario_id', 'm1']);
+    // PKG-03A: una operación con los reintentos agotados ya no la toma el ejecutor.
+    expect(h.filtros).toContainEqual(['is:reintentos_agotados_at', null]);
     expect(h.update).toHaveBeenCalledWith('sub_1', { pause_collection: { behavior: 'void' } }, { stripeAccount: 'acct_1', idempotencyKey: 'ekko:suspender_cobro:1' });
     expect(h.cancel).not.toHaveBeenCalled();
     expect(resultados()).toEqual([{ p_id: 'op-s', p_ok: true, p_error: null, p_resultado: { status: 'active', pause_collection: 'void' } }]);

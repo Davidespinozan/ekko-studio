@@ -12,17 +12,26 @@ const mockUpdate = vi.fn();
 const mockAuditInsert = vi.fn();
 const mockNotifInsert = vi.fn();
 const mockPush = vi.fn();
+const mockRpcPush = vi.fn().mockResolvedValue({ data: 1, error: null });
 
-vi.mock('../../netlify/functions/_lib/push', () => ({
+vi.mock('../../netlify/functions/_lib/push', async (orig) => ({
+  // PKG-03A: clasificar y asentar el resultado son los reales; solo el envío es simulado.
+  ...(await orig<typeof import('../../netlify/functions/_lib/push')>()),
   enviarPushAUsuario: (...args: unknown[]) => mockPush(...args)
 }));
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
     auth: { getUser: mockGetUser },
+    rpc: (...a: unknown[]) => mockRpcPush(...a),
     from: vi.fn((table: string) => {
       if (table === 'audit_log') return { insert: mockAuditInsert };
-      if (table === 'notificaciones') return { insert: mockNotifInsert };
+      if (table === 'notificaciones') return { insert: (fila: unknown) => {
+        // PKG-03A: el insert encadena .select() para obtener el id y asentar el resultado del push DESPUÉS de enviar.
+        const r = mockNotifInsert(fila);
+        const res = Promise.resolve(r).then((x: { error?: unknown } | undefined) => ({ data: [{ id: 'n-1', usuario_id: 'm1' }], error: x?.error ?? null }));
+        return Object.assign(res, { select: () => Object.assign(res, { maybeSingle: () => res.then((x) => ({ data: x.data[0], error: x.error })) }) });
+      } };
       return {
         select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockMaybeSingle })) })),
         update: mockUpdate
@@ -118,6 +127,9 @@ describe('reception-marcar-no-show (Bloque D)', () => {
     expect(notif.tipo).toBe('no_show');
     expect(notif.titulo).toMatch(/bloqueada/i);
     expect(mockPush).toHaveBeenCalledTimes(1);
+    // PKG-03A: ya no se marca "enviado" al insertar; el resultado se asienta después.
+    expect(notif).not.toHaveProperty('push_enviado_at');
+    expect(mockRpcPush).toHaveBeenCalledWith('registrar_resultado_push', expect.objectContaining({ p_ids: ['n-1'] }));
   });
 
   it('lee los días de bloqueo de la config del tenant (15), no 7 fijos', async () => {

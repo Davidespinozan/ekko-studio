@@ -829,3 +829,23 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   son inmutables. `anon` (y PUBLIC) sin escritura ni EXECUTE en funciones de
   aplicación; `authenticated` sin DML donde ninguna política lo autoriza y sin
   TRUNCATE. **Extiende a EKKO-124 y EKKO-039.**
+- **EKKO-137 — PKG-03A · Pendientes operativos y entrega.** La notificación es el
+  outbox del correo: intentos (máx. 3), backoff (2 y 10 min) solo para lo
+  transitorio (timeout, red, 5xx, 429), terminal con motivo sin PII; lo que salió
+  de la ventana sin intentarse queda `fallo` visible, no se pierde. El push se
+  asienta DESPUÉS de intentar (`push_resultado`; `push_enviado_at` solo si salió).
+  Los correos directos del webhook dejan evidencia en `correos_directos` (misma
+  Idempotency-Key, sin destinatario). Eventos de Stripe y operaciones de cobro se
+  cierran por RPC de admin con nota y auditoría, sin reescribir la evidencia;
+  las operaciones de cobro tienen tope de 5 intentos automáticos por ronda y
+  reintentar abre una ronda sobre la MISMA operación. `v_pendientes_operativos`
+  solo deriva de las autoridades (admin de su estudio). Leído ≠ resuelto.
+  **Extiende a EKKO-111, EKKO-131 y EKKO-105.**
+- **EKKO-138 — `D-03A-1 = A`: una pausa del staff es independiente de la sanción.**
+  Levantar una sanción NO reanuda el cobro si sigue vigente una pausa comercial
+  puesta por el staff; el cobro solo vuelve con la transición explícita de
+  reactivar. **Decidida, NO implementada:** hoy `membresias.status = 'pausada'`
+  también llega como eco de la suspensión por sanción (Stripe `pause_collection`
+  → webhook → sync), así que el modelo no distingue la causa. Requiere una
+  extensión mínima del modelo (origen durable de la pausa del staff) autorizada
+  aparte. **Extiende a EKKO-066 y EKKO-129.**

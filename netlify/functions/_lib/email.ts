@@ -105,6 +105,20 @@ export async function enviarEmail(payload: EmailPayload): Promise<ResultadoEmail
   return r;
 }
 
+/**
+ * PKG-03A · ¿Vale la pena otro intento? Solo lo transitorio: timeout, red, 5xx
+ * y 429 (límite de tasa de Resend: pasa solo). Un 4xx distinto (payload o
+ * remitente inválido) o un destinatario inválido no se arreglan reintentando.
+ */
+export function falloReintentable(r: { motivo: MotivoFalloEmail; status?: number }): boolean {
+  return r.motivo === 'timeout' || r.motivo === 'red' || r.motivo === 'http_5xx' || (r.motivo === 'http_4xx' && r.status === 429);
+}
+
+/** Motivo persistible (sin PII): clase + status HTTP si lo hay. */
+export function motivoPersistible(r: { motivo: MotivoFalloEmail; status?: number }): string {
+  return r.status ? `${r.motivo}:${r.status}` : r.motivo;
+}
+
 /** Log sin PII: nunca destinatario, asunto, cuerpo ni key. */
 function registrar(datos: { ref: string; plantilla: PlantillaEmail; estado: string; motivo?: string; status?: number; id?: string }) {
   const linea = JSON.stringify(datos);

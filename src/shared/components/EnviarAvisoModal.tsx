@@ -32,8 +32,11 @@ export function EnviarAvisoModal({ miembroId, miembroNombre, onClose, onEnviado 
     }
     setSaving(true);
     try {
-      await backendPost('reception-notificar-miembro', { miembro_id: miembroId, mensaje: mensaje.trim() });
-      toast.success('Aviso enviado.');
+      const r = await backendPost<{ push?: string }>('reception-notificar-miembro', { miembro_id: miembroId, mensaje: mensaje.trim() });
+      // PKG-03A (F-9): el aviso queda en la app; el push solo se afirma si salió.
+      toast.success(r?.push === 'enviado'
+        ? 'Aviso registrado y enviado a su teléfono.'
+        : 'Aviso registrado: lo verá en la app.');
       onEnviado?.();
       onClose();
     } catch (err) {

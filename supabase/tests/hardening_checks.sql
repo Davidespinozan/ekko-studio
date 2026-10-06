@@ -197,9 +197,26 @@ SELECT 'P5', 'toda vista de public es security_invoker (excepciones intencionale
 INSERT INTO _hardening_resultado (area, caso, resultado)
 SELECT 'P5', 'anon sin SELECT en vistas de valor, libro y reconciliación',
   CASE WHEN NOT EXISTS (SELECT 1 FROM pg_class c WHERE c.relnamespace='public'::regnamespace AND c.relkind='v'
-         AND c.relname IN ('valor_por_lote','movimientos_sin_vinculo','v_libro_economico','v_reconciliacion_membresia')
+         AND c.relname IN ('valor_por_lote','movimientos_sin_vinculo','v_libro_economico','v_reconciliacion_membresia','v_pendientes_operativos')
          AND has_table_privilege('anon', c.oid, 'SELECT'))
        THEN '✅ PASS' ELSE '❌ FAIL — anon lee una vista financiera' END;
+
+-- PKG-03A (20261009100000): PUBLIC no ejecuta funciones de aplicación (por ahí
+-- las heredaba anon antes de 02C), y las RPC de servicio de entrega no son de
+-- authenticated.
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'PUBLIC sin EXECUTE en funciones de aplicación',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace
+         AND EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE')
+         AND NOT EXISTS (SELECT 1 FROM pg_depend d JOIN pg_extension e ON e.oid=d.refobjid WHERE d.objid=p.oid AND d.deptype='e'))
+       THEN '✅ PASS' ELSE '❌ FAIL — PUBLIC ejecuta funciones' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'RPC de entrega (03A) solo para service_role',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace
+         AND p.proname IN ('reclamar_correos_pendientes','notificacion_email_resultado','reclamar_push_pendientes',
+                           'registrar_resultado_push','registrar_correo_directo')
+         AND has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+       THEN '✅ PASS' ELSE '❌ FAIL — authenticated ejecuta una RPC de entrega' END;
 
 -- ── Resultado ────────────────────────────────────────────────────────────────
 SELECT area, caso, resultado FROM _hardening_resultado ORDER BY id;

@@ -8,7 +8,8 @@ const VACIO: ConteoPendientes = {
   identidadPendiente: 0,
   membresiasVencidas: 0,
   noShows7d: 0,
-  materialPendiente: 0
+  materialPendiente: 0,
+  operacion: 0
 };
 
 /**
@@ -31,7 +32,7 @@ export function useCentroPendientes() {
     const now = new Date();
     const hace7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const [cobros, identidad, vencidas, noShows, material] = await Promise.all([
+    const [cobros, identidad, vencidas, noShows, material, operacion] = await Promise.all([
       supabase
         .from('usuarios')
         .select('id', { count: 'exact', head: true })
@@ -63,10 +64,13 @@ export function useCentroPendientes() {
       // Join + anti-join (sin fila vigente en material_sesion): no se expresa
       // en un solo `.from().select()` de PostgREST, por eso es una RPC. Cast:
       // RPC nueva, aún no está en los tipos generados de Supabase.
-      (supabase.rpc as any)('staff_listar_material_pendiente') as Promise<{ data: unknown[] | null; error: { message: string } | null }>
+      (supabase.rpc as any)('staff_listar_material_pendiente') as Promise<{ data: unknown[] | null; error: { message: string } | null }>,
+      // PKG-03A: trabajo operativo derivado (vista admin-only, security_invoker).
+      // Cast: vista nueva, aún no está en los tipos generados de Supabase.
+      (supabase.from as any)('v_pendientes_operativos').select('fuente', { count: 'exact', head: true }) as Promise<{ count: number | null; error: { message: string } | null }>
     ]);
 
-    const fallo = [cobros, identidad, vencidas, noShows, material].find((r) => r.error);
+    const fallo = [cobros, identidad, vencidas, noShows, material, operacion].find((r) => r.error);
     if (fallo) {
       console.error('[useCentroPendientes]', fallo.error);
       setError(true);
@@ -79,7 +83,8 @@ export function useCentroPendientes() {
       identidadPendiente: identidad.count ?? 0,
       membresiasVencidas: vencidas.count ?? 0,
       noShows7d: noShows.count ?? 0,
-      materialPendiente: (material.data as unknown[] | null)?.length ?? 0
+      materialPendiente: (material.data as unknown[] | null)?.length ?? 0,
+      operacion: operacion.count ?? 0
     });
     setIsLoading(false);
   }, [tenant.id]);

@@ -13,6 +13,8 @@ export interface ConteoPendientes {
   membresiasVencidas: number;
   noShows7d: number;
   materialPendiente: number;
+  /** PKG-03A: filas de `v_pendientes_operativos` (revisiones, Stripe, cobro, entrega, divergencias). */
+  operacion: number;
 }
 
 export interface ItemPendiente {
@@ -32,6 +34,18 @@ export interface ItemPendiente {
  */
 export function construirPendientes(c: ConteoPendientes): ItemPendiente[] {
   const items: ItemPendiente[] = [];
+
+  if (c.operacion > 0) {
+    items.push({
+      key: 'operacion',
+      icon: 'alert-triangle',
+      title: c.operacion === 1 ? 'Pendiente operativo' : 'Pendientes operativos',
+      detail: 'Revisiones de cobro, eventos de Stripe, correos fallidos o divergencias que necesitan una decisión.',
+      count: c.operacion,
+      tono: 'dang',
+      to: '/admin/operacion'
+    });
+  }
 
   if (c.membresiasVencidas > 0) {
     items.push({
@@ -95,5 +109,5 @@ export function construirPendientes(c: ConteoPendientes): ItemPendiente[] {
 }
 
 export function totalPendientes(c: ConteoPendientes): number {
-  return c.cobrosPendientes + c.identidadPendiente + c.membresiasVencidas + c.noShows7d + c.materialPendiente;
+  return c.cobrosPendientes + c.identidadPendiente + c.membresiasVencidas + c.noShows7d + c.materialPendiente + c.operacion;
 }
