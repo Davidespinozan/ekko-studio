@@ -140,7 +140,14 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- Nada.
+- **PKG-02H "Operaciones de cobro del staff durables"** (EKKO-141) — COMMITTED en
+  local (un commit, ver `git log`), gate verde, SIN PUSH / SIN DEPLOY / MIGRACIÓN NO
+  APLICADA. Migración `20261012100000_02h_operaciones_staff_durables.sql`. Cambian de
+  cuerpo a propósito `staff_pausar_membresia`, `staff_cancelar_membresia`,
+  `_reconciliar_cobro_sancion`, `operacion_suscripcion_preparar`,
+  `operacion_suscripcion_resultado`; sin funciones nuevas. `stripe-pausar-membresia`
+  y `staff-cancelar-membresia` (fin de periodo) pasan a RPC → ejecutor. Pruebas:
+  `src/__tests__/db/02h-operaciones-staff.db.test.ts`.
 
 ## PKG-03B — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-03B "Reconciliador Stripe (detect-only)"** (EKKO-140, D-03B-1 = A) —

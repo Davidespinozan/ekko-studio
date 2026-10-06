@@ -31,6 +31,7 @@ const LABEL_TIPO: Record<string, string> = {
   suspender_cobro: 'Suspender cobro (sanción)',
   reanudar_cobro: 'Reanudar cobro',
   cancelar_suscripcion: 'Cancelar suscripción',
+  cancelar_fin_periodo: 'Programar cancelación al fin del periodo',
   correo_aviso_fallido: 'Correo de aviso',
   correo_directo_fallido: 'Correo de cobro',
   activo_sin_derecho: 'Acceso activo sin membresía vigente',

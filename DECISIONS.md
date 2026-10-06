@@ -870,3 +870,20 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   ventana cubre no se reporta. Alcance: cuentas de `tenants.stripe_account_id`,
   suscripciones con `metadata.app = 'ekko'` o referidas por una membresía.
   **Extiende a EKKO-131, EKKO-137 y EKKO-138.**
+- **EKKO-141 — PKG-02H · Las operaciones de cobro del staff son durables.** Pausar,
+  reactivar y dar de baja al fin del periodo escriben su operación en
+  `stripe_operaciones_suscripcion` en la MISMA transacción que la transición local
+  (causas `pausa_staff`, `reactivacion_staff`, `baja_fin_periodo`; tipo nuevo
+  `cancelar_fin_periodo`), con identidad por operación lógica (una pausa = una
+  operación; una reactivación por pausa levantada; una baja programada por
+  membresía). La función de Netlify ya no toca Stripe primero: RPC → ejecutor, el
+  orden de R2-B. Si Stripe falla o es ambiguo, EKKO no se deshace: la operación
+  queda `fallida`, visible en Operación, y se reintenta con la misma identidad; un
+  reintento del mismo acto no produce un segundo efecto. El ejecutor revalida por
+  causa: una pausa ya reactivada se descarta (`reactivada`); una reactivación con
+  sanción vigente o pausa comercial vigente se descarta. La sanción solo descarta
+  SUS suspensiones y no duplica una reanudación en espera. **Matiz a EKKO-138:** el
+  marcador `reanudar_cobro` descartado `pausa_comercial_vigente` se deja solo cuando
+  lo último aplicado es la suspensión POR SANCIÓN; si lo último aplicado es la pausa
+  del staff, su propia operación es la evidencia. **Extiende a EKKO-131, EKKO-138,
+  EKKO-139 y EKKO-057.**

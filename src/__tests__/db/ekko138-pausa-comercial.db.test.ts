@@ -106,9 +106,10 @@ describe('sanción y pausa comercial', () => {
     const { m } = await conSub();
     await pausar(m, true);
     await sancionar(m);
-    expect(await ops(m)).toEqual([]);
+    // PKG-02H: la única operación es la pausa del staff; la sanción no añade suspensión.
+    expect((await ops(m)).map((o) => [o.tipo, o.causa])).toEqual([['suspender_cobro', 'pausa_staff']]);
     await levantar(m);
-    expect(await ops(m)).toEqual([]);
+    expect((await ops(m)).some((o) => o.tipo === 'reanudar_cobro')).toBe(false);
     expect(await mem(m)).toMatchObject({ status: 'pausada', intencion: true });
   });
 
@@ -117,18 +118,20 @@ describe('sanción y pausa comercial', () => {
     await sancionar(m);
     await aplicar(m);
     await eco(sub, 'pausada');
-    // La membresía ya está en pausa por el proveedor: el staff declara SOLO la intención.
+    // La membresía ya está en pausa por el proveedor: el staff declara la intención
+    // y (PKG-02H) deja su propia operación de pausa, que el ejecutor aplica.
     expect(await pausar(m, true)).toMatchObject({ success: true, status: 'pausada' });
     expect(await mem(m)).toMatchObject({ status: 'pausada', intencion: true });
+    await aplicar(m);
     await levantar(m);
+    // Nada se reanuda. La evidencia de por qué es la pausa del staff aplicada (lo
+    // último aplicado); el marcador `pausa_comercial_vigente` queda para cuando lo
+    // último aplicado es la suspensión por sanción (ver 5c).
     const o = await ops(m);
-    expect(o.map((x) => [x.tipo, x.estado, x.motivo_descarte])).toEqual([
-      ['suspender_cobro', 'aplicada', null],
-      ['reanudar_cobro', 'descartada', 'pausa_comercial_vigente']
+    expect(o.map((x) => [x.tipo, x.causa, x.estado])).toEqual([
+      ['suspender_cobro', 'sancion', 'aplicada'],
+      ['suspender_cobro', 'pausa_staff', 'aplicada']
     ]);
-    // 16 · la llave de la reanudación es la de esa suspensión (una por ciclo).
-    const susp = await b.fila<{ id: string }>(`SELECT id FROM stripe_operaciones_suscripcion WHERE usuario_id = $1 AND tipo = 'suspender_cobro'`, [m.id]);
-    expect(o[1].operation_key).toBe(`reanudar:${susp.id}`);
     // 15 · levantar otra vez / re-evaluar no duplica nada.
     await levantar(m);
     await b.fila('SELECT _reconciliar_cobro_sancion($1)', [m.id]);
@@ -137,21 +140,44 @@ describe('sanción y pausa comercial', () => {
     // El cobro vuelve SOLO con la reactivación explícita del staff…
     await pausar(m, false);
     expect(await mem(m)).toMatchObject({ status: 'activa', intencion: false });
+    expect((await ops(m)).filter((x) => x.tipo === 'reanudar_cobro').map((x) => [x.causa, x.estado])).toEqual([['reactivacion_staff', 'pendiente']]);
+    await aplicar(m);
     // …y si hay una NUEVA sanción, se vuelve a suspender (el ciclo anterior quedó cerrado).
     await sancionar(m);
-    expect((await ops(m)).filter((x) => x.tipo === 'suspender_cobro').map((x) => x.estado)).toEqual(['aplicada', 'pendiente']);
+    expect((await ops(m)).filter((x) => x.tipo === 'suspender_cobro').map((x) => [x.causa, x.estado])).toEqual([
+      ['sancion', 'aplicada'], ['pausa_staff', 'aplicada'], ['sancion', 'pendiente']
+    ]);
+  });
+
+  it('5c · el marcador pausa_comercial_vigente: sanción aplicada, el staff pausa pero su operación aún no se aplicó, se levanta la sanción', async () => {
+    const { m, sub } = await conSub();
+    await sancionar(m);
+    await aplicar(m);
+    await eco(sub, 'pausada');
+    await pausar(m, true); // operación del staff pendiente (el ejecutor no corrió)
+    await levantar(m);
+    const o = await ops(m);
+    expect(o.map((x) => [x.tipo, x.causa, x.estado, x.motivo_descarte])).toEqual([
+      ['suspender_cobro', 'sancion', 'aplicada', null],
+      ['suspender_cobro', 'pausa_staff', 'pendiente', null],
+      ['reanudar_cobro', 'levantar_sancion', 'descartada', 'pausa_comercial_vigente']
+    ]);
+    // 16 · la llave del marcador es la de esa suspensión por sanción (una por ciclo).
+    const susp = await b.fila<{ id: string }>(`SELECT id FROM stripe_operaciones_suscripcion WHERE usuario_id = $1 AND causa = 'sancion'`, [m.id]);
+    expect(o[2].operation_key).toBe(`reanudar:${susp.id}`);
   });
 
   it('5b · el staff pausa ANTES de que llegue el eco de la sanción: misma regla (no reanuda al levantar)', async () => {
     const { m } = await conSub();
     await sancionar(m);
-    await pausar(m, true); // aún 'activa' → pausa normal con intención
+    await pausar(m, true); // aún 'activa' → pausa normal con intención (+ su operación, PKG-02H)
     await aplicar(m);
     await levantar(m);
-    expect((await ops(m)).map((x) => [x.tipo, x.estado, x.motivo_descarte])).toEqual([
-      ['suspender_cobro', 'aplicada', null],
-      ['reanudar_cobro', 'descartada', 'pausa_comercial_vigente']
+    expect((await ops(m)).map((x) => [x.tipo, x.causa, x.estado])).toEqual([
+      ['suspender_cobro', 'sancion', 'aplicada'],
+      ['suspender_cobro', 'pausa_staff', 'aplicada']
     ]);
+    expect((await ops(m)).some((x) => x.tipo === 'reanudar_cobro')).toBe(false);
   });
 
   it('6 · sanción → reactivar: la membresía vuelve pero el cobro sigue suspendido por la sanción; se reanuda al levantarla', async () => {
@@ -171,12 +197,15 @@ describe('sanción y pausa comercial', () => {
     const { m } = await conSub();
     await pausar(m, true);
     await sancionar(m);
-    expect(await ops(m)).toEqual([]);
+    expect((await ops(m)).map((x) => [x.tipo, x.causa, x.estado])).toEqual([['suspender_cobro', 'pausa_staff', 'pendiente']]);
     await pausar(m, false);
-    expect((await ops(m)).map((x) => [x.tipo, x.causa, x.estado])).toEqual([['suspender_cobro', 'sancion', 'pendiente']]);
+    // PKG-02H: la pausa del staff que no llegó a aplicarse se descarta; la sanción crea la suya.
+    expect((await ops(m)).map((x) => [x.tipo, x.causa, x.estado])).toEqual([
+      ['suspender_cobro', 'pausa_staff', 'descartada'], ['suspender_cobro', 'sancion', 'pendiente']
+    ]);
     await aplicar(m);
     await levantar(m);
-    expect((await ops(m)).map((x) => [x.tipo, x.estado])).toEqual([['suspender_cobro', 'aplicada'], ['reanudar_cobro', 'pendiente']]);
+    expect((await ops(m)).filter((x) => x.estado !== 'descartada').map((x) => [x.tipo, x.estado])).toEqual([['suspender_cobro', 'aplicada'], ['reanudar_cobro', 'pendiente']]);
   });
 
   it('17 · una reanudación en espera se descarta si el staff pausa antes de ejecutarla; un fallo del proveedor no toca la intención', async () => {
@@ -185,10 +214,11 @@ describe('sanción y pausa comercial', () => {
     await aplicar(m);
     await eco(sub, 'pausada');
     await levantar(m); // reanudar pendiente
-    await pausar(m, true);
+    await pausar(m, true); // PKG-02H: la RPC ya descarta la reanudación en espera (pausa_comercial)
     await aplicar(m);
     const r = (await ops(m)).find((x) => x.tipo === 'reanudar_cobro')!;
-    expect([r.estado, r.motivo_descarte]).toEqual(['descartada', 'pausa_comercial_vigente']);
+    expect(r.estado).toBe('descartada');
+    expect(r.motivo_descarte).toMatch(/^pausa_comercial/);
     expect(await mem(m)).toMatchObject({ intencion: true });
 
     const otro = await conSub();

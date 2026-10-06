@@ -58,6 +58,7 @@ rediscute sin evidencia nueva.
 - EKKO-139 — reactivar durante una sanción no reanuda el cobro; pausar/reactivar idempotentes.
 - EKKO-131 — operaciones de cobro con evidencia durable y reintento.
 - EKKO-140 (D-03B-1 = A) — reconciliador de Stripe detect-only: discrepancias con evidencia, cierre por convergencia, sin reparar.
+- EKKO-141 (PKG-02H) — pausa, reactivación y baja al fin del periodo del staff como operaciones durables (RPC → ejecutor), idempotentes por operación lógica.
 - EKKO-105 (D-01A-1) — estado durable de los eventos del webhook.
 - EKKO-106 — crear un Checkout no da derecho; lo da el evento financiero.
 - EKKO-107 — idempotencia de lo que EKKO le pide a Stripe.

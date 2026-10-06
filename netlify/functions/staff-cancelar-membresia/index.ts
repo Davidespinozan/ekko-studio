@@ -112,29 +112,15 @@ export const handler: Handler = async (event) => {
       });
     const humano = (m: string) => (m.includes(': ') ? m.split(': ').slice(1).join(': ') : m);
 
-    if (!inmediata && stripe && subId && accountId) {
-      // 1) Stripe primero (reversible) → 2) RPC; si rechaza, se revierte.
-      await stripe.subscriptions.update(subId, { cancel_at_period_end: true }, { stripeAccount: accountId });
-      const { data, error } = await llamarRpc();
-      if (error) {
-        try {
-          await stripe.subscriptions.update(subId, { cancel_at_period_end: false }, { stripeAccount: accountId });
-        } catch (e) {
-          console.error('[staff-cancelar-membresia] rollback Stripe falló', e instanceof Error ? e.message : e);
-        }
-        return badRequest(humano(error.message));
-      }
-      return ok({ success: true, result: data, inmediata: false });
-    }
-
-    // Inmediata: 1) RPC → 2) cancelar en Stripe (irreversible, por eso va después).
+    // 1) RPC → 2) Stripe. Inmediata (R2-B) y al fin del periodo (PKG-02H): la RPC
+    // deja la operación en stripe_operaciones_suscripcion en la MISMA transacción
+    // que la baja (cancelar_suscripcion / cancelar_fin_periodo). Aquí se ejecuta;
+    // si Stripe falla queda `fallida` con evidencia durable, aviso al admin y
+    // reintento. Antes, la baja al fin del periodo iba Stripe primero con un
+    // rollback best-effort que, si fallaba, nadie registraba.
     const { data, error } = await llamarRpc();
     if (error) return badRequest(humano(error.message));
 
-    // R2-B (PKG-01P): la RPC dejó la operación "cancelar suscripción" en
-    // stripe_operaciones_suscripcion (misma transacción que la baja). Aquí se
-    // ejecuta; si Stripe falla queda `fallida` con evidencia durable, aviso al
-    // admin y reintento (antes: solo un reporte en Sentry).
     let stripeCancelado: boolean | null = null;
     if (stripe && subId && accountId) {
       try {
@@ -145,12 +131,12 @@ export const handler: Handler = async (event) => {
         await reportarErrorServidor('staff-cancelar-membresia', e, {
           usuario_id: body.usuario_id,
           subscription_id: subId,
-          nota: 'La membresía quedó cancelada en la base; la cancelación en Stripe quedó pendiente en stripe_operaciones_suscripcion.'
+          nota: 'La baja quedó en la base; la operación en Stripe quedó pendiente en stripe_operaciones_suscripcion.'
         });
       }
     }
 
-    return ok({ success: true, result: data, inmediata: true, stripe_cancelado: stripeCancelado });
+    return ok({ success: true, result: data, inmediata, stripe_cancelado: stripeCancelado });
   } catch (err) {
     console.error('[staff-cancelar-membresia]', err instanceof Error ? err.message : err);
     return serverError('No pudimos dar de baja la membresía');

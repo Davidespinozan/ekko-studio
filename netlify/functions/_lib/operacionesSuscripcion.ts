@@ -12,6 +12,9 @@ import { reportarErrorServidor } from './sentry';
  *   suspender_cobro      sanción            → pause_collection { behavior: 'void' }
  *   reanudar_cobro       sanción levantada  → pause_collection: null
  *   cancelar_suscripcion revocación / baja  → subscriptions.cancel (inmediata)
+ *   PKG-02H · también las operaciones del STAFF (pausa, reactivación, baja al fin
+ *   del periodo): suspender_cobro/reanudar_cobro con causa pausa_staff /
+ *   reactivacion_staff, y cancelar_fin_periodo → cancel_at_period_end: true.
  *
  * Aquí solo se EJECUTA y se asienta el resultado:
  *   1) `operacion_suscripcion_preparar` revalida contra el estado actual (no se
@@ -36,7 +39,7 @@ interface Preparada {
   ejecutar: boolean;
   estado?: string;
   motivo?: string;
-  tipo?: 'suspender_cobro' | 'reanudar_cobro' | 'cancelar_suscripcion';
+  tipo?: 'suspender_cobro' | 'reanudar_cobro' | 'cancelar_suscripcion' | 'cancelar_fin_periodo';
   tenant_id?: string;
   stripe_subscription_id?: string;
   idempotency_key?: string;
@@ -110,6 +113,9 @@ export async function ejecutarOperacionesSuscripcion(
       if (prep.tipo === 'cancelar_suscripcion') {
         const sub = await stripe.subscriptions.cancel(subId, opciones);
         resultado = { status: sub?.status ?? 'canceled' };
+      } else if (prep.tipo === 'cancelar_fin_periodo') {
+        const sub = await stripe.subscriptions.update(subId, { cancel_at_period_end: true }, opciones);
+        resultado = { status: sub?.status ?? null, cancel_at_period_end: sub?.cancel_at_period_end ?? true };
       } else {
         const sub = await stripe.subscriptions.update(
           subId,
@@ -120,7 +126,7 @@ export async function ejecutarOperacionesSuscripcion(
       }
       aplicada = true;
     } catch (e) {
-      if (prep.tipo === 'cancelar_suscripcion' && yaCancelada(e)) {
+      if ((prep.tipo === 'cancelar_suscripcion' || prep.tipo === 'cancelar_fin_periodo') && yaCancelada(e)) {
         aplicada = true;
         resultado = { status: 'canceled', nota: 'ya_estaba_cancelada' };
       } else {

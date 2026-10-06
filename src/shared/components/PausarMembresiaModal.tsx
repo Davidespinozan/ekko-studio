@@ -14,7 +14,8 @@ interface Props {
 }
 
 export function pausarMembresia(usuario_id: string, pausar: boolean, motivo: string) {
-  return backendPost<{ success: boolean; stripe_pausado: boolean }>('stripe-pausar-membresia', { usuario_id, pausar, motivo });
+  return backendPost<{ success: boolean; stripe_pausado: boolean; cobro_pendiente?: boolean; cobro_suspendido_por_sancion?: boolean }>(
+    'stripe-pausar-membresia', { usuario_id, pausar, motivo });
 }
 
 /**
@@ -36,11 +37,21 @@ export function PausarMembresiaModal({ usuarioId, nombre, pausar, onClose, onDon
     setSaving(true);
     try {
       const r = await pausarMembresia(usuarioId, pausar, motivo.trim());
-      toast.success(
-        pausar
-          ? `Membresía en pausa${r.stripe_pausado ? ' · cobro de Stripe detenido' : ''}.`
-          : `Membresía reactivada${r.stripe_pausado ? ' · cobro de Stripe reanudado' : ''}.`
-      );
+      // PKG-02H: el cambio en EKKO ya quedó; lo de Stripe solo se afirma si se aplicó.
+      if (r.cobro_pendiente) {
+        toast.warning(
+          pausar
+            ? 'Membresía en pausa en EKKO. Stripe no confirmó la pausa del cobro: queda pendiente y se reintentará (ver Operación).'
+            : 'Membresía reactivada en EKKO. Stripe no confirmó la reanudación del cobro: queda pendiente y se reintentará (ver Operación).',
+          12_000
+        );
+      } else {
+        toast.success(
+          pausar
+            ? `Membresía en pausa${r.stripe_pausado ? ' · cobro de Stripe detenido' : ''}.`
+            : `Membresía reactivada${r.stripe_pausado ? ' · cobro de Stripe reanudado' : r.cobro_suspendido_por_sancion ? ' · el cobro sigue suspendido por la sanción' : ''}.`
+        );
+      }
       await onDone();
       onClose();
     } catch (err) {

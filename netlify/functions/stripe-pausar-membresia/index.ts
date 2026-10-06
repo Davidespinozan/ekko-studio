@@ -7,29 +7,30 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { getStripe } from '../_lib/stripe';
-import { resolverCuentaConectada } from '../_lib/connectBilling';
+import { ejecutarOperacionesSuscripcion } from '../_lib/operacionesSuscripcion';
 import { esStaffActivo } from '../_lib/staff';
+import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
  * POST /stripe-pausar-membresia
  * Auth: Bearer JWT de admin o recepcionista.
  * Body: { usuario_id, pausar: boolean, motivo }
  *
- * Pausa (o reanuda) la membresía de un miembro: viaje, lesión, etc. Antes un
- * "congelado" a mano seguía pagando o había que cancelarlo.
- *  1) Stripe primero: pause_collection (behavior 'void': no se factura mientras
- *     dure) o null para reanudar — sobre la cuenta conectada del estudio.
- *  2) RPC staff_pausar_membresia con el token del staff (gate de rol + tenant,
- *     estados, aviso al miembro, audit_log). Si la RPC rechaza, se revierte Stripe.
- * Paquetes / membresías de mostrador (sin suscripción) solo pasan por la RPC.
- * (SALA pausar-membresia.)
+ * Pausa (o reanuda) la membresía de un miembro: viaje, lesión, etc.
  *
- * EKKO-138: reactivar durante una SANCIÓN no reanuda el cobro en Stripe: la RPC
- * quita la intención de pausa comercial y re-asegura la suspensión de la sanción;
- * el cobro vuelve al levantarla. Si no se puede leer la sanción, no se toca Stripe.
+ * PKG-02H · orden de R2-B: 1) RPC `staff_pausar_membresia` con el token del staff
+ * (gate de rol + tenant, estados, intención de pausa comercial EKKO-138, aviso,
+ * audit_log) que deja la OPERACIÓN de cobro en `stripe_operaciones_suscripcion`
+ * en la MISMA transacción; 2) el ejecutor la aplica en Stripe con la llave de esa
+ * operación. Si Stripe falla, EKKO no se deshace: la operación queda `fallida`,
+ * visible en Operación, y se reintenta (cron diario / "sincronizar cobro").
+ * Antes: Stripe primero y la RPC después, sin intención durable ni llave; un fallo
+ * a medias dejaba a Stripe y a EKKO en desacuerdo sin que nadie lo supiera.
+ * Paquetes / membresías de mostrador (sin suscripción) solo pasan por la RPC.
+ *
+ * EKKO-139: reactivar durante una SANCIÓN no crea reanudación (la RPC lo decide y
+ * re-asegura la suspensión de la sanción); el cobro vuelve al levantarla.
  */
-
 interface Body {
   usuario_id?: string;
   pausar?: boolean;
@@ -72,68 +73,47 @@ export const handler: Handler = async (event) => {
 
     const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
 
-    // Membresía a tocar (viva si pausamos, pausada si reanudamos) + aislamiento de tenant ANTES de Stripe.
-    const { data: mem } = await admin
-      .from('membresias')
-      .select('id, tenant_id, stripe_subscription_id, status')
-      .eq('usuario_id', body.usuario_id)
-      .in('status', body.pausar ? ['trialing', 'activa', 'past_due'] : ['pausada'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (mem && mem.tenant_id !== staff.tenant_id) {
-      return forbidden('No puedes modificar la membresía de otro estudio');
-    }
-
-    // EKKO-138: ¿sigue sancionado? Entonces reactivar NO reanuda el cobro.
-    let sancionado = false;
-    if (!body.pausar) {
-      const r = await admin.from('usuarios').select('sancionado_at').eq('id', body.usuario_id).maybeSingle();
-      if (r?.error) return serverError('No pudimos confirmar el estado del miembro');
-      sancionado = Boolean((r?.data as { sancionado_at?: string | null } | null)?.sancionado_at);
-    }
-
-    let subId: string | null = sancionado ? null : mem?.stripe_subscription_id ?? null;
-    let accountId: string | null = null;
-    if (subId && process.env.STRIPE_SECRET_KEY) {
-      accountId = (await resolverCuentaConectada(admin, staff.tenant_id)).accountId;
-      if (!accountId) subId = null;
-    } else {
-      subId = null; // paquete / mostrador / Stripe no configurado → solo RPC
-    }
-
-    const stripe = subId && accountId ? getStripe() : null;
-    const payload = body.pausar ? { behavior: 'void' as const } : null;
-
-    // 1) Stripe primero (para poder revertir si la RPC rechaza).
-    if (stripe && subId && accountId) {
-      await stripe.subscriptions.update(subId, { pause_collection: payload }, { stripeAccount: accountId });
-    }
-
-    // 2) RPC con el token del staff (gate de rol + tenant + audit).
+    // 1) RPC con el token del staff: decide, deja la intención y la operación durable.
     const { data, error } = await asUser.rpc('staff_pausar_membresia', {
       p_usuario_id: body.usuario_id,
       p_pausar: body.pausar,
       p_motivo: motivo
     });
     if (error) {
-      if (stripe && subId && accountId) {
-        const revert = body.pausar ? null : { behavior: 'void' as const };
-        try {
-          await stripe.subscriptions.update(subId, { pause_collection: revert }, { stripeAccount: accountId });
-        } catch (e) {
-          console.error('[stripe-pausar-membresia] rollback Stripe falló', e instanceof Error ? e.message : e);
-        }
-      }
       const humano = error.message.includes(': ') ? error.message.split(': ').slice(1).join(': ') : error.message;
       return badRequest(humano);
+    }
+    const resultado = (data ?? {}) as { operacion_cobro?: boolean; cobro_suspendido_por_sancion?: boolean; stripe_subscription_id?: string | null };
+
+    // 2) Ejecutor: aplica en Stripe lo que la base dejó escrito (si hay Stripe).
+    let stripePausado: boolean | null = null; // null = no había nada que aplicar en Stripe
+    let cobroPendiente = false;
+    if (resultado.operacion_cobro && process.env.STRIPE_SECRET_KEY) {
+      try {
+        const cobro = await ejecutarOperacionesSuscripcion(admin, { usuarioId: body.usuario_id });
+        stripePausado = cobro.aplicadas > 0 && cobro.fallidas === 0;
+        cobroPendiente = cobro.fallidas > 0;
+      } catch (e) {
+        stripePausado = false;
+        cobroPendiente = true;
+        await reportarErrorServidor('stripe-pausar-membresia', e, {
+          usuario_id: body.usuario_id,
+          nota: 'La membresía cambió en la base; la operación de cobro quedó pendiente en stripe_operaciones_suscripcion.'
+        });
+      }
+    } else if (resultado.operacion_cobro) {
+      cobroPendiente = true; // sin Stripe configurado: queda pendiente para el ejecutor
     }
 
     // El push NO se manda aquí: la RPC deja el aviso en `notificaciones` sin
     // `push_enviado_at` y cron-push lo reparte en el siguiente minuto (EKKO-033).
-    // Mandarlo también inline hacía que al miembro le llegara dos veces.
-
-    return ok({ success: true, result: data, stripe_pausado: Boolean(subId), cobro_suspendido_por_sancion: sancionado });
+    return ok({
+      success: true,
+      result: data,
+      stripe_pausado: stripePausado === true,
+      cobro_pendiente: cobroPendiente,
+      cobro_suspendido_por_sancion: Boolean(resultado.cobro_suspendido_por_sancion)
+    });
   } catch (err) {
     console.error('[stripe-pausar-membresia]', err instanceof Error ? err.message : err);
     return serverError('No pudimos actualizar la membresía');

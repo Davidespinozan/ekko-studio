@@ -17,9 +17,10 @@ const mockReportar = vi.fn().mockResolvedValue(undefined);
 const mockOps = vi.fn((): Array<{ id: string }> => []);
 /** RPC por nombre: la baja, y los dos pasos del ejecutor de operaciones de cobro. */
 const PREPARADA = { ejecutar: true, tipo: 'cancelar_suscripcion', tenant_id: 't1', stripe_subscription_id: 'sub_1', idempotency_key: 'ekko:cancelar:mem-1:1' };
-function rpcPorNombre(baja: { data: unknown; error: unknown } = { data: { success: true }, error: null }) {
+const PREPARADA_FIN = { ...PREPARADA, tipo: 'cancelar_fin_periodo', idempotency_key: 'ekko:cancelar_fin:mem-1:1' };
+function rpcPorNombre(baja: { data: unknown; error: unknown } = { data: { success: true }, error: null }, preparada: typeof PREPARADA = PREPARADA) {
   mockRpc.mockImplementation((fn: string) => {
-    if (fn === 'operacion_suscripcion_preparar') return Promise.resolve({ data: PREPARADA, error: null });
+    if (fn === 'operacion_suscripcion_preparar') return Promise.resolve({ data: preparada, error: null });
     if (fn === 'operacion_suscripcion_resultado') return Promise.resolve({ data: { success: true }, error: null });
     return Promise.resolve(baja);
   });
@@ -79,20 +80,23 @@ beforeEach(() => {
 });
 
 describe('staff-cancelar-membresia', () => {
-  it('con suscripción: no se renueva (cancel_at_period_end) y conserva el acceso; Stripe ANTES que la RPC', async () => {
+  it('PKG-02H · con suscripción: no se renueva (cancel_at_period_end); la RPC va ANTES y deja la operación; el ejecutor la aplica con su llave', async () => {
     mockMaybeSingle.mockResolvedValueOnce({ data: STAFF, error: null }).mockResolvedValueOnce({ data: conSub, error: null });
+    mockOps.mockReturnValue([{ id: 'op-fin' }]);
+    rpcPorNombre(undefined, PREPARADA_FIN);
 
     const r = await invocar(BODY);
 
     expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ inmediata: false });
-    expect(mockSubUpdate).toHaveBeenCalledWith('sub_1', { cancel_at_period_end: true }, { stripeAccount: 'acct_1' });
+    expect(r.body).toMatchObject({ inmediata: false, stripe_cancelado: true });
     expect(mockRpc).toHaveBeenCalledWith('staff_cancelar_membresia', { p_usuario_id: 'm1', p_inmediata: false, p_motivo: 'Se muda de ciudad' });
+    expect(mockSubUpdate).toHaveBeenCalledWith('sub_1', { cancel_at_period_end: true }, { stripeAccount: 'acct_1', idempotencyKey: 'ekko:cancelar_fin:mem-1:1' });
+    expect(mockRpc.mock.invocationCallOrder[0]).toBeLessThan(mockSubUpdate.mock.invocationCallOrder[0]);
     expect(mockSubCancel).not.toHaveBeenCalled();
-    expect(mockSubUpdate.mock.invocationCallOrder[0]).toBeLessThan(mockRpc.mock.invocationCallOrder[0]);
+    expect(mockRpc).toHaveBeenLastCalledWith('operacion_suscripcion_resultado', { p_id: 'op-fin', p_ok: true, p_error: null, p_resultado: { status: null, cancel_at_period_end: true } });
   });
 
-  it('si la RPC rechaza, REVIERTE Stripe', async () => {
+  it('PKG-02H · si la RPC rechaza, NO se toca Stripe (ya no hay nada que revertir)', async () => {
     mockMaybeSingle.mockResolvedValueOnce({ data: STAFF, error: null }).mockResolvedValueOnce({ data: conSub, error: null });
     mockRpc.mockResolvedValue({ data: null, error: { message: 'EKKO_MOTIVO_REQUERIDO: Indica el motivo de la baja' } });
 
@@ -100,7 +104,22 @@ describe('staff-cancelar-membresia', () => {
 
     expect(r.status).toBe(400);
     expect(r.body.error).toBe('Indica el motivo de la baja');
-    expect(mockSubUpdate).toHaveBeenLastCalledWith('sub_1', { cancel_at_period_end: false }, { stripeAccount: 'acct_1' });
+    expect(mockSubUpdate).not.toHaveBeenCalled();
+    expect(mockSubCancel).not.toHaveBeenCalled();
+  });
+
+  it('PKG-02H · al fin del periodo y Stripe falla: la baja en EKKO queda, la operación queda FALLIDA y se informa', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: STAFF, error: null }).mockResolvedValueOnce({ data: conSub, error: null });
+    mockSubUpdate.mockRejectedValue(new Error('stripe caído'));
+    mockOps.mockReturnValue([{ id: 'op-fin' }]);
+    rpcPorNombre(undefined, PREPARADA_FIN);
+
+    const r = await invocar(BODY);
+
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ inmediata: false, stripe_cancelado: false });
+    expect(mockRpc).toHaveBeenLastCalledWith('operacion_suscripcion_resultado',
+      expect.objectContaining({ p_id: 'op-fin', p_ok: false, p_error: expect.stringContaining('stripe caído') }));
   });
 
   it('sin suscripción (mostrador / paquete): baja inmediata solo por la RPC', async () => {
