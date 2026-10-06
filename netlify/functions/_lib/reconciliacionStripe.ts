@@ -25,6 +25,14 @@ import { APP_ID, esDeOtraApp, mapStripeStatus } from './stripe';
  * Alcance: solo las cuentas conectadas de `tenants.stripe_account_id` (las crea
  * el onboarding de EKKO) y, dentro, solo suscripciones con `metadata.app = 'ekko'`
  * o referidas por una membresía de EKKO. Lo de otra app se ignora entero.
+ *
+ * Fase D · dos entradas (cron diario y endpoint manual) sobre el MISMO núcleo.
+ * Solapamiento: una corrida cuyas lecturas son anteriores a otra ya asentada
+ * NO asienta observaciones (queda `parcial` con `superada_por_corrida_posterior`:
+ * si cerrara o abriera con datos viejos, podría cerrar en falso lo que la más
+ * nueva vio). Si dos corridas insertan la misma discrepancia nueva a la vez, la
+ * segunda choca con el índice único y se asienta `parcial` con
+ * `conflicto_concurrente` en vez de perder su registro. Sin coordinador nuevo.
  */
 
 const VIVAS_LOCAL = new Set(['trialing', 'activa', 'past_due', 'pausada']);
@@ -254,13 +262,33 @@ export async function reconciliarStripe(
   if (errT) throw new Error(`tenants: ${errT.message}`);
 
   for (const t of (tenants ?? []) as Array<{ id: string; stripe_account_id: string }>) {
-    const asentar = async (estado: ResultadoEstudio['estado'], leidas: number, discrepancias: Discrepancia[], error: string | null) => {
-      const { error: e } = await admin.rpc('registrar_reconciliacion_stripe', {
+    const inicioEstudio = new Date(ahora()).toISOString();
+    const registrar = (estado: ResultadoEstudio['estado'], leidas: number, discrepancias: Discrepancia[], error: string | null) =>
+      admin.rpc('registrar_reconciliacion_stripe', {
         p_corrida_id: corridaId, p_tenant_id: t.id, p_estado: estado, p_suscripciones_leidas: leidas,
         p_discrepancias: estado === 'fallida' ? [] : discrepancias, p_error: error
       });
+    const asentar = async (estado: ResultadoEstudio['estado'], leidas: number, discrepancias: Discrepancia[], error: string | null) => {
+      let { error: e } = await registrar(estado, leidas, discrepancias, error);
+      if (e && (e as { code?: string }).code === '23505' && discrepancias.length > 0) {
+        // Otra corrida insertó la misma discrepancia nueva un instante antes: la
+        // evidencia ya existe; esta corrida se asienta sin observaciones.
+        estado = 'parcial'; discrepancias = []; error = 'conflicto_concurrente';
+        ({ error: e } = await registrar(estado, leidas, discrepancias, error));
+      }
       if (e) throw new Error(`registrar_reconciliacion_stripe: ${e.message}`);
       estudios.push({ tenant_id: t.id, estado, suscripciones_leidas: leidas, discrepancias: discrepancias.length, error });
+    };
+    /** ¿Otra corrida asentó este estudio DESPUÉS de que esta empezó a leer? Entonces lo leído aquí es viejo. */
+    const superada = async (): Promise<boolean> => {
+      const { data, error: e } = await admin
+        .from('reconciliacion_stripe_corridas')
+        .select('terminada_at')
+        .eq('tenant_id', t.id)
+        .gt('terminada_at', inicioEstudio)
+        .limit(1);
+      if (e) throw new Error(`reconciliacion_stripe_corridas: ${e.message}`);
+      return ((data ?? []) as unknown[]).length > 0;
     };
 
     if (ahora() > fin) {
@@ -303,6 +331,10 @@ export async function reconciliarStripe(
     }
 
     const discrepancias = compararEstudio(locales, suscripciones, { lecturaCompleta: completa, ahora: ahora() });
+    if (await superada()) {
+      await asentar('parcial', suscripciones.length, [], 'superada_por_corrida_posterior');
+      continue;
+    }
     await asentar(completa ? 'completa' : 'parcial', suscripciones.length, discrepancias, error);
   }
   return { corrida_id: corridaId, estudios };

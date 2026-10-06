@@ -108,24 +108,42 @@ describe('compararEstudio', () => {
 
 // ── Orquestador ──────────────────────────────────────────────────────────────
 type Rpc = { fn: string; args: Record<string, unknown> };
-function adminSimulado(tenants: Array<{ id: string; stripe_account_id: string }>, locales: Record<string, unknown[]>, fallaLocal = false) {
+type Opciones = {
+  fallaLocal?: boolean;
+  /** Corridas ya asentadas del estudio (fase D: ¿otra corrida terminó después de que esta empezó?). */
+  corridasPosteriores?: Record<string, number>;
+  /** Primera llamada a registrar con observaciones → choque del índice único (otra corrida insertó lo mismo). */
+  conflictoUnico?: boolean;
+};
+function adminSimulado(tenants: Array<{ id: string; stripe_account_id: string }>, locales: Record<string, unknown[]>, opts: Opciones | boolean = {}) {
+  const o: Opciones = typeof opts === 'boolean' ? { fallaLocal: opts } : opts;
   const rpcs: Rpc[] = [];
+  let conflictoPendiente = Boolean(o.conflictoUnico);
   const admin = {
     rpcs,
-    rpc: (fn: string, args: Record<string, unknown>) => { rpcs.push({ fn, args }); return Promise.resolve({ data: {}, error: null }); },
+    rpc: (fn: string, args: Record<string, unknown>) => {
+      rpcs.push({ fn, args });
+      if (conflictoPendiente && ((args.p_discrepancias as unknown[]) ?? []).length > 0) {
+        conflictoPendiente = false;
+        return Promise.resolve({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "discrepancias_stripe_abierta_uniq"' } });
+      }
+      return Promise.resolve({ data: {}, error: null });
+    },
     from: (tabla: string) => {
-      const q: Record<string, unknown> = {};
       let tenant = '';
       const c: Record<string, unknown> = {};
-      c.select = () => c; c.not = () => c; c.in = () => c;
+      c.select = () => c; c.not = () => c; c.in = () => c; c.gt = () => c; c.limit = () => c;
       c.eq = (col: string, v: string) => { if (col === 'tenant_id') tenant = v; return c; };
       c.then = (cb: (v: unknown) => unknown) => {
         if (tabla === 'tenants') return Promise.resolve({ data: tenants, error: null }).then(cb);
-        if (tabla === 'membresias') return Promise.resolve(fallaLocal ? { data: null, error: { message: 'timeout' } } : { data: locales[tenant] ?? [], error: null }).then(cb);
+        if (tabla === 'membresias') return Promise.resolve(o.fallaLocal ? { data: null, error: { message: 'timeout' } } : { data: locales[tenant] ?? [], error: null }).then(cb);
         if (tabla === 'usuarios') return Promise.resolve({ data: [{ id: 'u1', status: 'activo', sancionado_at: null }], error: null }).then(cb);
+        if (tabla === 'reconciliacion_stripe_corridas') {
+          const n = o.corridasPosteriores?.[tenant] ?? 0;
+          return Promise.resolve({ data: Array.from({ length: n }, () => ({ terminada_at: 'x' })), error: null }).then(cb);
+        }
         return Promise.resolve({ data: [], error: null }).then(cb);
       };
-      void q;
       return c;
     }
   };
@@ -226,5 +244,38 @@ describe('18 · la fachada de Stripe es de solo lectura', () => {
     await l.listarSuscripciones('acct_1');
     expect(usados).toEqual(['stripe.accounts.retrieve', 'stripe.subscriptions.list']);
     expect(Object.keys(l).sort()).toEqual(['cuentaEsDeEkko', 'listarSuscripciones']);
+  });
+});
+
+describe('fase D · solapamiento entre cron y manual (mismo núcleo)', () => {
+  it('9-10 · una corrida que leyó ANTES de que otra asentara el estudio NO asienta observaciones: parcial + superada_por_corrida_posterior (no cierra ni abre con datos viejos)', async () => {
+    const admin = adminSimulado([{ id: 't1', stripe_account_id: 'acct_1' }, { id: 't2', stripe_account_id: 'acct_2' }],
+      { t1: [filaMem()], t2: [] }, { corridasPosteriores: { t1: 1 } });
+    const stripe: StripeLectura = { cuentaEsDeEkko: async () => true, listarSuscripciones: async () => ({ data: [sub({ id: 'sub_0' })], has_more: false }) };
+    const r = await reconciliarStripe(admin as never, stripe, { ahora: () => AHORA });
+    const a = asientos(admin);
+    expect(a.map((x) => [x.p_tenant_id, x.p_estado, x.p_suscripciones_leidas, (x.p_discrepancias as unknown[]).length, x.p_error])).toEqual([
+      ['t1', 'parcial', 1, 0, 'superada_por_corrida_posterior'],
+      ['t2', 'completa', 1, 1, null] // el otro estudio no estaba superado: normal
+    ]);
+    expect(r.estudios[0]).toMatchObject({ estado: 'parcial', discrepancias: 0 });
+  });
+
+  it('11 · dos corridas insertan la misma discrepancia nueva a la vez: la segunda choca con el índice único y se asienta parcial + conflicto_concurrente (sin perder su registro ni duplicar)', async () => {
+    const admin = adminSimulado([{ id: 't1', stripe_account_id: 'acct_1' }], { t1: [] }, { conflictoUnico: true });
+    const stripe: StripeLectura = { cuentaEsDeEkko: async () => true, listarSuscripciones: async () => ({ data: [sub({ id: 'sub_0' })], has_more: false }) };
+    const r = await reconciliarStripe(admin as never, stripe, { ahora: () => AHORA });
+    const a = asientos(admin);
+    expect(a).toHaveLength(2);
+    expect((a[0].p_discrepancias as unknown[]).length).toBe(1); // intento original
+    expect(a[1]).toMatchObject({ p_estado: 'parcial', p_discrepancias: [], p_error: 'conflicto_concurrente', p_suscripciones_leidas: 1 });
+    expect(r.estudios[0]).toMatchObject({ estado: 'parcial', discrepancias: 0, error: 'conflicto_concurrente' });
+  });
+
+  it('un choque único en una corrida sin observaciones no se maquilla: el error se propaga', async () => {
+    const admin = adminSimulado([{ id: 't1', stripe_account_id: 'acct_1' }], { t1: [] });
+    admin.rpc = () => Promise.resolve({ data: null, error: { code: '23505', message: 'dup' } });
+    const stripe: StripeLectura = { cuentaEsDeEkko: async () => true, listarSuscripciones: async () => ({ data: [], has_more: false }) };
+    await expect(reconciliarStripe(admin as never, stripe, { ahora: () => AHORA })).rejects.toThrow(/registrar_reconciliacion_stripe/);
   });
 });

@@ -78,3 +78,10 @@
 # 10:30 UTC = 03:30 en Mazatlán.
 [functions."cron-material-vencido"]
   schedule = "30 10 * * *"
+
+# PKG-03B (fase D): reconciliación Stripe DETECT-ONLY diaria (EKKO-140). Solo lee
+# Stripe (accounts.retrieve, subscriptions.list) y asienta discrepancias; no
+# repara nada. 09:00 UTC = 02:00 en Mazatlán. Mismo núcleo que el endpoint manual
+# `reconciliar-stripe` (protegido por token).
+[functions."cron-reconciliar-stripe"]
+  schedule = "0 9 * * *"

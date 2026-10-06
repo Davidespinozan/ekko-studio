@@ -135,7 +135,12 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- Nada.
+- **PKG-03B fase D "Reconciliación diaria"** — COMMITTED en local (un commit, ver
+  `git log`), gate verde, SIN PUSH / SIN DEPLOY. Sin migración. `cron-reconciliar-stripe`
+  (envoltorio delgado del mismo núcleo, 09:00 UTC diario en `netlify.toml`); el
+  endpoint manual y su token se conservan. Guardas de solapamiento en el núcleo
+  (sin coordinador nuevo): una corrida superada por otra posterior no asienta
+  observaciones; un choque del índice único se asienta como `conflicto_concurrente`.
 
 ## Desplegado, pendiente de fases (no cerrado)
 - **PKG-03B "Reconciliador Stripe (detect-only)"** (EKKO-140, D-03B-1 = A) —
