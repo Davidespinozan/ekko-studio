@@ -127,12 +127,14 @@ export default function Equipo() {
 
   async function handleHardDelete() {
     if (!hardDelete) return;
-    const { error } = await adminDeleteUser({ usuario_id: hardDelete.id });
+    const { data, error } = await adminDeleteUser({ usuario_id: hardDelete.id });
     if (error) {
       toast.error(error.error || 'No se pudo eliminar');
       return;
     }
-    toast.success(`${capitalizar(hardDelete.nombre) || hardDelete.email} fue eliminado.`);
+    // PKG-06A: si el proveedor de acceso no respondió, el perfil ya no existe y se dice.
+    if (data?.acceso_eliminado === false) toast.error(data.aviso ?? 'El perfil se eliminó; la cuenta de acceso quedó pendiente.');
+    else toast.success(`${capitalizar(hardDelete.nombre) || hardDelete.email} fue eliminado.`);
     setHardDelete(null);
     await refetch();
   }

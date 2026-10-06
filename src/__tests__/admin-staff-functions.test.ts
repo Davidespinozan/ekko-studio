@@ -5,9 +5,8 @@ import { resolve } from 'node:path';
 /**
  * admin-update-role y admin-seed-demo (SALA_PARITY_AUDIT_2 · P0-2 / P0-4):
  *  - un admin REVOCADO no opera aunque conserve su sesión;
- *  - ascender a staff a un miembro `pendiente_*` lo deja activo (si no, nace sin
- *    poderes: is_admin()/is_recepcionista() exigen status='activo');
- *  - un admin no se cambia el rol a sí mismo;
+ *  - PKG-06A: el cambio de rol es la RPC `cuenta_cambiar_rol` (actor explícito,
+ *    auditoría y último admin en el servidor); la función solo autentica y traduce;
  *  - las cuentas demo NUNCA llevan una contraseña fija.
  */
 
@@ -43,6 +42,8 @@ vi.mock('@supabase/supabase-js', () => ({
   })
 }));
 
+vi.mock('../../netlify/functions/_lib/sentry', () => ({ reportarErrorServidor: vi.fn().mockResolvedValue(undefined) }));
+
 import { handler as updateRole } from '../../netlify/functions/admin-update-role/index';
 import { handler as seedDemo, generarPasswordDemo } from '../../netlify/functions/admin-seed-demo/index';
 
@@ -64,45 +65,46 @@ beforeEach(() => {
   mockRpc.mockResolvedValue({ data: 2, error: null });
 });
 
-describe('admin-update-role', () => {
-  it('un admin REVOCADO no puede cambiar roles (403)', async () => {
+describe('admin-update-role (PKG-06A: una transacción del servidor)', () => {
+  it('un admin REVOCADO no puede cambiar roles (403): nada llega a la RPC', async () => {
     mockMaybeSingle.mockResolvedValueOnce({ data: { ...ADMIN, status: 'revocado' }, error: null });
     const res = await invocar(updateRole, evento({ usuario_id: 'm-1', rol: 'admin' }));
     expect(res.statusCode).toBe(403);
-    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  it('un admin no se cambia el rol a sí mismo (400)', async () => {
-    mockMaybeSingle
-      .mockResolvedValueOnce({ data: ADMIN, error: null })
-      .mockResolvedValueOnce({ data: { ...ADMIN, email: 'a@e.mx' }, error: null });
-    const res = await invocar(updateRole, evento({ usuario_id: 'u-admin', rol: 'recepcionista' }));
-    expect(res.statusCode).toBe(400);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  it('ascender a recepcionista a un miembro pendiente_pago lo deja ACTIVO', async () => {
-    mockMaybeSingle
-      .mockResolvedValueOnce({ data: ADMIN, error: null })
-      .mockResolvedValueOnce({
-        data: { id: 'm-1', tenant_id: 't1', rol: 'miembro', email: 'm@e.mx', status: 'pendiente_pago' },
-        error: null
-      });
+  it('el cambio va por `cuenta_cambiar_rol` con el admin como actor; la RPC decide status (pendiente_* → activo al ascender)', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: ADMIN, error: null });
+    mockRpc.mockResolvedValueOnce({ data: { success: true, idempotente: false, usuario_id: 'm-1', rol: 'recepcionista', status: 'activo' }, error: null });
     const res = await invocar(updateRole, evento({ usuario_id: 'm-1', rol: 'recepcionista' }));
     expect(res.statusCode).toBe(200);
-    expect(mockUpdate).toHaveBeenCalledWith({ rol: 'recepcionista', status: 'activo' });
+    expect(mockRpc).toHaveBeenCalledWith('cuenta_cambiar_rol', { p_actor_id: 'u-admin', p_usuario_id: 'm-1', p_rol: 'recepcionista' });
+    expect(mockUpdate).not.toHaveBeenCalled(); // ya no hay UPDATE suelto con service_role
+    expect(JSON.parse(res.body)).toMatchObject({ success: true, rol: 'recepcionista', status: 'activo', idempotente: false });
   });
 
-  it('cambiarle el rol a un REVOCADO no lo reactiva', async () => {
-    mockMaybeSingle
-      .mockResolvedValueOnce({ data: ADMIN, error: null })
-      .mockResolvedValueOnce({
-        data: { id: 'r-1', tenant_id: 't1', rol: 'recepcionista', email: 'r@e.mx', status: 'revocado' },
-        error: null
-      });
-    const res = await invocar(updateRole, evento({ usuario_id: 'r-1', rol: 'admin' }));
-    expect(res.statusCode).toBe(200);
-    expect(mockUpdate).toHaveBeenCalledWith({ rol: 'admin' });
+  it('su propio rol → 400; último admin → 409; otro tenant → 404 (códigos EKKO_* del servidor, texto humano)', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: ADMIN, error: null });
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'EKKO_PROPIO_ROL: No puedes cambiar tu propio rol. Pídeselo a otro admin.' } });
+    let res = await invocar(updateRole, evento({ usuario_id: 'u-admin', rol: 'recepcionista' }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toMatch(/propio rol/);
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'EKKO_ULTIMO_ADMIN: No puedes dejar el estudio sin ningún admin activo. Nombra otro admin primero.' } });
+    res = await invocar(updateRole, evento({ usuario_id: 'a-2', rol: 'miembro' }));
+    expect(res.statusCode).toBe(409);
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'EKKO_MIEMBRO_INVALIDO: Usuario no encontrado o de otro estudio' } });
+    res = await invocar(updateRole, evento({ usuario_id: 'x', rol: 'miembro' }));
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('rol "staff" ya no existe (400 antes de la RPC); un error desconocido no se filtra (500 genérico)', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: ADMIN, error: null });
+    expect((await invocar(updateRole, evento({ usuario_id: 'm-1', rol: 'staff' }))).statusCode).toBe(400);
+    expect(mockRpc).not.toHaveBeenCalled();
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'could not serialize access' } });
+    const res = await invocar(updateRole, evento({ usuario_id: 'm-1', rol: 'admin' }));
+    expect(res.statusCode).toBe(500);
+    expect(JSON.parse(res.body).error).not.toMatch(/serialize/);
   });
 });
 

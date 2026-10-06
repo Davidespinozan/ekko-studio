@@ -233,5 +233,28 @@ SELECT 'P5', 'registrar_reconciliacion_stripe solo para service_role',
          AND (has_function_privilege('authenticated', p.oid, 'EXECUTE') OR has_function_privilege('anon', p.oid, 'EXECUTE')))
        THEN '✅ PASS' ELSE '❌ FAIL — el registro de reconciliación es invocable por clientes' END;
 
+-- PKG-06A (20261013100000): las operaciones compuestas de cuenta son RPC de
+-- servicio con actor por parámetro: si authenticated pudiera ejecutarlas, el
+-- actor se forjaría. Y la guardia D-FIN-1 (historial durable) y la vinculación
+-- elegible deben seguir en el cuerpo de las funciones.
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P5', 'RPC de cuenta (06A) solo para service_role: el actor no se forja',
+  CASE WHEN NOT EXISTS (SELECT 1 FROM pg_proc p WHERE p.pronamespace='public'::regnamespace
+         AND p.proname IN ('cuenta_alta_preparar','cuenta_alta_finalizar','cuenta_cambiar_rol','cuenta_eliminar',
+                           'cuenta_password_reseteada','staff_actualizar_cuenta','auth_usuario_sin_perfil',
+                           'cuenta_historial_durable','_cuenta_huella_staff','_cuenta_actor','_cuenta_avisar_cambiar_password')
+         AND (has_function_privilege('authenticated', p.oid, 'EXECUTE') OR has_function_privilege('anon', p.oid, 'EXECUTE')))
+       AND (SELECT count(*) FROM pg_proc p WHERE p.pronamespace='public'::regnamespace
+            AND p.proname IN ('cuenta_alta_preparar','cuenta_alta_finalizar','cuenta_cambiar_rol','cuenta_eliminar',
+                              'cuenta_password_reseteada','staff_actualizar_cuenta','auth_usuario_sin_perfil')) = 7
+       THEN '✅ PASS' ELSE '❌ FAIL — una RPC de cuenta falta o es invocable por clientes' END;
+INSERT INTO _hardening_resultado (area, caso, resultado)
+SELECT 'P4', 'contrato 06A: cuenta_eliminar consulta el historial durable y la huella; el alta en Auth no vincula perfiles con historial sin autorización',
+  CASE WHEN (SELECT prosrc FROM pg_proc WHERE proname='cuenta_eliminar' AND pronamespace='public'::regnamespace) LIKE '%cuenta_historial_durable(%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='cuenta_eliminar' AND pronamespace='public'::regnamespace) LIKE '%_cuenta_huella_staff(%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='handle_new_auth_user' AND pronamespace='public'::regnamespace) LIKE '%EKKO_PERFIL_CON_HISTORIAL%'
+         AND (SELECT prosrc FROM pg_proc WHERE proname='handle_new_auth_user' AND pronamespace='public'::regnamespace) LIKE '%acceso_autorizado_at IS NULL%'
+       THEN '✅ PASS' ELSE '❌ FAIL — se perdió la guardia de D-FIN-1 o la vinculación elegible' END;
+
 -- ── Resultado ────────────────────────────────────────────────────────────────
 SELECT area, caso, resultado FROM _hardening_resultado ORDER BY id;

@@ -9,9 +9,8 @@ import { createClient } from '@supabase/supabase-js';
 import { randomInt } from 'node:crypto';
 import { ok, badRequest, unauthorized, forbidden, serverError, notFound } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { writeAuditLog } from '../_lib/auditLog';
-import { avisarCambiarPassword } from '../_lib/acceso';
 import { esStaffActivo } from '../_lib/staff';
+import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
  * POST /reception-reset-password
@@ -20,9 +19,14 @@ import { esStaffActivo } from '../_lib/staff';
  *
  * Genera una contraseña temporal nueva para el miembro (cuando olvidó el
  * acceso) y la devuelve para que recepción se la entregue en mostrador.
- * Va por service_role; valida rol del caller y que el target sea del mismo
- * tenant. Registra el reset en audit_log (insert-only) — NUNCA la contraseña
- * (ni antes/después). Antes vivía en notas_admin (borrable — B1/B2).
+ *
+ * PKG-06A: la mutación de la contraseña vive en el proveedor de Auth y no es
+ * transaccional con Postgres; no se finge. Orden: validar → Auth → RPC
+ * `cuenta_password_reseteada` (aviso cambiar_password + audit con actor, en UNA
+ * transacción). Si la RPC falla después de que Auth aceptó, la respuesta sigue
+ * siendo verdad: la contraseña SÍ cambió (se entrega) y se dice que la evidencia
+ * no quedó (`evidencia_registrada: false`); un fallo del aviso nunca convierte un
+ * reset exitoso en un falso "no se pudo". NUNCA se guarda la contraseña.
  */
 
 // Alfabeto sin caracteres ambiguos (0/O, 1/I/l).
@@ -77,7 +81,7 @@ export const handler: Handler = async (event) => {
       .select('id, auth_id, tenant_id, email, rol')
       .eq('id', usuario_id)
       .maybeSingle();
-    if (targetErr) return serverError(targetErr.message);
+    if (targetErr) return serverError('No se pudo cargar la cuenta. Intenta de nuevo.');
     if (!target) return notFound('Miembro no encontrado');
     if (target.tenant_id !== caller.tenant_id) return forbidden('El miembro es de otro tenant');
     if (!target.auth_id) return badRequest('Esta cuenta no tiene acceso creado todavía');
@@ -94,26 +98,34 @@ export const handler: Handler = async (event) => {
     const { error: pwErr } = await supabaseAdmin.auth.admin.updateUserById(target.auth_id, {
       password: nuevaPassword
     });
-    if (pwErr) return serverError(`No se pudo resetear la contraseña: ${pwErr.message}`);
+    if (pwErr) {
+      await reportarErrorServidor('reception-reset-password', new Error(pwErr.message), { paso: 'auth.updateUserById', usuario_id });
+      return serverError('No se pudo restablecer la contraseña. Intenta de nuevo.');
+    }
 
-    // Clave temporal dictada en mostrador → la persona debe cambiarla al entrar.
-    await avisarCambiarPassword(supabaseAdmin, { tenant_id: target.tenant_id, usuario_id: target.id, origen: 'reset' });
-
-    // Auditoría inmutable (audit_log) — NUNCA la contraseña ni antes/después.
-    await writeAuditLog(supabaseAdmin, {
-      tenant_id: target.tenant_id,
-      actor_usuario_id: caller.id,
-      actor_rol: caller.rol,
-      accion: 'password_reset',
-      target_tipo: 'usuario',
-      target_id: target.id,
-      motivo: typeof motivo === 'string' && motivo.trim() ? motivo.trim() : null
+    // Evidencia + aviso "cambia tu contraseña temporal" (gate de 02C), en una
+    // transacción y con el actor. La contraseña NO viaja a la base.
+    const { error: rpcErr } = await supabaseAdmin.rpc('cuenta_password_reseteada', {
+      p_actor_id: caller.id,
+      p_usuario_id: target.id,
+      p_motivo: typeof motivo === 'string' && motivo.trim() ? motivo.trim() : null
     });
+    if (rpcErr) {
+      // La contraseña YA cambió: se entrega y se dice que la evidencia no quedó.
+      await reportarErrorServidor('reception-reset-password', new Error(rpcErr.message), { paso: 'cuenta_password_reseteada', usuario_id });
+      return ok({
+        success: true,
+        email: target.email,
+        password: nuevaPassword,
+        evidencia_registrada: false,
+        aviso: 'La contraseña se restableció, pero no quedó registrada en el historial ni se dejó el aviso de cambiarla. Repórtalo al admin.'
+      });
+    }
 
     // El password se devuelve para entregar en mostrador — NUNCA loguearlo.
-    return ok({ success: true, email: target.email, password: nuevaPassword });
+    return ok({ success: true, email: target.email, password: nuevaPassword, evidencia_registrada: true });
   } catch (e) {
     console.error('[reception-reset-password]', e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return serverError('No se pudo restablecer la contraseña. Intenta de nuevo.');
   }
 };

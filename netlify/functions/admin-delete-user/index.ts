@@ -11,38 +11,66 @@ import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
 import { esAdminActivo } from '../_lib/staff';
+import { conflicto, respuestaErrorRpc } from '../_lib/cuentas';
+import { reportarErrorServidor } from '../_lib/sentry';
 
 /**
  * POST /admin-delete-user
  * Auth: Bearer JWT del admin
- * Body: { usuario_id }
+ * Body: { usuario_id, motivo? }
  *
- * HARD DELETE: borra de auth.users → cascadea a public.usuarios via
- * FK (auth_id ON DELETE CASCADE). Cascadea también a notificaciones,
- * membresias (CASCADE). Pagos quedan huérfanos (SET NULL).
+ * PKG-06A · D-FIN-1 = A: el borrado físico SOLO procede para una cuenta
+ * desechable, sin historial durable (membresías, ledger de créditos, pagos,
+ * reservas, ventas, material, reversales, operaciones/discrepancias de Stripe,
+ * notas, cliente de Stripe) ni huella como staff (check-ins, cancelaciones, notas,
+ * bitácora, ventas, revisiones…). Con historial se responde 409 y se manda a
+ * "Revocar acceso", que conserva la evidencia. La guardia vive en la RPC
+ * `cuenta_eliminar` (una transacción): deja `cuenta_eliminada` con el actor ANTES
+ * del DELETE (target_id sin FK: sobrevive) y borra la fila local. Después se borra
+ * la cuenta de Auth; si eso falla, se dice (el perfil ya no existe) y el siguiente
+ * alta con ese correo limpia la cuenta de Auth huérfana.
  *
- * Bloquea si target tiene reservas (FK reservas.usuario_id RESTRICT) —
- * el admin debe cancelarlas/limpiarlas primero. Esto preserva
- * integridad de auditoría de reservas (folio, slot, status).
- *
- * Guards:
- *  - Caller debe ser admin del tenant.
- *  - Target debe ser del mismo tenant.
- *  - No puede borrarse a sí mismo.
- *  - No puede borrar al último admin activo del tenant.
+ * Guards de autoridad (también en la RPC): admin activo del tenant; target del
+ * mismo tenant; no a sí mismo; nunca al último admin activo (trigger + RPC).
  */
 
 interface DeleteUserRequest {
   usuario_id: string;
+  motivo?: string;
 }
 
-/** 409 con mensaje humano + datos para la UI. */
-function conflicto(error: string, extra: Record<string, unknown> = {}) {
-  return {
-    statusCode: 409,
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ error, ...extra })
-  };
+const NOMBRES: Record<string, string> = {
+  membresias: 'membresías',
+  movimientos: 'movimientos de créditos',
+  pagos: 'cobros registrados',
+  reservas: 'reservas en historial',
+  ventas_mostrador: 'ventas de mostrador',
+  material: 'archivos de material',
+  reversales: 'reembolsos o disputas',
+  operaciones_stripe: 'operaciones de cobro',
+  discrepancias_stripe: 'discrepancias con Stripe',
+  correos_directos: 'correos del cobro',
+  notas: 'notas del equipo sobre la persona',
+  cliente_stripe: 'cliente en Stripe',
+  bitacora: 'acciones en la bitácora',
+  checkins: 'check-ins registrados por esta persona',
+  cancelaciones: 'cancelaciones hechas por esta persona',
+  notas_escritas: 'notas escritas por esta persona',
+  ventas_registradas: 'ventas registradas por esta persona',
+  material_subido: 'material subido por esta persona',
+  invitados_registrados: 'invitados registrados por esta persona',
+  revisiones: 'revisiones financieras hechas por esta persona',
+  eventos_revisados: 'eventos de Stripe revisados por esta persona',
+  operaciones_revisadas: 'operaciones revisadas por esta persona',
+  discrepancias_revisadas: 'discrepancias revisadas por esta persona',
+  correos_revisados: 'correos revisados por esta persona',
+  accesos_autorizados: 'accesos autorizados por esta persona'
+};
+
+function describir(historial: Record<string, number>): string {
+  return Object.entries(historial)
+    .map(([k, n]) => `${n} ${NOMBRES[k] ?? k}`)
+    .join(', ');
 }
 
 export const handler: Handler = async (event) => {
@@ -85,129 +113,47 @@ export const handler: Handler = async (event) => {
       auth: { persistSession: false }
     });
 
-    // Obtener target
-    const { data: target, error: targetErr } = await supabaseAdmin
-      .from('usuarios')
-      .select('id, tenant_id, rol, auth_id, email, nombre')
-      .eq('id', body.usuario_id)
-      .maybeSingle();
-
-    if (targetErr || !target) return badRequest('Usuario no encontrado');
-
-    if (target.tenant_id !== adminProfile.tenant_id) {
-      return forbidden('Usuario es de otro tenant');
-    }
-
-    // No borrar último admin
-    if (target.rol === 'admin') {
-      const { count: adminCount } = await supabaseAdmin
-        .from('usuarios')
-        .select('id', { count: 'exact', head: true })
-        .eq('tenant_id', target.tenant_id)
-        .eq('rol', 'admin')
-        .neq('status', 'revocado');
-
-      if ((adminCount ?? 0) <= 1) {
-        return badRequest('No puedes eliminar al último admin del tenant');
-      }
-    }
-
-    // Pre-check: reservas (FK RESTRICT bloquearía el delete)
-    const { count: reservasCount } = await supabaseAdmin
-      .from('reservas')
-      .select('id', { count: 'exact', head: true })
-      .eq('usuario_id', target.id);
-
-    if ((reservasCount ?? 0) > 0) {
-      return {
-        statusCode: 409,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          error: `No se puede eliminar: tiene ${reservasCount} ${reservasCount === 1 ? 'reserva' : 'reservas'} en historial. Cancela o reasigna las reservas antes de eliminar.`,
-          reservas_count: reservasCount
-        })
-      };
-    }
-
-    // Pre-check: suscripción viva en Stripe. Borrar al miembro borra en cascada
-    // su fila de `membresias`, pero NO cancela nada en Stripe: la tarjeta se
-    // seguiría cobrando cada mes a una persona que ya no existe aquí (y el
-    // reconciliador del cron busca filas que ya no están). Primero la baja.
-    const { data: subViva } = await supabaseAdmin
-      .from('membresias')
-      .select('id')
-      .eq('usuario_id', target.id)
-      .in('status', ['trialing', 'activa', 'past_due', 'pausada'])
-      .not('stripe_subscription_id', 'is', null)
-      .limit(1)
-      .maybeSingle();
-    if (subViva) {
-      return conflicto(
-        'No se puede eliminar: tiene una suscripción activa en Stripe que se seguiría cobrando. Cancela primero su membresía.',
-        { suscripcion_viva: true }
-      );
-    }
-
-    // Pre-check: cobros registrados. `payment_events.usuario_id` quedaría en NULL
-    // y esos ingresos se volverían huérfanos en Reportes e imposibles de
-    // reembolsar con contexto. Una cuenta que pagó se revoca, no se borra.
-    const { count: pagosCount } = await supabaseAdmin
-      .from('payment_events')
-      .select('id', { count: 'exact', head: true })
-      .eq('usuario_id', target.id);
-    if ((pagosCount ?? 0) > 0) {
-      return conflicto(
-        `No se puede eliminar: tiene ${pagosCount} ${pagosCount === 1 ? 'cobro registrado' : 'cobros registrados'}. Para quitarle el acceso usa "Revocar" o "Suspender"; su historial de pagos se conserva.`,
-        { pagos_count: pagosCount }
-      );
-    }
-
-    // Pre-check: huella como STAFF. Estas FKs no tienen ON DELETE y el borrado
-    // tronaba con "Database error deleting user" (check-ins que hizo,
-    // cancelaciones, notas, bitácora). Igual que arriba: al equipo se le revoca.
-    const huellas: Array<[string, string, string]> = [
-      ['reservas', 'check_in_by', 'check-ins registrados por esta persona'],
-      ['reservas', 'cancelada_por', 'cancelaciones hechas por esta persona'],
-      ['notas_miembro', 'autor_id', 'notas escritas por esta persona'],
-      ['audit_log', 'actor_usuario_id', 'acciones en la bitácora']
-    ];
-    for (const [tabla, columna, que] of huellas) {
-      const { count } = await supabaseAdmin
-        .from(tabla)
-        .select('id', { count: 'exact', head: true })
-        .eq(columna, target.id);
-      if ((count ?? 0) > 0) {
-        return conflicto(
-          `No se puede eliminar: hay ${count} ${que}. Usa "Revocar acceso": conserva el historial y le quita la entrada al panel.`,
-          { tabla, count }
-        );
-      }
-    }
-
-    if (!target.auth_id) {
-      // Sin auth_id: borrar directo de public.usuarios
-      const { error: delErr } = await supabaseAdmin
-        .from('usuarios')
-        .delete()
-        .eq('id', target.id);
-      if (delErr) return serverError(delErr.message);
-      return ok({ success: true, deleted: { id: target.id, email: target.email } });
-    }
-
-    // Borrar de auth.users → CASCADE a usuarios + notificaciones + membresias
-    const { error: authDelErr } = await supabaseAdmin.auth.admin.deleteUser(target.auth_id);
-    if (authDelErr) return serverError(`Error eliminando cuenta: ${authDelErr.message}`);
-
-    return ok({
-      success: true,
-      deleted: {
-        id: target.id,
-        email: target.email,
-        nombre: target.nombre
-      }
+    // Guardia + evidencia + DELETE local: UNA transacción en el servidor.
+    const { data, error } = await supabaseAdmin.rpc('cuenta_eliminar', {
+      p_actor_id: adminProfile.id,
+      p_usuario_id: body.usuario_id,
+      p_motivo: typeof body.motivo === 'string' ? body.motivo : null
     });
+    if (error) return respuestaErrorRpc('admin-delete-user', error, { usuario_id: body.usuario_id });
+
+    const r = (data ?? {}) as {
+      permitido: boolean;
+      usuario_id: string;
+      auth_id?: string | null;
+      historial?: Record<string, number>;
+      huella_staff?: Record<string, number>;
+    };
+
+    if (!r.permitido) {
+      const todo = { ...(r.historial ?? {}), ...(r.huella_staff ?? {}) };
+      return conflicto(
+        `No se puede eliminar: tiene ${describir(todo)}. Para quitarle el acceso usa "Revocar acceso": conserva el historial y le quita la entrada.`,
+        { historial: r.historial ?? {}, huella_staff: r.huella_staff ?? {} }
+      );
+    }
+
+    // El perfil ya no existe. Ahora la cuenta de Auth (fuera de la transacción).
+    if (r.auth_id) {
+      const { error: authDelErr } = await supabaseAdmin.auth.admin.deleteUser(r.auth_id);
+      if (authDelErr) {
+        await reportarErrorServidor('admin-delete-user', new Error(authDelErr.message), { paso: 'auth.deleteUser', usuario_id: body.usuario_id });
+        return ok({
+          success: true,
+          deleted: { id: r.usuario_id },
+          acceso_eliminado: false,
+          aviso: 'El perfil se eliminó, pero la cuenta de acceso del proveedor no se pudo borrar todavía. Se limpiará sola al volver a dar de alta ese correo.'
+        });
+      }
+    }
+
+    return ok({ success: true, deleted: { id: r.usuario_id }, acceso_eliminado: true });
   } catch (e) {
     console.error('[admin-delete-user]', e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return serverError('No se pudo eliminar la cuenta. Intenta de nuevo.');
   }
 };

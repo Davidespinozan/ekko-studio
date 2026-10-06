@@ -77,6 +77,19 @@ function describirCambio(e: AuditEntryUsuario): string {
       return 'Stripe reportó una suscripción viva sobre una membresía cerrada (sin cambios)';
     case 'acceso_restaurado':
       return 'Restauró un acceso revocado';
+    // PKG-06A: operaciones de cuenta con actor explícito.
+    case 'cuenta_creada':
+      return `Creó la cuenta (${valorTexto(e.despues?.rol)})`;
+    case 'acceso_creado':
+      return 'Creó el acceso a un perfil existente';
+    case 'acceso_autorizado':
+      return 'Autorizó crear el acceso sobre este perfil';
+    case 'auth_vinculado':
+      return 'Vinculó el acceso al perfil';
+    case 'rol_cambiado':
+      return `Cambió rol: ${valorTexto(e.antes?.rol)} → ${valorTexto(e.despues?.rol)}`;
+    case 'cuenta_eliminada':
+      return 'Eliminó la cuenta (sin historial)';
     default:
       // Una acción nueva sin etiqueta: legible, nunca el identificador crudo.
       return e.accion.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());

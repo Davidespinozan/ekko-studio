@@ -168,7 +168,25 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- Nada.
+- **PKG-06A "Operaciones compuestas de cuenta" — IMPLEMENTADO LOCALMENTE, en un
+  commit local SIN PUSH** (EKKO-142, D-FIN-1 = A). Migración
+  `20261013100000_06a_cuentas_compuestas.sql` (md5 `4cbd57a7b5ce694918fc048e314c4b1d`,
+  NO aplicada en producción): columnas `usuarios.acceso_autorizado_at/por`; RPC de
+  servicio `cuenta_alta_preparar`, `cuenta_alta_finalizar`, `cuenta_cambiar_rol`,
+  `cuenta_eliminar`, `cuenta_password_reseteada`, `staff_actualizar_cuenta`,
+  `auth_usuario_sin_perfil`, `cuenta_historial_durable` (+ `_cuenta_actor`,
+  `_cuenta_huella_staff`, `_cuenta_avisar_cambiar_password`), solo service_role;
+  `handle_new_auth_user` recreada (hash `a2a99ce2…` → `b2a4f040…`): vincula por
+  correo solo cascarones o perfiles autorizados. Funciones de Netlify
+  `admin-create-user`, `reception-create-member`, `admin-update-role`,
+  `admin-delete-user`, `reception-reset-password`, `reception-update-member`
+  reescritas sobre `_lib/cuentas.ts` (RPC → Auth → RPC; compensación por propiedad;
+  respuesta parcial honesta); `_lib/acceso.ts` retirado (lo hace la RPC). Pruebas:
+  `db/06a-cuentas-compuestas.db.test.ts` (36; 35 muerden sin la migración), 6 suites
+  de funciones reescritas al contrato RPC (58). Hardening 51/51 (antes 49); drift 66/66 (antes 64).
+  Gate completo verde: 208 archivos / 1999 pruebas, build OK, `git diff --check` OK (58 s, máquina en reposo). Las demás funciones de producción quedan con hash
+  idéntico (comparado contra `h_prod_02h_despues`). Activación: pendiente de
+  autorización del dueño (`ekko-activar`); orden: migración (aditiva) → deploy.
 
 ## PKG-03B — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-03B "Reconciliador Stripe (detect-only)"** (EKKO-140, D-03B-1 = A) —

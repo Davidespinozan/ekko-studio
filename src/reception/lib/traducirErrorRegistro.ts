@@ -10,6 +10,14 @@
 export function traducirErrorRegistro(message: string): string {
   const m = message.toLowerCase();
 
+  // PKG-06A: un perfil existente nunca se adueña por el correo; el servidor lo
+  // dice con su propio mensaje (perfil con historial, rol distinto, ambiguo).
+  if (m.includes('perfil con historial') || m.includes('no se reescribe') || m.includes('más de un perfil')) {
+    return message;
+  }
+  if (m.includes('quedó creado') || m.includes('se revirtió') || m.includes('mismo correo')) {
+    return message;
+  }
   if (
     m.includes('ya existe') ||
     m.includes('already') ||

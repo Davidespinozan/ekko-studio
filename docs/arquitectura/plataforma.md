@@ -34,6 +34,20 @@ protege la base. Procede de la fundación del kernel multi-tenant (historia en
   REST: nombre, teléfono, avatar, notas del admin, revocar a staff.
 - Datos sensibles aparte: `usuarios_datos_privados` (solo dueño y admin lectura).
 - Nunca se deja un estudio sin admin activo (`count_admins_activos`).
+- Operaciones compuestas de cuenta (PKG-06A, EKKO-142): alta, cambio de rol, baja,
+  reset de contraseña y edición por staff tienen su parte LOCAL en una RPC de
+  servicio (`cuenta_alta_preparar`/`cuenta_alta_finalizar`, `cuenta_cambiar_rol`,
+  `cuenta_eliminar`, `cuenta_password_reseteada`, `staff_actualizar_cuenta`) que
+  corre en una transacción con el actor explícito validado (solo service_role las
+  ejecuta: el actor no se forja) y publica ese actor en la transacción para que los
+  triggers de auditoría de R1 lo vean. Lo que toca al proveedor de Auth queda fuera
+  y la función de Netlify lo ordena: preparar → Auth → finalizar; Auth → copia local
+  del correo. No hay atomicidad distribuida: hay orden seguro, compensación por
+  propiedad (solo se revierte lo que esa operación creó) y respuesta parcial honesta.
+- El correo no prueba identidad: el trigger de alta vincula un perfil sin acceso solo
+  si no tiene historial durable (`cuenta_historial_durable`) o si un staff lo
+  autorizó sobre ESE perfil (`acceso_autorizado_at/por`). Borrado físico solo para
+  cuentas sin historial ni huella como staff (D-FIN-1 = A); lo demás se revoca.
 
 ## Identidad y puerta
 - Ficha de identidad (foto, datos, INE) y contrato firmado condicionan el ingreso;

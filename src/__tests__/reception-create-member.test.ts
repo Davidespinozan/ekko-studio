@@ -4,25 +4,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * Tests de seguridad de la Netlify Function `reception-create-member`
  * (Recepción Plus RP-1). El corazón: el gate de rol y que el rol del
  * usuario creado esté hardcodeado a 'miembro' — recepción nunca crea staff.
+ * PKG-06A: la parte local (perfil + auditoría con actor) va por RPC; la
+ * evidencia `cuenta_creada` la escribe `cuenta_alta_finalizar`, no la función.
  */
 
 const mockGetUser = vi.fn();
 const mockMaybeSingle = vi.fn();
 const mockCreateUser = vi.fn();
 const mockDeleteUser = vi.fn();
-const mockAuditInsert = vi.fn();
-const mockNotifInsert = vi.fn().mockResolvedValue({ error: null });
-// update().eq().select().maybeSingle() → devuelve el id del miembro creado.
-function updateReturn() {
-  return {
-    eq: vi.fn(() => ({
-      select: vi.fn(() => ({
-        maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'm-new' }, error: null })
-      }))
-    }))
-  };
-}
-const mockUpdate = vi.fn((_payload: Record<string, unknown>) => updateReturn());
+const mockRpc = vi.fn();
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
@@ -30,18 +20,15 @@ vi.mock('@supabase/supabase-js', () => ({
       getUser: mockGetUser,
       admin: { createUser: mockCreateUser, deleteUser: mockDeleteUser }
     },
-    from: vi.fn((table: string) => {
-      if (table === 'audit_log') return { insert: mockAuditInsert };
-      if (table === 'notificaciones') return { insert: mockNotifInsert };
-      return {
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        maybeSingle: mockMaybeSingle,
-        update: mockUpdate
-      };
-    })
+    rpc: (...a: unknown[]) => mockRpc(...a),
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: mockMaybeSingle
+    }))
   }))
 }));
+vi.mock('../../netlify/functions/_lib/sentry', () => ({ reportarErrorServidor: vi.fn().mockResolvedValue(undefined) }));
 
 import { handler } from '../../netlify/functions/reception-create-member/index';
 
@@ -57,6 +44,7 @@ async function invocar(event: AnyEvent) {
   const res = await handler(event, {} as never, () => {});
   return res as { statusCode: number; body: string };
 }
+const llamadas = (fn: string) => mockRpc.mock.calls.filter((c) => c[0] === fn).map((c) => c[1] as Record<string, unknown>);
 
 describe('reception-create-member · seguridad', () => {
   beforeEach(() => {
@@ -66,8 +54,11 @@ describe('reception-create-member · seguridad', () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
     mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-caller' } }, error: null });
     mockCreateUser.mockResolvedValue({ data: { user: { id: 'auth-nuevo' } }, error: null });
-    mockUpdate.mockImplementation(() => updateReturn());
-    mockAuditInsert.mockResolvedValue({ error: null });
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === 'cuenta_alta_preparar') return Promise.resolve({ data: { modo: 'nueva' }, error: null });
+      if (fn === 'cuenta_alta_finalizar') return Promise.resolve({ data: { success: true, idempotente: false, usuario_id: 'm-new', rol: 'miembro', status: 'pendiente_pago' }, error: null });
+      return Promise.resolve({ data: null, error: null });
+    });
   });
 
   it('rechaza método que no sea POST', async () => {
@@ -85,6 +76,7 @@ describe('reception-create-member · seguridad', () => {
     const res = await invocar(evento(BODY_OK));
     expect(res.statusCode).toBe(403);
     expect(mockCreateUser).not.toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 
   it('caller sin perfil → 403', async () => {
@@ -94,18 +86,16 @@ describe('reception-create-member · seguridad', () => {
     expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
-  it('recepcionista SÍ puede registrar — crea con rol="miembro"', async () => {
+  it('recepcionista SÍ puede registrar — la RPC recibe rol="miembro" y al caller como actor (el tenant lo fija la RPC)', async () => {
     mockMaybeSingle.mockResolvedValue({
       data: { id: 'u-recep', tenant_id: 'tenant-1', rol: 'recepcionista', status: 'activo' },
       error: null
     });
-    const res = await invocar(evento(BODY_OK));
+    const res = await invocar(evento({ ...BODY_OK, membresia_tier: 'esencial' }));
     expect(res.statusCode).toBe(200);
-    expect(mockUpdate).toHaveBeenCalledTimes(1);
-    const updatePayload = mockUpdate.mock.calls[0][0] as Record<string, unknown>;
-    expect(updatePayload.rol).toBe('miembro');
-    expect(updatePayload.tenant_id).toBe('tenant-1'); // tenant del caller, no del body
-    expect(updatePayload.status).toBe('pendiente_pago');
+    expect(llamadas('cuenta_alta_preparar')[0]).toMatchObject({ p_actor_id: 'u-recep', p_rol: 'miembro', p_email: 'nuevo@cravia.mx' });
+    expect(llamadas('cuenta_alta_finalizar')[0]).toMatchObject({ p_actor_id: 'u-recep', p_rol: 'miembro', p_tier: 'esencial', p_auth_id: 'auth-nuevo', p_modo: 'nueva' });
+    expect(JSON.parse(res.body).user).toMatchObject({ id: 'm-new', rol: 'miembro', status: 'pendiente_pago', password: 'password123' });
   });
 
   it('admin también puede usar esta función', async () => {
@@ -117,16 +107,17 @@ describe('reception-create-member · seguridad', () => {
     expect(res.statusCode).toBe(200);
   });
 
-  it('rol="admin" en el body se IGNORA — siempre crea miembro', async () => {
+  it('rol="admin" y tenant_id en el body se IGNORAN — siempre miembro, tenant del actor', async () => {
     mockMaybeSingle.mockResolvedValue({
       data: { id: 'u-recep', tenant_id: 'tenant-1', rol: 'recepcionista', status: 'activo' },
       error: null
     });
     const res = await invocar(evento({ ...BODY_OK, rol: 'admin', tenant_id: 'otro-tenant' }));
     expect(res.statusCode).toBe(200);
-    const updatePayload = mockUpdate.mock.calls[0][0] as Record<string, unknown>;
-    expect(updatePayload.rol).toBe('miembro'); // nunca 'admin'
-    expect(updatePayload.tenant_id).toBe('tenant-1'); // nunca 'otro-tenant'
+    for (const l of [...llamadas('cuenta_alta_preparar'), ...llamadas('cuenta_alta_finalizar')]) {
+      expect(l.p_rol).toBe('miembro');
+      expect(l).not.toHaveProperty('p_tenant_id');
+    }
   });
 
   it('password corta → 400 antes de tocar Auth', async () => {
@@ -135,18 +126,18 @@ describe('reception-create-member · seguridad', () => {
     expect(mockCreateUser).not.toHaveBeenCalled();
   });
 
-  it('escribe audit_log create_member (Bloque A)', async () => {
-    mockMaybeSingle.mockResolvedValue({
-      data: { id: 'u-recep', tenant_id: 'tenant-1', rol: 'recepcionista', status: 'activo' },
-      error: null
-    });
+  it('un recepcionista REVOCADO no registra aunque conserve su sesión (403)', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'revocado' }, error: null });
+    expect((await invocar(evento(BODY_OK))).statusCode).toBe(403);
+    expect(mockCreateUser).not.toHaveBeenCalled();
+  });
+
+  it('un perfil con historial para ese correo no se adueña: 409 antes de Auth (PKG-06A)', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo' }, error: null });
+    mockRpc.mockResolvedValueOnce({ data: { modo: 'perfil_con_historial', perfil_id: 'p-9', historial: { reservas: 3 } }, error: null });
     const res = await invocar(evento(BODY_OK));
-    expect(res.statusCode).toBe(200);
-    const audit = mockAuditInsert.mock.calls[0][0] as Record<string, unknown>;
-    expect(audit.accion).toBe('create_member');
-    expect(audit.target_id).toBe('m-new');
-    expect(audit.tenant_id).toBe('tenant-1');
-    expect(audit.actor_usuario_id).toBe('u-recep');
-    expect((audit.despues as Record<string, unknown>).rol).toBe('miembro');
+    expect(res.statusCode).toBe(409);
+    expect(JSON.parse(res.body).perfil_id).toBe('p-9');
+    expect(mockCreateUser).not.toHaveBeenCalled();
   });
 });

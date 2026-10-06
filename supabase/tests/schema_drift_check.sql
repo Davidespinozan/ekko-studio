@@ -291,6 +291,18 @@ INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
         THEN '✅ PASS' ELSE '❌ FALTA — 02C no aplicada' END);
 
 
+-- PKG-06A (20261013100000): marcador de vinculación autorizada y RPC de cuenta.
+INSERT INTO _schema_check (bloque, migracion, objeto, resultado) VALUES
+('11 · Grants/RLS', '20261013100000_06a', 'usuarios.acceso_autorizado_at / acceso_autorizado_por',
+ CASE WHEN (SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='usuarios'
+            AND column_name IN ('acceso_autorizado_at','acceso_autorizado_por')) = 2 THEN '✅ PASS' ELSE '❌ FALTA — 06A no aplicada' END),
+('11 · Grants/RLS', '20261013100000_06a', 'RPC de cuenta: preparar/finalizar alta, cambiar rol, eliminar, password reseteada, actualizar cuenta',
+ CASE WHEN (SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace
+            AND proname IN ('cuenta_alta_preparar','cuenta_alta_finalizar','cuenta_cambiar_rol','cuenta_eliminar',
+                            'cuenta_password_reseteada','staff_actualizar_cuenta','cuenta_historial_durable')) = 7
+        THEN '✅ PASS' ELSE '❌ FALTA — 06A no aplicada' END);
+
+
 -- ////////////////////////////////////////////////////////////////////////////
 -- BLOQUE 12 — Índices / objetos varios
 -- ////////////////////////////////////////////////////////////////////////////

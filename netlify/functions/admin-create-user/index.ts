@@ -10,17 +10,23 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { avisarCambiarPassword } from '../_lib/acceso';
 import { esAdminActivo } from '../_lib/staff';
+import { altaDeCuenta, esAltaOk } from '../_lib/cuentas';
 
 /**
  * POST /admin-create-user
  * Auth: Bearer JWT del admin
- * Body: { email, password, nombre, telefono?, rol, membresia_tier? }
+ * Body: { email, password, nombre, telefono?, rol, membresia_tier?, perfil_id? }
  *
- * Crea cuenta en Supabase Auth + fila en usuarios del MISMO tenant del admin.
- * Roles permitidos: 'miembro' | 'recepcionista' | 'staff' | 'admin'
- * Si rol === 'miembro', membresia_tier puede ser 'basica' | 'pro' o null
+ * Crea cuenta en Supabase Auth + perfil en `usuarios` del MISMO tenant del admin.
+ * Roles permitidos: 'miembro' | 'recepcionista' | 'admin'.
+ *
+ * PKG-06A: la parte local va por RPC con el admin como actor explícito
+ * (`cuenta_alta_preparar` → Auth → `cuenta_alta_finalizar`, ver `_lib/cuentas.ts`).
+ * Un perfil existente nunca se adueña por el correo: si tiene historial y no se
+ * confirmó sobre ESE perfil (`perfil_id`), el alta se rechaza antes de tocar Auth.
+ * Si Auth quedó creada y la finalización falla, solo se revierte lo que esta alta
+ * creó; un perfil preexistente nunca se borra como rollback.
  */
 
 interface CreateRequest {
@@ -28,11 +34,13 @@ interface CreateRequest {
   password: string;
   nombre: string;
   telefono?: string;
-  rol: 'miembro' | 'recepcionista' | 'staff' | 'admin';
-  membresia_tier?: 'basica' | 'pro' | null;
+  rol: 'miembro' | 'recepcionista' | 'admin';
+  membresia_tier?: string | null;
+  /** Alta explícita sobre un perfil existente sin acceso (autoriza vincularlo aunque tenga historial). */
+  perfil_id?: string | null;
 }
 
-const ROLES_VALIDOS = ['miembro', 'recepcionista', 'staff', 'admin'] as const;
+const ROLES_VALIDOS = ['miembro', 'recepcionista', 'admin'] as const;
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') return badRequest('Method not allowed');
@@ -55,7 +63,8 @@ export const handler: Handler = async (event) => {
     const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY');
 
     // Cliente con token del admin (para validar quién es)
-    const supabaseAsUser = createClient(supabaseUrl, anonKey, {      global: { headers: { Authorization: `Bearer ${userToken}` } }
+    const supabaseAsUser = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${userToken}` } }
     });
 
     const { data: { user: authUser }, error: userErr } = await supabaseAsUser.auth.getUser();
@@ -72,73 +81,37 @@ export const handler: Handler = async (event) => {
       return forbidden('Solo admin puede crear usuarios');
     }
 
-    const tenantId = adminProfile.tenant_id;
-
     // Cliente con service_role (bypasea RLS para crear cuentas)
-    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {      auth: { persistSession: false }
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false }
     });
 
-    // 1. Crear cuenta en Auth con email confirmado (no manda email)
-    const { data: newAuthUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email: body.email.trim().toLowerCase(),
+    const email = body.email.trim().toLowerCase();
+    const nombre = body.nombre.trim();
+    const r = await altaDeCuenta({
+      funcion: 'admin-create-user',
+      admin: supabaseAdmin,
+      actorId: adminProfile.id,
+      email,
       password: body.password,
-      email_confirm: true,
-      user_metadata: {
-        tenant_slug: 'ekko', // el trigger lo usa, pero el INSERT manual de abajo lo sobrescribe
-        nombre: body.nombre.trim(),
-        telefono: body.telefono?.trim() || null
-      }
+      nombre,
+      telefono: body.telefono?.trim() || null,
+      rol: body.rol,
+      tier: body.rol === 'miembro' ? (body.membresia_tier ?? null) : null,
+      perfilId: body.perfil_id ?? null
     });
-
-    if (createErr) {
-      const msg = createErr.message.toLowerCase();
-      if (msg.includes('already') || msg.includes('exists') || msg.includes('registered')) {
-        return badRequest('Ya existe una cuenta con ese email');
-      }
-      return serverError(createErr.message);
-    }
-
-    if (!newAuthUser?.user) return serverError('No se pudo crear la cuenta');
-
-    // 2. El trigger on_auth_user_created ya insertó fila en `usuarios` con rol='miembro'.
-    //    Actualizar a los valores reales (rol + tier + status).
-    const status = body.rol === 'miembro' ? 'pendiente_pago' : 'activo';
-
-    const { data: nuevoUsuario, error: updateErr } = await supabaseAdmin
-      .from('usuarios')
-      .update({
-        rol: body.rol,
-        membresia_tier: body.rol === 'miembro' ? (body.membresia_tier ?? null) : null,
-        status,
-        nombre: body.nombre.trim(),
-        telefono: body.telefono?.trim() || null,
-        tenant_id: tenantId
-      })
-      .eq('auth_id', newAuthUser.user.id)
-      .select('id')
-      .maybeSingle();
-
-    // Sin fila final NO hay éxito: si el trigger de alta no insertó ni vinculó
-    // (correo ambiguo), quedaba una cuenta de Auth sin perfil y esta función
-    // respondía 200. Se limpia el auth user y se avisa (Fase 1 identidad).
-    if (updateErr || !nuevoUsuario?.id) {
-      await supabaseAdmin.auth.admin.deleteUser(newAuthUser.user.id);
-      return serverError(
-        updateErr
-          ? `No se pudo asignar el rol: ${updateErr.message}`
-          : 'La cuenta de acceso se creó pero no quedó vinculada a ningún perfil; se revirtió. Revisa si ya existe alguien con ese correo.'
-      );
-    }
-
-    // La clave la puso el admin → la persona (miembro o staff) debe cambiarla al entrar.
-    await avisarCambiarPassword(supabaseAdmin, { tenant_id: tenantId, usuario_id: nuevoUsuario.id, origen: 'alta' });
+    if (!esAltaOk(r)) return r;
 
     return ok({
       success: true,
+      modo: r.modo,
+      recuperada: r.recuperada,
       user: {
-        email: body.email.trim().toLowerCase(),
-        nombre: body.nombre.trim(),
-        rol: body.rol,
+        id: r.usuario_id,
+        email,
+        nombre,
+        rol: r.rol,
+        status: r.status,
         // SEC-FIX (H4): el password se devuelve para que admin se lo dé al
         // cliente, pero NO debe llegar a ningún log — no hacer console.log
         // de este objeto ni de la respuesta.
@@ -148,6 +121,6 @@ export const handler: Handler = async (event) => {
   } catch (e) {
     // Loguear SOLO el Error — nunca el body ni el password.
     console.error('[admin-create-user]', e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return serverError('No se pudo crear la cuenta. Intenta de nuevo.');
   }
 };

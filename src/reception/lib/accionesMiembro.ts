@@ -23,6 +23,8 @@ export interface UpdateResult {
   cambios?: string[];
   avatar_url?: string | null;
   sin_cambios?: boolean;
+  /** PKG-06A: estado REAL de la cuenta tras la transacción del servidor. */
+  status?: string;
 }
 
 export function actualizarMiembro(usuario_id: string, patch: MiembroPatch): Promise<UpdateResult> {
@@ -33,6 +35,9 @@ export interface ResetResult {
   success: boolean;
   email: string;
   password: string;
+  /** PKG-06A: la contraseña SÍ cambió; `false` = no quedó registrada en el historial (ver `aviso`). */
+  evidencia_registrada?: boolean;
+  aviso?: string;
 }
 
 export function resetearPasswordMiembro(usuario_id: string): Promise<ResetResult> {

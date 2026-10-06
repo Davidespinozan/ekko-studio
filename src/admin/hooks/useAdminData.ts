@@ -706,7 +706,7 @@ export interface CreateUserParams {
   password: string;
   nombre: string;
   telefono?: string;
-  rol: 'miembro' | 'recepcionista' | 'staff' | 'admin';
+  rol: 'miembro' | 'recepcionista' | 'admin';
   // slug de cualquier plan activo del tenant (no solo basica/pro).
   membresia_tier?: string | null;
 }
@@ -727,26 +727,31 @@ export async function adminCreateUser(params: CreateUserParams) {
 
 export async function adminUpdateRole(params: {
   usuario_id: string;
-  rol: 'miembro' | 'recepcionista' | 'staff' | 'admin';
+  rol: 'miembro' | 'recepcionista' | 'admin';
 }) {
   return backendPost<{ success: boolean }>('admin-update-role', params);
 }
 
 export interface AdminDeleteUserResponse {
   success: boolean;
-  deleted: { id: string; email: string; nombre?: string | null };
+  deleted: { id: string };
+  /** `false` = el perfil ya no existe pero la cuenta de acceso del proveedor no se pudo borrar todavía. */
+  acceso_eliminado?: boolean;
+  aviso?: string;
 }
 
 export interface AdminDeleteUserError {
   error: string;
-  reservas_count?: number;
+  /** PKG-06A: qué historial durable o huella como staff impide el borrado físico. */
+  historial?: Record<string, number>;
+  huella_staff?: Record<string, number>;
 }
 
 /**
- * Hard delete: borra de auth.users → cascadea a public.usuarios,
- * notificaciones, membresias. Bloquea (409) si target tiene reservas.
- * Devuelve {data,error} para que el caller surface el mensaje rico
- * del backend (ej. "tiene N reservas").
+ * PKG-06A (D-FIN-1 = A): el borrado físico solo procede para una cuenta sin
+ * historial durable ni huella como staff; si no, el servidor responde 409 y manda
+ * a "Revocar acceso". Devuelve {data,error} para que el caller surface el mensaje
+ * rico del backend (qué historial lo impide).
  */
 export async function adminDeleteUser(params: { usuario_id: string }): Promise<{
   data: AdminDeleteUserResponse | null;

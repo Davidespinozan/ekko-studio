@@ -887,3 +887,33 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   lo último aplicado es la suspensión POR SANCIÓN; si lo último aplicado es la pausa
   del staff, su propia operación es la evidencia. **Extiende a EKKO-131, EKKO-138,
   EKKO-139 y EKKO-057.**
+
+## PKG-06A — operaciones compuestas de cuenta (2026-10-06)
+
+- **EKKO-142 — PKG-06A · `D-FIN-1 = A`: las operaciones compuestas de cuenta tienen
+  frontera del servidor.** Alta (admin y recepción), cambio de rol, baja, reset de
+  contraseña y edición por staff corrían como Auth Admin API + escrituras sueltas con
+  service_role + auditoría best-effort (actor NULL/'sistema'). Ahora la parte LOCAL de
+  cada una es UNA transacción en una RPC de servicio con actor explícito validado
+  (`cuenta_alta_preparar`/`cuenta_alta_finalizar`, `cuenta_cambiar_rol`,
+  `cuenta_eliminar`, `cuenta_password_reseteada`, `staff_actualizar_cuenta`), solo
+  ejecutable por service_role (el actor no se forja), que publica ese actor en la
+  transacción para que la auditoría de R1 lo registre. No se afirma atomicidad con el
+  proveedor de Auth: hay orden seguro (preparar → Auth → finalizar; Auth → copia local
+  del correo), compensación por PROPIEDAD (solo se revierte la cuenta de Auth cuyo
+  perfil creó esa misma alta; un perfil preexistente nunca se borra como rollback) y
+  respuesta parcial honesta cuando una mitad quedó hecha, con reintento que converge.
+  **El correo no prueba identidad:** el alta en Auth vincula un perfil sin acceso solo
+  si no tiene historial durable (cascarón; EKKO-095 sigue valiendo para él) o si un
+  staff autorizó el acceso sobre ESE perfil (`acceso_autorizado_at/por`, consumido al
+  vincular); con historial y sin autorización el alta se rechaza
+  (`EKKO_PERFIL_CON_HISTORIAL`). Al vincular no se reescriben rol, status ni plan.
+  **D-FIN-1 = A:** no hay borrado físico de una cuenta con historial durable
+  (membresías, ledger, pagos, reservas, ventas, material, reversales, operaciones y
+  discrepancias de Stripe, notas, cliente de Stripe) ni con huella como staff; se usa
+  la revocación. El borrado permitido deja `cuenta_eliminada` ANTES del DELETE, con
+  actor y sin PII (sobrevive: `target_id` no tiene FK). Un reset de contraseña cuya
+  evidencia falla sigue siendo un reset exitoso y se dice (`evidencia_registrada`).
+  `writeAuditLog` queda para evidencia no crítica; ninguna mutación de cuenta depende
+  de él. El rol legado `staff` deja de aceptarse en las funciones. **Refina EKKO-095 y
+  EKKO-083; complementa EKKO-136 y EKKO-137.**

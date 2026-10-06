@@ -7,6 +7,13 @@ import type { SupabaseClient } from '@supabase/supabase-js';
  * `service_role` (que bypassa RLS — authenticated no puede insertar).
  *
  * Reemplaza la auditoría previa en `usuarios.notas_admin` (borrable → B1/B2).
+ *
+ * PKG-06A — alcance de este helper: es BEST-EFFORT (no lanza), así que sirve
+ * para evidencia operativa no crítica (observaciones, invitados, ficha…). Toda
+ * mutación de CUENTA cuya auditoría es parte de la corrección (alta, rol, baja,
+ * reset de contraseña, status/sanción/contacto) la audita su RPC dentro de la
+ * misma transacción, con actor explícito: `cuenta_*` / `staff_actualizar_cuenta`
+ * (20261013100000). Ninguna de esas operaciones depende de este helper.
  */
 
 export interface AuditEntry {

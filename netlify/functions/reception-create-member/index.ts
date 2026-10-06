@@ -10,14 +10,13 @@ import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { ok, badRequest, unauthorized, forbidden, serverError } from '../_lib/http';
 import { requireEnv } from '../_lib/env';
-import { writeAuditLog } from '../_lib/auditLog';
-import { avisarCambiarPassword } from '../_lib/acceso';
 import { esStaffActivo } from '../_lib/staff';
+import { altaDeCuenta, esAltaOk } from '../_lib/cuentas';
 
 /**
  * POST /reception-create-member
  * Auth: Bearer JWT de un admin o recepcionista.
- * Body: { email, password, nombre, telefono?, membresia_tier? }
+ * Body: { email, password, nombre, telefono?, membresia_tier?, perfil_id? }
  *
  * Registra un MIEMBRO nuevo desde el mostrador (Recepción Plus, RP-1).
  *
@@ -25,7 +24,13 @@ import { esStaffActivo } from '../_lib/staff';
  *  - El caller debe ser `admin` o `recepcionista` (gate de rol).
  *  - El `rol` del usuario creado está HARDCODEADO a 'miembro'. El body NO
  *    tiene campo `rol` y el código nunca lo lee → recepción jamás crea staff.
- *  - El `tenant_id` se toma del caller, nunca del body.
+ *    La RPC lo vuelve a exigir: con rol distinto de miembro pide actor admin.
+ *  - El `tenant_id` es el del actor (lo fija la RPC), nunca el del body.
+ *
+ * PKG-06A: la parte local va por RPC con el caller como actor explícito
+ * (`cuenta_alta_preparar` → Auth → `cuenta_alta_finalizar`, ver `_lib/cuentas.ts`);
+ * la auditoría `cuenta_creada` queda en la misma transacción que el perfil. Un
+ * perfil existente nunca se adueña por el correo ni se borra como rollback.
  *
  * Distinta de `admin-create-user` (FIX01): esa exige rol admin y permite
  * crear cualquier rol. Esta es el contrato acotado para recepción (D5).
@@ -36,7 +41,8 @@ interface CreateMemberRequest {
   password: string;
   nombre: string;
   telefono?: string;
-  membresia_tier?: 'basica' | 'pro' | null;
+  membresia_tier?: string | null;
+  perfil_id?: string | null;
 }
 
 export const handler: Handler = async (event) => {
@@ -79,84 +85,37 @@ export const handler: Handler = async (event) => {
       return forbidden('Solo recepción o admin pueden registrar miembros');
     }
 
-    const tenantId = callerProfile.tenant_id;
-
     // Cliente service_role (bypasea RLS para crear la cuenta).
     const supabaseAdmin = createClient(supabaseUrl, serviceKey, {
       auth: { persistSession: false }
     });
 
-    // 1. Crear cuenta en Auth con email confirmado (no manda email).
-    const { data: newAuthUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-      email: body.email.trim().toLowerCase(),
+    const email = body.email.trim().toLowerCase();
+    const nombre = body.nombre.trim();
+    const r = await altaDeCuenta({
+      funcion: 'reception-create-member',
+      admin: supabaseAdmin,
+      actorId: callerProfile.id,
+      email,
       password: body.password,
-      email_confirm: true,
-      user_metadata: {
-        tenant_slug: 'ekko',
-        nombre: body.nombre.trim(),
-        telefono: body.telefono?.trim() || null
-      }
+      nombre,
+      telefono: body.telefono?.trim() || null,
+      rol: 'miembro', // FIJO — recepción nunca crea staff.
+      tier: body.membresia_tier ?? null,
+      perfilId: body.perfil_id ?? null
     });
-
-    if (createErr) {
-      const msg = createErr.message.toLowerCase();
-      if (msg.includes('already') || msg.includes('exists') || msg.includes('registered')) {
-        return badRequest('Ya existe una cuenta con ese email');
-      }
-      return serverError(createErr.message);
-    }
-
-    if (!newAuthUser?.user) return serverError('No se pudo crear la cuenta');
-
-    // 2. El trigger on_auth_user_created ya insertó la fila en `usuarios`.
-    //    La actualizamos a los valores reales.
-    //    rol='miembro' es FIJO — recepción nunca crea staff.
-    const { data: nuevoMiembro, error: updateErr } = await supabaseAdmin
-      .from('usuarios')
-      .update({
-        rol: 'miembro',
-        membresia_tier: body.membresia_tier ?? null,
-        status: 'pendiente_pago',
-        nombre: body.nombre.trim(),
-        telefono: body.telefono?.trim() || null,
-        tenant_id: tenantId
-      })
-      .eq('auth_id', newAuthUser.user.id)
-      .select('id')
-      .maybeSingle();
-
-    if (updateErr || !nuevoMiembro) {
-      // Best-effort: limpiar el auth user creado para no dejar huérfano.
-      await supabaseAdmin.auth.admin.deleteUser(newAuthUser.user.id);
-      return serverError(`No se pudo registrar el miembro: ${updateErr?.message ?? 'sin datos'}`);
-    }
-
-    // La clave la dictó recepción → el miembro debe cambiarla al entrar (gate).
-    await avisarCambiarPassword(supabaseAdmin, { tenant_id: tenantId, usuario_id: nuevoMiembro.id, origen: 'alta' });
-
-    // Auditoría inmutable: alta de miembro (Bloque A). No rompe la respuesta si falla.
-    await writeAuditLog(supabaseAdmin, {
-      tenant_id: tenantId,
-      actor_usuario_id: callerProfile.id,
-      actor_rol: callerProfile.rol,
-      accion: 'create_member',
-      target_tipo: 'usuario',
-      target_id: nuevoMiembro.id,
-      despues: {
-        nombre: body.nombre.trim(),
-        email: body.email.trim().toLowerCase(),
-        rol: 'miembro',
-        status: 'pendiente_pago'
-      }
-    });
+    if (!esAltaOk(r)) return r;
 
     return ok({
       success: true,
+      modo: r.modo,
+      recuperada: r.recuperada,
       user: {
-        id: nuevoMiembro.id,
-        email: body.email.trim().toLowerCase(),
-        nombre: body.nombre.trim(),
+        id: r.usuario_id,
+        email,
+        nombre,
         rol: 'miembro',
+        status: r.status,
         // SEC-FIX (H4): el password se muestra a recepción para dárselo al
         // cliente, pero NO debe llegar a ningún log — no hacer console.log
         // de este objeto ni de la respuesta.
@@ -166,6 +125,6 @@ export const handler: Handler = async (event) => {
   } catch (e) {
     // Loguear SOLO el Error — nunca el body ni el password.
     console.error('[reception-create-member]', e);
-    return serverError(e instanceof Error ? e.message : 'Error desconocido');
+    return serverError('No se pudo registrar al miembro. Intenta de nuevo.');
   }
 };

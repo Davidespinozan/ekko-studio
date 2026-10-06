@@ -1,46 +1,33 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /**
- * Bloque A — gobernanza. Tests de la Netlify Function `reception-update-member`:
- *  - motivo OBLIGATORIO en status/tier/desbloqueo (400 si falta).
- *  - escribe audit_log por acción con antes/después correctos.
- *  - contacto NO requiere motivo.
- *  - dejó de escribir en notas_admin (B1/B2).
- *  - desbloqueo NO resetea no_shows_count (B4).
+ * PKG-06A · `reception-update-member`: la parte local (nombre/teléfono/status/
+ * sanción/desbloqueo/foto + restauración de revocado + auditoría con actor) es la
+ * RPC `staff_actualizar_cuenta` en UNA transacción; el correo va primero a Auth y
+ * después a la RPC. Aquí se prueba el orden, los 400/403 tempranos, el contrato
+ * parcial honesto y que las operaciones de cobro (R2-B) se ejecutan DESPUÉS.
+ * Las reglas de dominio de la RPC se prueban en db/06a-cuentas-compuestas.
  */
 
 const mockGetUser = vi.fn();
 const mockMaybeSingle = vi.fn();
-const mockUpdate = vi.fn();
-const mockAuditInsert = vi.fn();
 const mockUpdateUserById = vi.fn();
-const mockTierMaybeSingle = vi.fn();
-
 const mockRpc = vi.fn();
+const mockUpload = vi.fn();
+
 vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => ({
-    rpc: mockRpc,
+    rpc: (...a: unknown[]) => mockRpc(...a),
     auth: {
       getUser: mockGetUser,
       admin: { updateUserById: mockUpdateUserById }
     },
-    from: vi.fn((table: string) => {
-      if (table === 'audit_log') return { insert: mockAuditInsert };
-      // tiers: select().eq().eq().eq().maybeSingle() (validación del plan contra la DB)
-      if (table === 'tiers') {
-        const chain: Record<string, unknown> = { maybeSingle: mockTierMaybeSingle };
-        chain.eq = vi.fn(() => chain);
-        return { select: vi.fn(() => chain) };
-      }
-      // usuarios: soporta select().eq().maybeSingle() y update().eq()
-      return {
-        select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockMaybeSingle })) })),
-        update: mockUpdate
-      };
-    }),
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: mockMaybeSingle })) }))
+    })),
     storage: {
       from: vi.fn(() => ({
-        upload: vi.fn().mockResolvedValue({ error: null }),
+        upload: (...a: unknown[]) => mockUpload(...a),
         getPublicUrl: vi.fn(() => ({ data: { publicUrl: 'https://cdn.test/a.jpg' } }))
       }))
     }
@@ -76,37 +63,17 @@ async function invocar(event: AnyEvent) {
 }
 
 const CALLER = { id: 'u-recep', tenant_id: 't1', rol: 'recepcionista', status: 'activo', nombre: 'Recep' };
-const TARGET = {
-  id: 'm-1',
-  auth_id: 'auth-m1',
-  tenant_id: 't1',
-  rol: 'miembro',
-  nombre: 'Ana',
-  email: 'ana@cravia.mx',
-  telefono: '123',
-  status: 'activo',
-  membresia_tier: 'basica',
-  bloqueado_hasta: null,
-  no_shows_count: 0
-};
+const TARGET = { id: 'm-1', auth_id: 'auth-m1', tenant_id: 't1', rol: 'miembro', email: 'ana@cravia.mx', status: 'activo' };
 
-function setCallerTarget(target: Record<string, unknown> = TARGET) {
+function setCallerTarget(target: Record<string, unknown> = TARGET, caller: Record<string, unknown> = CALLER) {
   mockMaybeSingle
-    .mockResolvedValueOnce({ data: CALLER, error: null })
+    .mockResolvedValueOnce({ data: caller, error: null })
     .mockResolvedValueOnce({ data: target, error: null });
 }
+const rpcOk = (cambios: string[], status = 'activo') => ({ data: { success: true, sin_cambios: false, cambios, status, avatar_url: null }, error: null });
+const llamadasRpc = () => mockRpc.mock.calls.map((c) => c[1] as Record<string, unknown>);
 
-function patchEnviado(): Record<string, unknown> {
-  return mockUpdate.mock.calls[0][0] as Record<string, unknown>;
-}
-
-function auditDe(accion: string): Record<string, unknown> | undefined {
-  return mockAuditInsert.mock.calls
-    .map((c) => c[0] as Record<string, unknown>)
-    .find((e) => e.accion === accion);
-}
-
-describe('reception-update-member · gobernanza (Bloque A)', () => {
+describe('reception-update-member (PKG-06A)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.VITE_SUPABASE_URL = 'http://supabase.test';
@@ -114,210 +81,174 @@ describe('reception-update-member · gobernanza (Bloque A)', () => {
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'service';
     mockGetUser.mockResolvedValue({ data: { user: { id: 'auth-caller' } }, error: null });
     mockUpdateUserById.mockResolvedValue({ error: null });
-    mockAuditInsert.mockResolvedValue({ error: null });
-    mockUpdate.mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
-    // Por defecto el plan pedido existe y está activo en el tenant.
-    mockTierMaybeSingle.mockResolvedValue({ data: { slug: 'pro' }, error: null });
-    mockRpc.mockResolvedValue({ data: { success: true, status: 'activo' }, error: null });
+    mockUpload.mockResolvedValue({ error: null });
+    mockRpc.mockResolvedValue(rpcOk(['status→suspendido'], 'suspendido'));
     mockEjecutar.mockResolvedValue({ procesadas: 0, aplicadas: 0, fallidas: 0, descartadas: 0, sin_stripe: false });
   });
 
-  it('R2-B: sancionar (o levantar la sanción) ejecuta las operaciones de cobro de ESE miembro, después del UPDATE', async () => {
+  it('R2-B: cambiar el status va a la RPC (actor, cambios, motivo) y DESPUÉS se ejecutan las operaciones de cobro de ESE miembro', async () => {
     setCallerTarget();
     mockEjecutar.mockResolvedValue({ procesadas: 1, aplicadas: 1, fallidas: 0, descartadas: 0, sin_stripe: false });
     const res = await invocar(evento({ usuario_id: 'm-1', status: 'suspendido', motivo: 'Daños al equipo' }));
     expect(res.statusCode).toBe(200);
-    expect(mockEjecutar).toHaveBeenCalledTimes(1);
+    expect(mockRpc).toHaveBeenCalledWith('staff_actualizar_cuenta', {
+      p_actor_id: 'u-recep', p_usuario_id: 'm-1', p_cambios: { status: 'suspendido' }, p_motivo: 'Daños al equipo'
+    });
     expect(mockEjecutar.mock.calls[0][1]).toEqual({ usuarioId: 'm-1' });
-    expect(mockUpdate.mock.invocationCallOrder[0]).toBeLessThan(mockEjecutar.mock.invocationCallOrder[0]);
-    expect(JSON.parse(res.body).cobro_stripe).toMatchObject({ aplicadas: 1, fallidas: 0 });
+    expect(mockRpc.mock.invocationCallOrder[0]).toBeLessThan(mockEjecutar.mock.invocationCallOrder[0]);
+    expect(JSON.parse(res.body)).toMatchObject({ success: true, status: 'suspendido', cambios: ['status→suspendido'], cobro_stripe: { aplicadas: 1 } });
   });
 
-  it('R2-B: si Stripe falla o el ejecutor revienta, la sanción NO se deshace: 200, UPDATE hecho, error reportado', async () => {
+  it('R2-B: si Stripe falla o el ejecutor revienta, la sanción NO se deshace: 200, cambio hecho, error reportado', async () => {
     setCallerTarget();
     mockEjecutar.mockRejectedValue(new Error('stripe caído'));
     const res = await invocar(evento({ usuario_id: 'm-1', status: 'suspendido', motivo: 'Daños al equipo' }));
     expect(res.statusCode).toBe(200);
-    expect(patchEnviado()).toMatchObject({ status: 'suspendido' });
-    expect(patchEnviado().sancionado_at).toBeTruthy();
     expect(JSON.parse(res.body).cobro_stripe).toBeNull();
     expect(mockReportarError).toHaveBeenCalledTimes(1);
   });
 
-  it('R2-B: un cambio de contacto (sin cambio de estado) no toca el cobro', async () => {
+  it('un cambio de contacto (sin cambio de estado) no toca el cobro y no requiere motivo', async () => {
     setCallerTarget();
+    mockRpc.mockResolvedValue(rpcOk(['nombre']));
     const res = await invocar(evento({ usuario_id: 'm-1', nombre: 'Ana María' }));
     expect(res.statusCode).toBe(200);
+    expect(llamadasRpc()[0]).toMatchObject({ p_cambios: { nombre: 'Ana María' }, p_motivo: null });
     expect(mockEjecutar).not.toHaveBeenCalled();
   });
 
-  it('cambio de status SIN motivo → 400, sin update ni audit', async () => {
+  it('cambio de status SIN motivo → 400; membresia_tier → 400; desbloqueo sin motivo → 400. Sin RPC.', async () => {
     setCallerTarget();
-    const res = await invocar(evento({ usuario_id: 'm-1', status: 'suspendido' }));
-    expect(res.statusCode).toBe(400);
-    expect(mockUpdate).not.toHaveBeenCalled();
-    expect(mockAuditInsert).not.toHaveBeenCalled();
-  });
-
-  it('cambio de status CON motivo → 200 + audit status_change con antes/después', async () => {
+    expect((await invocar(evento({ usuario_id: 'm-1', status: 'suspendido' }))).statusCode).toBe(400);
     setCallerTarget();
-    const res = await invocar(
-      evento({ usuario_id: 'm-1', status: 'suspendido', motivo: 'Cliente solicitó suspensión' })
-    );
-    expect(res.statusCode).toBe(200);
-    const patch = patchEnviado();
-    expect(patch.status).toBe('suspendido');
-    // B1/B2: ya no se escribe notas_admin.
-    expect(patch).not.toHaveProperty('notas_admin');
-    const audit = auditDe('status_change');
-    expect(audit).toBeDefined();
-    expect(audit?.antes).toEqual({ status: 'activo', sancionado: false });
-    expect(audit?.despues).toEqual({ status: 'suspendido', sancionado: true });
-    expect(audit?.motivo).toBe('Cliente solicitó suspensión');
-    expect(audit?.actor_usuario_id).toBe('u-recep');
-  });
-
-  it('membresia_tier en el body → 400 sin update (el plan se activa con cobro, no desde "Editar datos")', async () => {
+    expect((await invocar(evento({ usuario_id: 'm-1', membresia_tier: 'pro', motivo: 'Pagó' }))).statusCode).toBe(400);
     setCallerTarget();
-    const res = await invocar(evento({ usuario_id: 'm-1', membresia_tier: 'pro', motivo: 'Compró paquete' }));
-    expect(res.statusCode).toBe(400);
-    expect(mockUpdate).not.toHaveBeenCalled();
-    expect(mockTierMaybeSingle).not.toHaveBeenCalled();
-  });
-
-  it('membresia_tier: null tampoco (quitar el plan a mano cancelaba la membresía local y no la de Stripe)', async () => {
+    expect((await invocar(evento({ usuario_id: 'm-1', membresia_tier: null, motivo: 'Baja' }))).statusCode).toBe(400);
     setCallerTarget();
-    const res = await invocar(evento({ usuario_id: 'm-1', membresia_tier: null, motivo: 'Baja voluntaria' }));
-    expect(res.statusCode).toBe(400);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  it('edición de contacto NO requiere motivo → 200 + audit contact_change', async () => {
-    setCallerTarget();
-    const res = await invocar(evento({ usuario_id: 'm-1', nombre: 'Ana María' }));
-    expect(res.statusCode).toBe(200);
-    expect(mockUpdate).toHaveBeenCalled();
-    const patch = patchEnviado();
-    expect(patch.nombre).toBe('Ana María');
-    expect(patch).not.toHaveProperty('notas_admin');
-    expect(auditDe('contact_change')).toBeDefined();
-  });
-
-  it('desbloqueo CON motivo: bloqueado_hasta=null y NO resetea no_shows_count (B4)', async () => {
-    setCallerTarget({ ...TARGET, bloqueado_hasta: '2099-01-01T00:00:00Z', no_shows_count: 3 });
-    const res = await invocar(
-      evento({ usuario_id: 'm-1', unblock: true, motivo: 'Error operativo (no fue no-show real)' })
-    );
-    expect(res.statusCode).toBe(200);
-    const patch = patchEnviado();
-    expect(patch.bloqueado_hasta).toBeNull();
-    expect(patch).not.toHaveProperty('no_shows_count'); // B4: no se toca
-    const audit = auditDe('unblock');
-    expect(audit).toBeDefined();
-    expect((audit?.despues as Record<string, unknown>).no_shows_count).toBe(3); // conservado
-  });
-
-  it('desbloqueo SIN motivo → 400', async () => {
-    setCallerTarget({ ...TARGET, bloqueado_hasta: '2099-01-01T00:00:00Z', no_shows_count: 3 });
-    const res = await invocar(evento({ usuario_id: 'm-1', unblock: true }));
-    expect(res.statusCode).toBe(400);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  it('un miembro NO puede usar la función (403)', async () => {
-    mockMaybeSingle.mockResolvedValueOnce({
-      data: { ...CALLER, rol: 'miembro' },
-      error: null
-    });
-    const res = await invocar(evento({ usuario_id: 'm-1', nombre: 'X' }));
-    expect(res.statusCode).toBe(403);
-  });
-
-  it('un recepcionista REVOCADO no puede usar la función aunque conserve su sesión (403)', async () => {
-    mockMaybeSingle.mockResolvedValueOnce({
-      data: { ...CALLER, status: 'revocado' },
-      error: null
-    });
-    const res = await invocar(evento({ usuario_id: 'm-1', nombre: 'X' }));
-    expect(res.statusCode).toBe(403);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  it('escalada: un recepcionista NO puede cambiarle el email de acceso a un admin (403, sin tocar auth)', async () => {
-    setCallerTarget({ ...TARGET, id: 'a-1', auth_id: 'auth-admin', rol: 'admin', email: 'dueno@ekko.mx' });
-    const res = await invocar(evento({ usuario_id: 'a-1', email: 'atacante@evil.mx' }));
-    expect(res.statusCode).toBe(403);
-    expect(mockUpdateUserById).not.toHaveBeenCalled();
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  it('escalada: un recepcionista tampoco puede suspender a otro miembro del equipo (403)', async () => {
-    setCallerTarget({ ...TARGET, id: 'r-2', rol: 'recepcionista' });
-    const res = await invocar(evento({ usuario_id: 'r-2', status: 'suspendido', motivo: 'porque sí' }));
-    expect(res.statusCode).toBe(403);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  it('un admin SÍ puede editar una cuenta del equipo', async () => {
-    mockMaybeSingle.mockResolvedValueOnce({ data: { ...CALLER, id: 'u-admin', rol: 'admin' }, error: null });
-    mockMaybeSingle.mockResolvedValueOnce({ data: { ...TARGET, id: 'r-2', rol: 'recepcionista' }, error: null });
-    const res = await invocar(evento({ usuario_id: 'r-2', nombre: 'Nuevo Nombre' }));
-    expect(res.statusCode).toBe(200);
-  });
-
-
-  it('suspender desde el mostrador = sanción: fija sancionado_at + motivo en el MISMO update', async () => {
-    setCallerTarget();
-    const res = await invocar(evento({ usuario_id: 'm-1', status: 'suspendido', motivo: 'Daños al equipo' }));
-    expect(res.statusCode).toBe(200);
-    const patch = patchEnviado();
-    expect(patch.status).toBe('suspendido');
-    expect(typeof patch.sancionado_at).toBe('string');
-    expect(patch.sancion_motivo).toBe('Daños al equipo');
-    expect(auditDe('status_change')?.despues).toEqual({ status: 'suspendido', sancionado: true });
-  });
-
-  it('reactivar levanta la sanción: sancionado_at y motivo a NULL junto con status=activo', async () => {
-    setCallerTarget({ ...TARGET, status: 'suspendido', sancionado_at: '2026-09-01T00:00:00Z' });
-    const res = await invocar(evento({ usuario_id: 'm-1', status: 'activo', motivo: 'Pagó los daños' }));
-    expect(res.statusCode).toBe(200);
-    const patch = patchEnviado();
-    expect(patch).toMatchObject({ status: 'activo', sancionado_at: null, sancion_motivo: null });
-    expect(auditDe('status_change')?.antes).toEqual({ status: 'suspendido', sancionado: true });
-  });
-
-  // ── F2 · R1: la revocación es persistente ──────────────────────────────────
-  it('recepción NO puede levantar una revocación (403, sin update ni RPC)', async () => {
-    setCallerTarget({ ...TARGET, status: 'revocado' });
-    const res = await invocar(evento({ usuario_id: 'm-1', status: 'activo', motivo: 'Volvió' }));
-    expect(res.statusCode).toBe(403);
-    expect(mockUpdate).not.toHaveBeenCalled();
+    expect((await invocar(evento({ usuario_id: 'm-1', unblock: true }))).statusCode).toBe(400);
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  it('un admin la levanta SOLO por la RPC explícita restaurar_acceso_revocado, y el audit dice el estado final', async () => {
-    mockMaybeSingle
-      .mockResolvedValueOnce({ data: { ...CALLER, id: 'u-admin', rol: 'admin' }, error: null })
-      .mockResolvedValueOnce({ data: { ...TARGET, status: 'revocado' }, error: null })
-      .mockResolvedValueOnce({ data: { status: 'activo' }, error: null });
-
-    const res = await invocar(evento({ usuario_id: 'm-1', status: 'activo', motivo: 'Revocación por error' }));
-
+  it('desbloqueo CON motivo viaja como { unblock: true } (la RPC conserva no_shows_count — B4)', async () => {
+    setCallerTarget();
+    mockRpc.mockResolvedValue(rpcOk(['desbloqueo']));
+    const res = await invocar(evento({ usuario_id: 'm-1', unblock: true, motivo: 'Avisó con tiempo' }));
     expect(res.statusCode).toBe(200);
-    expect(mockRpc).toHaveBeenCalledWith('restaurar_acceso_revocado', {
-      p_usuario_id: 'm-1', p_actor_id: 'u-admin', p_status: 'activo', p_motivo: 'Revocación por error'
-    });
-    // El UPDATE normal no lleva status (lo pondría el trigger de vuelta en revocado).
-    expect(patchEnviado()).not.toHaveProperty('status');
-    expect(auditDe('status_change')?.despues).toMatchObject({ status: 'activo' });
+    expect(llamadasRpc()[0]).toMatchObject({ p_cambios: { unblock: true }, p_motivo: 'Avisó con tiempo' });
   });
 
-  it('el audit de status_change registra lo que quedó persistido, no lo pedido', async () => {
-    mockMaybeSingle
-      .mockResolvedValueOnce({ data: CALLER, error: null })
-      .mockResolvedValueOnce({ data: TARGET, error: null })
-      .mockResolvedValueOnce({ data: { status: 'suspendido' }, error: null });
-    await invocar(evento({ usuario_id: 'm-1', status: 'pendiente_pago', motivo: 'Debe la mensualidad' }));
-    expect(auditDe('status_change')?.despues).toMatchObject({ status: 'suspendido' });
+  it('un miembro NO puede usar la función (403); un recepcionista REVOCADO tampoco', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: { ...CALLER, rol: 'miembro' }, error: null });
+    expect((await invocar(evento({ usuario_id: 'm-1', nombre: 'X' }))).statusCode).toBe(403);
+    mockMaybeSingle.mockResolvedValueOnce({ data: { ...CALLER, status: 'revocado' }, error: null });
+    expect((await invocar(evento({ usuario_id: 'm-1', nombre: 'X' }))).statusCode).toBe(403);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('escalada: recepción no edita cuentas del equipo (403, sin tocar Auth ni la RPC); un admin sí', async () => {
+    setCallerTarget({ ...TARGET, id: 'a-1', rol: 'admin', email: 'jefe@cravia.mx' });
+    expect((await invocar(evento({ usuario_id: 'a-1', email: 'robo@x.mx' }))).statusCode).toBe(403);
+    setCallerTarget({ ...TARGET, id: 'r-2', rol: 'recepcionista' });
+    expect((await invocar(evento({ usuario_id: 'r-2', status: 'suspendido', motivo: 'Celos' }))).statusCode).toBe(403);
+    expect(mockUpdateUserById).not.toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalled();
+    setCallerTarget({ ...TARGET, id: 'r-2', rol: 'recepcionista' }, { ...CALLER, id: 'u-admin', rol: 'admin' });
+    mockRpc.mockResolvedValue(rpcOk(['nombre']));
+    expect((await invocar(evento({ usuario_id: 'r-2', nombre: 'Nuevo nombre' }))).statusCode).toBe(200);
+  });
+
+  it('correo: primero Auth, después la copia local por la RPC (así el reintento converge)', async () => {
+    setCallerTarget();
+    mockRpc.mockResolvedValue(rpcOk(['email']));
+    const res = await invocar(evento({ usuario_id: 'm-1', email: 'Nueva@Cravia.mx' }));
+    expect(res.statusCode).toBe(200);
+    expect(mockUpdateUserById).toHaveBeenCalledWith('auth-m1', { email: 'nueva@cravia.mx', email_confirm: true });
+    expect(mockRpc).toHaveBeenCalledWith('staff_actualizar_cuenta', expect.objectContaining({ p_cambios: { email: 'nueva@cravia.mx' } }));
+    expect(mockUpdateUserById.mock.invocationCallOrder[0]).toBeLessThan(mockRpc.mock.invocationCallOrder[0]);
+  });
+
+  it('correo igual al actual o inválido: ni Auth ni RPC / 400', async () => {
+    setCallerTarget();
+    expect((await invocar(evento({ usuario_id: 'm-1', email: 'ANA@cravia.mx' }))).statusCode).toBe(200);
+    expect(mockUpdateUserById).not.toHaveBeenCalled();
+    setCallerTarget();
+    expect((await invocar(evento({ usuario_id: 'm-1', email: 'sin-arroba' }))).statusCode).toBe(400);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('Auth rechaza el correo y no había otros cambios → 400 "ya existe" / 500, sin RPC', async () => {
+    setCallerTarget();
+    mockUpdateUserById.mockResolvedValue({ error: { message: 'A user with this email address has already been registered' } });
+    const res = await invocar(evento({ usuario_id: 'm-1', email: 'otro@cravia.mx' }));
+    expect(res.statusCode).toBe(400);
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('parcial honesto: nombre guardado pero Auth rechazó el correo → 409 con lo que SÍ se aplicó', async () => {
+    setCallerTarget();
+    mockRpc.mockResolvedValueOnce(rpcOk(['nombre']));
+    mockUpdateUserById.mockResolvedValue({ error: { message: 'already registered' } });
+    const res = await invocar(evento({ usuario_id: 'm-1', nombre: 'Ana María', email: 'otro@cravia.mx' }));
+    expect(res.statusCode).toBe(409);
+    const body = JSON.parse(res.body);
+    expect(body.error).toMatch(/Se guardó nombre/);
+    expect(body.parcial).toEqual({ aplicado: ['nombre'], email: 'no_aplicado' });
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+  });
+
+  it('parcial honesto: Auth aceptó el correo pero la copia local falló → 500 con `parcial` (nunca "nada pasó")', async () => {
+    setCallerTarget();
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'connection reset' } });
+    const res = await invocar(evento({ usuario_id: 'm-1', email: 'otro@cravia.mx' }));
+    expect(res.statusCode).toBe(500);
+    const body = JSON.parse(res.body);
+    expect(body.error).toMatch(/ya cambió/);
+    expect(body.parcial).toMatchObject({ email: 'auth_actualizado_perfil_pendiente' });
+    expect(mockReportarError).toHaveBeenCalled();
+  });
+
+  it('la RPC rechaza con un código EKKO_* → se traduce con su texto; un error desconocido → 500 genérico', async () => {
+    setCallerTarget();
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'EKKO_MOTIVO_REQUERIDO: Motivo obligatorio para esta acción' } });
+    let res = await invocar(evento({ usuario_id: 'm-1', status: 'suspendido', motivo: 'Daños' }));
+    expect(res.statusCode).toBe(400);
+    expect(JSON.parse(res.body).error).toBe('Motivo obligatorio para esta acción');
+    expect(mockEjecutar).not.toHaveBeenCalled();
+    setCallerTarget();
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'deadlock detected' } });
+    res = await invocar(evento({ usuario_id: 'm-1', nombre: 'X' }));
+    expect(res.statusCode).toBe(500);
+    expect(JSON.parse(res.body).error).not.toMatch(/deadlock/);
+  });
+
+  it('revocación: recepción NO la levanta (403, sin RPC); un admin sí, y la restauración ocurre dentro de la RPC', async () => {
+    setCallerTarget({ ...TARGET, status: 'revocado' });
+    expect((await invocar(evento({ usuario_id: 'm-1', status: 'activo', motivo: 'Volvió' }))).statusCode).toBe(403);
+    expect(mockRpc).not.toHaveBeenCalled();
+    setCallerTarget({ ...TARGET, status: 'revocado' }, { ...CALLER, id: 'u-admin', rol: 'admin' });
+    mockRpc.mockResolvedValue(rpcOk(['status→activo'], 'activo'));
+    const res = await invocar(evento({ usuario_id: 'm-1', status: 'activo', motivo: 'Revocación por error' }));
+    expect(res.statusCode).toBe(200);
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(mockRpc).toHaveBeenCalledWith('staff_actualizar_cuenta', expect.objectContaining({ p_actor_id: 'u-admin', p_cambios: { status: 'activo' } }));
+    expect(JSON.parse(res.body).status).toBe('activo');
+  });
+
+  it('foto: se sube a Storage ANTES de la transacción local y la URL viaja a la RPC', async () => {
+    setCallerTarget();
+    mockRpc.mockResolvedValue({ data: { success: true, sin_cambios: false, cambios: ['foto'], status: 'activo', avatar_url: 'https://cdn.test/a.jpg' }, error: null });
+    const res = await invocar(evento({ usuario_id: 'm-1', avatar: { base64: Buffer.from('img').toString('base64'), contentType: 'image/jpeg' } }));
+    expect(res.statusCode).toBe(200);
+    expect(mockUpload.mock.invocationCallOrder[0]).toBeLessThan(mockRpc.mock.invocationCallOrder[0]);
+    expect(llamadasRpc()[0]).toMatchObject({ p_cambios: { avatar_url: 'https://cdn.test/a.jpg' } });
+    expect(JSON.parse(res.body).avatar_url).toBe('https://cdn.test/a.jpg');
+  });
+
+  it('sin cambios → 200 sin_cambios, sin RPC ni Auth', async () => {
+    setCallerTarget();
+    const res = await invocar(evento({ usuario_id: 'm-1' }));
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toMatchObject({ success: true, sin_cambios: true });
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 });
