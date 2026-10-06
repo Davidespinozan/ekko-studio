@@ -4,22 +4,24 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-06 · PKG-03B cerrado en producción (fase D: reconciliación
-diaria 09:00 UTC + endpoint manual con token). Primera corrida programada pendiente. Todo lo de abajo se
+Última actualización: 2026-10-06 · PKG-02H cerrado en producción (operaciones de cobro
+del staff durables). Antes: PKG-03B (reconciliador diario, primera corrida pendiente). Todo lo de abajo se
 verificó en vivo contra git, Netlify y Supabase.
 
 ## Producción (verificado 2026-10-06 02:00 UTC)
-- Código de negocio publicado: `f71358677529fbc29c29bbb2911e94cce33c34e9`
-  ("feat(stripe): schedule daily reconciliation", PKG-03B fase D); el commit
-  docs-only de este archivo va encima (ver `git log`). Cadena:
+- Código de negocio publicado: `50c3a4c2b1790b64c43aac90c65c876c1e071783`
+  ("fix(billing): make staff pause operations durable", PKG-02H); el commit docs-only
+  de este archivo va encima (ver `git log`). Cadena:
   `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
   en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
   pendiente) → `c33b750` (STATUS) → `6fe3f64` (F-1) → `762dbe4` (STATUS) → `890498a` (PKG-03A)
   → `1d42079` (STATUS) → `0890adb` (EKKO-138) → `0b23ca7` (STATUS) → `0ffe13d` (PKG-03B)
-  → `07a85d8` (STATUS) → `308a4a7` (STATUS) → `f713586` (PKG-03B fase D).
-- Netlify production: deploy `6ac45ba046ad180008bf2860`, READY, `commit_ref` =
-  `f713586`, publicado 2026-10-06 02:25:21 UTC; **9 funciones programadas** (antes 8):
-  la nueva es `cron-reconciliar-stripe` a `0 9 * * *` (09:00 UTC diario). Antes:
+  → `07a85d8` (STATUS) → `308a4a7` (STATUS) → `f713586` (PKG-03B fase D) → `a682065` (STATUS)
+  → `50c3a4c` (PKG-02H).
+- Netlify production: deploy `6ac46533fd7f11000905e896`, READY, `commit_ref` =
+  `50c3a4c`, publicado 2026-10-06 03:06:13 UTC; 9 funciones programadas (sin cambio),
+  `cron-reconciliar-stripe` a `0 9 * * *`. Antes: `6ac45c84…` = a682065, `6ac45ba0…` =
+  f713586 (02:25 UTC, fase D de 03B). Antes de eso:
   `6ac45875…` = 308a4a7, `6ac45790…` = 07a85d8 (reconstrucción para cargar la
   variable del reconciliador, 02:08 UTC), `6ac455aa…` = 07a85d8,
   `6ac4548d…` = 0ffe13d (01:55 UTC), `6ac44f67…` = 0b23ca7,
@@ -30,8 +32,9 @@ verificó en vivo contra git, Netlify y Supabase.
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **108/108 migraciones**; última
-  `20261011100000_03b_reconciliacion_stripe.sql` (PKG-03B). La 107 es
+- Supabase: **109/109 migraciones**; última
+  `20261012100000_02h_operaciones_staff_durables.sql` (PKG-02H). La 108 es
+  `20261011100000_03b_reconciliacion_stripe.sql` (PKG-03B), la 107
   `20261010100000_ekko138_pausa_comercial.sql` (EKKO-138), la 106
   `20261009100000_03a_pendientes_operativos.sql` (PKG-03A), la 105
   `20261008100000_f1_vistas_valor_security_invoker.sql` (F-1), la 104
@@ -52,6 +55,31 @@ R1 · PKG-00A, 00C, 00E, 00F, 00G · PKG-01A–01H · R2-A (01I–01M) · R2-B (
 PKG-02A, 02B · Arquitectura de contexto fases 1–4 (PUBLICADA / VALIDADA / CERRADA) ·
 **PKG-03B "Reconciliador Stripe (detect-only)" — CLOSED IN PRODUCTION** (EKKO-140; detalle
 y evidencia en la sección "PKG-03B" de abajo; primera corrida programada pendiente) ·
+**PKG-02H "Operaciones de cobro del staff durables" — CLOSED IN PRODUCTION** (EKKO-141).
+Alcance final tras deduplicar contra R1, R2-A/B, EKKO-138, 03A y 03B: pausar, reactivar y
+dar de baja al fin del periodo escriben su operación en `stripe_operaciones_suscripcion`
+en la misma transacción que la transición local (causas `pausa_staff`,
+`reactivacion_staff`, `baja_fin_periodo`; tipo `cancelar_fin_periodo`), con identidad por
+operación lógica; `stripe-pausar-membresia` y `staff-cancelar-membresia` (fin de periodo)
+pasan a RPC → ejecutor (ya no tocan Stripe antes de la intención). Evidencia
+(2026-10-06 03:00–03:10 UTC): commit `50c3a4c`; migración `20261012100000` aplicada
+(108 → 109, md5 `cf90c704896d40103478c0c270f1a24d`) antes del código, sin crear
+operaciones (tabla con 0 filas antes y después); deploy `6ac46533fd7f11000905e896`
+READY con ese SHA. Funciones 118 → 118: cambiaron exactamente `staff_pausar_membresia`,
+`staff_cancelar_membresia`, `_reconciliar_cobro_sancion`, `operacion_suscripcion_preparar`
+y `operacion_suscripcion_resultado`; 0 nuevas, 0 quitadas; idénticas al build probado.
+Constraints `tipo`/`causa` ampliados; ACL de las 5 funciones sin cambio; sin DML de cliente
+en operaciones; anon/PUBLIC 0. En las definiciones vivas: intención `pausa_comercial_at`
+sigue siendo autoridad y el sync del webhook no la toca; reactivar con sanción no crea
+reanudación; la sanción solo descarta sus suspensiones y no duplica reanudaciones; la
+revocación va primero; la baja inmediata (R2-B) intacta; llaves
+`pausar_staff:<mem>:<pausa>`, `reactivar_staff:<mem>:<pausa>`, `cancelar_fin:<mem>`.
+03A: pendientes/fallidas visibles con `vigilar_operacion`/`decidir_operacion`; etiqueta
+nueva publicada. 03B intacto: 9 programadas, `0 9 * * *`, manual con token (POST sin
+token → 403), supresión `operacion_en_vuelo` presente. Hardening 49/49; drift 64/64;
+datos de negocio intactos (foto antes = después). Local: DB 27 suites / 455 pruebas; gate
+207 archivos / 1958. Sin evento artificial: ninguna pausa, reactivación, baja ni
+mutación de Stripe durante la activación.
 **PKG-02C "Frontera de autorización por REST: avisos, notas y grants" — CLOSED IN
 PRODUCTION** (EKKO-136). Evidencia de la activación (2026-10-05 21:36–21:50 UTC):
 commit `50b880d` publicado; migración `20261006100000` aplicada (102 → 103); deploy
@@ -140,14 +168,7 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- **PKG-02H "Operaciones de cobro del staff durables"** (EKKO-141) — COMMITTED en
-  local (un commit, ver `git log`), gate verde, SIN PUSH / SIN DEPLOY / MIGRACIÓN NO
-  APLICADA. Migración `20261012100000_02h_operaciones_staff_durables.sql`. Cambian de
-  cuerpo a propósito `staff_pausar_membresia`, `staff_cancelar_membresia`,
-  `_reconciliar_cobro_sancion`, `operacion_suscripcion_preparar`,
-  `operacion_suscripcion_resultado`; sin funciones nuevas. `stripe-pausar-membresia`
-  y `staff-cancelar-membresia` (fin de periodo) pasan a RPC → ejecutor. Pruebas:
-  `src/__tests__/db/02h-operaciones-staff.db.test.ts`.
+- Nada.
 
 ## PKG-03B — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-03B "Reconciliador Stripe (detect-only)"** (EKKO-140, D-03B-1 = A) —
@@ -221,6 +242,9 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   dos pruebas). No se aplica, no se borra, no se commitea. Ver nota de `57b9af0`.
 
 ## Diferido / pendiente no bloqueante
+- PKG-02H, evidencia natural (no se fabrica): primera pausa real del staff con
+  suscripción, primera reactivación, primera baja al fin del periodo, primer fallo
+  ambiguo del proveedor en una operación del staff.
 - PKG-03A, evidencia natural (no se fabrica): primer correo que falle y se
   reintente; primer push con fallo; primera operación de cobro que agote reintentos;
   primer correo directo del webhook asentado en `correos_directos`.
@@ -234,8 +258,8 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   2. Si alguien reanuda el cobro directo en Stripe durante una pausa comercial, la
      intención local se conserva y el proveedor queda activo: divergencia que
      detectaría PKG-03B.
-  3. La pausa/reactivación del staff sigue llamando a Stripe directo, sin fila de
-     operación ni llave de idempotencia (02H).
+  3. (Resuelto por PKG-02H: la pausa/reactivación del staff ya es una operación
+     durable con llave.)
 - `PENDING FIRST LEGITIMATE PASSWORD CHANGE` (PKG-02C): el primer cambio real de
   contraseña de un usuario con aviso `cambiar_password` abierto debe cerrarlo; hoy no
   hay ningún aviso de ese tipo. No se fabrica.
@@ -260,8 +284,11 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 
 ## Siguiente paso
 Observar la primera corrida programada del reconciliador (09:00 UTC) en
-`reconciliacion_stripe_corridas` / Operación, sin intervenir. Después, decisión del
-dueño sobre el siguiente bloque (02H u otro). En Operación siguen 2 pendientes reales. En Operación hay trabajo real esperando
+`reconciliacion_stripe_corridas` / Operación, sin intervenir, y resolver desde el panel
+los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
+`activo_sin_derecho`). Fuera de 02H quedan, para decisión del dueño: intención local en
+cambio de plan, auditoría en borrar usuario / cambiar rol, huérfanos de Storage y
+`cron-material-vencido`. Ningún paquete nuevo está autorizado. En Operación hay trabajo real esperando
 una decisión: el evento de Stripe en `revision` desde 2026-10-02 y una divergencia
 `activo_sin_derecho`. PKG-03B y 02H no están autorizados. En Operación hay trabajo real
 esperando una decisión del dueño: el evento de Stripe en `revision` desde 2026-10-02
