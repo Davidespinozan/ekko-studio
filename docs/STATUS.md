@@ -4,24 +4,27 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-05 (noche) · hotfix F-1 cerrado en producción (vistas
-de valor aisladas). Antes: reconciliación tras dos sesiones que escribieron el mismo
-día. Todo lo de abajo se verificó en vivo contra git, Netlify y Supabase.
+Última actualización: 2026-10-06 · PKG-03A cerrado en producción (pendientes
+operativos y entrega). Antes: F-1 (vistas de valor aisladas). Todo lo de abajo se
+verificó en vivo contra git, Netlify y Supabase.
 
-## Producción (verificado 2026-10-05 23:28 UTC)
-- `origin/main` = HEAD = `6fe3f640ee1002e32de3ebd5dd0d375890afc416`
-  ("fix(security): isolate financial reconciliation views", F-1). Cadena del día:
+## Producción (verificado 2026-10-06 00:20 UTC)
+- Código de negocio publicado: `890498add89e2b728efd85e1f3e8a294ac86741a`
+  ("feat(operations): add durable operational pending workflow", PKG-03A); el
+  commit docs-only de este archivo va encima (ver `git log`). Cadena:
   `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
   en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
-  pendiente) → `c33b750` (STATUS) → `6fe3f64` (F-1).
-- Netlify production: deploy `6ac432095e347500081e187d`, READY, `commit_ref` =
-  `6fe3f64`, publicado 2026-10-05 23:27:39 UTC. Antes: `6ac42df5…` = c33b750 (23:10),
+  pendiente) → `c33b750` (STATUS) → `6fe3f64` (F-1) → `762dbe4` (STATUS) → `890498a` (PKG-03A).
+- Netlify production: deploy `6ac43c905e3475000842d63f`, READY, `commit_ref` =
+  `890498a`, publicado 2026-10-06 00:12:49 UTC. Antes: `6ac432a4…` = 762dbe4,
+  `6ac43209…` = 6fe3f64 (23:27 UTC), `6ac42df5…` = c33b750 (23:10),
   `6ac42883…` = cf7c3a0 (22:47 UTC). Cada commit anterior tuvo su deploy
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **105/105 migraciones**; última
-  `20261008100000_f1_vistas_valor_security_invoker.sql` (F-1). La 104 es
+- Supabase: **106/106 migraciones**; última
+  `20261009100000_03a_pendientes_operativos.sql` (PKG-03A). La 105 es
+  `20261008100000_f1_vistas_valor_security_invoker.sql` (F-1), la 104
   `20261007100000_material_pendiente_y_requerido.sql` y la 103
   `20261006100000_02c_frontera_rest_avisos_y_grants.sql` (PKG-02C), aplicadas.
 - Datos de negocio (lectura 23:04 UTC, sin PII): **1 membresía activa** (alta manual
@@ -64,6 +67,24 @@ idéntico; hardening 45/45 (2 checks P5 nuevos); drift 64/64; sin datos tocados.
 Gate local 197 archivos / 1836 pruebas. Producción tiene un solo tenant: el
 aislamiento entre tenants con datos reales queda probado en PGlite
 (`f1-vistas-valor.db.test.ts`), no con datos de producción.
+**PKG-03A "Pendientes operativos y entrega" — CLOSED IN PRODUCTION** (EKKO-137).
+Evidencia (2026-10-06 00:05–00:20 UTC): commit `890498a`; migración `20261009100000`
+aplicada (105 → 106, md5 `ffd683f4900c94ef82ccbaa61b3179be`) ANTES del código; deploy
+`6ac43c905e3475000842d63f` READY con ese SHA. Funciones 106 → 116: cambiaron solo
+`notificaciones_frontera_cliente` (02C, lista blanca) y `operacion_suscripcion_resultado`
+(R2-B, tope de 5 intentos por ronda); 10 nuevas, ninguna quitada; idénticas a la base
+local probada. Objetos: ciclo de vida de correo/push en `notificaciones`,
+`correos_directos`, cierre humano en `stripe_webhook_events`, tope y RPC de
+reintentar/descartar en `stripe_operaciones_suscripcion`, `v_pendientes_operativos`
+(security_invoker), página `/admin/operacion` y tarjeta en el Centro de pendientes.
+Autorización: RPC de entrega solo service_role; RPC de admin con guarda interna; sin
+EXECUTE de anon/PUBLIC; anon 401 en vista, tabla y RPC nuevas. La vista, leída como el
+admin real (transacción de solo lectura revertida), deriva justo el trabajo real
+esperado: el evento de Stripe en `revision` desde 2026-10-02 y una divergencia
+`activo_sin_derecho`; recepción y miembro ven 0. Hardening 47/47; drift 64/64; datos
+de negocio intactos (hash de `notificaciones` y `stripe_webhook_events` sobre las
+columnas previas = idéntico al de antes). Gate local 201 archivos / 1878 pruebas.
+D-03A-1 / EKKO-138: BLOQUEADA, NO implementada (ver "Diferido").
 Qué decidió cada uno: `docs/DECISIONS_INDEX.md` → `DECISIONS.md`.
 Evidencia: migraciones `supabase/migrations/`, pruebas `src/__tests__/db/`.
 
@@ -92,13 +113,9 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- **PKG-03A "Pendientes operativos y entrega"** (EKKO-137) — IMPLEMENTADO
-  LOCALMENTE, gate verde, SIN COMMIT / SIN PUSH / SIN DEPLOY / MIGRACIÓN NO
-  APLICADA. Migración `20261009100000_03a_pendientes_operativos.sql`. Cambian de
-  cuerpo a propósito `notificaciones_frontera_cliente` (02C, ahora lista blanca) y
-  `operacion_suscripcion_resultado` (R2-B, tope de reintentos); 10 funciones nuevas.
-  D-03A-1 (EKKO-138) decidida y NO implementada: falta extensión de modelo.
-  Pruebas: `src/__tests__/db/03a-pendientes-operativos.db.test.ts`, P5.
+- Nada. (Corrección: la versión anterior de este archivo, dentro del commit
+  `890498a`, decía "SIN COMMIT"; se escribió antes de commitear. PKG-03A ya está
+  publicado y cerrado, ver "Cerrado en producción".)
 
 ## Escritor único
 Un solo agente o sesión escribe en este árbol a la vez; las demás son de solo lectura.
@@ -112,6 +129,14 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   dos pruebas). No se aplica, no se borra, no se commitea. Ver nota de `57b9af0`.
 
 ## Diferido / pendiente no bloqueante
+- PKG-03A, evidencia natural (no se fabrica): primer correo que falle y se
+  reintente; primer push con fallo; primera operación de cobro que agote reintentos;
+  primer correo directo del webhook asentado en `correos_directos`.
+- **D-03A-1 / EKKO-138 — BLOQUEADA / NO IMPLEMENTADA:** hace falta una
+  representación durable que distinga una pausa comercial/del staff de una pausa
+  derivada de la sanción (hoy `membresias.status = 'pausada'` también llega como eco
+  de la suspensión por sanción vía Stripe). Relacionado: reactivar a mano durante
+  una sanción reanuda el cobro.
 - `PENDING FIRST LEGITIMATE PASSWORD CHANGE` (PKG-02C): el primer cambio real de
   contraseña de un usuario con aviso `cambiar_password` abierto debe cerrarlo; hoy no
   hay ningún aviso de ese tipo. No se fabrica.
@@ -135,7 +160,9 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 - 2 usuarios con caché de plan divergente (evidencia de que el caché no decide).
 
 ## Siguiente paso
-Revisión del dueño de PKG-03A (local) y de la extensión de modelo para D-03A-1.
+Decidir la extensión de modelo para D-03A-1 (EKKO-138). En Operación hay trabajo real
+esperando una decisión del dueño: el evento de Stripe en `revision` desde 2026-10-02
+y una divergencia `activo_sin_derecho`. PKG-03B no está autorizado.
 Pendientes previos — decisiones del dueño: cierre formal de los tres trabajos de material/Login, cuál
 versión del enlace de Login queda (publicada vs stash) y qué hacer con los 2 objetos
 huérfanos de Storage. Después, el siguiente bloque del programa (resto del E — admin —
