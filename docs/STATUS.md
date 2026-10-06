@@ -4,23 +4,26 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-06 · PKG-06A cerrado en producción (operaciones compuestas
-de cuenta con frontera del servidor). Antes: PKG-02H (operaciones de cobro del staff
-durables). Todo lo de abajo se verificó en vivo contra git, Netlify y Supabase.
+Última actualización: 2026-10-06 · PKG-06D cerrado en producción (frontera de columnas y
+de cliente, en dos fases). Antes: PKG-06A (operaciones compuestas de cuenta). Todo lo de
+abajo se verificó en vivo contra git, Netlify y Supabase.
 
-## Producción (verificado 2026-10-06 04:15 UTC y re-verificado 15:51 UTC)
-- Código de negocio publicado: `b12fe4f3237a7f3fb20c7bf568a6bce3e60b16ec`
-  ("fix(accounts): make account composites durable", PKG-06A); el commit docs-only
+## Producción (verificado 2026-10-06 16:45 UTC)
+- Código de negocio publicado: `fdecdbb81d8cfc0d6a5c5c7cd96814e10d57cc1a`
+  ("fix(security): harden client data boundary", PKG-06D); el commit docs-only
   de este archivo va encima (ver `git log`). Cadena:
   `a80a8df` (contexto fase 4) → `50b880d` (PKG-02C) → `57b9af0` (link "Volver a EKKO"
   en Login) → `8d7519d` (fix `supabase.rpc` en material) → `cf7c3a0` (material
   pendiente) → `c33b750` (STATUS) → `6fe3f64` (F-1) → `762dbe4` (STATUS) → `890498a` (PKG-03A)
   → `1d42079` (STATUS) → `0890adb` (EKKO-138) → `0b23ca7` (STATUS) → `0ffe13d` (PKG-03B)
   → `07a85d8` (STATUS) → `308a4a7` (STATUS) → `f713586` (PKG-03B fase D) → `a682065` (STATUS)
-  → `50c3a4c` (PKG-02H) → `82604ef` (STATUS) → `b12fe4f` (PKG-06A).
-- Netlify production: deploy `6ac473f643f09e0008dc0393`, READY, `commit_ref` =
-  `b12fe4f`, publicado 2026-10-06 04:09:16 UTC; 46 funciones, 9 programadas (sin
-  cambio), `cron-reconciliar-stripe` a `0 9 * * *`. Antes: `6ac466413a08ae000859a132` =
+  → `50c3a4c` (PKG-02H) → `82604ef` (STATUS) → `b12fe4f` (PKG-06A) → `c02532b` (STATUS)
+  → `fdecdbb` (PKG-06D).
+- Netlify production: deploy `6ac52294893a0e0008a43504`, READY, `commit_ref` =
+  `fdecdbb`, publicado 2026-10-06 16:34:20 UTC; 46 funciones, 9 programadas (sin
+  cambio), `cron-reconciliar-stripe` a `0 9 * * *`; cabeceras con
+  Content-Security-Policy. Antes: `6ac51926…` = c02532b, `6ac473f643f09e0008dc0393` =
+  b12fe4f (04:09 UTC, PKG-06A), `6ac466413a08ae000859a132` =
   82604ef, `6ac46533…` = 50c3a4c (03:06 UTC, PKG-02H), `6ac45c84…` = a682065, `6ac45ba0…` =
   f713586 (02:25 UTC, fase D de 03B). Antes de eso:
   `6ac45875…` = 308a4a7, `6ac45790…` = 07a85d8 (reconstrucción para cargar la
@@ -33,8 +36,12 @@ durables). Todo lo de abajo se verificó en vivo contra git, Netlify y Supabase.
   READY con su SHA exacto: `6ac419b1…` = 50b880d (21:43 UTC), `6ac41d7d…` = 57b9af0
   (22:00 UTC), `6ac42107…` = 8d7519d (22:15 UTC). El build command es
   `npm run ci:gate`: cada push a `main` dispara su propio deploy.
-- Supabase: **110/110 migraciones**; última
-  `20261013100000_06a_cuentas_compuestas.sql` (PKG-06A, md5
+- Supabase: **112/112 migraciones**; última
+  `20261014110000_06d_b_frontera_columnas.sql` (PKG-06D B, md5
+  `81bf09281b2a3c8ab932d7c5d523d99f`, aplicada 2026-10-06 ~16:40 UTC, DESPUÉS del
+  deploy); la 111 es `20261014100000_06d_a_lectura_interna_por_rpc.sql` (PKG-06D A,
+  md5 `ad0798d34a5ee6de13cabdbc0a9058a9`, aplicada ~16:28 UTC, ANTES del deploy); la
+  110 es `20261013100000_06a_cuentas_compuestas.sql` (PKG-06A, md5
   `4cbd57a7b5ce694918fc048e314c4b1d`, aplicada 2026-10-06 ~04:03 UTC). La 109 es
   `20261012100000_02h_operaciones_staff_durables.sql` (PKG-02H). La 108 es
   `20261011100000_03b_reconciliacion_stripe.sql` (PKG-03B), la 107
@@ -61,7 +68,9 @@ y evidencia en la sección "PKG-03B" de abajo; primera corrida programada OBSERV
 2026-10-06 09:00:52 UTC: completa, 15 suscripciones leídas, 0 discrepancias) ·
 **PKG-02H "Operaciones de cobro del staff durables" — CLOSED IN PRODUCTION** (EKKO-141) ·
 **PKG-06A "Operaciones compuestas de cuenta" — CLOSED IN PRODUCTION** (EKKO-142,
-D-FIN-1 = A; detalle en la sección "PKG-06A" de abajo).
+D-FIN-1 = A; detalle en la sección "PKG-06A" de abajo) ·
+**PKG-06D "Frontera de columnas y de cliente" — CLOSED IN PRODUCTION** (EKKO-143;
+detalle en la sección "PKG-06D" de abajo).
 Alcance final tras deduplicar contra R1, R2-A/B, EKKO-138, 03A y 03B: pausar, reactivar y
 dar de baja al fin del periodo escriben su operación en `stripe_operaciones_suscripcion`
 en la misma transacción que la transición local (causas `pausa_staff`,
@@ -174,36 +183,56 @@ remediación y su cierre formal lo decide el dueño.
   `src/__tests__/db/material-pendiente.db.test.ts` y las de frontend del commit.
 
 ## Solo en local
-- **PKG-06D "Frontera de columnas y de cliente" — IMPLEMENTADO LOCALMENTE, en un
-  commit local SIN PUSH** (EKKO-143). Dos migraciones, NO aplicadas en producción:
-  A `20261014100000_06d_a_lectura_interna_por_rpc.sql` (md5
-  `ad0798d34a5ee6de13cabdbc0a9058a9`; aditiva: `staff_datos_internos_cuenta`,
-  `staff_observaciones_reserva`, `buscar_cuentas_staff`) y B
-  `20261014110000_06d_b_frontera_columnas.sql` (md5
-  `81bf09281b2a3c8ab932d7c5d523d99f`; SELECT de `authenticated`/`anon` por columnas
-  en `usuarios` —sin `notas_admin`, `sancion_motivo`, `acceso_autorizado_*`— y en
-  `reservas` —sin `observaciones`, `qr_token_hash`—). ORDEN DE ACTIVACIÓN
-  OBLIGATORIO: A → push/deploy → B (un cliente viejo con `select('*')` recibiría
-  "permission denied" si B va antes del deploy). Cliente: ninguna lectura de
-  `usuarios`/`reservas` usa `*` (`src/shared/lib/columnas.ts`); la lista del panel
-  es la RPC `buscar_cuentas_staff` (texto como parámetro: FR-27); notas y
-  observaciones del staff por RPC; `AuthProvider` con `errorSesion` +
-  `ErrorSesion` (E-16, FR-36) en los tres layouts. Servidor: `_lib/errores.ts`
-  (`errorInterno`, marca `seguro`) aplicado a 44 sitios de 20 funciones de
-  navegador (FR-26); `backend.ts` solo muestra el `error` de un 5xx marcado
-  `seguro`; Signup igual. `netlify.toml`: Content-Security-Policy (FR-25; script
-  estricto, `'unsafe-inline'` solo en style-src, documentado) y `/*.map` → 404;
-  `vite.config.ts`: `sourcemap` false en producción (FR-37). Pruebas:
-  `db/06d-frontera-columnas.db.test.ts` (16; 12 muerden sin migraciones, 5 con solo
-  A), `csp.test.ts` (8), `vite-config.test.ts` (3), `errores-internos.test.ts` (4),
-  `AuthProvider.test.tsx` (6), `backend.test.ts` (+4), contratos de
-  `useAdminData.errores` y `DetalleReservaModal` al nuevo contrato RPC. Hardening
-  54/54 (antes 51); drift 68/68 (antes 66). Gate completo verde: 213 archivos / 2041
-  pruebas, build OK sin ningún `.map` en `dist`, `git diff --check` OK (62 s, máquina en
-  reposo; una corrida previa falló en tsc por una prueba que importaba
-  `vite.config.ts` a través de la referencia de proyecto; se reescribió como prueba
-  estática). Activación: pendiente de
-  autorización del dueño (`ekko-activar`, en dos fases).
+- Nada.
+
+## PKG-06D — cerrado en producción (detalle; la línea corta está en "Cerrado")
+- **PKG-06D "Frontera de columnas y de cliente"** (EKKO-143) — commit `fdecdbb`
+  ("fix(security): harden client data boundary"), activado 2026-10-06 en DOS FASES
+  obligatorias: migración A `20261014100000_06d_a_lectura_interna_por_rpc.sql` (md5
+  `ad0798d34a5ee6de13cabdbc0a9058a9`; Supabase 110 → 111; aditiva: RPC
+  `staff_datos_internos_cuenta`, `staff_observaciones_reserva`,
+  `buscar_cuentas_staff`, SECURITY DEFINER con guardia `is_recepcionista()` + tenant,
+  sin EXECUTE para PUBLIC/anon) → push y deploy Netlify `6ac52294893a0e0008a43504`
+  READY = fdecdbb (16:34 UTC) → compuerta pre-B sobre el bundle publicado (0
+  `select('*')` en usuarios/reservas, listas de columnas explícitas, 3 RPC presentes,
+  0 `.or()` de búsqueda, 0 `select()` con columnas revocadas, `sin_perfil`/ErrorSesion
+  y contrato `seguro` publicados, 0 source maps, CSP viva idéntica a la probada) →
+  migración B `20261014110000_06d_b_frontera_columnas.sql` (md5
+  `81bf09281b2a3c8ab932d7c5d523d99f`; Supabase 111 → 112; solo REVOKE/GRANT). Para
+  aplicar A sola, B se apartó del directorio durante el push y se restauró (árbol
+  limpio verificado antes de cualquier commit).
+- Qué quedó: FR-34, FR-25, FR-26, FR-27, FR-37 y FR-36/E-16 CLOSED IN PRODUCTION.
+  Frontera de columnas: `authenticated` y `anon` tienen SELECT por columnas —22 en
+  `usuarios` (sin `notas_admin`, `sancion_motivo`, `acceso_autorizado_*`), 26 en
+  `reservas` (sin `observaciones`, `qr_token_hash`)—; verificado en vivo que cada
+  columna interna y `*` responden "permission denied" para authenticated y anon, que
+  UPDATE (incl. `notas_admin` del admin) y service_role siguen intactos y que ninguna
+  vista de public expone esas columnas. El staff lee lo interno por RPC; el panel
+  busca por `buscar_cuentas_staff` (texto como parámetro). Errores: `errorInterno`
+  (marca `seguro`) en 44 sitios de 20 funciones de navegador; `backend.ts` y Signup
+  solo muestran el `error` de un 5xx marcado `seguro`. CSP en producción (script-src
+  'self' + Stripe.js; connect-src Supabase + API de Stripe; frame-ancestors 'none';
+  'unsafe-inline' solo en style-src), X-Frame-Options/nosniff/Referrer/Permissions
+  intactos. Source maps: el deploy publica 0 `.map` y el bundle no trae
+  `sourceMappingURL`. Hidratación: `errorSesion` (carga / sin_perfil) con Reintentar
+  y Cerrar sesión en los tres layouts.
+- Verificación: 132 funciones de aplicación (129 + 3), las 3 nuevas hash-idénticas al
+  build local; ninguna función previa cambió (02C, F-1, R1, R2-B, 02H, 03A, 03B, 06A
+  intactas por hash). Hardening 54/54; drift 68/68 (con los checks de 06D; la versión
+  previa daba 51/51 y 66/66 antes de A). Datos de negocio: hash de 14 tablas idéntico
+  antes de A, después de A, después del deploy y después de B: CERO mutaciones de
+  Auth, de negocio o de Stripe causadas por la activación; 0 eventos artificiales. Las
+  6 funciones sondeadas responden 401 sin token. Gate local 213 archivos / 2041
+  pruebas; base 29 archivos / 507; `db/06d-frontera-columnas` 16/16 (12 muerden sin
+  migraciones, 5 con solo A).
+- Residuales aceptados: `style-src 'unsafe-inline'` (documentado en `netlify.toml`);
+  al activar Sentry (D-FIN-2) hay que añadir su host de ingest a `connect-src`; las
+  funciones programadas, el webhook y el reconciliador conservan sus mensajes (sin
+  navegador); el host de Supabase está fijo en la CSP y en seis URLs de imagen; la
+  nota del admin se escribe por REST (lectura por RPC); el tipo generado de
+  `reservas` va atrasado respecto a la tabla (casts en los llamadores); la regla
+  `/*.map` → 404 queda sombreada por el `/*` de `public/_redirects` (una petición a un
+  `.map` inexistente devuelve el shell HTML con 200, nunca un mapa).
 
 ## PKG-06A — cerrado en producción (detalle; la línea corta está en "Cerrado")
 - **PKG-06A "Operaciones compuestas de cuenta con frontera del servidor"** (EKKO-142,
@@ -326,6 +355,10 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
   dos pruebas). No se aplica, no se borra, no se commitea. Ver nota de `57b9af0`.
 
 ## Diferido / pendiente no bloqueante
+- PKG-06D, evidencia natural (no se fabrica): primer miembro real que entra con el
+  cliente nuevo (hidratación por columnas), primera búsqueda real del panel por la RPC,
+  primera lectura de notas/observaciones del staff por RPC, primer 5xx real
+  enmascarado, primera violación de CSP (si la hubiera) observada en el navegador.
 - PKG-06A, evidencia natural (no se fabrica): primera alta real (admin o recepción),
   primer cambio de rol, primer intento de borrado (permitido o protegido), primer
   reset de contraseña y primera edición de cuenta por recepción; primera fila de
@@ -373,10 +406,9 @@ resolvieron deteniendo y reconciliando, nunca con rebase ni merge automático.
 ## Siguiente paso
 Resolver desde el panel los 2 pendientes reales de Operación (evento de Stripe en `revision` desde 2026-10-02 y
 `activo_sin_derecho`). El backlog canónico final (reconciliación post-R1/R2/01/02/03)
-deja 7 paquetes: 06B (operaciones de cobro del miembro y del webhook), 06C (alta pública
-con verificación), 06D (frontera de columnas y cliente), 06E (ciclo de vida del
-material), 06F (agregación en el servidor), 06G (señales operativas durables); el
-siguiente recomendado es PKG-06D. Decisiones del dueño pendientes: D-FIN-2 (DSN de
+deja 5 paquetes: 06B (operaciones de cobro del miembro y del webhook), 06C (alta pública
+con verificación), 06E (ciclo de vida del material), 06F (agregación en el servidor),
+06G (señales operativas durables); el siguiente recomendado es PKG-06G. Decisiones del dueño pendientes: D-FIN-2 (DSN de
 Sentry en producción: hoy no hay), D-FIN-3 (deploy previews con secretos LIVE),
 D-FIN-4 (cuentas demo al salir), D-FIN-8 (2 objetos huérfanos de Storage), respaldo y
 simulacro de restauración, cuál versión del enlace de Login queda (publicada vs stash).
