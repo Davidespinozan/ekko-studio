@@ -21,7 +21,9 @@ CANÓNICA sin cambios: 0 hallazgos abiertos.
   (5a1a431, 03:47:30 UTC), `6aed4e0d8531e61c7020dd1b` (6bc101e, 03:50:38 UTC) y
   `6aed4fedc833ae800efb5513` (748525e, 03:58:32 UTC) y `6aee3ab74e41305a13a1aa28`
   (7bd4dc6, lienzo claro en admin y recepción, modelo SALA; READY, production,
-  2026-11-06 20:40:37 UTC; aprobado por el dueño). El dueño NO
+  2026-11-06 20:40:37 UTC; aprobado por el dueño).
+  `6aee4784a81e221c9114b55e` (38b2fce, lienzo claro en la app del miembro, inicio y
+  perfil renovados; READY, production, 2026-11-06 21:35:07 UTC; aprobado por el dueño). El dueño NO
   revisó en pantalla el último paquete (Estudios y fichas de día): pidió subirlo sin
   preguntar; queda PENDIENTE / NO BLOQUEANTE su revisión en el teléfono (PWA). Sin migración: ninguno toca la base. Sondas: sitio 200; `stryv-care`
   sin token → 401; `/loader.css` 200 y el splash en `index.html`; los bundles traen la
