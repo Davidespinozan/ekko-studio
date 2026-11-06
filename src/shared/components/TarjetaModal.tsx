@@ -14,21 +14,22 @@ import { crearSetupIntent, actualizarTarjeta } from '@shared/lib/checkout';
 const PK = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined;
 
 const appearance: Appearance = {
-  theme: 'night',
+  // Lienzo claro (2026-11-06): el formulario de pago vive en un modal blanco.
+  theme: 'stripe',
   variables: {
-    colorPrimary: '#e5b829',
-    colorBackground: '#141416',
-    colorText: '#ededea',
-    colorTextSecondary: '#8a8a86',
-    colorDanger: '#e5484d',
+    colorPrimary: '#C9A01F',
+    colorBackground: '#FFFFFF',
+    colorText: '#16150F',
+    colorTextSecondary: '#5C5950',
+    colorDanger: '#B23A3A',
     fontFamily: 'Inter, system-ui, sans-serif',
     borderRadius: '13px'
   },
   rules: {
-    '.Input': { border: '0.5px solid rgba(255, 255, 255, 0.12)', backgroundColor: '#060607' },
-    '.Input:focus': { border: '0.5px solid #e5b829', boxShadow: '0 0 0 3px rgba(229, 184, 41, 0.20)' },
-    '.Label': { color: '#8a8a86' },
-    '.Tab': { border: '0.5px solid rgba(255, 255, 255, 0.12)' },
+    '.Input': { border: '1px solid rgba(28, 24, 12, 0.14)', backgroundColor: '#FFFFFF' },
+    '.Input:focus': { border: '1px solid #e5b829', boxShadow: '0 0 0 3px rgba(229, 184, 41, 0.22)' },
+    '.Label': { color: '#5C5950' },
+    '.Tab': { border: '1px solid rgba(28, 24, 12, 0.14)' },
     '.Tab--selected': { borderColor: '#e5b829' }
   }
 };

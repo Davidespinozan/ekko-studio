@@ -14,6 +14,8 @@ import { desdeReservasVigentesISO } from '@member/logic/reservasVigentes';
 import { formatFechaEnZona } from '@shared/lib/timezone';
 import { ContactoEstudio } from '@shared/components/ContactoEstudio';
 import { ErrorCarga } from '@shared/components/ErrorCarga';
+import { EstudiosHoy } from '@member/components/EstudiosHoy';
+import { Sparkles, CalendarClock } from 'lucide-react';
 
 type Recurso = Database['public']['Tables']['recursos']['Row'];
 type Reserva = Database['public']['Tables']['reservas']['Row'];
@@ -164,25 +166,10 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Greeting — banner cálido, saludo según la hora. Le da vida al inicio. */}
-      <div className="ek-home-saludo">
-      <div className="ek-card ek-card--cream" style={{ marginBottom: '20px' }}>
-        <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'rgba(10, 10, 10, 0.55)' }}>
-          {saludo},
-        </p>
-        <h1 style={{
-          fontFamily: 'var(--ek-font-display)',
-          fontSize: 'clamp(28px, 8vw, 42px)',
-          fontWeight: 700,
-          letterSpacing: '-0.03em',
-          lineHeight: 1.05,
-          margin: '2px 0 0',
-          color: 'var(--ek-bg)'
-        }}>
-          {nombreFormat} <span aria-hidden="true">👋</span>
-        </h1>
-        <div style={{ width: '44px', height: '4px', borderRadius: '2px', background: 'var(--ek-mustard)', marginTop: '12px' }} />
-      </div>
+      {/* Saludo como título sobre el lienzo (modelo SALA), sin tarjeta. */}
+      <div className="ek-home-saludo ek-home-hola">
+        <p className="ek-kicker">{saludo}</p>
+        <h1>Hola, {nombreFormat.split(' ')[0]}.</h1>
       </div>
 
       {/* Próxima sesión — ARRIBA, imagen fija, SIEMPRE visible (le da imagen al
@@ -241,6 +228,25 @@ export default function Dashboard() {
           creditosRestantes={creditosChip}
         />
       )}
+      </div>
+
+      {/* Debajo del resumen (modelo SALA): estudios con foto y accesos rápidos. */}
+      <div className="ek-home-extra">
+        <EstudiosHoy />
+        {!loadingResumen && !errorResumen && (
+          <div className="ek-home-accesos">
+            <Link to="/app/perfil" className={`ek-acceso-card${carnet.requiereAccion ? '' : ' ek-acceso-card--oro'}`}>
+              <span className="ek-acceso-k"><Sparkles size={12} aria-hidden="true" /> Mi membresía</span>
+              <b>{carnet.requiereAccion ? carnet.estadoLabel : tierNombre}</b>
+              <small>{carnet.subtitulo ?? carnet.titulo}</small>
+            </Link>
+            <Link to="/app/reservas" className="ek-acceso-card">
+              <span className="ek-acceso-k"><CalendarClock size={12} aria-hidden="true" /> Mis reservas</span>
+              <b>Ver historial</b>
+              <small>Próximas e historial</small>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

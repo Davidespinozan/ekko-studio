@@ -9,11 +9,9 @@
 
 /* Cabecera translúcida */
 .ek-member .ek-header-glass {
-  background: rgba(6, 6, 7, 0.72);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
-  border-bottom: 1px solid var(--ek-line-strong);
-  box-shadow: none;
+  background: var(--ek-chrome-grad-h);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 0 var(--ek-chrome-edge);
 }
 
 /* Tarjetas: hairline más presente y halo mostaza al pasar */
@@ -21,11 +19,6 @@
 .ek-member .ek-stat-card {
   border-color: var(--ek-line-strong);
   transition: border-color 0.22s var(--ek-ease-out), box-shadow 0.22s var(--ek-ease-out), transform 0.22s var(--ek-ease-out);
-}
-.ek-member .ek-card:hover,
-.ek-member .ek-stat-card:hover {
-  border-color: var(--ek-mustard-dim);
-  box-shadow: 0 0 0 1px var(--ek-mustard-soft), 0 24px 48px -28px rgba(229, 184, 41, 0.35);
 }
 
 /* Kickers en mono (sin punto: aquí hay muchos) */
@@ -49,7 +42,7 @@
 .ek-home {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "aviso" "saludo" "hero" "resumen";
+  grid-template-areas: "aviso" "saludo" "hero" "resumen" "extra";
 }
 .ek-home > .ek-card--md:first-child { grid-area: aviso; }
 .ek-home-saludo { grid-area: saludo; min-width: 0; }
@@ -68,7 +61,6 @@
   }
   .ek-home-hero { display: flex; flex-direction: column; align-self: stretch; }
   .ek-home-hero .ek-hero-foto { flex: 1; min-height: 380px; }
-  .ek-home-saludo .ek-card--cream h1 { font-size: clamp(28px, 2.6vw, 38px); }
 }
 
 /* ── Estudios: la foto es la protagonista; nombre y datos sobre un velo ──── */
@@ -213,3 +205,98 @@
 .ek-member .ek-slot { border-radius: 999px; border-color: var(--ek-line-strong); }
 .ek-member .ek-slot:not(:disabled):hover { border-color: var(--ek-mustard); color: var(--ek-mustard); }
 .ek-member .ek-slot:disabled { opacity: 0.35; }
+
+/* ── Lienzo claro (2026-11-06): barra de abajo como cromo sólido, ancho completo ── */
+.ek-bottom-nav--cromo {
+  background: var(--ek-chrome-grad-h);
+  border-top: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: inset 0 1px 0 var(--ek-chrome-edge), 0 -10px 30px -12px rgba(0, 0, 0, 0.35);
+}
+.ek-bottom-nav--cromo .ek-bottom-nav-inner { max-width: 560px; margin: 0 auto; }
+.ek-bottom-nav--cromo .ek-bottom-nav-item { color: var(--ek-ink-faint); }
+.ek-bottom-nav--cromo .ek-bottom-nav-item--active { color: var(--ek-mustard); background: rgba(255, 255, 255, 0.07); }
+
+/* ── Inicio: saludo como título, sin tarjeta ── */
+.ek-home-hola { margin: 4px 0 18px; }
+.ek-home-hola h1 {
+  margin: 4px 0 0;
+  font-family: var(--ek-font-display);
+  font-size: clamp(30px, 7vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+  color: var(--ek-ink);
+}
+
+/* ── Inicio: accesos (membresía dorada + mis reservas) ── */
+.ek-home-accesos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+.ek-acceso-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 92px;
+  padding: 14px 16px;
+  border-radius: var(--ek-r-md);
+  border: 1px solid var(--ek-line);
+  background: #FFFFFF;
+  box-shadow: var(--ek-shadow-card);
+  color: var(--ek-ink);
+  text-decoration: none;
+  transition: transform 0.2s var(--ek-ease-out), box-shadow 0.2s var(--ek-ease-out);
+}
+.ek-acceso-card:hover { transform: translateY(-2px); }
+.ek-acceso-card .ek-acceso-k {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--ek-font-mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ek-ink-faint);
+}
+.ek-acceso-card b { font-family: var(--ek-font-display); font-size: 18px; letter-spacing: -0.02em; }
+.ek-acceso-card small { font-size: 12.5px; color: var(--ek-ink-muted); }
+.ek-acceso-card--oro {
+  border-color: transparent;
+  background: linear-gradient(140deg, #E8C24A 0%, #C9A01F 55%, #A9831A 100%);
+  color: #16150F;
+  box-shadow: 0 14px 32px -16px rgba(201, 160, 31, 0.7);
+}
+.ek-acceso-card--oro .ek-acceso-k, .ek-acceso-card--oro small { color: rgba(22, 21, 15, 0.7); }
+
+/* ── Inicio: estudios para hoy (carrusel con foto) ── */
+.ek-home-estudios-h { display: flex; align-items: baseline; justify-content: space-between; margin: 4px 0 10px; }
+.ek-home-estudios-h h2 { margin: 0; font-family: var(--ek-font-display); font-size: 20px; letter-spacing: -0.02em; }
+.ek-home-estudios-h a { font-size: 13px; font-weight: 600; color: var(--ek-mustard-texto); text-decoration: none; }
+.ek-carrusel { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; padding-bottom: 6px; margin-bottom: 18px; scrollbar-width: none; }
+.ek-carrusel::-webkit-scrollbar { display: none; }
+.ek-mini-estudio {
+  flex: 0 0 168px;
+  scroll-snap-align: start;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid var(--ek-line);
+  background: #FFFFFF;
+  box-shadow: var(--ek-shadow-card);
+  color: var(--ek-ink);
+  text-decoration: none;
+}
+.ek-mini-estudio-foto { aspect-ratio: 16 / 10; background: #EAE6DC; }
+.ek-mini-estudio-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ek-mini-estudio-b { padding: 10px 12px 12px; }
+.ek-mini-estudio-b b { display: block; font-family: var(--ek-font-display); font-size: 15px; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ek-mini-estudio-b small { display: block; margin-top: 3px; font-size: 12px; color: var(--ek-ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* En la rejilla de escritorio del inicio, lo nuevo ocupa las dos columnas */
+.ek-home-extra { grid-area: extra; min-width: 0; }
+@media (min-width: 1024px) {
+  .ek-home { grid-template-areas: "aviso aviso" "saludo hero" "resumen hero" "extra extra"; grid-template-rows: auto auto 1fr auto; }
+}
+
+/* ── Perfil: avatar centrado y "Miembro desde" ── */
+.ek-perfil-cabeza { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; padding: 6px 0 4px; }
+.ek-perfil-av {
+  width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; overflow: hidden;
+  background: var(--ek-chrome-grad); color: var(--ek-mustard);
+  font-family: var(--ek-font-display); font-size: 34px; font-weight: 700; letter-spacing: -0.04em;
+  box-shadow: 0 0 0 4px #FFFFFF, 0 14px 30px -14px rgba(28, 24, 12, 0.45);
+}
+.ek-perfil-av img { width: 100%; height: 100%; object-fit: cover; }
+.ek-perfil-nombre { margin: 4px 0 0; font-family: var(--ek-font-display); font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
+.ek-perfil-meta { margin: 0; font-size: 13px; color: var(--ek-ink-muted); }

@@ -7,6 +7,7 @@ import { MiSuscripcion } from '@member/components/MiSuscripcion';
 import { EditarPerfilModal } from '@member/components/EditarPerfilModal';
 import { CambiarPasswordModal } from '@member/components/CambiarPasswordModal';
 import { ActivarAvisosPush } from '@shared/components/ActivarAvisosPush';
+import { formatFechaEnZona } from '@shared/lib/timezone';
 
 export default function Perfil() {
   const { authUser, usuario, signOut } = useAuth();
@@ -30,64 +31,20 @@ export default function Perfil() {
   return (
     <div className="ek-container">
       <div className="ek-stack-lg" style={{ paddingTop: '4px' }}>
-        {/* Avatar + nombre + contacto sobre un badge crema (como el saludo del
-            inicio) — le da un toque premium al header del perfil. */}
-        <div className="ek-card ek-card--cream" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <span className="ek-avatar-ring" style={{ flexShrink: 0 }}>
-            {usuario?.avatar_url ? (
-              <img
-                src={usuario.avatar_url}
-                alt={usuario.nombre ?? 'Avatar'}
-                style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover' }}
-              />
-            ) : (
-              <div style={{
-                width: '72px',
-                height: '72px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, var(--ek-bg-elevated), var(--ek-bg-soft))',
-                color: 'var(--ek-mustard)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontFamily: 'var(--ek-font-display)',
-                fontSize: '26px',
-                fontWeight: 700,
-                letterSpacing: '-0.04em'
-              }}>
-                {initials}
-              </div>
-            )}
+        {/* Cabeza del perfil (modelo SALA): avatar grande centrado, nombre, contacto y antigüedad. */}
+        <div className="ek-perfil-cabeza">
+          <span className="ek-perfil-av">
+            {usuario?.avatar_url ? <img src={usuario.avatar_url} alt={usuario.nombre ?? 'Avatar'} /> : initials}
           </span>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <p style={{ margin: 0, fontFamily: 'var(--ek-font-display)', fontSize: '18px', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--ek-bg)' }}>
-              {nombreFormat || 'Tu cuenta'}
-            </p>
-            <p style={{ margin: '3px 0 0', wordBreak: 'break-word', fontSize: '13px', color: 'rgba(10, 10, 10, 0.6)' }}>{authUser?.email}</p>
-            {usuario?.telefono && (
-              <p style={{ margin: '1px 0 0', fontSize: '13px', color: 'rgba(10, 10, 10, 0.6)' }}>{usuario.telefono}</p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => setEditarOpen(true)}
-            aria-label="Editar perfil"
-            title="Editar perfil"
-            style={{
-              flexShrink: 0,
-              width: 38,
-              height: 38,
-              borderRadius: '50%',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'rgba(10, 10, 10, 0.06)',
-              border: '0.5px solid rgba(10, 10, 10, 0.12)',
-              color: 'var(--ek-bg)',
-              cursor: 'pointer'
-            }}
-          >
-            <Pencil size={16} aria-hidden="true" />
+          <p className="ek-perfil-nombre">{nombreFormat || 'Tu cuenta'}</p>
+          <p className="ek-perfil-meta" style={{ wordBreak: 'break-word' }}>
+            {authUser?.email}{usuario?.telefono ? ` · ${usuario.telefono}` : ''}
+          </p>
+          {usuario?.created_at && (
+            <p className="ek-perfil-meta">Miembro desde {formatFechaEnZona(usuario.created_at, { month: 'long', year: 'numeric' })}</p>
+          )}
+          <button type="button" className="ek-cta ek-cta--secondary" onClick={() => setEditarOpen(true)} style={{ minHeight: '40px', padding: '8px 16px', fontSize: '13px' }}>
+            <Pencil size={14} aria-hidden="true" /> Editar perfil
           </button>
         </div>
 

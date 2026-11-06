@@ -11,6 +11,7 @@ import { NotificacionesBell } from './components/NotificacionesBell';
 import { BottomNav } from './components/BottomNav';
 import { CambiarPasswordGate } from '@shared/components/CambiarPasswordGate';
 import '../styles/miembro.css';
+import '../styles/claro.css';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const PagarMembresia = lazy(() => import('./pages/PagarMembresia'));
@@ -83,9 +84,11 @@ export default function MemberLayout() {
   if (errorSesion) return <ErrorSesion tipo={errorSesion} onReintentar={() => void reintentarSesion()} onCerrarSesion={() => void signOut()} />;
   if (pendientePago) {
     return (
-      <Suspense fallback={<LoadingScreen />}>
-        <PagarMembresia />
-      </Suspense>
+      <div className="ek-page ek-member ek-claro">
+        <Suspense fallback={<LoadingScreen />}>
+          <PagarMembresia />
+        </Suspense>
+      </div>
     );
   }
   if (usuario && validacion && !validacion.permitido) {
@@ -94,9 +97,8 @@ export default function MemberLayout() {
   }
 
   return (
-    <div className="ek-page ek-member" style={{ paddingBottom: 'calc(96px + env(safe-area-inset-bottom, 0px))' /* espacio para la píldora flotante */ }}>
-      <div className="ek-grain" aria-hidden="true" />
-      <div className="ek-aurora" aria-hidden="true"><i /><i /><i /></div>
+    // Lienzo claro (modelo SALA): cabecera y barra de abajo oscuras, contenido claro.
+    <div className="ek-page ek-member ek-claro" style={{ paddingBottom: 'calc(88px + env(safe-area-inset-bottom, 0px))' /* espacio para la barra de abajo */ }}>
       <DemoBanner vista="Miembro" />
       <CambiarPasswordGate />
       <header className="ek-header-glass">

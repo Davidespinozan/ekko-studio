@@ -51,6 +51,7 @@
 /* Cromo que vive dentro del área de trabajo: vuelve a los tokens oscuros. */
 .ek-claro .ek-header-glass,
 .ek-claro .adm-topbar-mobile,
+.ek-claro .ek-bottom-nav,
 .ek-claro .ek-hello {
   --ek-bg-soft:      #101012;
   --ek-bg-elevated:  #202024;
@@ -114,3 +115,9 @@
 
 /* Modales dentro del área de trabajo */
 .ek-claro .ek-modal { background: #FFFFFF; border-color: var(--ek-line-strong); }
+
+/* Etiquetas de campo en mostaza: versión profunda sobre claro */
+.ek-claro .ek-field-label { color: var(--ek-mustard-texto); }
+/* El difuminado de las filas que se desplazan termina en el lienzo, no en negro */
+.ek-claro .ek-hscroll-fade::after { background: linear-gradient(to right, rgba(243, 240, 233, 0), #F3F0E9); }
+.ek-claro .ek-dia:not(.ek-dia--activo) { background: #FFFFFF; }
