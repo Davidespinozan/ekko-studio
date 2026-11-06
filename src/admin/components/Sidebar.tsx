@@ -385,6 +385,23 @@ export function Sidebar({ onNavigate }: Props = {}) {
           Cerrar sesión
           <ArrowRight size={14} aria-hidden="true" />
         </button>
+        {/* Como en Fukuroll y Renovacell (EKKO-149): "Operado por STRYV" en el pie del
+            menú es la entrada del admin a sus planes STRYV (Care y Grow). El panel es
+            solo de admins, así que aquí siempre es la versión con el botón a los planes. */}
+        <NavLink
+          to="/admin/stryv"
+          onClick={onNavigate}
+          className={({ isActive }) => `adm-sidebar-stryv${isActive ? ' adm-sidebar-stryv--active' : ''}`}
+          data-testid="side-stryv"
+        >
+          <span className="adm-sidebar-stryv-top">
+            <span className="ek-stryv-dot" aria-hidden="true" />
+            Operado por <b>STRYV</b>
+          </span>
+          <span className="adm-sidebar-stryv-care">
+            Ver mis planes STRYV <span aria-hidden="true">›</span>
+          </span>
+        </NavLink>
       </div>
     </aside>
   );

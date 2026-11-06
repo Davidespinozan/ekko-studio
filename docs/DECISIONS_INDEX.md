@@ -54,6 +54,7 @@ rediscute sin evidencia nueva.
 - Series antiguas: D1, D2, D3 (recepción), L-01, L-02 (zona horaria, check-in), H3 (cross-tenant).
 
 ## Stripe y cobro
+- EKKO-149 — Planes STRYV (Care con infraestructura como Fukuroll, Grow de videos con IA): suscripciones que STRYV le cobra al estudio en la cuenta de la plataforma (no en la conectada); un cliente por estudio, un producto/precio/portal por plan; solo admin activo; no toca la base ni derechos; precio de Care ($2,500) pendiente de confirmar.
 - EKKO-129, EKKO-130 (D-01P-1) — sanción suspende el cobro; revocación cancela de inmediato.
 - EKKO-138 (D-03A-1 = A) — pausa del staff ≠ sanción: `pausa_comercial_at` (intención del staff); levantar la sanción no reanuda una pausa comercial.
 - EKKO-139 — reactivar durante una sanción no reanuda el cobro; pausar/reactivar idempotentes.

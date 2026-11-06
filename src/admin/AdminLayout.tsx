@@ -24,6 +24,8 @@ const AjustesLanding = lazy(() => import('./pages/AjustesLanding'));
 const AjustesContacto = lazy(() => import('./pages/AjustesContacto'));
 const AjustesReglas = lazy(() => import('./pages/AjustesReglas'));
 const AjustesMarca = lazy(() => import('./pages/AjustesMarca'));
+// EKKO-149: planes STRYV (Care y Grow; solo admin; se abre desde el pie del menú, sin entrada propia).
+const PlanesStryv = lazy(() => import('./pages/PlanesStryv'));
 
 export default function AdminLayout() {
   const { isLoading, errorSesion, reintentarSesion, signOut } = useAdminGuard();
@@ -100,6 +102,7 @@ export default function AdminLayout() {
               <Route path="/contacto" element={<AjustesContacto />} />
               <Route path="/reglas" element={<AjustesReglas />} />
               <Route path="/marca" element={<AjustesMarca />} />
+              <Route path="/stryv" element={<PlanesStryv />} />
               {/* Legacy redirect: la página plana /admin/configuracion fue
                   reemplazada por las 4 páginas de AJUSTES (Sprint D-Admin). */}
               <Route path="/configuracion" element={<Navigate to="/admin/landing" replace />} />

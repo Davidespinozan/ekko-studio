@@ -1103,3 +1103,37 @@ Migraciones `20261005100000` y `20261005110000`; pruebas
   toca). FR-65: el índice `mov_tenant_fecha_idx (tenant_id, created_at DESC)` ya existe
   desde 20260921110000 y está en producción; no se agrega otro. **Cierra FR-62, FR-63
   y confirma FR-65 como ya resuelto.**
+
+## Planes STRYV — operado por STRYV (2026-11-05)
+
+- **EKKO-149 — Planes STRYV: las suscripciones con las que STRYV le cobra al estudio
+  el mantenimiento y la infraestructura del sistema (STRYV Care) y los videos con IA
+  para redes (STRYV Grow).** Decisión del dueño (2026-11-05): igual que en Renovacell
+  (misma pantalla, mismo flujo y la misma función `stryv-care` con
+  `status | checkout | portal`, ahora con `plan = care | grow`), pero con la
+  INFRAESTRUCTURA incluida en Care como en Fukuroll (servidores, base de datos, dominio
+  y certificados dentro del plan; sin precio preferente ni nota de servicios externos).
+  Grow ($6,500 MXN al mes): 15 videos al mes producidos con IA, escenas de los propios
+  estudios con voz y música, diseñados para llevar gente a reservar en la app, listos
+  para Instagram, TikTok y Facebook. (1) Se cobra en la cuenta de Stripe de STRYV —la
+  de la plataforma, la misma `STRIPE_SECRET_KEY` que usa Connect—, nunca en la cuenta
+  conectada del estudio (sin `stripeAccount`); el cliente de Stripe es el ESTUDIO (uno
+  por tenant, compartido por los planes), identificado por
+  `metadata.stryv_care_tenant = <slug del estudio>`; cada plan tiene su producto, su
+  precio (`lookup_key` estable por plan y monto), su configuración propia del portal y
+  su suscripción, todo creado solo la primera vez con llaves de idempotencia. (2) Solo
+  el admin ACTIVO del estudio los ve y los activa (`esAdminActivo`); la tarjeta se pone
+  una sola vez en Checkout de Stripe y el portal propio solo permite cambiar tarjeta y
+  ver recibos; una suscripción viva del plan (`active`, `trialing`, `past_due`,
+  `unpaid`) no se duplica (409), y tener uno no impide activar el otro. (3) No toca la
+  base de EKKO ni membresías, créditos ni reservas: todo vive en Stripe; sus objetos
+  llevan `metadata.app = 'stryv-care' | 'stryv-grow'`, que el webhook de EKKO ya
+  descarta (`app_ajena`, EKKO-019); los recibos que muestra cada tarjeta son los de su
+  propia suscripción. (4) Precios por defecto: Care $2,500 (como Fukuroll) y Grow
+  $6,500; `STRYV_CARE_CENTAVOS` y `STRYV_GROW_CENTAVOS` los cambian sin tocar código.
+  PENDIENTE confirmar el de Care con el dueño, porque Renovacell muestra $4,000 como
+  precio regular del plan con infraestructura. (5) "Operado por STRYV": en el pie del
+  menú del admin (entrada a `/admin/stryv`, sin sección propia) y en el pie de la
+  landing (enlace a stryvstudio.com); miembros no lo ven. Sin decidir si recepción debe
+  ver el enlace (en Renovacell el resto del equipo sí lo ve; en EKKO recepción no tiene
+  menú lateral).

@@ -225,16 +225,39 @@ export default function Footer() {
         </div>
       </div>
 
-      <p
+      <div
         style={{
-          fontSize: '11px',
-          color: 'var(--ek-ink-faint)',
-          marginTop: '32px',
-          letterSpacing: '0.04em'
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px 16px',
+          marginTop: '32px'
         }}
       >
-        © {new Date().getFullYear()} {tenant.nombre || 'EKKO Studio'}. {footer.copyright}
-      </p>
+        <p
+          style={{
+            fontSize: '11px',
+            color: 'var(--ek-ink-faint)',
+            margin: 0,
+            letterSpacing: '0.04em'
+          }}
+        >
+          © {new Date().getFullYear()} {tenant.nombre || 'EKKO Studio'}. {footer.copyright}
+        </p>
+        {/* Pie "Operado por STRYV" → página de STRYV (mismo diseño que Fukuroll y
+            Renovacell, EKKO-149). Fijo: no lo cambia el editor de la landing. */}
+        <a
+          className="ek-stryv-pill"
+          href="https://stryvstudio.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Operado por STRYV · stryvstudio.com"
+        >
+          <span className="ek-stryv-dot" aria-hidden="true" />
+          Operado por <b>STRYV</b>
+        </a>
+      </div>
     </footer>
   );
 }
