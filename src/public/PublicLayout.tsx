@@ -17,7 +17,8 @@ const ConfirmarCorreo = lazy(() => import('./pages/ConfirmarCorreo'));
 export default function PublicLayout() {
   const { authUser, signOut } = useAuth();
   const location = useLocation();
-  const enLogin = location.pathname === '/login';
+  // Fase 2 premium: login, recuperar y nueva contraseña traen su propio marco (AccesoLayout).
+  const enAcceso = ['/login', '/recuperar', '/nueva-contrasena'].includes(location.pathname);
   // Fase 1 premium: la landing trae su propia navegación flotante (LandingNav).
   const enLanding = location.pathname === '/';
   useRoleRedirect(['/', '/login', '/signup']);
@@ -25,14 +26,13 @@ export default function PublicLayout() {
   return (
     <div className="ek-page">
       <DemoBanner vista="Landing" />
-      {!enLanding && (
+      {!enLanding && !enAcceso && (
         <header
           style={{
             padding: 'calc(1rem + env(safe-area-inset-top, 0px)) 1.25rem 1rem',
             borderBottom: '1px solid var(--ek-line)',
             display: 'flex',
-            // En login el nav va vacío → el logo se centra y crece (tamaño miembro).
-            justifyContent: enLogin ? 'center' : 'space-between',
+            justifyContent: 'space-between',
             alignItems: 'center'
           }}
         >
@@ -40,7 +40,7 @@ export default function PublicLayout() {
             <img
               src="https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_STUDIO_logo_transparente.png"
               alt="EKKO Studio"
-              style={{ height: enLogin ? '104px' : '86px', width: 'auto', display: 'block' }}
+              style={{ height: '86px', width: 'auto', display: 'block' }}
             />
           </Link>
           <nav style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
@@ -63,7 +63,7 @@ export default function PublicLayout() {
                   Salir
                 </button>
               </>
-            ) : !enLogin ? (
+            ) : (
               <Link
                 to="/login"
                 className="ek-cta ek-cta--gold"
@@ -71,7 +71,7 @@ export default function PublicLayout() {
               >
                 Iniciar sesión
               </Link>
-            ) : null}
+            )}
           </nav>
         </header>
       )}

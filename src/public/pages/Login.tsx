@@ -1,6 +1,7 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { ArrowLeft, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, AlertCircle, Mail, Lock } from 'lucide-react';
+import { AccesoLayout } from '../components/AccesoLayout';
 import { supabase } from '@shared/lib/supabase';
 import { Spinner } from '@shared/components/Spinner';
 import { ContactoEstudio } from '@shared/components/ContactoEstudio';
@@ -90,107 +91,88 @@ export default function Login() {
   }
 
   return (
-    <div style={{
-      minHeight: '100dvh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      // Anclado arriba pero en un punto medio: ni pegado al header ni centrado
-      // (que en móvil caía muy abajo). ~10vh de aire da el balance.
-      justifyContent: 'flex-start',
-      padding: '0 20px',
-      paddingTop: 'clamp(56px, 10vh, 120px)',
-      paddingBottom: 'calc(48px + env(safe-area-inset-bottom, 0px))'
-    }}>
-      <div style={{ maxWidth: '400px', width: '100%' }}>
-        <Link to="/" style={{
-          fontSize: '13px',
-          color: 'var(--ek-ink-muted)',
-          textDecoration: 'none',
-          marginBottom: '20px',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '6px'
-        }}>
-          <ArrowLeft size={15} aria-hidden="true" /> Volver a EKKO
-        </Link>
+    <AccesoLayout>
+      <Link to="/" className="ek-acceso-volver">
+        <ArrowLeft size={15} aria-hidden="true" /> Volver a EKKO
+      </Link>
+      <span className="ek-kicker">Tu cuenta EKKO</span>
+      <h1 className="ek-acceso-h1">Iniciar sesión</h1>
+      <p className="ek-acceso-sub">Entra con tu email y contraseña.</p>
 
-        <div className="ek-card">
-          <form onSubmit={handleSubmit} className="ek-stack-md">
-            <div className="ek-form-field">
-              <label htmlFor="email" className="ek-label">Email</label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="ek-input"
-                placeholder="tu@email.com"
-              />
-            </div>
-
-            <div className="ek-form-field">
-              <label htmlFor="password" className="ek-label">Contraseña</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  autoComplete="current-password"
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="ek-input"
-                  placeholder="••••••••"
-                  style={{ paddingRight: '48px' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="ek-icon-btn ek-icon-btn--ghost ek-icon-btn--sm"
-                  aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                  style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)' }}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <p className="ek-error-text" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '1px' }} aria-hidden="true" />
-                <span>
-                  {error}
-                  {/* A12: si el mensaje manda a contactar al estudio, que haya cómo. */}
-                  {/contacta|escr[ií]bele|recepci[oó]n/i.test(error) && (
-                    <>
-                      {' '}
-                      <ContactoEstudio enLinea etiqueta="Escríbenos por WhatsApp" mensaje={`Hola, no puedo entrar a mi cuenta de EKKO (${email.trim() || 'sin email'}): ${error}`} />
-                    </>
-                  )}
-                </span>
-              </p>
-            )}
-
-            <button
-              type="submit"
-              className="ek-cta ek-cta--full"
-              disabled={isSubmitting || !email || !password}
-            >
-              {isSubmitting ? <Spinner size={16} label="Iniciando sesión…" /> : 'Iniciar sesión'}
-            </button>
-
-            <Link
-              to="/recuperar"
-              style={{ fontSize: '13px', color: 'var(--ek-ink-muted)', textDecoration: 'underline', textAlign: 'center' }}
-            >
-              ¿Olvidaste tu contraseña?
-            </Link>
-          </form>
+      <form onSubmit={handleSubmit} className="ek-stack-md">
+        <div className="ek-form-field">
+          <label htmlFor="email" className="ek-label">Email</label>
+          <div className="ek-campo">
+            <Mail size={16} aria-hidden="true" />
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="ek-input"
+              placeholder="tu@email.com"
+            />
+          </div>
         </div>
-      </div>
-    </div>
+
+        <div className="ek-form-field">
+          <label htmlFor="password" className="ek-label">Contraseña</label>
+          <div className="ek-campo">
+            <Lock size={16} aria-hidden="true" />
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="ek-input"
+              placeholder="••••••••"
+              style={{ paddingRight: '52px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="ek-icon-btn ek-icon-btn--ghost ek-icon-btn--sm"
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }}
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <p className="ek-error-text" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+            <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '1px' }} aria-hidden="true" />
+            <span>
+              {error}
+              {/* A12: si el mensaje manda a contactar al estudio, que haya cómo. */}
+              {/contacta|escr[ií]bele|recepci[oó]n/i.test(error) && (
+                <>
+                  {' '}
+                  <ContactoEstudio enLinea etiqueta="Escríbenos por WhatsApp" mensaje={`Hola, no puedo entrar a mi cuenta de EKKO (${email.trim() || 'sin email'}): ${error}`} />
+                </>
+              )}
+            </span>
+          </p>
+        )}
+
+        <button
+          type="submit"
+          className="ek-cta ek-cta--gold ek-cta--full"
+          disabled={isSubmitting || !email || !password}
+        >
+          {isSubmitting ? <Spinner size={16} label="Iniciando sesión…" /> : 'Iniciar sesión'}
+        </button>
+
+        <div className="ek-acceso-fila-fin">
+          <Link to="/recuperar">¿Olvidaste tu contraseña?</Link>
+        </div>
+      </form>
+    </AccesoLayout>
   );
 }

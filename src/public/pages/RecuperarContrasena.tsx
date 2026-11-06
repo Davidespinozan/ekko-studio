@@ -1,29 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Mail } from 'lucide-react';
+import { AccesoLayout } from '../components/AccesoLayout';
 import { Link } from 'react-router-dom';
 import { supabase } from '@shared/lib/supabase';
 import { validarEmail } from '../lib/recuperacionLogic';
 
-const WRAP: React.CSSProperties = {
-  minHeight: '100dvh',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'flex-start',
-  padding: '0 20px',
-  paddingTop: 'clamp(56px, 10vh, 120px)',
-  paddingBottom: 'calc(48px + env(safe-area-inset-bottom, 0px))'
-};
-
-const VOLVER: React.CSSProperties = {
-  fontSize: '13px',
-  color: 'var(--ek-mustard)',
-  textDecoration: 'none',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '5px'
-};
 
 /**
  * /recuperar — el miembro (o el staff) pide un enlace para restablecer su
@@ -60,53 +41,49 @@ export default function RecuperarContrasena() {
   }
 
   return (
-    <div style={WRAP}>
-      <div style={{ maxWidth: '400px', width: '100%' }}>
-        <div className="ek-card">
+    <AccesoLayout>
+      <Link to="/login" className="ek-acceso-volver">
+        <ArrowLeft size={15} aria-hidden="true" /> Volver al login
+      </Link>
           {enviado ? (
             <div className="ek-stack-md">
-              <p className="ek-eyebrow" style={{ margin: 0 }}>REVISA TU CORREO</p>
-              <h2 className="ek-h3" style={{ margin: 0 }}>Listo</h2>
+              <span className="ek-kicker">Revisa tu correo</span>
+              <h2 className="ek-acceso-h1">Listo</h2>
               <p className="ek-body-muted" style={{ margin: 0, lineHeight: 1.55 }}>
                 Si existe una cuenta con ese email, te llegará un enlace para crear una contraseña nueva
                 (revisa también spam). <strong>Si no te llega en unos minutos, pide en recepción que te
                 restablezcan el acceso.</strong>
               </p>
-              <Link to="/login" style={VOLVER}>
-                <ArrowLeft size={14} strokeWidth={2.25} aria-hidden="true" /> Volver al login
-              </Link>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="ek-stack-md">
-              <p className="ek-eyebrow" style={{ margin: 0 }}>RECUPERAR CONTRASEÑA</p>
-              <h2 className="ek-h3" style={{ margin: 0 }}>¿Olvidaste tu contraseña?</h2>
+              <span className="ek-kicker">Recuperar contraseña</span>
+              <h2 className="ek-acceso-h1">¿Olvidaste tu contraseña?</h2>
               <p className="ek-body-muted" style={{ margin: 0, lineHeight: 1.55 }}>
                 Escribe tu email y te enviamos un enlace para crear una nueva.
               </p>
               <div className="ek-form-field">
                 <label htmlFor="rec-email" className="ek-label">Email</label>
-                <input
-                  id="rec-email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="ek-input"
-                  placeholder="tu@email.com"
-                />
+                <div className="ek-campo">
+                  <Mail size={16} aria-hidden="true" />
+                  <input
+                    id="rec-email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="ek-input"
+                    placeholder="tu@email.com"
+                  />
+                </div>
               </div>
               {error && <p className="ek-error-text">{error}</p>}
-              <button type="submit" className="ek-cta ek-cta--full" disabled={enviando || !email}>
+              <button type="submit" className="ek-cta ek-cta--gold ek-cta--full" disabled={enviando || !email}>
                 {enviando ? 'Enviando…' : 'Enviar enlace de recuperación'}
               </button>
-              <Link to="/login" style={VOLVER}>
-                <ArrowLeft size={14} strokeWidth={2.25} aria-hidden="true" /> Volver al login
-              </Link>
             </form>
           )}
-        </div>
-      </div>
-    </div>
+    </AccesoLayout>
   );
 }

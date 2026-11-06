@@ -1,0 +1,207 @@
+/* ============================================================================
+   ACCESO — login, recuperar y nueva contraseña (Fase 2 premium, 2026-11-05).
+   Pantalla partida: panel de marca (foto del estudio bajo un velo oscuro,
+   auroras mostaza tenues, grano, kicker mono, título con acento y tres
+   garantías) + panel del formulario sin tarjeta, con campos píldora e ícono,
+   foco mostaza y botón principal dorado. En teléfono el panel de marca se
+   vuelve una cabecera compacta. Patrón del acceso de Peptivera, en EKKO.
+   ============================================================================ */
+
+.ek-acceso {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 55fr 45fr;
+  background: var(--ek-bg);
+}
+
+/* ── Panel de marca ──────────────────────────────────────────────────────── */
+.ek-acceso-brand {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+  padding: calc(36px + env(safe-area-inset-top, 0px)) 56px 44px;
+  color: var(--ek-ink);
+  background:
+    linear-gradient(180deg, rgba(6, 6, 7, 0.5) 0%, rgba(6, 6, 7, 0.72) 55%, rgba(6, 6, 7, 0.9) 100%),
+    url('https://cfihcrjbvgjiohedsjos.supabase.co/storage/v1/object/public/estudios/ekko/EKKO_studio.jpg') center / cover no-repeat;
+}
+.ek-acceso-brand::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.ek-acceso-aurora {
+  position: absolute;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(80px);
+  opacity: 0.8;
+}
+.ek-acceso-aurora i {
+  position: absolute;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  animation: ek-acceso-flota 20s ease-in-out infinite;
+}
+.ek-acceso-aurora i:nth-child(1) { width: 42vw; height: 42vw; left: -4%; top: 2%; background: radial-gradient(circle, rgba(229, 184, 41, 0.22), transparent 65%); }
+.ek-acceso-aurora i:nth-child(2) { width: 30vw; height: 30vw; right: 0; bottom: -4%; background: radial-gradient(circle, rgba(201, 160, 31, 0.16), transparent 65%); animation-delay: -8s; animation-duration: 26s; }
+@keyframes ek-acceso-flota {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(3vw, -2vw) scale(1.08); }
+  66% { transform: translate(-2vw, 2vw) scale(0.94); }
+}
+.ek-acceso-top { position: relative; z-index: 1; }
+.ek-acceso-top a { display: inline-flex; }
+.ek-acceso-top img { height: 76px; width: auto; display: block; margin: -16px 0; }
+.ek-acceso-mid { position: relative; z-index: 1; max-width: 560px; }
+.ek-acceso-mid h2 {
+  margin: 18px 0 0;
+  font-family: var(--ek-font-display);
+  font-size: clamp(34px, 4.2vw, 56px);
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  color: #fff;
+}
+.ek-acceso-mid h2 em { font-style: normal; }
+.ek-acceso-mid p { margin: 16px 0 0; font-size: 16px; line-height: 1.6; color: var(--ek-ink-muted); }
+.ek-acceso-trust {
+  position: relative;
+  z-index: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.ek-acceso-trust li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--ek-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--ek-ink-muted);
+}
+.ek-acceso-dot {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--ek-line-strong);
+  background: rgba(255, 255, 255, 0.04);
+}
+.ek-acceso-dot::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border-radius: 50%;
+  background: var(--ek-mustard);
+  box-shadow: 0 0 8px var(--ek-mustard-glow-strong);
+}
+
+/* ── Panel del formulario ────────────────────────────────────────────────── */
+.ek-acceso-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(48px + env(safe-area-inset-top, 0px)) 40px calc(48px + env(safe-area-inset-bottom, 0px));
+  background: radial-gradient(700px 360px at 50% -10%, rgba(229, 184, 41, 0.08), transparent 70%), var(--ek-bg);
+}
+.ek-acceso-card { width: min(400px, 100%); }
+.ek-acceso-volver {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 22px;
+  min-height: 44px;
+  font-size: 13px;
+  color: var(--ek-ink-muted);
+  text-decoration: none;
+}
+.ek-acceso-volver:hover { color: var(--ek-ink); }
+.ek-acceso-h1 {
+  margin: 14px 0 0;
+  font-family: var(--ek-font-display);
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+.ek-acceso-sub { margin: 8px 0 28px; font-size: 14.5px; line-height: 1.55; color: var(--ek-ink-muted); }
+.ek-acceso .ek-label {
+  font-family: var(--ek-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.ek-campo { position: relative; }
+.ek-campo > svg {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ek-ink-faint);
+  pointer-events: none;
+  transition: color 0.16s;
+}
+.ek-campo:focus-within > svg { color: var(--ek-mustard); }
+.ek-acceso .ek-input {
+  min-height: 52px;
+  padding: 0 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--ek-line-strong);
+  font-size: 15px;
+}
+.ek-acceso .ek-campo .ek-input { padding-left: 46px; }
+.ek-acceso .ek-input:hover { border-color: rgba(255, 255, 255, 0.22); }
+.ek-acceso .ek-input:focus,
+.ek-acceso .ek-input:focus-visible {
+  outline: none;
+  border-color: var(--ek-mustard);
+  box-shadow: 0 0 0 4px var(--ek-mustard-dim);
+}
+.ek-acceso .ek-cta { border-radius: 999px; min-height: 52px; font-size: 15px; }
+.ek-acceso-fila-fin { display: flex; justify-content: flex-end; margin-top: -6px; }
+.ek-acceso-fila-fin a,
+.ek-acceso-enlace {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 44px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ek-mustard);
+  text-decoration: underline;
+  text-decoration-color: var(--ek-mustard-dim);
+  text-underline-offset: 3px;
+}
+.ek-acceso-fila-fin a:hover,
+.ek-acceso-enlace:hover { text-decoration-color: currentColor; }
+
+/* ── Teléfono: la marca se vuelve cabecera compacta ──────────────────────── */
+@media (max-width: 860px) {
+  .ek-acceso { grid-template-columns: 1fr; }
+  .ek-acceso-brand { gap: 10px; padding: calc(18px + env(safe-area-inset-top, 0px)) 20px 22px; }
+  .ek-acceso-top img { height: 64px; margin: -14px 0; }
+  .ek-acceso-mid h2 { margin-top: 6px; font-size: 28px; }
+  .ek-acceso-mid p, .ek-acceso-trust { display: none; }
+  .ek-acceso-panel { align-items: flex-start; padding: 28px 20px calc(48px + env(safe-area-inset-bottom, 0px)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ek-acceso-aurora i { animation: none !important; }
+}

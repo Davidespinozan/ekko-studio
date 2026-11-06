@@ -1,31 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { AccesoLayout } from '../components/AccesoLayout';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@shared/lib/supabase';
 import { CambiarPasswordForm } from '@shared/components/CambiarPasswordForm';
 
 type EstadoEnlace = 'verificando' | 'listo' | 'invalido';
-
-const WRAP: React.CSSProperties = {
-  minHeight: '100dvh',
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  justifyContent: 'flex-start',
-  padding: '0 20px',
-  paddingTop: 'clamp(56px, 10vh, 120px)',
-  paddingBottom: 'calc(48px + env(safe-area-inset-bottom, 0px))'
-};
-
-const VOLVER: React.CSSProperties = {
-  fontSize: '13px',
-  color: 'var(--ek-mustard)',
-  textDecoration: 'none',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: '5px'
-};
 
 /**
  * /nueva-contrasena — destino del enlace de recuperación (y del "email de
@@ -75,15 +55,15 @@ export default function NuevaContrasena() {
     if (enlace === 'invalido') {
       return (
         <div className="ek-stack-md">
-          <p className="ek-eyebrow" style={{ margin: 0, color: 'var(--ek-danger)' }}>ENLACE NO VÁLIDO</p>
-          <h2 className="ek-h3" style={{ margin: 0 }}>El enlace expiró o no es válido</h2>
+          <span className="ek-kicker" style={{ color: 'var(--ek-danger)' }}>Enlace no válido</span>
+          <h2 className="ek-acceso-h1">El enlace expiró o no es válido</h2>
           <p className="ek-body-muted" style={{ margin: 0, lineHeight: 1.55 }}>
             Los enlaces de recuperación caducan por seguridad. Pide uno nuevo.
           </p>
-          <Link to="/recuperar" className="ek-cta ek-cta--full" style={{ textAlign: 'center', textDecoration: 'none' }}>
+          <Link to="/recuperar" className="ek-cta ek-cta--gold ek-cta--full" style={{ textAlign: 'center', textDecoration: 'none' }}>
             Pedir un enlace nuevo
           </Link>
-          <Link to="/login" style={VOLVER}>
+          <Link to="/login" className="ek-acceso-enlace">
             <ArrowLeft size={14} strokeWidth={2.25} aria-hidden="true" /> Volver al login
           </Link>
         </div>
@@ -92,12 +72,12 @@ export default function NuevaContrasena() {
     if (exito) {
       return (
         <div className="ek-stack-md">
-          <p className="ek-eyebrow" style={{ margin: 0 }}>LISTO</p>
-          <h2 className="ek-h3" style={{ margin: 0 }}>Contraseña actualizada</h2>
+          <span className="ek-kicker">Listo</span>
+          <h2 className="ek-acceso-h1">Contraseña actualizada</h2>
           <p className="ek-body-muted" style={{ margin: 0, lineHeight: 1.55 }}>
             Tu contraseña se cambió correctamente. Ya puedes entrar con la nueva.
           </p>
-          <button type="button" onClick={() => navigate('/', { replace: true })} className="ek-cta ek-cta--full">
+          <button type="button" onClick={() => navigate('/', { replace: true })} className="ek-cta ek-cta--gold ek-cta--full">
             Ir a mi cuenta
           </button>
         </div>
@@ -105,8 +85,8 @@ export default function NuevaContrasena() {
     }
     return (
       <div className="ek-stack-md">
-        <p className="ek-eyebrow" style={{ margin: 0 }}>NUEVA CONTRASEÑA</p>
-        <h2 className="ek-h3" style={{ margin: 0 }}>Elige tu nueva contraseña</h2>
+        <span className="ek-kicker">Nueva contraseña</span>
+        <h2 className="ek-acceso-h1">Elige tu nueva contraseña</h2>
         <CambiarPasswordForm
           autoFocus
           onSuccess={() => {
@@ -119,10 +99,6 @@ export default function NuevaContrasena() {
   }
 
   return (
-    <div style={WRAP}>
-      <div style={{ maxWidth: '400px', width: '100%' }}>
-        <div className="ek-card">{contenido()}</div>
-      </div>
-    </div>
+    <AccesoLayout>{contenido()}</AccesoLayout>
   );
 }
