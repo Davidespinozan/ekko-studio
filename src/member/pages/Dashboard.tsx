@@ -141,7 +141,7 @@ export default function Dashboard() {
       : null;
 
   return (
-    <div className="ek-container">
+    <div className="ek-container ek-home">
       {bloqueado && (
         <div className="ek-card ek-card--md" style={{
           borderColor: 'rgba(226, 85, 85, 0.3)',
@@ -165,6 +165,7 @@ export default function Dashboard() {
       )}
 
       {/* Greeting — banner cálido, saludo según la hora. Le da vida al inicio. */}
+      <div className="ek-home-saludo">
       <div className="ek-card ek-card--cream" style={{ marginBottom: '20px' }}>
         <p style={{ margin: 0, fontSize: '13px', fontWeight: 600, color: 'rgba(10, 10, 10, 0.55)' }}>
           {saludo},
@@ -182,9 +183,12 @@ export default function Dashboard() {
         </h1>
         <div style={{ width: '44px', height: '4px', borderRadius: '2px', background: 'var(--ek-mustard)', marginTop: '12px' }} />
       </div>
+      </div>
 
       {/* Próxima sesión — ARRIBA, imagen fija, SIEMPRE visible (le da imagen al
-          inicio). Con sesión → datos + Ver QR; sin sesión → mensaje + Reservar. */}
+          inicio). Con sesión → datos + Ver QR; sin sesión → mensaje + Reservar.
+          Fase 4 premium: en escritorio ocupa la columna derecha a toda altura. */}
+      <div className="ek-home-hero">
       {loadingReservas ? (
         <div className="ek-skeleton" style={{ height: '260px', borderRadius: 'var(--ek-r-card)', marginBottom: '24px' }} />
       ) : errorReservas ? (
@@ -208,8 +212,10 @@ export default function Dashboard() {
           )}
         </>
       )}
+      </div>
 
       {/* Resumen compacto: Próximas · Sesiones · Membresía · (Créditos) */}
+      <div className="ek-home-resumen">
       {loadingResumen ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' }}>
           {Array.from({ length: 3 }).map((_, i) => (
@@ -235,6 +241,7 @@ export default function Dashboard() {
           creditosRestantes={creditosChip}
         />
       )}
+      </div>
     </div>
   );
 }

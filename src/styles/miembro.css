@@ -42,3 +42,31 @@
   .ek-member .ek-container { max-width: 760px; padding: 32px 24px; }
   .ek-member .ek-header-inner { max-width: 760px; }
 }
+
+/* ── Inicio (Fase 4): en teléfono el orden de siempre (saludo, próxima sesión,
+   resumen); en escritorio dos columnas: saludo y resumen a la izquierda, la
+   próxima sesión a la derecha a toda altura. ─────────────────────────────── */
+.ek-home {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "aviso" "saludo" "hero" "resumen";
+}
+.ek-home > .ek-card--md:first-child { grid-area: aviso; }
+.ek-home-saludo { grid-area: saludo; min-width: 0; }
+.ek-home-hero { grid-area: hero; min-width: 0; }
+.ek-home-resumen { grid-area: resumen; min-width: 0; }
+@media (min-width: 1024px) {
+  .ek-member .ek-container.ek-home { max-width: 1080px; }
+  .ek-home {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+    grid-template-areas: "aviso aviso" "saludo hero" "resumen hero";
+    /* La altura sobrante de la próxima sesión va a la fila del resumen: el saludo
+       y el resumen quedan pegados arriba, sin hueco entre ellos. */
+    grid-template-rows: auto auto 1fr;
+    column-gap: 24px;
+    align-items: start;
+  }
+  .ek-home-hero { display: flex; flex-direction: column; align-self: stretch; }
+  .ek-home-hero .ek-hero-foto { flex: 1; min-height: 380px; }
+  .ek-home-saludo .ek-card--cream h1 { font-size: clamp(28px, 2.6vw, 38px); }
+}
