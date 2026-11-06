@@ -9,16 +9,19 @@ pulido del miembro), pantalla de carga con isotipo y Planes STRYV (EKKO-149) DEP
 VERIFICADOS EN PRODUCCIÓN. Antes: PKG-06F (agregados en el servidor). REMEDIACIÓN
 CANÓNICA sin cambios: 0 hallazgos abiertos.
 
-## Producción (verificado 2026-11-06 03:52 UTC)
-- Código publicado: `6bc101e03d9df119c6fd4ca2a349894e60a6eebc` ("feat(admin): pulido
-  premium del panel"), cadena `aff6e42` (Planes STRYV, EKKO-149) → `33a9a87` (landing
-  fase 1) → `acc5f2b` (acceso fase 2) → `7eb6442` (pantalla de carga) → `83b4422`
-  (pulido del miembro) → `5f25b54` (docs) → `e589d22` (inicio del miembro a dos
-  columnas) → `5a1a431` (bienvenida del admin y recepción) → `6bc101e`.
+## Producción (verificado 2026-11-06 04:33 UTC)
+- Código publicado: `748525ea229aea590fa2cf150aeecd019a0355ec` ("feat(miembro):
+  estudios con la foto como protagonista y fichas de día en Reservar"), cadena
+  `aff6e42` (Planes STRYV, EKKO-149) → `33a9a87` (landing fase 1) → `acc5f2b` (acceso
+  fase 2) → `7eb6442` (pantalla de carga) → `83b4422` (pulido del miembro) → `5f25b54`
+  (docs) → `e589d22` (inicio del miembro a dos columnas) → `5a1a431` (bienvenida del
+  admin y recepción) → `6bc101e` (pulido del admin) → `dd7eba9` (docs) → `748525e`.
   Netlify deploys `6aed46532ba5f4ac90dab61b` (33a9a87, 03:17:40 UTC),
   `6aed49d21073299859a3ea08` (83b4422, 03:32:40 UTC), `6aed4d52b8f7c1fbaf90d0ac`
-  (5a1a431, 03:47:30 UTC) y `6aed4e0d8531e61c7020dd1b` (6bc101e, READY, production,
-  03:50:38 UTC). Sin migración: ninguno toca la base. Sondas: sitio 200; `stryv-care`
+  (5a1a431, 03:47:30 UTC), `6aed4e0d8531e61c7020dd1b` (6bc101e, 03:50:38 UTC) y
+  `6aed4fedc833ae800efb5513` (748525e, READY, production, 03:58:32 UTC). El dueño NO
+  revisó en pantalla el último paquete (Estudios y fichas de día): pidió subirlo sin
+  preguntar; queda PENDIENTE / NO BLOQUEANTE su revisión en el teléfono (PWA). Sin migración: ninguno toca la base. Sondas: sitio 200; `stryv-care`
   sin token → 401; `/loader.css` 200 y el splash en `index.html`; los bundles traen la
   nav flotante, la cinta, "Operado por STRYV", "Ver mis planes STRYV", el acceso
   partido (`ek-acceso-brand`), la app del miembro (`ek-member`, `ek-home-hero`) y la
