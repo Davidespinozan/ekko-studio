@@ -9,22 +9,27 @@ pulido del miembro), pantalla de carga con isotipo y Planes STRYV (EKKO-149) DEP
 VERIFICADOS EN PRODUCCIÓN. Antes: PKG-06F (agregados en el servidor). REMEDIACIÓN
 CANÓNICA sin cambios: 0 hallazgos abiertos.
 
-## Producción (verificado 2026-11-06 03:35 UTC)
-- Código publicado: `83b44220e1aacc6b2eaa362d54fa92256a54c2e4` ("feat(miembro): pulido
-  premium (fase 3)"), cadena `aff6e42` (Planes STRYV, EKKO-149) → `33a9a87` (landing
-  fase 1) → `acc5f2b` (acceso fase 2) → `7eb6442` (pantalla de carga) → `83b4422`.
-  Netlify deploys `6aed46532ba5f4ac90dab61b` (33a9a87, 03:17:40 UTC) y
-  `6aed49d21073299859a3ea08` (83b4422, READY, production, 03:32:40 UTC). Sin
-  migración: ninguno toca la base. Sondas: sitio 200; `stryv-care` sin token → 401;
-  `/loader.css` 200 y el splash en `index.html`; los bundles traen la nav flotante, la
-  cinta, "Operado por STRYV", "Ver mis planes STRYV", el acceso partido
-  (`ek-acceso-brand`) y la app del miembro (`ek-member`).
+## Producción (verificado 2026-11-06 03:52 UTC)
+- Código publicado: `6bc101e03d9df119c6fd4ca2a349894e60a6eebc` ("feat(admin): pulido
+  premium del panel"), cadena `aff6e42` (Planes STRYV, EKKO-149) → `33a9a87` (landing
+  fase 1) → `acc5f2b` (acceso fase 2) → `7eb6442` (pantalla de carga) → `83b4422`
+  (pulido del miembro) → `5f25b54` (docs) → `e589d22` (inicio del miembro a dos
+  columnas) → `5a1a431` (bienvenida del admin y recepción) → `6bc101e`.
+  Netlify deploys `6aed46532ba5f4ac90dab61b` (33a9a87, 03:17:40 UTC),
+  `6aed49d21073299859a3ea08` (83b4422, 03:32:40 UTC), `6aed4d52b8f7c1fbaf90d0ac`
+  (5a1a431, 03:47:30 UTC) y `6aed4e0d8531e61c7020dd1b` (6bc101e, READY, production,
+  03:50:38 UTC). Sin migración: ninguno toca la base. Sondas: sitio 200; `stryv-care`
+  sin token → 401; `/loader.css` 200 y el splash en `index.html`; los bundles traen la
+  nav flotante, la cinta, "Operado por STRYV", "Ver mis planes STRYV", el acceso
+  partido (`ek-acceso-brand`), la app del miembro (`ek-member`, `ek-home-hero`) y la
+  bienvenida (`ek-hello`).
   Pendientes del dueño (no bloqueantes): precio de STRYV Care ($2,500 por defecto vs
   $4,000 "regular" de Renovacell; `STRYV_CARE_CENTAVOS`) y si recepción ve el enlace
   "Operado por STRYV". Residual de pruebas: `ekko138-pausa-comercial.db.test.ts` caso
-  5b falló una vez en un gate con la máquina cargada (13.8) y pasa aislado y en los
-  gates en reposo; intermitente, sin tocar. En local (sin commit): fase 4, inicio del
-  miembro a dos columnas en escritorio.
+  5b es intermitente (falló en 3 de 11 gates, también en reposo) y pasa aislado: al
+  levantar la sanción, "la última operación aplicada" se elige por `created_at` y dos
+  operaciones aplicadas en el mismo tick empatan (PGlite). Dominio membresía/derecho;
+  sin tocar, pendiente de autorización del dueño. Local: nada sin subir.
 - Estado anterior (PKG-06F, 2026-10-06), que sigue siendo la base de negocio:
 - Código de negocio publicado: `dba3e9aebfb733c3d61d68b94e90674f4a8b2ca6`
   ("fix(scale): move authoritative aggregates server-side", PKG-06F); el commit docs-only
