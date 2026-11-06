@@ -9,6 +9,7 @@ import { BrandLogo } from '@shared/components/BrandLogo';
 import { Sidebar } from './components/Sidebar';
 import { CambiarPasswordGate } from '@shared/components/CambiarPasswordGate';
 import { NotificacionesBell } from '@member/components/NotificacionesBell';
+import '../styles/admin.css';
 
 const Dashboard = lazy(() => import('./pages/AdminDashboard'));
 const Reportes = lazy(() => import('./pages/Reportes'));
@@ -37,6 +38,8 @@ export default function AdminLayout() {
 
   return (
     <div className="adm-shell">
+      <div className="ek-grain" aria-hidden="true" />
+      <div className="ek-aurora" aria-hidden="true"><i /><i /><i /></div>
       <CambiarPasswordGate />
       <div className="adm-sidebar-desktop">
         <Sidebar />

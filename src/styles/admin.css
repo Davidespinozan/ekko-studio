@@ -1,0 +1,68 @@
+/* ============================================================================
+   PANEL ADMIN — pulido premium (2026-11-06). Solo bajo `.adm-shell`: barra
+   lateral con el cromo de la marca y hairline, etiquetas de sección en mono,
+   grano y aurora tenue en el lienzo, hairlines más presentes y halo mostaza al
+   pasar sobre las tarjetas, kicker de página con punto, botones píldora. No
+   cambia estructura, rutas ni datos.
+   ============================================================================ */
+.adm-shell { position: relative; isolation: isolate; }
+
+/* Barra lateral: cromo con dirección y hairline (como el menú de Renovacell) */
+.adm-shell .adm-sidebar-desktop {
+  background: var(--ek-chrome-grad);
+  border-right: 1px solid var(--ek-line-strong);
+  box-shadow: inset 0 1px 0 var(--ek-chrome-edge), inset -1px 0 0 rgba(0, 0, 0, 0.35);
+}
+.adm-shell .adm-drawer { background: var(--ek-chrome-grad); }
+.adm-shell .adm-sidebar-brand { border-bottom-color: var(--ek-line-strong); }
+.adm-shell .adm-sidebar-section-label {
+  font-family: var(--ek-font-mono);
+  letter-spacing: 0.14em;
+}
+.adm-shell .adm-sidebar-item { border-radius: 999px; }
+.adm-shell .adm-sidebar-item--active::before { left: -13px; }
+.adm-shell .adm-sidebar-footer { border-top-color: var(--ek-line-strong); }
+
+/* Barra superior en teléfono: vidrio */
+.adm-shell .adm-topbar-mobile {
+  background: rgba(6, 6, 7, 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid var(--ek-line-strong);
+  box-shadow: none;
+}
+
+/* Kicker de página (el eyebrow que precede al título) con punto mostaza */
+.adm-main .ek-eyebrow--mustard:has(+ h1),
+.adm-main .ek-eyebrow--mustard:has(+ .ek-h2) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--ek-font-mono);
+  letter-spacing: 0.16em;
+}
+.adm-main .ek-eyebrow--mustard:has(+ h1)::before,
+.adm-main .ek-eyebrow--mustard:has(+ .ek-h2)::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ek-mustard);
+  box-shadow: 0 0 12px var(--ek-mustard);
+  flex: none;
+}
+
+/* Tarjetas: hairline más presente y halo mostaza al pasar */
+.adm-main .ek-card,
+.adm-main .ek-stat-card {
+  border-color: var(--ek-line-strong);
+  transition: border-color 0.22s var(--ek-ease-out), box-shadow 0.22s var(--ek-ease-out), transform 0.22s var(--ek-ease-out);
+}
+.adm-main .ek-card:hover,
+.adm-main .ek-stat-card:hover {
+  border-color: var(--ek-mustard-dim);
+  box-shadow: 0 0 0 1px var(--ek-mustard-soft), 0 24px 48px -28px rgba(229, 184, 41, 0.35);
+}
+
+/* Botones píldora, como en el resto del sistema */
+.adm-main .ek-cta { border-radius: 999px; }
