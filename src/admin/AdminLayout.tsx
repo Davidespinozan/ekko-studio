@@ -10,6 +10,7 @@ import { Sidebar } from './components/Sidebar';
 import { CambiarPasswordGate } from '@shared/components/CambiarPasswordGate';
 import { NotificacionesBell } from '@member/components/NotificacionesBell';
 import '../styles/admin.css';
+import '../styles/claro.css';
 
 const Dashboard = lazy(() => import('./pages/AdminDashboard'));
 const Reportes = lazy(() => import('./pages/Reportes'));
@@ -38,8 +39,6 @@ export default function AdminLayout() {
 
   return (
     <div className="adm-shell">
-      <div className="ek-grain" aria-hidden="true" />
-      <div className="ek-aurora" aria-hidden="true"><i /><i /><i /></div>
       <CambiarPasswordGate />
       <div className="adm-sidebar-desktop">
         <Sidebar />
@@ -69,7 +68,8 @@ export default function AdminLayout() {
         </div>
       )}
 
-      <div className="adm-content">
+      {/* Lienzo claro (modelo SALA): cromo oscuro, área de trabajo clara. */}
+      <div className="adm-content ek-claro">
         <header className="adm-topbar-mobile" style={{ position: 'relative', justifyContent: 'center' }}>
           <button
             onClick={() => setDrawerOpen(true)}

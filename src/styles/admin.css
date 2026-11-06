@@ -52,16 +52,10 @@
   flex: none;
 }
 
-/* Tarjetas: hairline más presente y halo mostaza al pasar */
+/* Tarjetas: la profundidad sobre lienzo claro vive en claro.css. */
 .adm-main .ek-card,
 .adm-main .ek-stat-card {
-  border-color: var(--ek-line-strong);
   transition: border-color 0.22s var(--ek-ease-out), box-shadow 0.22s var(--ek-ease-out), transform 0.22s var(--ek-ease-out);
-}
-.adm-main .ek-card:hover,
-.adm-main .ek-stat-card:hover {
-  border-color: var(--ek-mustard-dim);
-  box-shadow: 0 0 0 1px var(--ek-mustard-soft), 0 24px 48px -28px rgba(229, 184, 41, 0.35);
 }
 
 /* Botones píldora, como en el resto del sistema */

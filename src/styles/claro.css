@@ -1,0 +1,116 @@
+/* ============================================================================
+   LIENZO CLARO — panel del admin y recepción (2026-11-06, decisión del dueño).
+   Modelo de SALA: el CROMO (barra lateral, cabecera, bienvenida) sigue oscuro
+   con la marca; el ÁREA DE TRABAJO es clara (fondo hueso cálido, tarjetas
+   blancas, hairlines finos, sombra de contacto suave). La mostaza queda como
+   acento y relleno de botones; como TEXTO sobre blanco se oscurece para leerse.
+   Se aplica con la clase `.ek-claro` en el contenedor del área de trabajo;
+   todo lo de abajo son tokens, así que los componentes no cambian. La app del
+   miembro y la landing siguen oscuras.
+   ============================================================================ */
+.ek-claro {
+  --ek-bg-soft:      #F7F4EE;
+  --ek-bg-elevated:  #FFFFFF;
+  --ek-metal-top:    #FFFFFF;
+  --ek-metal-mid:    #FFFFFF;
+  --ek-metal-bottom: #FFFFFF;
+  --ek-surface:      #FFFFFF;
+
+  --ek-ink:       #16150F;
+  --ek-ink-muted: #5C5950;
+  --ek-ink-faint: #8A867B;
+
+  --ek-line:        rgba(28, 24, 12, 0.08);
+  --ek-line-strong: rgba(28, 24, 12, 0.14);
+
+  --ek-success:      #2E7D5B;
+  --ek-success-soft: rgba(46, 125, 91, 0.10);
+  --ek-danger:       #B23A3A;
+  --ek-danger-soft:  rgba(178, 58, 58, 0.09);
+  --ek-warning:      #9A6B0E;
+  --ek-warning-soft: rgba(229, 184, 41, 0.16);
+  --ek-info:         #2C5F8E;
+  --ek-info-soft:    rgba(44, 95, 142, 0.09);
+
+  --ek-mustard-soft: rgba(229, 184, 41, 0.14);
+  --ek-mustard-dim:  rgba(201, 160, 31, 0.32);
+
+  --ek-shadow-card:  0 1px 2px rgba(28, 24, 12, 0.05), 0 14px 32px -20px rgba(28, 24, 12, 0.22);
+  --ek-shadow-hero:  0 2px 6px rgba(28, 24, 12, 0.06), 0 24px 48px -24px rgba(28, 24, 12, 0.28);
+  --ek-shadow:       var(--ek-shadow-card);
+  --ek-shadow-md:    var(--ek-shadow-card);
+
+  /* Mostaza como texto sobre blanco: versión profunda (AA). */
+  --ek-mustard-texto: #8C6E1F;
+
+  background: #F3F0E9;
+  color: var(--ek-ink);
+  color-scheme: light;
+}
+
+/* Cromo que vive dentro del área de trabajo: vuelve a los tokens oscuros. */
+.ek-claro .ek-header-glass,
+.ek-claro .adm-topbar-mobile,
+.ek-claro .ek-hello {
+  --ek-bg-soft:      #101012;
+  --ek-bg-elevated:  #202024;
+  --ek-ink:          #EDEDEA;
+  --ek-ink-muted:    #ADADA8;
+  --ek-ink-faint:    #8C8C87;
+  --ek-line:         rgba(255, 255, 255, 0.06);
+  --ek-line-strong:  rgba(255, 255, 255, 0.12);
+  --ek-mustard-texto: var(--ek-mustard);
+  color-scheme: dark;
+}
+
+/* Tarjetas: blancas con hairline y sombra de contacto; al pasar, se elevan. */
+.ek-claro .ek-card,
+.ek-claro .ek-stat-card {
+  border: 1px solid var(--ek-line);
+  box-shadow: var(--ek-shadow-card);
+}
+.ek-claro .ek-card:hover,
+.ek-claro .ek-stat-card:hover {
+  border-color: var(--ek-line-strong);
+  box-shadow: 0 1px 2px rgba(28, 24, 12, 0.06), 0 22px 44px -22px rgba(28, 24, 12, 0.3);
+}
+
+/* Campos, botones de ícono y esqueletos pensados para negro */
+.ek-claro .ek-input,
+.ek-claro select.ek-input,
+.ek-claro textarea.ek-input {
+  background: #FFFFFF;
+  border: 1px solid var(--ek-line-strong);
+  color: var(--ek-ink);
+}
+.ek-claro .ek-input::placeholder { color: var(--ek-ink-faint); }
+.ek-claro .ek-input:focus { border-color: var(--ek-mustard); box-shadow: 0 0 0 4px var(--ek-mustard-soft); }
+.ek-claro .ek-icon-btn { background: #FFFFFF; border-color: var(--ek-line-strong); }
+.ek-claro .ek-cta:not(.ek-cta--gold):not(.ek-cta--secondary):not(.ek-cta--ghost) {
+  background: #FFFFFF;
+  border: 1px solid var(--ek-line-strong);
+  color: var(--ek-ink);
+  box-shadow: 0 1px 2px rgba(28, 24, 12, 0.06);
+}
+.ek-claro .ek-cta--secondary:hover { background: rgba(28, 24, 12, 0.04); }
+.ek-claro .ek-skeleton {
+  background: linear-gradient(90deg, rgba(28, 24, 12, 0.05) 0%, rgba(28, 24, 12, 0.09) 50%, rgba(28, 24, 12, 0.05) 100%);
+  background-size: 200% 100%;
+}
+.ek-claro .ek-chip { background: #FFFFFF; border-color: var(--ek-line-strong); }
+.ek-claro .ek-chip--active { background: var(--ek-mustard-soft); color: var(--ek-mustard-texto); border-color: var(--ek-mustard); }
+
+/* La mostaza como color de TEXTO (estilos en línea y enlaces) se oscurece. */
+.ek-claro [style*="color: var(--ek-mustard)"] { color: var(--ek-mustard-texto) !important; }
+.ek-claro a:not(.ek-cta):not([class*="adm-sidebar"]) { text-decoration-color: currentColor; }
+
+/* Encabezados de sección y kicker de página con más peso sobre claro */
+.ek-claro .ek-eyebrow { color: var(--ek-ink-muted); }
+.ek-claro .ek-h2, .ek-claro h1 { color: var(--ek-ink); }
+
+/* Tablas: encabezado gris cálido, filas con hover teñido */
+.ek-claro table thead th { background: #FAF8F3; color: var(--ek-ink-faint); }
+.ek-claro table tbody tr:hover { background: rgba(229, 184, 41, 0.06); }
+
+/* Modales dentro del área de trabajo */
+.ek-claro .ek-modal { background: #FFFFFF; border-color: var(--ek-line-strong); }

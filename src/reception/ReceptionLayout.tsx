@@ -9,6 +9,7 @@ import { BrandLogo } from '@shared/components/BrandLogo';
 import { ReceptionBottomNav } from './components/ReceptionBottomNav';
 import { CambiarPasswordGate } from '@shared/components/CambiarPasswordGate';
 import { NotificacionesBell } from '@member/components/NotificacionesBell';
+import '../styles/claro.css';
 
 /** Título de sección para el header (mismo patrón que miembro). */
 function tituloDeSeccion(path: string): string {
@@ -71,7 +72,7 @@ export default function ReceptionLayout() {
   const nombre = capitalizar(usuario.nombre) || usuario.email;
 
   return (
-    <div className="rec-shell">
+    <div className="rec-shell ek-claro">
       <DemoBanner vista="Recepción" />
       <CambiarPasswordGate />
 
