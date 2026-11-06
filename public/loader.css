@@ -1,0 +1,60 @@
+/* Pantalla de carga de EKKO (como en SALA): el isotipo con un anillo mostaza
+   que le da la vuelta. Vive en public/ y se enlaza desde index.html para que
+   el primer paint (antes de que cargue el bundle) ya la muestre; el componente
+   LoadingScreen usa estas mismas clases. Colores literales a propósito: aquí
+   todavía no existen los tokens de ekko.css. Respeta prefers-reduced-motion. */
+.ek-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: #060607;
+  color: #adada8;
+}
+.ek-loader-mark {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ek-loader-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0%, #e5b829 32%, #c9a01f 55%, transparent 72%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  filter: drop-shadow(0 0 10px rgba(229, 184, 41, 0.45));
+  animation: ek-loader-spin 1.3s linear infinite;
+}
+.ek-loader-logo {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border-radius: 22%;
+  animation: ek-loader-breathe 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+.ek-loader-label {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: ek-loader-fade 1.2s ease 0.3s both;
+}
+@keyframes ek-loader-spin { to { transform: rotate(360deg); } }
+@keyframes ek-loader-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.92; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+@keyframes ek-loader-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .ek-loader-ring, .ek-loader-logo, .ek-loader-label { animation: none; }
+}

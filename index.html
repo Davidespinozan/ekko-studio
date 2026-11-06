@@ -25,6 +25,7 @@
     <title>EKKO Studio · Estudio profesional para creadores en Culiacán</title>
     <meta name="description" content="La plataforma para creadores de contenido en Culiacán. Estudios profesionales, equipo incluido, membresías desde $800/mes." />
     <link rel="canonical" href="https://ekkostudio.app/" />
+    <link rel="stylesheet" href="/loader.css" />
 
     <!-- Open Graph (previews en WhatsApp, Facebook, LinkedIn…) -->
     <meta property="og:site_name" content="EKKO Studio" />
@@ -64,7 +65,15 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Pantalla de carga del primer paint (el isotipo con el anillo): React la reemplaza al montar. -->
+      <div class="ek-loader" role="status" aria-label="Cargando">
+        <div class="ek-loader-mark">
+          <div class="ek-loader-ring" aria-hidden="true"></div>
+          <img class="ek-loader-logo" src="/icons/icon-192.png" alt="" width="52" height="52" />
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
