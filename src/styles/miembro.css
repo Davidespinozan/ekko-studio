@@ -1,0 +1,44 @@
+/* ============================================================================
+   APP DEL MIEMBRO — pulido premium (Fase 3, 2026-11-06). Solo bajo `.ek-member`:
+   cabecera de vidrio (blur + hairline) en lugar de la banda de cromo, grano y
+   aurora tenue en el lienzo, hairlines más presentes y halo mostaza al pasar
+   sobre las tarjetas, kickers en mono, y en escritorio una columna un poco más
+   ancha con más aire. El teléfono (su medio natural) cambia poco.
+   ============================================================================ */
+.ek-member { position: relative; isolation: isolate; }
+
+/* Cabecera translúcida */
+.ek-member .ek-header-glass {
+  background: rgba(6, 6, 7, 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid var(--ek-line-strong);
+  box-shadow: none;
+}
+
+/* Tarjetas: hairline más presente y halo mostaza al pasar */
+.ek-member .ek-card,
+.ek-member .ek-stat-card {
+  border-color: var(--ek-line-strong);
+  transition: border-color 0.22s var(--ek-ease-out), box-shadow 0.22s var(--ek-ease-out), transform 0.22s var(--ek-ease-out);
+}
+.ek-member .ek-card:hover,
+.ek-member .ek-stat-card:hover {
+  border-color: var(--ek-mustard-dim);
+  box-shadow: 0 0 0 1px var(--ek-mustard-soft), 0 24px 48px -28px rgba(229, 184, 41, 0.35);
+}
+
+/* Kickers en mono (sin punto: aquí hay muchos) */
+.ek-member .ek-eyebrow {
+  font-family: var(--ek-font-mono);
+  letter-spacing: 0.14em;
+}
+
+/* Botones píldora, como en la landing y el acceso */
+.ek-member .ek-cta { border-radius: 999px; }
+
+/* Escritorio: columna un poco más ancha, con aire */
+@media (min-width: 1024px) {
+  .ek-member .ek-container { max-width: 760px; padding: 32px 24px; }
+  .ek-member .ek-header-inner { max-width: 760px; }
+}
