@@ -315,3 +315,13 @@ describe('generarSlotsDisponibles · permitirEnCurso (recepción, walk-in tarde)
     expect(tarde[1].disponible).toBe(true);
   });
 });
+
+describe('partesFichaDia (pulido premium del selector de fecha)', async () => {
+  const { partesFichaDia } = await import('../reservaLogic');
+  it('Hoy y Mañana arriba; si no, el día corto; número y mes abajo', () => {
+    expect(partesFichaDia('2026-11-05', 'Hoy')).toEqual({ arriba: 'Hoy', numero: 5, mes: 'nov' });
+    expect(partesFichaDia('2026-11-06', 'Mañana')).toEqual({ arriba: 'Mañana', numero: 6, mes: 'nov' });
+    expect(partesFichaDia('2026-11-07', 'Sab 7 nov')).toEqual({ arriba: 'Sab', numero: 7, mes: 'nov' });
+    expect(partesFichaDia('2026-12-01', 'Mar 1 dic')).toEqual({ arriba: 'Mar', numero: 1, mes: 'dic' });
+  });
+});

@@ -35,7 +35,8 @@ import {
   formatHora,
   puedeReservarRecurso,
   type TenantReservaConfig,
-  type Slot
+  type Slot,
+  partesFichaDia
 } from '../logic/reservaLogic';
 import { useResumenMiembro } from '../hooks/useResumenMiembro';
 import type { Database } from '@shared/types/database';
@@ -566,14 +567,20 @@ export default function Reservar() {
             >
               {fechas.slice(0, 14).map((f) => {
                 const activo = fechaSel === f.fechaISO;
+                const ficha = partesFichaDia(f.fechaISO, f.label);
                 return (
                   <button
                     key={f.fechaISO}
+                    type="button"
                     onClick={() => setFechaSel(f.fechaISO)}
-                    className={`ek-chip ${activo ? 'ek-chip--active' : ''}`}
-                    style={{ scrollSnapAlign: 'start', borderRadius: 'var(--ek-r-sm)', fontSize: '13px' }}
+                    className={`ek-dia${activo ? ' ek-dia--activo' : ''}`}
+                    aria-label={f.label}
+                    aria-pressed={activo}
+                    style={{ scrollSnapAlign: 'start' }}
                   >
-                    {f.label}
+                    <span className="ek-dia-arriba">{ficha.arriba}</span>
+                    <span className="ek-dia-num">{ficha.numero}</span>
+                    <span className="ek-dia-mes">{ficha.mes}</span>
                   </button>
                 );
               })}

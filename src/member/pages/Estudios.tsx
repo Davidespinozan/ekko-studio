@@ -59,90 +59,38 @@ export default function Estudios() {
 
   return (
     <div className="ek-container">
-      <p className="ek-body-muted" style={{ margin: '4px 0 20px' }}>
+      <p className="ek-kicker" style={{ marginBottom: '6px' }}>
+        Nuestros espacios · {recursos.length} {recursos.length === 1 ? 'estudio' : 'estudios'}
+      </p>
+      <p className="ek-body-muted" style={{ margin: '0 0 18px' }}>
         Espacios profesionales diseñados para creadores. Cada uno con su personalidad.
       </p>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))',
-        gap: '16px'
-      }}>
+      <div className="ek-estudios-grid">
         {recursos.map((r) => {
+          const tipos = (r.tipo_contenido ?? []).filter(Boolean);
+          const meta = [
+            r.capacidad_personas ? `Hasta ${r.capacidad_personas} ${r.capacidad_personas === 1 ? 'persona' : 'personas'}` : null,
+            tipos[0] ?? null
+          ].filter(Boolean).join(' · ');
           return (
-            <Link
-              key={r.id}
-              to={`/app/estudios/${r.slug}`}
-              className="ek-card ek-card-interactive"
-              style={{
-                padding: 0,
-                overflow: 'hidden',
-                textDecoration: 'none',
-                color: 'inherit',
-                borderRadius: 'var(--ek-r-md)'
-              }}
-            >
-              <div style={{
-                background: 'linear-gradient(135deg, var(--ek-bg-elevated) 0%, var(--ek-bg) 100%)',
-                aspectRatio: '16 / 10',
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                {r.foto_url ? (
-                  <img
-                    src={r.foto_url}
-                    alt={r.nombre}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover'
-                    }}
-                  />
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', color: 'var(--ek-ink-faint)' }}>
-                    <ImageIcon size={24} strokeWidth={1.5} aria-hidden="true" />
-                    <span style={{ fontSize: '10px', letterSpacing: '0.18em', fontWeight: 600 }}>FOTO PRÓXIMAMENTE</span>
-                  </div>
-                )}
-                {(r.costo_creditos ?? 1) >= 2 && (
-                  <span style={{
-                    position: 'absolute',
-                    top: '10px',
-                    left: '10px',
-                    padding: '3px 9px',
-                    borderRadius: '999px',
-                    background: 'var(--ek-mustard)',
-                    color: 'var(--ek-bg)',
-                    fontSize: '9.5px',
-                    fontWeight: 700,
-                    letterSpacing: '0.08em'
-                  }}>PRO</span>
-                )}
-              </div>
-
-              {/* Cuerpo compacto: la FOTO es la protagonista. Nombre y flecha en
-                  una sola fila (la descripción va en el detalle). */}
-              <div style={{
-                padding: '12px 14px',
-                background: 'var(--ek-bg-soft)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '10px'
-              }}>
-                <h3 style={{
-                  fontFamily: 'var(--ek-font-display)',
-                  fontSize: '18px',
-                  fontWeight: 700,
-                  letterSpacing: '-0.03em',
-                  margin: 0,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>{r.nombre}</h3>
-                <ArrowRight size={18} style={{ color: 'var(--ek-mustard)', flexShrink: 0 }} aria-hidden="true" />
+            <Link key={r.id} to={`/app/estudios/${r.slug}`} className="ek-estudio-tarjeta" aria-label={`${r.nombre}: ver detalle`}>
+              {r.foto_url ? (
+                <img src={r.foto_url} alt="" loading="lazy" decoding="async" />
+              ) : (
+                <div className="ek-estudio-tarjeta-sin">
+                  <ImageIcon size={26} strokeWidth={1.5} aria-hidden="true" />
+                  <span>Foto próximamente</span>
+                </div>
+              )}
+              <div className="ek-estudio-tarjeta-scrim" aria-hidden="true" />
+              {(r.costo_creditos ?? 1) >= 2 && <span className="ek-estudio-tarjeta-pro">PRO</span>}
+              <div className="ek-estudio-tarjeta-body">
+                <div style={{ minWidth: 0 }}>
+                  <h3>{r.nombre}</h3>
+                  {meta && <p className="ek-estudio-tarjeta-meta">{meta}</p>}
+                </div>
+                <span className="ek-estudio-tarjeta-ir" aria-hidden="true"><ArrowRight size={18} /></span>
               </div>
             </Link>
           );

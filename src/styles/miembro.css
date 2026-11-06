@@ -70,3 +70,146 @@
   .ek-home-hero .ek-hero-foto { flex: 1; min-height: 380px; }
   .ek-home-saludo .ek-card--cream h1 { font-size: clamp(28px, 2.6vw, 38px); }
 }
+
+/* ── Estudios: la foto es la protagonista; nombre y datos sobre un velo ──── */
+.ek-estudios-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 14px;
+}
+.ek-estudio-tarjeta {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--ek-r-md);
+  border: 1px solid var(--ek-line-strong);
+  background: var(--ek-bg-soft);
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.22s var(--ek-ease-out), border-color 0.22s var(--ek-ease-out), box-shadow 0.22s var(--ek-ease-out);
+}
+.ek-estudio-tarjeta:hover { border-color: var(--ek-mustard-dim); box-shadow: 0 24px 48px -28px rgba(229, 184, 41, 0.45); transform: translateY(-2px); }
+.ek-estudio-tarjeta:active { transform: scale(0.985); }
+.ek-estudio-tarjeta > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s var(--ek-ease-out);
+}
+.ek-estudio-tarjeta:hover > img { transform: scale(1.04); }
+.ek-estudio-tarjeta-sin {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--ek-ink-faint);
+  font-family: var(--ek-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--ek-bg-elevated) 0%, var(--ek-bg) 100%);
+}
+.ek-estudio-tarjeta-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(6, 6, 7, 0) 32%, rgba(6, 6, 7, 0.55) 64%, rgba(6, 6, 7, 0.92) 100%);
+}
+.ek-estudio-tarjeta-pro {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--ek-mustard);
+  color: var(--ek-bg);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.ek-estudio-tarjeta-body {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+}
+.ek-estudio-tarjeta h3 {
+  margin: 0;
+  font-family: var(--ek-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: #fff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ek-estudio-tarjeta-meta {
+  margin: 5px 0 0;
+  font-family: var(--ek-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ek-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ek-estudio-tarjeta-ir {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ek-mustard);
+  color: var(--ek-bg);
+  box-shadow: 0 8px 20px var(--ek-mustard-glow);
+}
+
+/* ── Reservar: etiquetas en mono, fichas de día y horarios píldora ────────── */
+.ek-member .ek-field-label { font-family: var(--ek-font-mono); letter-spacing: 0.16em; }
+.ek-dia {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 66px;
+  min-height: 74px;
+  padding: 8px 10px;
+  border-radius: 16px;
+  border: 0.5px solid var(--ek-line-strong);
+  background: var(--ek-bg-soft);
+  color: var(--ek-ink);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s, box-shadow 0.18s;
+}
+.ek-dia:hover { border-color: var(--ek-mustard-dim); }
+.ek-dia-arriba { font-family: var(--ek-font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ek-ink-muted); }
+.ek-dia-num { font-family: var(--ek-font-display); font-size: 22px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+.ek-dia-mes { font-size: 10.5px; color: var(--ek-ink-faint); text-transform: lowercase; }
+.ek-dia--activo {
+  background: var(--ek-mustard);
+  border-color: var(--ek-mustard);
+  color: var(--ek-bg);
+  box-shadow: 0 8px 20px var(--ek-mustard-glow);
+}
+.ek-dia--activo .ek-dia-arriba, .ek-dia--activo .ek-dia-mes { color: rgba(10, 10, 10, 0.65); }
+.ek-member .ek-slot { border-radius: 999px; border-color: var(--ek-line-strong); }
+.ek-member .ek-slot:not(:disabled):hover { border-color: var(--ek-mustard); color: var(--ek-mustard); }
+.ek-member .ek-slot:disabled { opacity: 0.35; }

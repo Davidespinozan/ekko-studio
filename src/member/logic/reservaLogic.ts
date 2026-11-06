@@ -256,6 +256,18 @@ function capitalize(s: string): string {
 }
 
 /**
+ * Ficha de día del selector de fecha (app del miembro, pulido premium): arriba
+ * "Hoy"/"Mañana" o el día de la semana corto, en medio el número y abajo el mes.
+ */
+export function partesFichaDia(fechaISO: string, label: string): { arriba: string; numero: number; mes: string } {
+  const relativa = label === 'Hoy' || label === 'Mañana';
+  const arriba = relativa ? label : capitalize(DIAS_ES[diaSemanaDeFechaISO(fechaISO)].slice(0, 3));
+  const numero = Number(fechaISO.slice(8, 10));
+  const mes = formatFechaEnZona(instanteDeFechaHoraEnZona(fechaISO, '12:00'), { month: 'short' }).replace('.', '');
+  return { arriba, numero, mes };
+}
+
+/**
  * Formato HH:mm (hora de pared del estudio).
  */
 export function formatHora(d: Date): string {
