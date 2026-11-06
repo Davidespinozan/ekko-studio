@@ -12,6 +12,9 @@ import { Reveal } from '../components/Reveal';
 import { MagneticButton } from '@shared/components/MagneticButton';
 import { PlanTipoToggle } from '@shared/components/PlanTipoToggle';
 import Footer from '../components/Footer';
+import { LandingNav } from '../components/LandingNav';
+import { partirPalabras, sinFlecha, instalarBrilloTarjetas, instalarProgresoScroll, instalarSpotlight } from '../lib/landingFx';
+import '../../styles/landing.css';
 
 // Íconos de "Cómo funciona" por posición (el texto es editable; el ícono no).
 const PASO_ICONS = [CalendarCheck, Clapperboard, FolderDown];
@@ -129,6 +132,20 @@ export default function Landing() {
   const { hero, cta_final, whatsappUrl, membresias, estudios: estudiosCopy, como_funciona, faq, estudio_modal } =
     useLandingConfig();
   const ctaWhatsappUrl = whatsappUrl();
+  const raizRef = useRef<HTMLDivElement>(null);
+  const heroRef = useRef<HTMLElement>(null);
+  // Capa premium (Fase 1): brillo que sigue al cursor en las tarjetas, barra de
+  // progreso de lectura y foco del hero. Cada instalador devuelve su limpieza.
+  useEffect(() => {
+    const quitar = [instalarBrilloTarjetas(raizRef.current), instalarProgresoScroll(), instalarSpotlight(heroRef.current)];
+    return () => quitar.forEach((q) => q());
+  }, []);
+  // Cinta: los tipos de contenido reales de los estudios más lo que pasa en EKKO
+  // (decorativa; se repite dos veces para el bucle). No repite nombres de estudios.
+  const cinta = Array.from(new Set([
+    ...estudios.flatMap((e) => e.tipo_contenido ?? []).map((t) => t.trim()).filter(Boolean),
+    'Equipo profesional ya montado', 'Material entregado en MP4', 'Reserva desde la app', 'Culiacán'
+  ]));
 
   const aEstudioInfo = (r: EstudioPublico): EstudioInfo => {
     return {
@@ -162,15 +179,20 @@ export default function Landing() {
   const planesVisibles = vistaPlan === 'membresias' ? planesMensuales : planesPaquetes;
 
   return (
-    <div style={{
+    <div ref={raizRef} className="ek-landing" style={{
       maxWidth: '1200px',
       margin: '0 auto',
       padding: '0 24px'
     }}>
+      <LandingNav />
+      <div className="ek-progreso" aria-hidden="true" />
+      <div className="ek-grain" aria-hidden="true" />
+      <div className="ek-aurora" aria-hidden="true"><i /><i /><i /></div>
+
       {/* ============================================================
           HERO
           ============================================================ */}
-      <section className="ek-hero" style={{
+      <section id="inicio" ref={heroRef} className="ek-hero" style={{
         minHeight: '86vh',
         display: 'flex',
         flexDirection: 'column',
@@ -192,11 +214,10 @@ export default function Landing() {
         {/* Orbs animados de fondo — dan "vida" al hero (respetan reduced-motion) */}
         <div className="ek-orb" aria-hidden="true" style={{ width: 320, height: 320, top: '-40px', right: 'clamp(-120px, -8vw, 20px)', opacity: 0.28 }} />
         <div className="ek-orb" aria-hidden="true" style={{ width: 260, height: 260, bottom: '-60px', left: '-80px', opacity: 0.2, animationDelay: '-8s', animationDuration: '26s' }} />
+        <div className="ek-hero-spot" aria-hidden="true" />
 
         {hero.eyebrow && (
-          <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '14px' }}>
-            {hero.eyebrow}
-          </p>
+          <span className="ek-pill"><span className="ek-pill-dot" aria-hidden="true" />{hero.eyebrow}</span>
         )}
 
         <h1 style={{
@@ -208,11 +229,15 @@ export default function Landing() {
           margin: 0,
           marginBottom: '16px'
         }}>
-          {hero.titulo}
+          {partirPalabras(hero.titulo).map((palabra, i) => (
+            <span key={`${palabra}-${i}`}>
+              <span className="ek-palabra" style={{ animationDelay: `${0.08 * i}s` }}>{palabra}</span>{' '}
+            </span>
+          ))}
           {hero.titulo_accent && (
             <>
               {hero.titulo && <br />}
-              <span style={{ color: 'var(--ek-mustard)' }}>{hero.titulo_accent}</span>
+              <span className="ek-palabra ek-grad" style={{ animationDelay: `${0.08 * partirPalabras(hero.titulo).length + 0.1}s` }}>{hero.titulo_accent}</span>
             </>
           )}
         </h1>
@@ -229,24 +254,41 @@ export default function Landing() {
           </p>
         )}
 
-        <MagneticButton
-          href={hero.cta_link || '#membresias'}
-          className="ek-cta ek-cta--gold ek-hero-cta"
-          style={{
-            padding: '15px 30px',
-            fontSize: '15px',
-            minHeight: '52px',
-            alignSelf: 'flex-start',
-            width: 'auto',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px'
-          }}
-        >
-          {hero.cta_texto}
-        </MagneticButton>
+        <div className="ek-hero-ctas">
+          <MagneticButton
+            href={hero.cta_link || '#membresias'}
+            className="ek-cta ek-cta--gold ek-hero-cta"
+            style={{
+              padding: '15px 30px',
+              fontSize: '15px',
+              minHeight: '52px',
+              width: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
+            }}
+          >
+            {sinFlecha(hero.cta_texto)} <ArrowRight size={18} aria-hidden="true" />
+          </MagneticButton>
+          <a href="#estudios" className="ek-cta ek-cta--ghost" style={{ padding: '15px 24px', fontSize: '15px', minHeight: '52px' }}>
+            Conoce los estudios
+          </a>
+        </div>
+        <div className="ek-hero-ticks" aria-label="Lo que incluye">
+          <span><Check size={16} aria-hidden="true" />Equipo profesional ya montado</span>
+          <span><Check size={16} aria-hidden="true" />Reserva desde la app</span>
+          <span><Check size={16} aria-hidden="true" />Material entregado en MP4</span>
+        </div>
+        <div className="ek-scroll-hint" aria-hidden="true" />
       </section>
+
+      {/* Cinta: lo que pasa en EKKO, en marquesina (decorativa). */}
+      <div className="ek-cinta" aria-hidden="true">
+        <div className="ek-cinta-track">
+          {[...cinta, ...cinta].map((t, i) => <span key={`${t}-${i}`}>{t}</span>)}
+        </div>
+      </div>
 
       {/* ============================================================
           TU ESTUDIO EN EL BOLSILLO (sección 2 — showcase de la app)
@@ -257,9 +299,9 @@ export default function Landing() {
           CÓMO FUNCIONA
           ============================================================ */}
       <Reveal>
-      <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
+      <section id="como-funciona" style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
         {como_funciona.eyebrow && (
-          <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>{como_funciona.eyebrow}</p>
+          <p className="ek-kicker" style={{ marginBottom: '12px' }}>{como_funciona.eyebrow}</p>
         )}
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
@@ -274,7 +316,7 @@ export default function Landing() {
           {como_funciona.titulo_accent && (
             <>
               <br />
-              <span style={{ color: 'var(--ek-mustard)' }}>{como_funciona.titulo_accent}</span>
+              <span className="ek-grad">{como_funciona.titulo_accent}</span>
             </>
           )}
         </h2>
@@ -286,13 +328,13 @@ export default function Landing() {
             return (
             <div
               key={n}
-              className="ek-card ek-card--md ek-step-card"
+              className="ek-card ek-card--md ek-step-card ek-glow"
             >
               <span className="ek-empty-icon ek-step-icon" style={{ width: 44, height: 44 }}>
                 <Icon size={20} aria-hidden="true" />
               </span>
               <div className="ek-step-text">
-                <p className="ek-eyebrow ek-eyebrow--mustard" style={{ marginBottom: '6px' }}>
+                <p className="ek-kicker" style={{ marginBottom: '6px' }}>
                   PASO {n}
                 </p>
                 <h3 className="ek-step-title" style={{
@@ -321,9 +363,9 @@ export default function Landing() {
           ESTUDIOS
           ============================================================ */}
       <Reveal>
-      <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
+      <section id="estudios" style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
         {estudiosCopy.eyebrow && (
-          <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>{estudiosCopy.eyebrow}</p>
+          <p className="ek-kicker" style={{ marginBottom: '12px' }}>{estudiosCopy.eyebrow}</p>
         )}
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
@@ -338,7 +380,7 @@ export default function Landing() {
           {estudiosCopy.titulo_accent && (
             <>
               <br />
-              <span style={{ color: 'var(--ek-mustard)' }}>{estudiosCopy.titulo_accent}</span>
+              <span className="ek-grad">{estudiosCopy.titulo_accent}</span>
             </>
           )}
         </h2>
@@ -368,7 +410,7 @@ export default function Landing() {
               <button
                 key={s.slug}
                 onClick={() => setEstudioAbierto(s)}
-                className="ek-estudio-card"
+                className="ek-estudio-card ek-glow"
               >
                 <div className="ek-estudio-media">
                   {s.esPro && (
@@ -442,7 +484,7 @@ export default function Landing() {
       <Reveal>
       <section id="membresias" style={{ padding: 'clamp(40px, 7vw, 64px) 0', textAlign: 'center' }}>
         {membresias.eyebrow && (
-          <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>{membresias.eyebrow}</p>
+          <p className="ek-kicker" style={{ marginBottom: '12px' }}>{membresias.eyebrow}</p>
         )}
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
@@ -457,7 +499,7 @@ export default function Landing() {
           {membresias.titulo_accent && (
             <>
               <br />
-              <span style={{ color: 'var(--ek-mustard)' }}>{membresias.titulo_accent}</span>
+              <span className="ek-grad">{membresias.titulo_accent}</span>
             </>
           )}
         </h2>
@@ -576,9 +618,9 @@ export default function Landing() {
           FAQ
           ============================================================ */}
       <Reveal>
-      <section style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
+      <section id="faq" style={{ padding: 'clamp(40px, 7vw, 64px) 0' }}>
         {faq.eyebrow && (
-          <p className="ek-eyebrow" style={{ marginBottom: '12px' }}>{faq.eyebrow}</p>
+          <p className="ek-kicker" style={{ marginBottom: '12px' }}>{faq.eyebrow}</p>
         )}
         <h2 style={{
           fontFamily: 'var(--ek-font-display)',
@@ -594,7 +636,7 @@ export default function Landing() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {faq.items.map((item) => (
-            <details key={item.q} className="ek-card" style={{ padding: '20px 24px', cursor: 'pointer', borderRadius: 'var(--ek-r-landing)' }}>
+            <details key={item.q} className="ek-card ek-glow ek-faq-item" style={{ padding: '20px 24px', borderRadius: 'var(--ek-r-landing)' }}>
               <summary style={{
                 fontFamily: 'var(--ek-font-display)',
                 fontSize: '17px',
@@ -606,7 +648,7 @@ export default function Landing() {
                 alignItems: 'center'
               }}>
                 {item.q}
-                <span style={{ color: 'var(--ek-mustard)', fontSize: '14px' }}>+</span>
+                <span className="ek-faq-plus" aria-hidden="true">+</span>
               </summary>
               <p style={{
                 fontSize: '14px',
@@ -626,17 +668,9 @@ export default function Landing() {
           ============================================================ */}
       <Reveal>
       <section id="contacto" style={{ padding: 'clamp(28px, 5vw, 48px) 0' }}>
-        <div style={{
-          background: 'var(--ek-bg-elevated)',
-          border: '0.5px solid var(--ek-line)',
-          borderRadius: 'var(--ek-r-landing)',
-          padding: 'clamp(32px, 5vw, 52px) clamp(24px, 5vw, 40px)',
-          textAlign: 'center'
-        }}>
+        <div className="ek-cierre">
           {cta_final.eyebrow && (
-            <p className="ek-eyebrow ek-eyebrow--mustard" style={{
-              marginBottom: '14px', justifyContent: 'center', display: 'flex'
-            }}>
+            <p className="ek-kicker" style={{ marginBottom: '14px' }}>
               {cta_final.eyebrow}
             </p>
           )}
@@ -664,7 +698,7 @@ export default function Landing() {
               className="ek-cta ek-cta--gold"
               style={{ padding: '15px 30px', fontSize: '15px', minHeight: '52px' }}
             >
-              {cta_final.cta_texto}
+              {sinFlecha(cta_final.cta_texto)} <ArrowRight size={18} aria-hidden="true" />
             </MagneticButton>
           ) : (
             <span
@@ -685,6 +719,13 @@ export default function Landing() {
       {/* ============================================================
           FOOTER (extraído a src/public/components/Footer.tsx)
           ============================================================ */}
+      {ctaWhatsappUrl && (
+        <a className="ek-wa-float" href={ctaWhatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="¿Dudas? Escríbenos por WhatsApp">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.885-9.885 9.885m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z" /></svg>
+          <span className="ek-wa-txt">¿Dudas? <b>Escríbenos</b></span>
+        </a>
+      )}
+
       <Footer />
 
       <EstudioModal
