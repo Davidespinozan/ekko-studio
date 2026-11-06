@@ -43,6 +43,7 @@ vi.mock('../../components/CheckInDetail', () => ({
 }));
 
 vi.mock('@shared/components/CumpleanosCard', () => ({ CumpleanosCard: () => null }));
+vi.mock('../../hooks/useReservasHoy', () => ({ useReservasHoy: () => ({ reservas: [], isLoading: false, error: false, cargado: true, refetch: vi.fn() }) }));
 
 import Hoy from '../Hoy';
 

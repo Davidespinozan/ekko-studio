@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ReservasHoyView } from '../components/ReservasHoyView';
 import { CheckInDetail } from '../components/CheckInDetail';
 import { CumpleanosCard } from '@shared/components/CumpleanosCard';
 import { ActivarAvisosPush } from '@shared/components/ActivarAvisosPush';
 import { useAuth } from '@shared/hooks/useAuth';
+import { BienvenidaPanel } from '@shared/components/BienvenidaPanel';
+import { resumenDelDia } from '@shared/lib/bienvenida';
+import { useReservasHoy } from '../hooks/useReservasHoy';
 
 /** Retorno de `check_in_manual_atomic` (misma forma que el `data` de qr-verify). */
 export interface CheckInManualData {
@@ -30,9 +33,20 @@ export interface CheckInManualData {
 export default function Hoy() {
   const [detalle, setDetalle] = useState<CheckInManualData | null>(null);
   const { usuario } = useAuth();
+  // Bienvenida (patrón Renovacell/Fukuroll): una lectura sin polling, solo para el resumen;
+  // la lista viva la lleva ReservasHoyView. Si la lectura falla, no se afirma ningún número.
+  const hoy = useReservasHoy(undefined, false);
+  const { refetch: leerHoy } = hoy;
+  // Sin polling el hook no lee solo: una lectura al entrar.
+  useEffect(() => { void leerHoy(); }, [leerHoy]);
+  const vivas = hoy.error ? [] : hoy.reservas.filter((r) => r.status === 'confirmada' || r.status === 'completada');
+  const resumen = hoy.error || hoy.isLoading
+    ? { texto: 'Aquí tienes el día: llegadas, check‑ins y faltantes.', urgente: false }
+    : resumenDelDia({ sesionesHoy: vivas.length, checkIns: vivas.filter((r) => r.status === 'completada').length });
 
   return (
     <div className="rec-main">
+      <BienvenidaPanel nombre={usuario?.nombre} rol={usuario?.rol} avatarUrl={usuario?.avatar_url} resumen={resumen.texto} urgente={resumen.urgente} />
       <CumpleanosCard dias={0} compacto />
       {usuario && (
         <ActivarAvisosPush

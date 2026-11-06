@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Sun, CloudSun, Moon, Eye, Ban, ArrowRight, ArrowUp, ArrowDown, PartyPopper } from 'lucide-react';
+import { Eye, Ban, ArrowRight, ArrowUp, ArrowDown, PartyPopper } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@shared/hooks/useAuth';
 import { useDashboardData, useDineroMetrics, type DashboardData } from '../hooks/useAdminData';
 import CardMenuDropdown from '../components/CardMenuDropdown';
 import CancelarReservaModal, { type ReservaParaCancelar } from '../components/CancelarReservaModal';
 import { CentroPendientes } from '../components/CentroPendientes';
+import { useCentroPendientes } from '../hooks/useCentroPendientes';
+import { totalPendientes } from '../logic/centroPendientes';
+import { BienvenidaPanel } from '@shared/components/BienvenidaPanel';
+import { resumenDelDia } from '@shared/lib/bienvenida';
 import { CumpleanosCard } from '@shared/components/CumpleanosCard';
 import { ActivarAvisosPush } from '@shared/components/ActivarAvisosPush';
 import DetalleReservaModal from '../components/DetalleReservaModal';
@@ -20,13 +24,6 @@ function capitalizar(s: string | null | undefined): string {
     .filter(Boolean)
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
-}
-
-function saludoTiming(d: Date = new Date()): { texto: string; icon: LucideIcon } {
-  const h = d.getHours();
-  if (h >= 5 && h < 12) return { texto: 'Buenos días', icon: Sun };
-  if (h >= 12 && h < 19) return { texto: 'Buenas tardes', icon: CloudSun };
-  return { texto: 'Buenas noches', icon: Moon };
 }
 
 function nombreMes(d: Date): string {
@@ -44,9 +41,8 @@ export default function AdminDashboard() {
   const [cancelar, setCancelar] = useState<ReservaParaCancelar | null>(null);
   const [detalleId, setDetalleId] = useState<string | null>(null);
 
-  const saludo = saludoTiming();
-  const SaludoIcon = saludo.icon;
-  const nombre = capitalizar(usuario?.nombre).split(' ')[0] || '';
+  // Bienvenida (patrón Renovacell/Fukuroll): lo pendiente manda; si falla el conteo, no se afirma nada.
+  const pendientes = useCentroPendientes();
 
   if (isLoading) {
     return (
@@ -77,25 +73,14 @@ export default function AdminDashboard() {
     );
   }
 
+  const resumen = resumenDelDia({
+    sesionesHoy: data.reservasHoy.length,
+    pendientes: pendientes.error || pendientes.isLoading ? 0 : totalPendientes(pendientes.conteo)
+  });
+
   return (
     <div>
-      <h1
-        style={{
-          fontFamily: 'var(--ek-font-display)',
-          fontSize: 'clamp(32px, 5vw, 48px)',
-          fontWeight: 700,
-          letterSpacing: '-0.03em',
-          lineHeight: 1.05,
-          margin: 0,
-          marginBottom: '6px'
-        }}
-      >
-        Hoy en EKKO
-      </h1>
-      <p style={{ fontSize: '14px', color: 'var(--ek-ink-muted)', margin: 0, marginBottom: '36px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-        {saludo.texto}{nombre ? `, ${nombre}` : ''}
-        <SaludoIcon size={15} aria-hidden="true" />
-      </p>
+      <BienvenidaPanel nombre={usuario?.nombre} rol={usuario?.rol} avatarUrl={usuario?.avatar_url} resumen={resumen.texto} urgente={resumen.urgente} />
 
       {usuario && (
         <ActivarAvisosPush

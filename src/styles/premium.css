@@ -135,3 +135,56 @@
   .ek-aurora i { animation: none !important; }
   .ek-grad { animation: none !important; color: var(--ek-mustard); background: none; -webkit-text-fill-color: initial; }
 }
+
+/* ── Bienvenida del panel (admin y recepción), patrón Renovacell/Fukuroll ──── */
+.ek-hello {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  margin-bottom: 20px;
+  padding: 22px 24px;
+  border-radius: var(--ek-r-card);
+  border: 1px solid var(--ek-line-strong);
+  background: radial-gradient(120% 150% at 100% 0%, rgba(229, 184, 41, 0.26), transparent 58%), var(--ek-chrome-grad);
+  box-shadow: var(--ek-shadow-card);
+  color: var(--ek-ink);
+}
+.ek-hello-av {
+  width: 52px;
+  height: 52px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  object-fit: cover;
+  background: linear-gradient(150deg, var(--ek-mustard), var(--ek-mustard-active));
+  color: var(--ek-bg);
+  font-family: var(--ek-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 8px 20px var(--ek-mustard-glow);
+}
+.ek-hello-t { min-width: 0; flex: 1; }
+.ek-hello-kicker { color: var(--ek-ink-muted); }
+.ek-hello-h {
+  margin: 6px 0 0;
+  font-family: var(--ek-font-display);
+  font-size: clamp(24px, 3vw, 30px);
+  line-height: 1.12;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+.ek-hello-p { margin: 6px 0 0; font-size: 14px; line-height: 1.45; color: var(--ek-ink-muted); }
+.ek-hello--urgente .ek-hello-p { color: var(--ek-mustard); font-weight: 600; }
+.ek-hello-extra { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+@media (max-width: 640px) {
+  .ek-hello { padding: 18px 16px; gap: 12px; }
+  .ek-hello-av { width: 44px; height: 44px; font-size: 17px; }
+  .ek-hello-h { font-size: 22px; }
+}
