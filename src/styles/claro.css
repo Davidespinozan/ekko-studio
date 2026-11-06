@@ -52,7 +52,9 @@
 .ek-claro .ek-header-glass,
 .ek-claro .adm-topbar-mobile,
 .ek-claro .ek-bottom-nav,
-.ek-claro .ek-hello {
+.ek-claro .ek-hello,
+.ek-claro .ek-hero-foto,
+.ek-claro .ek-estudio-tarjeta {
   --ek-bg-soft:      #101012;
   --ek-bg-elevated:  #202024;
   --ek-ink:          #EDEDEA;
@@ -121,3 +123,12 @@
 /* El difuminado de las filas que se desplazan termina en el lienzo, no en negro */
 .ek-claro .ek-hscroll-fade::after { background: linear-gradient(to right, rgba(243, 240, 233, 0), #F3F0E9); }
 .ek-claro .ek-dia:not(.ek-dia--activo) { background: #FFFFFF; }
+
+/* Sobre fotos (héroe de Inicio y Reservar) el botón secundario sigue siendo de vidrio. */
+.ek-claro .ek-hero-foto-body .ek-cta:not(.ek-cta--gold) {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  box-shadow: none;
+  backdrop-filter: blur(6px);
+}
