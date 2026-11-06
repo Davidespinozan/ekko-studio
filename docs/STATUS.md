@@ -4,12 +4,28 @@ Foto de conveniencia, no evidencia. Si contradice a producción, git, las
 migraciones o las pruebas, manda la realidad: repórtalo y corrige este archivo.
 Solo se actualiza después de VERIFICAR la transición (ver "Reglas" abajo).
 
-Última actualización: 2026-10-06 · PKG-06F cerrado en producción (agregados en el
-servidor; FR-62, FR-63). REMEDIACIÓN CANÓNICA: 0 hallazgos de implementación abiertos y
-0 paquetes pendientes. Antes: PKG-06E (ciclo de vida del material). Todo lo de
-abajo se verificó en vivo contra git, Netlify y Supabase.
+Última actualización: 2026-11-06 · Rediseño premium fases 1–3 (landing, acceso,
+pulido del miembro), pantalla de carga con isotipo y Planes STRYV (EKKO-149) DEPLOYED y
+VERIFICADOS EN PRODUCCIÓN. Antes: PKG-06F (agregados en el servidor). REMEDIACIÓN
+CANÓNICA sin cambios: 0 hallazgos abiertos.
 
-## Producción (verificado 2026-10-06 21:40 UTC)
+## Producción (verificado 2026-11-06 03:35 UTC)
+- Código publicado: `83b44220e1aacc6b2eaa362d54fa92256a54c2e4` ("feat(miembro): pulido
+  premium (fase 3)"), cadena `aff6e42` (Planes STRYV, EKKO-149) → `33a9a87` (landing
+  fase 1) → `acc5f2b` (acceso fase 2) → `7eb6442` (pantalla de carga) → `83b4422`.
+  Netlify deploys `6aed46532ba5f4ac90dab61b` (33a9a87, 03:17:40 UTC) y
+  `6aed49d21073299859a3ea08` (83b4422, READY, production, 03:32:40 UTC). Sin
+  migración: ninguno toca la base. Sondas: sitio 200; `stryv-care` sin token → 401;
+  `/loader.css` 200 y el splash en `index.html`; los bundles traen la nav flotante, la
+  cinta, "Operado por STRYV", "Ver mis planes STRYV", el acceso partido
+  (`ek-acceso-brand`) y la app del miembro (`ek-member`).
+  Pendientes del dueño (no bloqueantes): precio de STRYV Care ($2,500 por defecto vs
+  $4,000 "regular" de Renovacell; `STRYV_CARE_CENTAVOS`) y si recepción ve el enlace
+  "Operado por STRYV". Residual de pruebas: `ekko138-pausa-comercial.db.test.ts` caso
+  5b falló una vez en un gate con la máquina cargada (13.8) y pasa aislado y en los
+  gates en reposo; intermitente, sin tocar. En local (sin commit): fase 4, inicio del
+  miembro a dos columnas en escritorio.
+- Estado anterior (PKG-06F, 2026-10-06), que sigue siendo la base de negocio:
 - Código de negocio publicado: `dba3e9aebfb733c3d61d68b94e90674f4a8b2ca6`
   ("fix(scale): move authoritative aggregates server-side", PKG-06F); el commit docs-only
   de este archivo va encima (ver `git log`). Cadena:
